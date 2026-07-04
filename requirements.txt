@@ -1,0 +1,12 @@
+torch
+natsort
+huggingface_hub
+datasets
+transformers==4.51.0
+wandb
+torchdata 
+jsonargparse 
+lm_eval[math]
+matplotlib
+seaborn
+git+https://github.com/mcleish7/Muon.git

@@ -1,0 +1,17 @@
+#### Figure 2 -- 64 x 4 gpus
+# init from scratch
+python train.py --epochs=1 --max_length=1024 --out_path=huginn_llama --optim_config.lr=5e-5 --model_name="smcleish/Recurrent-Llama-3.2-2-4-2-untrained" --preprocessed_data_path="$PROCESSED_DATA_PATH/smcleish/Recurrent-Llama-3.2-2-4-2-untrained/llama_1b_packed_350b_sample_wrapped_packing/dataset" --scheduler_args.cooldown=0.0 --scheduler_args.warmup=0.00008 --max_grad_norm=1.0 --micro_batch_size=8 --batch_size=16 --compile=false --init_from_scratch=true --save_n_mins_before_timeout=10 --no_amp=false --save_interval=1000 --is_parquet_dataset=true --parquet_dataset_max_tokens=250_000_000_000
+
+# llama 2,4,2 init
+python train.py --epochs=1 --max_length=1024 --out_path=huginn_llama --optim_config.lr=5e-5 --model_name="smcleish/Recurrent-Llama-3.2-2-4-2-untrained" --preprocessed_data_path="$PROCESSED_DATA_PATH/smcleish/Recurrent-Llama-3.2-2-4-2-untrained/llama_1b_packed_350b_sample_wrapped_packing/dataset" --scheduler_args.cooldown=0.0 --scheduler_args.warmup=0.00008 --max_grad_norm=1.0 --micro_batch_size=8 --batch_size=16 --compile=false --save_n_mins_before_timeout=10 --no_amp=false --save_interval=1000 --is_parquet_dataset=true --parquet_dataset_max_tokens=250_000_000_000
+
+#### Figure 3 -- 1 x 4 gpus
+# llama 2,4,2 init, `mean_recurrence_schedule` args control the curriculum period
+python train.py --epochs=1 --max_length=1024 --out_path=huginn_llama --optim_config.lr=5e-5 --model_name="smcleish/Recurrent-Llama-3.2-2-4-2-untrained" --preprocessed_data_path="$PROCESSED_DATA_PATH/smcleish/Recurrent-Llama-3.2-2-4-2-untrained/llama_1b_packed_350b_sample_wrapped_packing/dataset" --scheduler_args.cooldown=0.0 --scheduler_args.warmup=0.005 --max_grad_norm=1.0 --micro_batch_size=8 --batch_size=128 --compile=false --no_amp=false --is_parquet_dataset=true --max_steps=25000 --mean_recurrence_schedule.turn_on=true --mean_recurrence_schedule.warmup=0.125 --save_interval=1000 --save_n_mins_before_timeout=5
+
+#### Figure 7 -- 16 x 4 gpus
+# llama 4,6,4 init, `mean_recurrence_schedule.max_mean_rec=YOUR_MAX_MEAN`
+python train.py --epochs=1 --max_length=1024 --out_path=huginn_llama --optim_config.lr=5e-5 --model_name="smcleish/Recurrent-Llama-3.2-untrained" --preprocessed_data_path="$PROCESSED_DATA_PATH/smcleish/Recurrent-Llama-3.2-2-4-2-untrained/llama_1b_packed_nemotron_cc_math_v1_4plus_wrapped_packing/dataset" --is_parquet_dataset=true --scheduler_args.cooldown=0.6 --scheduler_args.warmup=0.0025 --max_grad_norm=1.0 --micro_batch_size=8 --batch_size=16 --no_amp=false --max_steps=50000 --compile=false --save_interval=1000 --save_n_mins_before_timeout=5 --mean_recurrence_schedule.turn_on=true --mean_recurrence_schedule.warmup=0.75 --mean_recurrence_schedule.warmup_type="1-sqrt" --mean_recurrence_schedule.max_mean_rec=4 --muon.use_muon=true --muon.lr=0.001
+
+# llama non-recurrent
+python train.py --epochs=1 --max_length=1024 --out_path=huginn_llama --optim_config.lr=5e-5 --model_name="models/Llama-3.2-1B-untied" --preprocessed_data_path="$PROCESSED_DATA_PATH/smcleish/Recurrent-Llama-3.2-2-4-2-untrained/llama_1b_packed_nemotron_cc_math_v1_4plus_wrapped_packing/dataset" --is_parquet_dataset=true --scheduler_args.cooldown=0.6 --scheduler_args.warmup=0.0025 --max_grad_norm=1.0 --micro_batch_size=8 --batch_size=16 --no_amp=false --max_steps=50000 --compile=false --non_recurrent_model=true --save_interval=1000 --save_n_mins_before_timeout=5 --muon.use_muon=true --muon.lr=0.001

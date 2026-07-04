@@ -1,0 +1,10 @@
+models/*
+datasets/
+outputs*/
+
+*.pyc
+*.out
+*.core
+inductor_cache/
+huginn_llama/
+convert_pretrained_model/models/
