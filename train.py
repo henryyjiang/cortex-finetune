@@ -369,7 +369,11 @@ def startup(cfg: CLISettings):
         # all-reduce path engages (those key off the local `distributed` var).
         if cfg.muon["use_muon"] and not torch.distributed.is_initialized():
             os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
-            os.environ.setdefault("MASTER_PORT", "29500")
+            # Derive a per-job port from SLURM_JOB_ID: gpu-a100 nodes are shared,
+            # so co-located single-GPU arms would otherwise all bind the same
+            # hardcoded TCPStore port and collide (EADDRINUSE).
+            default_port = 20000 + int(os.getenv("SLURM_JOB_ID", "0")) % 40000
+            os.environ.setdefault("MASTER_PORT", str(default_port))
             torch.distributed.init_process_group(
                 backend="nccl", rank=0, world_size=1, device_id=local_device,
             )
