@@ -288,7 +288,11 @@ def get_unwrapped_model(state):
     if isinstance(state, dict):
         return state["model"].module if state["distributed"] else state["model"]
     else:
-        return state.module if torch.distributed.is_initialized() else state
+        # Detect the wrapper structurally (DDP `.module` / compile `_orig_mod`)
+        # rather than using is_initialized() as a DDP proxy: single-GPU Muon
+        # runs now form a 1-process group, so is_initialized() is True even
+        # though the model is unwrapped.
+        return get_unwrapped_model_from_module(state)
 
 
 ####################################################################################################
