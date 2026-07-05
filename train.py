@@ -356,6 +356,19 @@ def startup(cfg: CLISettings):
     else:
         world_size = 1
         distributed = False
+        # The host MuonWithAuxAdam (pip `muon`, Keller Jordan's distributed
+        # optimizer) calls dist.get_world_size() inside .step(); on a single-GPU
+        # run torch.distributed is otherwise never initialized, so it raises
+        # "Default process group has not been initialized".  Form a trivial
+        # 1-process NCCL group so Muon runs at world_size=1.  `distributed`
+        # stays False, so no DDP wrap / DistributedSampler / no_sync / metric
+        # all-reduce path engages (those key off the local `distributed` var).
+        if cfg.muon["use_muon"] and not torch.distributed.is_initialized():
+            os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+            os.environ.setdefault("MASTER_PORT", "29500")
+            torch.distributed.init_process_group(
+                backend="nccl", rank=0, world_size=1, device_id=local_device,
+            )
 
     weight_dtype = torch.float32
     if cfg.bf16_true:
