@@ -20,6 +20,7 @@ cd "$REPO"
 # pip install accelerate safetensors     # from_pretrained init path
 
 # ── 1. HF cache on scratch (home quota is small; ~11 GB PG-19 + 5 GB ckpt) ──
+export SCRATCH=${SCRATCH:-$HOME/scratch}   # not set by default on PACE Phoenix
 export HF_HOME=$SCRATCH/hf_cache
 mkdir -p "$HF_HOME"
 echo "HF_HOME=$HF_HOME  (job scripts export the same path + HF_HUB_OFFLINE=1)"

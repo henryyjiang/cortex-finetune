@@ -25,6 +25,7 @@ module load anaconda3
 module load cuda/12.1.1
 conda activate cortex-retro
 
+export SCRATCH=${SCRATCH:-$HOME/scratch}   # not set by default on PACE Phoenix
 export HF_HOME=$SCRATCH/hf_cache
 export HF_HUB_OFFLINE=1
 export WANDB_DIR=$SCRATCH
@@ -42,7 +43,7 @@ python train.py \
     --preprocessed_data_path data/pg19_olmo_len4096 \
     --max_length 4096 \
     --epochs 1 \
-    --micro_batch_size 2 \
+    --micro_batch_size 1 \
     --batch_size 16 \
     --optim_config.lr 1e-4 \
     --muon.use_muon true \

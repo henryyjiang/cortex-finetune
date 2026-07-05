@@ -37,7 +37,7 @@ def main() -> int:
     ap.add_argument("--tokenizer", required=True,
                     help="tokenizer source — use the graft-prepared model dir")
     ap.add_argument("--out", required=True, help="output dataset dir (save_to_disk)")
-    ap.add_argument("--dataset", default="deepmind/pg19")
+    ap.add_argument("--dataset", default="emozilla/pg19")  # complete parquet mirror; the deepmind original is script-based (datasets>=3.x refuses)
     ap.add_argument("--split", default="train")
     ap.add_argument("--text_col", default="text")
     ap.add_argument("--max_length", type=int, default=4096,
