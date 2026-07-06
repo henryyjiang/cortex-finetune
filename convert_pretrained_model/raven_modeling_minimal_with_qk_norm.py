@@ -1555,7 +1555,11 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
 
     def get_stats(self, logits, x, latent_states, xk, input_embeds, num_steps_no_grad, num_steps_with_grad):
         probs = torch.softmax(logits.float(), dim=-1)
-        prob_entropy = torch.where(probs > 0, -probs * probs.log(), 0).sum(dim=-1)
+        # NB: torch.where evaluates BOTH branches, so `probs.log()` still runs on
+        # the probs==0 entries (log(0) = -inf), and 0 * -inf = nan feeds the
+        # backward even though where() masks it in the forward.  Clamp the log
+        # argument instead so entropy is finite and grad-safe.
+        prob_entropy = -(probs * probs.clamp_min(1e-12).log()).sum(dim=-1)
         residual_diff = (x - latent_states).norm(dim=-1)
         rel_residual = residual_diff / latent_states.norm(dim=-1)
         stats = {

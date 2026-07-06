@@ -77,6 +77,13 @@ class CLISettings:
     init_from_scratch: bool = False
     take_loss_over_all_tokens: bool = False # for chat templated datasets default is to only supervise assistant tokens
     max_grad_norm: float = 1.0
+    # Abort after this many CONSECUTIVE non-finite (nan/inf) optimizer updates.
+    # Each such update is skipped (weights untouched) rather than applied — nan
+    # grads survive grad-clipping (nan * coef = nan) and would otherwise poison
+    # the weights permanently.  A run that is nan from step 1 fails fast here
+    # instead of burning hours training on garbage; transient bf16 overflow in
+    # the deep recurrent unroll is skipped and training continues.
+    max_nonfinite_skips: int = 20
     bf16_true: bool = False
     compile_warmup_routine: bool = False
     no_amp: bool = True
@@ -944,13 +951,22 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
     total_tokens_with_loss = 0
     tokens_in_step = 0
     k_mean_tracker = [0,0]
+    consecutive_nonfinite = 0   # run-abort guard: see max_nonfinite_skips
     elapsed_time = 0.0
 
     output_details = {
         "return_logits": False,
         "return_latents": False,
         "return_head": False,
-        "return_stats": True,
+        # get_stats() runs softmax + log over the full [B, T, vocab] logits every
+        # forward — an ~0.8-1.2 GB transient on an OLMo-size vocab, on top of the
+        # fp32 logits already held for the loss.  That transient is what tipped
+        # the loop-touching rungs (1b/2/3) over the 80 GB ceiling (they OOM'd
+        # 20-392 MB short), and its `prob_entropy = ... probs.log()` amplifies
+        # nan.  It is diagnostic-only (nothing in the wandb log reads it — the
+        # num_steps counters below are taken straight from the sampler), so keep
+        # it OFF during training.  Flip to True only for one-off inspection.
+        "return_stats": False,
     }
 
     metrics_to_agg_data_step = {
@@ -1009,7 +1025,10 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         outputs = model(input_ids, labels=labels, num_steps=num_steps, output_details=output_details)
 
                     (outputs["loss"] / accumulation_steps).backward()
-                    return outputs["loss"].detach(), outputs["log_ppl"].detach(), outputs["stats"]["num_steps_no_grad"], outputs["stats"]["num_steps_with_grad"]
+                    # num_steps = [n_no_grad, n_with_grad] — the same tensor the
+                    # model unpacks in iterate_forward — so read the counts from
+                    # it directly rather than from output_details stats (now off).
+                    return outputs["loss"].detach(), outputs["log_ppl"].detach(), int(num_steps[0]), int(num_steps[1])
             
             def non_rec_fwd_bwd(model, input_ids, labels):
                 with model.no_sync() if is_accumulating and state["distributed"] else nullcontext():
@@ -1051,7 +1070,9 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         # ccot_direct=False) the model omits the m_cross field,
                         # so bracket-indexing would KeyError — carry None instead.
                         m_cross = out.get("m_cross")             # carried, un-detached
-                        n_ng, n_wg = out["stats"]["num_steps_no_grad"], out["stats"]["num_steps_with_grad"]
+                        # counts from the sampler tensor (stats dict now off — see
+                        # output_details); matches what iterate_forward unpacked.
+                        n_ng, n_wg = int(num_steps[0]), int(num_steps[1])
                         if (yc != -100).any():                  # skip fully-masked chunks
                             chunk_losses.append(out["loss"])
                     if not chunk_losses:
@@ -1114,7 +1135,33 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     norm_type=2.0,
                 ).item()
                 grad_clip_coef = min(1.0, float(cfg.max_grad_norm) / (total_norm + 1e-12))
-                optimizer.step()
+
+                # Non-finite guard.  clip_grad_norm_ returns a nan/inf total_norm
+                # whenever ANY grad is nan/inf (nan loss -> nan grads, or bf16
+                # overflow in the deep recurrent unroll -> inf grads).  Applying
+                # such grads is unrecoverable: grad clipping does not sanitize nan
+                # (nan * coef = nan), so a single bad step poisons every weight
+                # for the rest of the run (the 500-step all-nan rung-2 failure).
+                # Skip the update entirely instead; count consecutive skips so a
+                # run that is nan/inf from step 1 aborts fast, while a transient
+                # overflow is dropped and training carries on.
+                if math.isfinite(total_norm):
+                    optimizer.step()
+                    consecutive_nonfinite = 0
+                else:
+                    consecutive_nonfinite += 1
+                    if is_main_process():
+                        print(f"[guard] step {optimizer_step + 1}: non-finite grad-norm "
+                              f"({total_norm}) — update SKIPPED "
+                              f"({consecutive_nonfinite}/{cfg.max_nonfinite_skips})")
+                    if consecutive_nonfinite >= cfg.max_nonfinite_skips:
+                        raise RuntimeError(
+                            f"Aborting: {consecutive_nonfinite} consecutive non-finite "
+                            f"updates (last grad-norm={total_norm}). The recurrent unroll "
+                            f"is diverging (bf16 overflow / nan) — lower the loop LR, "
+                            f"reduce mean_backprop_depth, or keep the m_cross carry + "
+                            f"logits in fp32."
+                        )
 
                 optimizer.zero_grad(set_to_none=True)
                 state["scheduler"].step()
