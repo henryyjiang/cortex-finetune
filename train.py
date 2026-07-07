@@ -84,6 +84,15 @@ class CLISettings:
     # instead of burning hours training on garbage; transient bf16 overflow in
     # the deep recurrent unroll is skipped and training continues.
     max_nonfinite_skips: int = 20
+    # Override the checkpoint's recurrence depths for the num_steps sampler (0 =
+    # use model_config).  override_mean_backprop_depth shortens the TBPTT window
+    # (fewer grad steps retained) — the lever for the step-500 unfreeze OOM: once
+    # the loop is trainable, activations are retained across num_steps_with_grad ×
+    # cross_chunks, and lowering the grad depth cuts that memory (and tames the
+    # BPTT gradient).  Forward compute (mean_recurrence) is unchanged — the
+    # no-grad prefix grows to keep total recurrence constant.
+    override_mean_backprop_depth: int = 0
+    override_mean_recurrence: int = 0
     # Debug: register forward hooks that report the FIRST module to emit a
     # non-finite output from finite inputs (i.e. the op that births the nan/inf),
     # and run fwd+bwd under torch.autograd.set_detect_anomaly to localize the
@@ -1080,6 +1089,19 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
     world_size = torch.distributed.get_world_size() if torch.distributed.is_initialized() else 1
 
     model_config = get_unwrapped_model(model).config
+    # Apply recurrence-depth overrides in one place so the sampler, scheduler and
+    # logging all see them.  Mutating model_config only affects the sampled
+    # num_steps (the forward reads num_steps, not these fields directly).
+    if cfg.override_mean_backprop_depth > 0:
+        if is_main_process():
+            print(f"[cortex] override mean_backprop_depth {model_config.mean_backprop_depth}"
+                  f" -> {cfg.override_mean_backprop_depth} (shorter TBPTT window)")
+        model_config.mean_backprop_depth = cfg.override_mean_backprop_depth
+    if cfg.override_mean_recurrence > 0:
+        if is_main_process():
+            print(f"[cortex] override mean_recurrence {model_config.mean_recurrence}"
+                  f" -> {cfg.override_mean_recurrence}")
+        model_config.mean_recurrence = cfg.override_mean_recurrence
     if cfg.mean_recurrence_schedule["turn_on"] or cfg.mean_backprop_depth_schedule["turn_on"]:
         num_steps_sampler_partial, new_mean_rec, new_backprop_depth = sheduler_n_k_handler(state, cfg, model_config)
     elif cfg.non_recurrent_model:
