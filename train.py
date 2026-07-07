@@ -375,6 +375,44 @@ def install_nan_localizer(model):
     return flag
 
 
+def reset_cortex_graft_init(model):
+    """Re-apply the cortex graft's DESIGNED initializations after from_pretrained.
+
+    RavenForCausalLM.__init__ builds CortexMemory — which eye_/zeros_-inits its
+    projections (h_T_proj, out_proj, in_proj, state_proj) so the memory read is a
+    no-op and step-0 == the base model — and THEN calls post_init().  HF's
+    _init_weights treats every cortex tensor as a freshly-'missing' key (see the
+    "newly initialized: ['cortex.h_T_proj.weight', ...]" load warning) and
+    re-initializes it, CLOBBERING those designed values.  Consequences:
+      * h_T_proj's clobbered draw can produce non-finite output from finite input
+        — the confirmed source of the rung2/rung3 forward-nan (localized to
+        module 'cortex.h_T_proj').
+      * the zero-init read paths (out_proj/in_proj) become random, so the memory
+        injection is NOT zero at step 0 — silently breaking step-0 == base.
+    Restore them on the live model here.  Mirrors the designed inits in
+    cortex_graft.CortexMemory / cortex_memory.buffers (LSTMBuffer, DirectCCoT);
+    kept in sync with those.  LoRA A/B are bare Parameters that _init_weights
+    does not touch (B stays zero), so they are intentionally left alone."""
+    cortex = getattr(get_unwrapped_model_from_module(model), "cortex", None)
+    if cortex is None:
+        return
+    fixed = []
+    if getattr(cortex, "h_T_proj", None) is not None:
+        torch.nn.init.eye_(cortex.h_T_proj.weight); fixed.append("h_T_proj=eye")
+    for buf_name in ("m_cross", "m_iter"):                     # LSTMBuffer
+        buf = getattr(cortex, buf_name, None)
+        if buf is None:
+            continue
+        torch.nn.init.zeros_(buf.out_proj.weight); fixed.append(f"{buf_name}.out_proj=0")
+        torch.nn.init.normal_(buf.slot_emb, std=0.02); fixed.append(f"{buf_name}.slot_emb~N(0,.02)")
+    ccot = getattr(cortex, "ccot_direct", None)                # DirectCCoT (K=0)
+    if ccot is not None:
+        torch.nn.init.eye_(ccot.state_proj.weight); fixed.append("ccot.state_proj=eye")
+        torch.nn.init.zeros_(ccot.in_proj.weight); fixed.append("ccot.in_proj=0")
+    if is_main_process():
+        print(f"[cortex] restored designed graft inits clobbered by post_init: {fixed}")
+
+
 def get_unwrapped_model_from_module(model):
     """Unwrap DDP / torch.compile to reach named_parameters with stable names."""
     m = model
@@ -490,6 +528,13 @@ def startup(cfg: CLISettings):
             "grafted modeling file predates the LoRA graft. Re-run "
             "tools/prepare_cortex_checkpoint.py to refresh the model dir."
         )
+
+    # cortex: undo post_init's clobbering of the graft's designed inits (must run
+    # AFTER from_pretrained, BEFORE the L2-SP snapshot / freeze / optimizer build
+    # so the anchor + optimizer see the intended weights).  Skipped on --resume
+    # (a resumed checkpoint carries the trained cortex weights, not fresh ones).
+    if cfg.cortex["use_memory"] and cfg.resume_path is None:
+        reset_cortex_graft_init(model)
 
     tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
     if tokenizer.pad_token is None:
