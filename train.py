@@ -376,26 +376,34 @@ def install_nan_localizer(model):
 
 
 def reset_cortex_graft_init(model):
-    """Re-apply the cortex graft's DESIGNED initializations after from_pretrained.
+    """Undo post_init's clobbering of the cortex graft's initialization, on the
+    live model after from_pretrained.
 
-    RavenForCausalLM.__init__ builds CortexMemory — which eye_/zeros_-inits its
-    projections (h_T_proj, out_proj, in_proj, state_proj) so the memory read is a
-    no-op and step-0 == the base model — and THEN calls post_init().  HF's
-    _init_weights treats every cortex tensor as a freshly-'missing' key (see the
-    "newly initialized: ['cortex.h_T_proj.weight', ...]" load warning) and
-    re-initializes it, CLOBBERING those designed values.  Consequences:
-      * h_T_proj's clobbered draw can produce non-finite output from finite input
-        — the confirmed source of the rung2/rung3 forward-nan (localized to
-        module 'cortex.h_T_proj').
-      * the zero-init read paths (out_proj/in_proj) become random, so the memory
-        injection is NOT zero at step 0 — silently breaking step-0 == base.
-    Restore them on the live model here.  Mirrors the designed inits in
-    cortex_graft.CortexMemory / cortex_memory.buffers (LSTMBuffer, DirectCCoT);
-    kept in sync with those.  LoRA A/B are bare Parameters that _init_weights
-    does not touch (B stays zero), so they are intentionally left alone."""
+    RavenForCausalLM.__init__ builds CortexMemory (designed inits so the memory
+    read is a no-op and step-0 == the base model) and THEN calls post_init().
+    HF's _init_weights treats every cortex tensor as a freshly-'missing' key (the
+    "newly initialized: ['cortex.h_T_proj.weight', 'cortex.m_cross.cand_ln1.bias',
+    ...]" load warning) and re-initializes it with the raven DEPTH-SCALED scheme.
+    The graft modules have no valid layer index, so that scheme hands them an
+    effectively-infinite std -> NON-FINITE weights.  That is the confirmed
+    forward-nan source, and it hits EVERY cortex op in turn (localizer found
+    h_T_proj first, then m_cross.cand_ln1, ...), so restoring hand-picked tensors
+    is whack-a-mole.  Instead reset the WHOLE cortex subtree:
+      (1) every submodule back to its nn default (Linear->kaiming, LayerNorm->
+          weight 1/bias 0) — finite, in place, dtype/device preserved;
+      (2) re-apply the few explicit designed inits the graft sets by hand.
+    Mirrors cortex_graft.CortexMemory + cortex_memory.buffers; skipped on
+    --resume (a resumed ckpt carries trained, not fresh, cortex weights).  LoRA
+    A/B are bare Parameters _init_weights never touches (B stays 0), left alone."""
     cortex = getattr(get_unwrapped_model_from_module(model), "cortex", None)
     if cortex is None:
         return
+    # (1) undo the non-finite clobber: nn defaults for every submodule.
+    n_reset = 0
+    for m in cortex.modules():
+        if m is not cortex and callable(getattr(m, "reset_parameters", None)):
+            m.reset_parameters(); n_reset += 1
+    # (2) re-apply the graft's explicit designed inits (mirror the source).
     fixed = []
     if getattr(cortex, "h_T_proj", None) is not None:
         torch.nn.init.eye_(cortex.h_T_proj.weight); fixed.append("h_T_proj=eye")
@@ -403,14 +411,24 @@ def reset_cortex_graft_init(model):
         buf = getattr(cortex, buf_name, None)
         if buf is None:
             continue
-        torch.nn.init.zeros_(buf.out_proj.weight); fixed.append(f"{buf_name}.out_proj=0")
-        torch.nn.init.normal_(buf.slot_emb, std=0.02); fixed.append(f"{buf_name}.slot_emb~N(0,.02)")
+        torch.nn.init.zeros_(buf.out_proj.weight)              # read starts at 0
+        torch.nn.init.normal_(buf.slot_emb, std=0.02)
+        torch.nn.init.ones_(buf.forget_bias)                  # LM2 §3.3 forget bias +1
+        torch.nn.init.zeros_(buf.input_bias)
+        fixed.append(f"{buf_name}.[out_proj=0,slot_emb~N,forget_bias=1,input_bias=0]")
     ccot = getattr(cortex, "ccot_direct", None)                # DirectCCoT (K=0)
     if ccot is not None:
         torch.nn.init.eye_(ccot.state_proj.weight); fixed.append("ccot.state_proj=eye")
         torch.nn.init.zeros_(ccot.in_proj.weight); fixed.append("ccot.in_proj=0")
+    # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
+    #     some module lacked reset_parameters and slipped through.
+    bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]
     if is_main_process():
-        print(f"[cortex] restored designed graft inits clobbered by post_init: {fixed}")
+        print(f"[cortex] reset {n_reset} cortex submodules to nn defaults + "
+              f"re-applied designed inits {fixed} (undo post_init clobber)")
+        if bad:
+            print(f"[cortex] WARNING: {len(bad)} cortex params STILL non-finite "
+                  f"after reset (no reset_parameters?): {bad[:12]}")
 
 
 def get_unwrapped_model_from_module(model):
