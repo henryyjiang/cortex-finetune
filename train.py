@@ -1240,6 +1240,24 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     wandb_lr_log  = {"train/lr_recur": lrs[0], "train/lr_nonrecur": lrs[0]}
 
 
+                # Per-tensor grad norms + max|g|, captured BEFORE clip_grad_norm_
+                # and in fp64.  Both details are load-bearing for the guard's
+                # diagnostic below: (a) on a non-finite total norm the clip coef
+                # is 0 and clip_grad_norm_ zeroes every grad IN PLACE, so anything
+                # read after it is all-zeros and names nothing; (b) the rung1b
+                # failure is finite-but-huge grads (~1e16+) whose fp32
+                # sum-of-squares overflows — fp32 norms would print inf for the
+                # offender AND the total, pointing nowhere.  Kept as GPU tensors
+                # (no sync) unless the guard actually fires.
+                _named_grads = [(n, p.grad.detach())
+                                for n, p in get_unwrapped_model_from_module(model).named_parameters()
+                                if p.grad is not None]
+                if _named_grads:
+                    _pre_clip_norms = torch.stack(
+                        [torch.linalg.vector_norm(g, dtype=torch.float64) for _, g in _named_grads])
+                    _pre_clip_maxes = torch.stack(
+                        [g.abs().amax().to(torch.float64) for _, g in _named_grads])
+
                 total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(),
                     max_norm=cfg.max_grad_norm,
@@ -1265,24 +1283,17 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         print(f"[guard] step {optimizer_step + 1}: non-finite grad-norm "
                               f"({total_norm}) — update SKIPPED "
                               f"({consecutive_nonfinite}/{cfg.max_nonfinite_skips})")
-                        # Name the offenders.  Per-tensor norms in fp64: a
-                        # finite-but-huge grad (~1e19, the rung1b signature)
-                        # overflows a fp32 sum-of-squares, so fp32 would print
-                        # inf for every tensor and point nowhere — and an
-                        # isfinite-elements check alone finds nothing at all.
-                        per_param = []
-                        for n, p in get_unwrapped_model_from_module(model).named_parameters():
-                            if p.grad is not None:
-                                g = p.grad.detach()
-                                per_param.append(
-                                    (n, g.double().norm().item(), bool(torch.isfinite(g).all()))
-                                )
-                        per_param.sort(key=lambda t: -t[1])
-                        n_bad = sum(1 for _, _, ok in per_param if not ok)
-                        print(f"[guard] {n_bad} grad tensors contain nan/inf elements; "
-                              f"top-8 by fp64 grad-norm:")
-                        for n, gn, ok in per_param[:8]:
-                            print(f"[guard]   {gn:11.3e}{'  (has nan/inf)' if not ok else ''}  {n}")
+                        # Name the offenders from the PRE-CLIP fp64 stats.
+                        if _named_grads:
+                            norms = _pre_clip_norms.tolist()
+                            maxes = _pre_clip_maxes.tolist()
+                            order = sorted(range(len(norms)), key=lambda i: -norms[i])
+                            n_bad = sum(1 for v in norms if not math.isfinite(v))
+                            print(f"[guard] {n_bad} tensors with non-finite pre-clip "
+                                  f"fp64 norm; top-8 by pre-clip grad norm:")
+                            for i in order[:8]:
+                                print(f"[guard]   norm={norms[i]:11.3e} "
+                                      f"max|g|={maxes[i]:9.3e}  {_named_grads[i][0]}")
                     if consecutive_nonfinite >= cfg.max_nonfinite_skips:
                         raise RuntimeError(
                             f"Aborting: {consecutive_nonfinite} consecutive non-finite "
