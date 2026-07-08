@@ -34,7 +34,14 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 MEMORY_SLOTS=${MEMORY_SLOTS:-4}
 LORA_RANK=${LORA_RANK:-16}
 LORA_ALPHA=${LORA_ALPHA:-32}
-RUN_NAME=${RUN_NAME:-rung1b-k${MEMORY_SLOTS}-lora${LORA_RANK}}
+# BACKPROP_DEPTH>0 shortens the TBPTT window (0 = checkpoint's depth) — the
+# fallback lever if the LoRA grads genuinely explode through the unroll.
+# MAX_STEPS>0 caps optimizer steps (for cheap probes).  MEM_SNAPSHOT=true
+# records allocator history + dumps a memory_viz pickle on OOM.
+BACKPROP_DEPTH=${BACKPROP_DEPTH:-0}
+MAX_STEPS=${MAX_STEPS:-0}
+MEM_SNAPSHOT=${MEM_SNAPSHOT:-false}
+RUN_NAME=${RUN_NAME:-rung1b-k${MEMORY_SLOTS}-lora${LORA_RANK}-a${LORA_ALPHA}$([ "$BACKPROP_DEPTH" != "0" ] && echo "-bpd${BACKPROP_DEPTH}")}
 
 python train.py \
     --run_name $RUN_NAME \
@@ -60,4 +67,7 @@ python train.py \
     --cortex.lora_alpha $LORA_ALPHA \
     --cortex.cross_chunks 4 \
     --cortex.eos_from_tokens true \
-    --cortex.freeze_loop true
+    --cortex.freeze_loop true \
+    --override_mean_backprop_depth $BACKPROP_DEPTH \
+    --record_memory_snapshot $MEM_SNAPSHOT \
+    --max_steps $MAX_STEPS

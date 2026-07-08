@@ -1265,6 +1265,24 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         print(f"[guard] step {optimizer_step + 1}: non-finite grad-norm "
                               f"({total_norm}) — update SKIPPED "
                               f"({consecutive_nonfinite}/{cfg.max_nonfinite_skips})")
+                        # Name the offenders.  Per-tensor norms in fp64: a
+                        # finite-but-huge grad (~1e19, the rung1b signature)
+                        # overflows a fp32 sum-of-squares, so fp32 would print
+                        # inf for every tensor and point nowhere — and an
+                        # isfinite-elements check alone finds nothing at all.
+                        per_param = []
+                        for n, p in get_unwrapped_model_from_module(model).named_parameters():
+                            if p.grad is not None:
+                                g = p.grad.detach()
+                                per_param.append(
+                                    (n, g.double().norm().item(), bool(torch.isfinite(g).all()))
+                                )
+                        per_param.sort(key=lambda t: -t[1])
+                        n_bad = sum(1 for _, _, ok in per_param if not ok)
+                        print(f"[guard] {n_bad} grad tensors contain nan/inf elements; "
+                              f"top-8 by fp64 grad-norm:")
+                        for n, gn, ok in per_param[:8]:
+                            print(f"[guard]   {gn:11.3e}{'  (has nan/inf)' if not ok else ''}  {n}")
                     if consecutive_nonfinite >= cfg.max_nonfinite_skips:
                         raise RuntimeError(
                             f"Aborting: {consecutive_nonfinite} consecutive non-finite "
