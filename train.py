@@ -93,11 +93,14 @@ class CLISettings:
     # no-grad prefix grows to keep total recurrence constant.
     override_mean_backprop_depth: int = 0
     override_mean_recurrence: int = 0
-    # Debug: register forward hooks that report the FIRST module to emit a
-    # non-finite output from finite inputs (i.e. the op that births the nan/inf),
-    # and run fwd+bwd under torch.autograd.set_detect_anomaly to localize the
-    # backward.  Slow — use with --max_steps 2-3 for a quick locate, then off.
-    debug_nan: bool = False
+    # Record the CUDA allocator's alloc/free history and dump it to
+    # <out_path>/<run_name>-oom.pickle when a forward/backward OOMs (view at
+    # https://pytorch.org/memory_viz).  For the unfreeze memory probes: the
+    # snapshot attributes every live block to a stack trace, which is the
+    # difference between knowing THAT phase 2 doesn't fit and knowing WHERE
+    # the post-unfreeze delta lives.  Small runtime overhead — leave off for
+    # real runs.
+    record_memory_snapshot: bool = False
     bf16_true: bool = False
     compile_warmup_routine: bool = False
     no_amp: bool = True
@@ -349,39 +352,6 @@ def set_loop_trainable(model, trainable: bool) -> int:
             p.requires_grad_(trainable)
             n += 1
     return n
-
-
-def install_nan_localizer(model):
-    """Register forward hooks on every leaf module; the FIRST one that emits a
-    non-finite output while ALL its inputs were finite is the op that birthed the
-    nan/inf (propagated nan downstream is ignored).  Debug-only (cfg.debug_nan) —
-    the per-module .all() checks are too slow for a real run.  Pairs with
-    set_detect_anomaly (backward) in train()."""
-    target = get_unwrapped_model_from_module(model)
-    flag = {"reported": False}
-
-    def _finite(t):
-        return (not torch.is_tensor(t)) or torch.isfinite(t).all().item()
-
-    def hook(module, inputs, output):
-        if flag["reported"]:
-            return
-        outs = output if isinstance(output, (tuple, list)) else (output,)
-        out_bad = any(torch.is_tensor(o) and not torch.isfinite(o).all().item() for o in outs)
-        if out_bad and all(_finite(i) for i in inputs):
-            flag["reported"] = True
-            if is_main_process():
-                print(f"[nan-localizer] FIRST non-finite born in module "
-                      f"'{module._nan_name}' ({type(module).__name__}) — inputs "
-                      f"were finite, so this op produced the nan/inf.")
-
-    for name, m in target.named_modules():
-        if not list(m.children()):          # leaf modules only
-            m._nan_name = name
-            m.register_forward_hook(hook)
-    if is_main_process():
-        print("[nan-localizer] forward hooks installed (debug_nan=True — expect a slowdown)")
-    return flag
 
 
 def reset_cortex_graft_init(model):
@@ -1054,6 +1024,9 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
     model, optimizer = state["model"], state["optimizer"]
     model.train()
 
+    if cfg.record_memory_snapshot:
+        torch.cuda.memory._record_memory_history(max_entries=200_000)
+
     accumulation_steps = cfg.batch_size // cfg.micro_batch_size
     optimizer_step = optimizer_step
     step_time = time.monotonic()
@@ -1063,9 +1036,6 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
     k_mean_tracker = [0,0]
     consecutive_nonfinite = 0   # run-abort guard: see max_nonfinite_skips
     elapsed_time = 0.0
-
-    if cfg.debug_nan:
-        install_nan_localizer(model)
 
     output_details = {
         "return_logits": False,
@@ -1232,8 +1202,22 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 fwd_bwd_func = cortex_fwd_bwd
             else:
                 fwd_bwd_func = tightly_scoped_fwd_bwd
-            with torch.autograd.set_detect_anomaly(True) if cfg.debug_nan else nullcontext():
+            try:
                 loss, log_ppl, num_steps_no_grad, num_steps_with_grad = fwd_bwd_func(model, input_ids, labels)
+            except torch.OutOfMemoryError:
+                # Dump the allocator history BEFORE the empty_cache/teardown path
+                # runs, so the snapshot still holds the live blocks of the step
+                # that OOMed.  n/k and the unfreeze phase are in the filename —
+                # the two things that determine the activation footprint.
+                if cfg.record_memory_snapshot:
+                    snap = os.path.join(
+                        cfg.out_path,
+                        f"{cfg.run_name}-oom-upd{optimizer_step}-n{int(num_steps[0])}-k{int(num_steps[1])}.pickle",
+                    )
+                    torch.cuda.memory._dump_snapshot(snap)
+                    print(f"[oom] allocator snapshot written to {snap} — "
+                          f"open at https://pytorch.org/memory_viz")
+                raise
 
             # logging
             metrics_to_agg_data_step["loss"].append(loss.item())
@@ -1281,14 +1265,6 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         print(f"[guard] step {optimizer_step + 1}: non-finite grad-norm "
                               f"({total_norm}) — update SKIPPED "
                               f"({consecutive_nonfinite}/{cfg.max_nonfinite_skips})")
-                    if cfg.debug_nan and is_main_process():
-                        # Localize which params carry the non-finite grad (the
-                        # forward-hook + anomaly mode miss an inf GRADIENT, e.g.
-                        # rung1b's BPTT explosion through the in-loop LoRA).
-                        bad = [n for n, p in get_unwrapped_model_from_module(model).named_parameters()
-                               if p.grad is not None and not torch.isfinite(p.grad).all()]
-                        print(f"[nan-localizer] {len(bad)} param tensors have non-finite grads; "
-                              f"first offenders: {bad[:12]}")
                     if consecutive_nonfinite >= cfg.max_nonfinite_skips:
                         raise RuntimeError(
                             f"Aborting: {consecutive_nonfinite} consecutive non-finite "
@@ -1340,9 +1316,15 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 time_interval = time_taken / accumulation_steps
                 tok_sec = tokens_in_step / time_taken
                 elapsed_time += time_taken
+                # peak over THIS accumulation window (reset below) — makes the
+                # phase-1 -> phase-2 activation jump at the staged unfreeze
+                # readable straight off the log.
+                peak_gib = torch.cuda.max_memory_allocated(device) / 2**30
+                torch.cuda.reset_peak_memory_stats(device)
                 print(
                     f"GPU: {model.device} | Step: {data_step:4d} | Updates: {optimizer_step:4d} | Time/step: {time_interval:2.4f}"
                     f" | Tok/sec={tok_sec:9.2f} | Loss: {loss:2.4f} / log-ppl: {log_ppl:2.4f} | Grad-Norm {total_norm:2.4f} | ClipCoef {grad_clip_coef:1.4f}"
+                    f" | Peak-Mem {peak_gib:5.2f}GiB"
                 )
                 total_tokens += tokens_in_step
                 step_time = time.monotonic()
