@@ -101,6 +101,14 @@ class CLISettings:
     # the post-unfreeze delta lives.  Small runtime overhead — leave off for
     # real runs.
     record_memory_snapshot: bool = False
+    # Forward-nan localizer (rung1b debugging).  Hooks every leaf module and
+    # prints the FIRST one whose output is non-finite while its inputs were
+    # finite (the op that births the nan), plus the running max|input| of the
+    # loop adapter — i.e. the raw recurrent residual stream, which nothing
+    # normalizes before the loop linears and which the loss cannot see (every
+    # consumer RMS-norms, so the forward is scale-invariant).  Large sync
+    # overhead — debug runs only.
+    debug_nan: bool = False
     bf16_true: bool = False
     compile_warmup_routine: bool = False
     no_amp: bool = True
@@ -408,6 +416,58 @@ def reset_cortex_graft_init(model):
         if bad:
             print(f"[cortex] WARNING: {len(bad)} cortex params STILL non-finite "
                   f"after reset (no reset_parameters?): {bad[:12]}")
+
+
+def install_nan_localizer(model):
+    """Reinstated (leaner) nan localizer for --debug_nan; see CLISettings.debug_nan.
+
+    Returns a state dict the train loop reads/re-arms once per update window:
+      fired       : latch — only the FIRST non-finite-from-finite module prints
+                    per window (downstream modules see non-finite INPUTS and
+                    stay silent, so the print names the birthplace).
+      adapter_max : running max|adapter input| — the raw residual stream at
+                    every loop step; directly tests the heavy-tailed-magnitude
+                    theory (finite-forward runs should still show huge values
+                    here if grad_B ∝ |x| is what overflows the fp32 grad norm).
+    Note: on the loop linears these hooks register AFTER LoopLoRA's, so
+    `output` is the post-LoRA value — a hit on a loop linear means base matmul
+    OR LoRA branch; the adapter_max reading disambiguates."""
+    state = {"fired": False, "adapter_max": 0.0}
+
+    def _all_finite(tensors):
+        return all(torch.isfinite(t).all().item() for t in tensors)
+
+    def leaf_hook(name):
+        def hook(mod, inputs, output):
+            if state["fired"]:
+                return
+            outs = [o for o in (output if isinstance(output, tuple) else (output,))
+                    if torch.is_tensor(o) and o.is_floating_point()]
+            ins = [i for i in inputs if torch.is_tensor(i) and i.is_floating_point()]
+            if outs and not _all_finite(outs) and _all_finite(ins):
+                in_max = max((i.abs().amax().item() for i in ins), default=float("nan"))
+                print(f"[nan-localizer] FIRST non-finite born in '{name}' "
+                      f"({type(mod).__name__}) — inputs finite, max|in|={in_max:.3e}")
+                state["fired"] = True
+        return hook
+
+    def adapter_hook(mod, inputs, output):
+        v = inputs[0].abs().amax().item()
+        if v > state["adapter_max"]:
+            state["adapter_max"] = v
+
+    n_hooked = 0
+    for name, m in model.named_modules():
+        if next(m.children(), None) is None and next(m.parameters(recurse=False), None) is not None:
+            m.register_forward_hook(leaf_hook(name))
+            n_hooked += 1
+    tr = getattr(model, "transformer", None)
+    if tr is not None and getattr(tr, "adapter", None) is not None:
+        tr.adapter.register_forward_hook(adapter_hook)
+    if is_main_process():
+        print(f"[nan-localizer] installed on {n_hooked} leaf modules "
+              f"(+ adapter max|input| tracker)")
+    return state
 
 
 def get_unwrapped_model_from_module(model):
@@ -1027,6 +1087,9 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
     if cfg.record_memory_snapshot:
         torch.cuda.memory._record_memory_history(max_entries=200_000)
 
+    if cfg.debug_nan:
+        state["nan_localizer"] = install_nan_localizer(get_unwrapped_model_from_module(model))
+
     accumulation_steps = cfg.batch_size // cfg.micro_batch_size
     optimizer_step = optimizer_step
     step_time = time.monotonic()
@@ -1249,14 +1312,19 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 # sum-of-squares overflows — fp32 norms would print inf for the
                 # offender AND the total, pointing nowhere.  Kept as GPU tensors
                 # (no sync) unless the guard actually fires.
-                _named_grads = [(n, p.grad.detach())
-                                for n, p in get_unwrapped_model_from_module(model).named_parameters()
-                                if p.grad is not None]
-                if _named_grads:
+                _grads = [(n, p.grad.detach())
+                          for n, p in get_unwrapped_model_from_module(model).named_parameters()
+                          if p.grad is not None]
+                _grad_names = [n for n, _ in _grads]
+                if _grads:
                     _pre_clip_norms = torch.stack(
-                        [torch.linalg.vector_norm(g, dtype=torch.float64) for _, g in _named_grads])
+                        [torch.linalg.vector_norm(g, dtype=torch.float64) for _, g in _grads])
                     _pre_clip_maxes = torch.stack(
-                        [g.abs().amax().to(torch.float64) for _, g in _named_grads])
+                        [g.abs().amax().to(torch.float64) for _, g in _grads])
+                # Drop the tensor refs NOW: holding them past zero_grad(set_to_
+                # none=True) keeps every grad buffer alive for the whole next
+                # window (~+4 GiB persistent — the 71.92->75.68 Peak-Mem jump).
+                _grads = None
 
                 total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(),
@@ -1284,16 +1352,23 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                               f"({total_norm}) — update SKIPPED "
                               f"({consecutive_nonfinite}/{cfg.max_nonfinite_skips})")
                         # Name the offenders from the PRE-CLIP fp64 stats.
-                        if _named_grads:
+                        # nan sorts LAST under -norm (all comparisons False), so
+                        # sort finite-huge first and list nan tensors separately —
+                        # a nan FORWARD nans every grad and the top-8 would
+                        # otherwise just be the first 8 params in model order.
+                        if _grad_names:
                             norms = _pre_clip_norms.tolist()
                             maxes = _pre_clip_maxes.tolist()
-                            order = sorted(range(len(norms)), key=lambda i: -norms[i])
-                            n_bad = sum(1 for v in norms if not math.isfinite(v))
-                            print(f"[guard] {n_bad} tensors with non-finite pre-clip "
-                                  f"fp64 norm; top-8 by pre-clip grad norm:")
-                            for i in order[:8]:
+                            nan_idx = [i for i, v in enumerate(norms) if math.isnan(v)]
+                            fin_idx = sorted((i for i, v in enumerate(norms) if not math.isnan(v)),
+                                             key=lambda i: -norms[i])
+                            print(f"[guard] {len(nan_idx)} grad tensors with nan norm "
+                                  f"(nan forward/backward), e.g. "
+                                  f"{[_grad_names[i] for i in nan_idx[:3]]}; "
+                                  f"top-8 non-nan by pre-clip fp64 norm:")
+                            for i in fin_idx[:8]:
                                 print(f"[guard]   norm={norms[i]:11.3e} "
-                                      f"max|g|={maxes[i]:9.3e}  {_named_grads[i][0]}")
+                                      f"max|g|={maxes[i]:9.3e}  {_grad_names[i]}")
                     if consecutive_nonfinite >= cfg.max_nonfinite_skips:
                         raise RuntimeError(
                             f"Aborting: {consecutive_nonfinite} consecutive non-finite "
@@ -1355,6 +1430,11 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     f" | Tok/sec={tok_sec:9.2f} | Loss: {loss:2.4f} / log-ppl: {log_ppl:2.4f} | Grad-Norm {total_norm:2.4f} | ClipCoef {grad_clip_coef:1.4f}"
                     f" | Peak-Mem {peak_gib:5.2f}GiB"
                 )
+                if cfg.debug_nan and "nan_localizer" in state:
+                    nl = state["nan_localizer"]
+                    print(f"[debug] max|adapter input| this window: {nl['adapter_max']:.3e}")
+                    nl["adapter_max"] = 0.0
+                    nl["fired"] = False   # re-arm: one localization per window
                 total_tokens += tokens_in_step
                 step_time = time.monotonic()
                 tokens_in_step = 0

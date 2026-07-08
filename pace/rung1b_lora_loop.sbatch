@@ -41,6 +41,9 @@ LORA_ALPHA=${LORA_ALPHA:-32}
 BACKPROP_DEPTH=${BACKPROP_DEPTH:-0}
 MAX_STEPS=${MAX_STEPS:-0}
 MEM_SNAPSHOT=${MEM_SNAPSHOT:-false}
+# DEBUG_NAN=true installs the forward-nan localizer + adapter max|input|
+# tracker (heavy sync overhead — probes only).
+DEBUG_NAN=${DEBUG_NAN:-false}
 RUN_NAME=${RUN_NAME:-rung1b-k${MEMORY_SLOTS}-lora${LORA_RANK}-a${LORA_ALPHA}$([ "$BACKPROP_DEPTH" != "0" ] && echo "-bpd${BACKPROP_DEPTH}")}
 
 python train.py \
@@ -70,4 +73,5 @@ python train.py \
     --cortex.freeze_loop true \
     --override_mean_backprop_depth $BACKPROP_DEPTH \
     --record_memory_snapshot $MEM_SNAPSHOT \
+    --debug_nan $DEBUG_NAN \
     --max_steps $MAX_STEPS
