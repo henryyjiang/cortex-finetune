@@ -456,18 +456,84 @@ def install_nan_localizer(model):
         if v > state["adapter_max"]:
             state["adapter_max"] = v
 
+    # Backward amplification tracker: per-module running max|grad_input| and
+    # max|grad_output| over the window (GPU tensors, no sync until printed).
+    # A module whose max|grad_input| >> max|grad_output| is where the gradient
+    # magnitude is BORN — e.g. an RMSNorm backward multiplies by ~1/rms(x), up
+    # to ~1/sqrt(eps)=1e3 when its input is near zero, while its forward output
+    # is scale-invariant and looks perfectly healthy.  This is the instrument
+    # for the rung1b cliff (loop_0/adapter LoRA-B grads at 1e19, loop_1..5 at
+    # ~1e0, forward finite).
+    state["bwd_gin"] = {}
+    state["bwd_gout"] = {}
+    # Forward input tracker on the loop linears (adapter + core_block): running
+    # max|input| per module — tests whether some loop-internal activation is
+    # huge at some (token, iteration) even though the adapter input is ~10.
+    state["fwd_in"] = {}
+
+    def _track(d, key, t):
+        v = t.detach().abs().amax().to(torch.float32)
+        d[key] = torch.maximum(d[key], v) if key in d else v
+
+    def bwd_hook(name):
+        def hook(mod, grad_input, grad_output):
+            for g in grad_input:
+                if torch.is_tensor(g) and g.is_floating_point():
+                    _track(state["bwd_gin"], name, g)
+            for g in grad_output:
+                if torch.is_tensor(g) and g.is_floating_point():
+                    _track(state["bwd_gout"], name, g)
+        return hook
+
+    def fwd_in_hook(name):
+        def hook(mod, inputs, output):
+            if inputs and torch.is_tensor(inputs[0]) and inputs[0].is_floating_point():
+                _track(state["fwd_in"], name, inputs[0])
+        return hook
+
     n_hooked = 0
     for name, m in model.named_modules():
         if next(m.children(), None) is None and next(m.parameters(recurse=False), None) is not None:
             m.register_forward_hook(leaf_hook(name))
+            m.register_full_backward_hook(bwd_hook(name))
+            if ("core_block" in name or "adapter" in name) and isinstance(m, torch.nn.Linear):
+                m.register_forward_hook(fwd_in_hook(name))
             n_hooked += 1
     tr = getattr(model, "transformer", None)
     if tr is not None and getattr(tr, "adapter", None) is not None:
         tr.adapter.register_forward_hook(adapter_hook)
     if is_main_process():
         print(f"[nan-localizer] installed on {n_hooked} leaf modules "
-              f"(+ adapter max|input| tracker)")
+              f"(fwd first-nan latch + bwd amplification tracker + loop-linear "
+              f"max|input| + adapter max|input|)")
     return state
+
+
+def print_nan_localizer_window(nl):
+    """Dump + reset the localizer's per-window stats (called once per update)."""
+    print(f"[debug] max|adapter input| this window: {nl['adapter_max']:.3e}")
+    if nl["bwd_gin"]:
+        gin = {k: v.item() for k, v in nl["bwd_gin"].items()}
+        gout = {k: v.item() for k, v in nl["bwd_gout"].items()}
+        top = sorted(gin, key=lambda k: -gin[k])[:10]
+        print("[debug] top-10 modules by max|grad_input| "
+              "(amplifiers have grad_in >> grad_out):")
+        for k in top:
+            go = gout.get(k, float("nan"))
+            ratio = gin[k] / go if go and math.isfinite(go) and go > 0 else float("nan")
+            print(f"[debug]   gin={gin[k]:11.3e} gout={go:11.3e} "
+                  f"amp={ratio:9.3e}  {k}")
+    if nl["fwd_in"]:
+        fin = {k: v.item() for k, v in nl["fwd_in"].items()}
+        top = sorted(fin, key=lambda k: -fin[k])[:6]
+        print("[debug] top-6 loop linears by max|input|:")
+        for k in top:
+            print(f"[debug]   max|in|={fin[k]:11.3e}  {k}")
+    nl["adapter_max"] = 0.0
+    nl["fired"] = False
+    nl["bwd_gin"].clear()
+    nl["bwd_gout"].clear()
+    nl["fwd_in"].clear()
 
 
 def get_unwrapped_model_from_module(model):
@@ -1431,10 +1497,7 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     f" | Peak-Mem {peak_gib:5.2f}GiB"
                 )
                 if cfg.debug_nan and "nan_localizer" in state:
-                    nl = state["nan_localizer"]
-                    print(f"[debug] max|adapter input| this window: {nl['adapter_max']:.3e}")
-                    nl["adapter_max"] = 0.0
-                    nl["fired"] = False   # re-arm: one localization per window
+                    print_nan_localizer_window(state["nan_localizer"])
                 total_tokens += tokens_in_step
                 step_time = time.monotonic()
                 tokens_in_step = 0
