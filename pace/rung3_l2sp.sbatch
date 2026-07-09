@@ -39,15 +39,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 MEMORY_SLOTS=${MEMORY_SLOTS:-4}
 FREEZE_UNTIL=${FREEZE_UNTIL:-500}
 L2SP_COEFF=${L2SP_COEFF:-1e-3}
-# BACKPROP_DEPTH>0 shortens the TBPTT window to fit the post-unfreeze activation
-# memory (the step-500 OOM lever); 0 = use the checkpoint's mean_backprop_depth.
-# MAX_STEPS>0 caps optimizer steps (for the fast freeze_until=5 memory probe).
-BACKPROP_DEPTH=${BACKPROP_DEPTH:-0}
-MAX_STEPS=${MAX_STEPS:-0}
-# MEM_SNAPSHOT=true records allocator history and dumps a memory_viz pickle on
-# OOM (plus Peak-Mem per update in the log) — turn on for the memory probes.
-MEM_SNAPSHOT=${MEM_SNAPSHOT:-false}
-RUN_NAME=${RUN_NAME:-rung3-k${MEMORY_SLOTS}-l2sp${L2SP_COEFF}$([ "$BACKPROP_DEPTH" != "0" ] && echo "-bpd${BACKPROP_DEPTH}")}
+RUN_NAME=${RUN_NAME:-rung3-k${MEMORY_SLOTS}-l2sp${L2SP_COEFF}}
 
 python train.py \
     --run_name $RUN_NAME \
@@ -73,7 +65,4 @@ python train.py \
     --cortex.eos_from_tokens true \
     --cortex.freeze_loop true \
     --cortex.freeze_loop_until_step $FREEZE_UNTIL \
-    --cortex.l2sp_coeff $L2SP_COEFF \
-    --override_mean_backprop_depth $BACKPROP_DEPTH \
-    --record_memory_snapshot $MEM_SNAPSHOT \
-    --max_steps $MAX_STEPS
+    --cortex.l2sp_coeff $L2SP_COEFF

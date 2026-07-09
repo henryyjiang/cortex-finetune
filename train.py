@@ -93,22 +93,6 @@ class CLISettings:
     # no-grad prefix grows to keep total recurrence constant.
     override_mean_backprop_depth: int = 0
     override_mean_recurrence: int = 0
-    # Record the CUDA allocator's alloc/free history and dump it to
-    # <out_path>/<run_name>-oom.pickle when a forward/backward OOMs (view at
-    # https://pytorch.org/memory_viz).  For the unfreeze memory probes: the
-    # snapshot attributes every live block to a stack trace, which is the
-    # difference between knowing THAT phase 2 doesn't fit and knowing WHERE
-    # the post-unfreeze delta lives.  Small runtime overhead — leave off for
-    # real runs.
-    record_memory_snapshot: bool = False
-    # Forward-nan localizer (rung1b debugging).  Hooks every leaf module and
-    # prints the FIRST one whose output is non-finite while its inputs were
-    # finite (the op that births the nan), plus the running max|input| of the
-    # loop adapter — i.e. the raw recurrent residual stream, which nothing
-    # normalizes before the loop linears and which the loss cannot see (every
-    # consumer RMS-norms, so the forward is scale-invariant).  Large sync
-    # overhead — debug runs only.
-    debug_nan: bool = False
     bf16_true: bool = False
     compile_warmup_routine: bool = False
     no_amp: bool = True
@@ -438,130 +422,6 @@ def reset_cortex_graft_init(model):
         if bad:
             print(f"[cortex] WARNING: {len(bad)} cortex params STILL non-finite "
                   f"after reset (no reset_parameters?): {bad[:12]}")
-
-
-def install_nan_localizer(model):
-    """Reinstated (leaner) nan localizer for --debug_nan; see CLISettings.debug_nan.
-
-    Returns a state dict the train loop reads/re-arms once per update window:
-      fired       : latch — only the FIRST non-finite-from-finite module prints
-                    per window (downstream modules see non-finite INPUTS and
-                    stay silent, so the print names the birthplace).
-      adapter_max : running max|adapter input| — the raw residual stream at
-                    every loop step; directly tests the heavy-tailed-magnitude
-                    theory (finite-forward runs should still show huge values
-                    here if grad_B ∝ |x| is what overflows the fp32 grad norm).
-    Note: on the loop linears these hooks register AFTER LoopLoRA's, so
-    `output` is the post-LoRA value — a hit on a loop linear means base matmul
-    OR LoRA branch; the adapter_max reading disambiguates."""
-    state = {"fired": False, "adapter_max": 0.0}
-
-    def _all_finite(tensors):
-        # Sum-based probe: nan/inf propagate to the scalar, so this detects
-        # non-finiteness without allocating a full-size bool mask per output —
-        # isfinite(logits).all() materializes ~100 MB for a [B,S,vocab] tensor
-        # and OOM'd a probe on a card already at margin.  (A finite tensor
-        # whose SUM overflows would false-positive, but magnitudes that large
-        # are exactly what this tool is hunting anyway.)
-        return all(torch.isfinite(t.sum()).item() for t in tensors)
-
-    def leaf_hook(name):
-        def hook(mod, inputs, output):
-            if state["fired"]:
-                return
-            outs = [o for o in (output if isinstance(output, tuple) else (output,))
-                    if torch.is_tensor(o) and o.is_floating_point()]
-            ins = [i for i in inputs if torch.is_tensor(i) and i.is_floating_point()]
-            if outs and not _all_finite(outs) and _all_finite(ins):
-                in_max = max((i.abs().amax().item() for i in ins), default=float("nan"))
-                print(f"[nan-localizer] FIRST non-finite born in '{name}' "
-                      f"({type(mod).__name__}) — inputs finite, max|in|={in_max:.3e}")
-                state["fired"] = True
-        return hook
-
-    def adapter_hook(mod, inputs, output):
-        v = inputs[0].abs().amax().item()
-        if v > state["adapter_max"]:
-            state["adapter_max"] = v
-
-    # Backward amplification tracker: per-module running max|grad_input| and
-    # max|grad_output| over the window (GPU tensors, no sync until printed).
-    # A module whose max|grad_input| >> max|grad_output| is where the gradient
-    # magnitude is BORN — e.g. an RMSNorm backward multiplies by ~1/rms(x), up
-    # to ~1/sqrt(eps)=1e3 when its input is near zero, while its forward output
-    # is scale-invariant and looks perfectly healthy.  This is the instrument
-    # for the rung1b cliff (loop_0/adapter LoRA-B grads at 1e19, loop_1..5 at
-    # ~1e0, forward finite).
-    state["bwd_gin"] = {}
-    state["bwd_gout"] = {}
-    # Forward input tracker on the loop linears (adapter + core_block): running
-    # max|input| per module — tests whether some loop-internal activation is
-    # huge at some (token, iteration) even though the adapter input is ~10.
-    state["fwd_in"] = {}
-
-    def _track(d, key, t):
-        v = t.detach().abs().amax().to(torch.float32)
-        d[key] = torch.maximum(d[key], v) if key in d else v
-
-    def bwd_hook(name):
-        def hook(mod, grad_input, grad_output):
-            for g in grad_input:
-                if torch.is_tensor(g) and g.is_floating_point():
-                    _track(state["bwd_gin"], name, g)
-            for g in grad_output:
-                if torch.is_tensor(g) and g.is_floating_point():
-                    _track(state["bwd_gout"], name, g)
-        return hook
-
-    def fwd_in_hook(name):
-        def hook(mod, inputs, output):
-            if inputs and torch.is_tensor(inputs[0]) and inputs[0].is_floating_point():
-                _track(state["fwd_in"], name, inputs[0])
-        return hook
-
-    n_hooked = 0
-    for name, m in model.named_modules():
-        if next(m.children(), None) is None and next(m.parameters(recurse=False), None) is not None:
-            m.register_forward_hook(leaf_hook(name))
-            m.register_full_backward_hook(bwd_hook(name))
-            if ("core_block" in name or "adapter" in name) and isinstance(m, torch.nn.Linear):
-                m.register_forward_hook(fwd_in_hook(name))
-            n_hooked += 1
-    tr = getattr(model, "transformer", None)
-    if tr is not None and getattr(tr, "adapter", None) is not None:
-        tr.adapter.register_forward_hook(adapter_hook)
-    if is_main_process():
-        print(f"[nan-localizer] installed on {n_hooked} leaf modules "
-              f"(fwd first-nan latch + bwd amplification tracker + loop-linear "
-              f"max|input| + adapter max|input|)")
-    return state
-
-
-def print_nan_localizer_window(nl):
-    """Dump + reset the localizer's per-window stats (called once per update)."""
-    print(f"[debug] max|adapter input| this window: {nl['adapter_max']:.3e}")
-    if nl["bwd_gin"]:
-        gin = {k: v.item() for k, v in nl["bwd_gin"].items()}
-        gout = {k: v.item() for k, v in nl["bwd_gout"].items()}
-        top = sorted(gin, key=lambda k: -gin[k])[:10]
-        print("[debug] top-10 modules by max|grad_input| "
-              "(amplifiers have grad_in >> grad_out):")
-        for k in top:
-            go = gout.get(k, float("nan"))
-            ratio = gin[k] / go if go and math.isfinite(go) and go > 0 else float("nan")
-            print(f"[debug]   gin={gin[k]:11.3e} gout={go:11.3e} "
-                  f"amp={ratio:9.3e}  {k}")
-    if nl["fwd_in"]:
-        fin = {k: v.item() for k, v in nl["fwd_in"].items()}
-        top = sorted(fin, key=lambda k: -fin[k])[:6]
-        print("[debug] top-6 loop linears by max|input|:")
-        for k in top:
-            print(f"[debug]   max|in|={fin[k]:11.3e}  {k}")
-    nl["adapter_max"] = 0.0
-    nl["fired"] = False
-    nl["bwd_gin"].clear()
-    nl["bwd_gout"].clear()
-    nl["fwd_in"].clear()
 
 
 def get_unwrapped_model_from_module(model):
@@ -1178,12 +1038,6 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
     model, optimizer = state["model"], state["optimizer"]
     model.train()
 
-    if cfg.record_memory_snapshot:
-        torch.cuda.memory._record_memory_history(max_entries=200_000)
-
-    if cfg.debug_nan:
-        state["nan_localizer"] = install_nan_localizer(get_unwrapped_model_from_module(model))
-
     accumulation_steps = cfg.batch_size // cfg.micro_batch_size
     optimizer_step = optimizer_step
     step_time = time.monotonic()
@@ -1359,22 +1213,7 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 fwd_bwd_func = cortex_fwd_bwd
             else:
                 fwd_bwd_func = tightly_scoped_fwd_bwd
-            try:
-                loss, log_ppl, num_steps_no_grad, num_steps_with_grad = fwd_bwd_func(model, input_ids, labels)
-            except torch.OutOfMemoryError:
-                # Dump the allocator history BEFORE the empty_cache/teardown path
-                # runs, so the snapshot still holds the live blocks of the step
-                # that OOMed.  n/k and the unfreeze phase are in the filename —
-                # the two things that determine the activation footprint.
-                if cfg.record_memory_snapshot:
-                    snap = os.path.join(
-                        cfg.out_path,
-                        f"{cfg.run_name}-oom-upd{optimizer_step}-n{int(num_steps[0])}-k{int(num_steps[1])}.pickle",
-                    )
-                    torch.cuda.memory._dump_snapshot(snap)
-                    print(f"[oom] allocator snapshot written to {snap} — "
-                          f"open at https://pytorch.org/memory_viz")
-                raise
+            loss, log_ppl, num_steps_no_grad, num_steps_with_grad = fwd_bwd_func(model, input_ids, labels)
 
             # logging
             metrics_to_agg_data_step["loss"].append(loss.item())
@@ -1396,29 +1235,6 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     lrs = [pg["lr"] for pg in optimizer.param_groups]
                     wandb_lr_log  = {"train/lr_recur": lrs[0], "train/lr_nonrecur": lrs[0]}
 
-
-                # Per-tensor grad norms + max|g|, captured BEFORE clip_grad_norm_
-                # and in fp64.  Both details are load-bearing for the guard's
-                # diagnostic below: (a) on a non-finite total norm the clip coef
-                # is 0 and clip_grad_norm_ zeroes every grad IN PLACE, so anything
-                # read after it is all-zeros and names nothing; (b) the rung1b
-                # failure is finite-but-huge grads (~1e16+) whose fp32
-                # sum-of-squares overflows — fp32 norms would print inf for the
-                # offender AND the total, pointing nowhere.  Kept as GPU tensors
-                # (no sync) unless the guard actually fires.
-                _grads = [(n, p.grad.detach())
-                          for n, p in get_unwrapped_model_from_module(model).named_parameters()
-                          if p.grad is not None]
-                _grad_names = [n for n, _ in _grads]
-                if _grads:
-                    _pre_clip_norms = torch.stack(
-                        [torch.linalg.vector_norm(g, dtype=torch.float64) for _, g in _grads])
-                    _pre_clip_maxes = torch.stack(
-                        [g.abs().amax().to(torch.float64) for _, g in _grads])
-                # Drop the tensor refs NOW: holding them past zero_grad(set_to_
-                # none=True) keeps every grad buffer alive for the whole next
-                # window (~+4 GiB persistent — the 71.92->75.68 Peak-Mem jump).
-                _grads = None
 
                 total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(),
@@ -1445,24 +1261,6 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         print(f"[guard] step {optimizer_step + 1}: non-finite grad-norm "
                               f"({total_norm}) — update SKIPPED "
                               f"({consecutive_nonfinite}/{cfg.max_nonfinite_skips})")
-                        # Name the offenders from the PRE-CLIP fp64 stats.
-                        # nan sorts LAST under -norm (all comparisons False), so
-                        # sort finite-huge first and list nan tensors separately —
-                        # a nan FORWARD nans every grad and the top-8 would
-                        # otherwise just be the first 8 params in model order.
-                        if _grad_names:
-                            norms = _pre_clip_norms.tolist()
-                            maxes = _pre_clip_maxes.tolist()
-                            nan_idx = [i for i, v in enumerate(norms) if math.isnan(v)]
-                            fin_idx = sorted((i for i, v in enumerate(norms) if not math.isnan(v)),
-                                             key=lambda i: -norms[i])
-                            print(f"[guard] {len(nan_idx)} grad tensors with nan norm "
-                                  f"(nan forward/backward), e.g. "
-                                  f"{[_grad_names[i] for i in nan_idx[:3]]}; "
-                                  f"top-8 non-nan by pre-clip fp64 norm:")
-                            for i in fin_idx[:8]:
-                                print(f"[guard]   norm={norms[i]:11.3e} "
-                                      f"max|g|={maxes[i]:9.3e}  {_grad_names[i]}")
                     if consecutive_nonfinite >= cfg.max_nonfinite_skips:
                         raise RuntimeError(
                             f"Aborting: {consecutive_nonfinite} consecutive non-finite "
@@ -1524,8 +1322,6 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     f" | Tok/sec={tok_sec:9.2f} | Loss: {loss:2.4f} / log-ppl: {log_ppl:2.4f} | Grad-Norm {total_norm:2.4f} | ClipCoef {grad_clip_coef:1.4f}"
                     f" | Peak-Mem {peak_gib:5.2f}GiB"
                 )
-                if cfg.debug_nan and "nan_localizer" in state:
-                    print_nan_localizer_window(state["nan_localizer"])
                 total_tokens += tokens_in_step
                 step_time = time.monotonic()
                 tokens_in_step = 0
