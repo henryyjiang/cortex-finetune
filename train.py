@@ -380,9 +380,31 @@ def reset_cortex_graft_init(model):
           weight 1/bias 0) — finite, in place, dtype/device preserved;
       (2) re-apply the few explicit designed inits the graft sets by hand.
     Mirrors cortex_graft.CortexMemory + cortex_memory.buffers; skipped on
-    --resume (a resumed ckpt carries trained, not fresh, cortex weights).  LoRA
-    A/B are bare Parameters _init_weights never touches (B stays 0), left alone."""
-    cortex = getattr(get_unwrapped_model_from_module(model), "cortex", None)
+    --resume (a resumed ckpt carries trained, not fresh, cortex weights).
+
+    LoRA (cortex_lora) MUST be re-initialized here too — the original "bare
+    Parameters _init_weights never touches, B stays 0" analysis was WRONG under
+    the meta-device from_pretrained path: the skeleton is built on meta (the
+    __init__ kaiming/zeros are no-ops), missing keys are materialized via
+    to_empty() = UNINITIALIZED memory, and _init_weights skips ParameterDicts —
+    so A/B keep whatever bytes the allocator hands them.  Driver-zeroed fresh
+    pages make MOST tensors read as zeros; recycled blocks carry ~1e19 garbage,
+    with run-to-run membership.  Root cause of the entire rung1b failure family:
+    garbage in an A row -> finite grad_B ~1e19 -> inf fp32 grad-norm every step
+    (healthy forward, B~0); garbage in a B -> forward nan from step 1.  Note the
+    non-finite sweep below can NOT catch this — the garbage is FINITE."""
+    unwrapped = get_unwrapped_model_from_module(model)
+    lora = getattr(unwrapped, "cortex_lora", None)
+    if lora is not None:
+        for A in lora.A.values():
+            torch.nn.init.kaiming_uniform_(A, a=math.sqrt(5))
+        for B in lora.B.values():
+            torch.nn.init.zeros_(B)
+        if is_main_process():
+            print(f"[cortex] re-initialized {len(lora.A)} LoRA A/B pairs "
+                  f"(A~kaiming, B=0) — undo to_empty() garbage from the "
+                  f"meta-device load path")
+    cortex = getattr(unwrapped, "cortex", None)
     if cortex is None:
         return
     # (1) undo the non-finite clobber: nn defaults for every submodule.
