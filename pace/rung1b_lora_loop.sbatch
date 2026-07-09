@@ -3,8 +3,11 @@
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64GB
-#SBATCH --gres=gpu:A100:1
-#SBATCH --constraint=A100-80GB
+# H200 (141 GB), like rung2/rung3: steady state with optimizer states + LoRA
+# activation saves sits within a hair of the 80 GB ceiling (the guard-skipped
+# probes never allocated optimizer states, so this was only discovered once
+# the first REAL update ran).  h200 is its own gres type — no --constraint.
+#SBATCH --gres=gpu:H200:1
 #SBATCH -t 16:00:00
 #SBATCH -q inferno
 #SBATCH -o logs/Report-%j.out

@@ -457,7 +457,13 @@ def install_nan_localizer(model):
     state = {"fired": False, "adapter_max": 0.0}
 
     def _all_finite(tensors):
-        return all(torch.isfinite(t).all().item() for t in tensors)
+        # Sum-based probe: nan/inf propagate to the scalar, so this detects
+        # non-finiteness without allocating a full-size bool mask per output —
+        # isfinite(logits).all() materializes ~100 MB for a [B,S,vocab] tensor
+        # and OOM'd a probe on a card already at margin.  (A finite tensor
+        # whose SUM overflows would false-positive, but magnitudes that large
+        # are exactly what this tool is hunting anyway.)
+        return all(torch.isfinite(t.sum()).item() for t in tensors)
 
     def leaf_hook(name):
         def hook(mod, inputs, output):
