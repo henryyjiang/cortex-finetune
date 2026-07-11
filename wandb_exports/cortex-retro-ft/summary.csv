@@ -1,0 +1,7 @@
+run,id,state,steps,tokens,loss_start,loss_final,loss_min,nan_loss_rows,skipped_updates,gnorm_p50,gnorm_p99,gnorm_max,clip_active_frac,max_loss_jump,end_trend,FLAGS,unfreeze,loss_pre/post_unfreeze,gnorm_pre/post_unfreeze
+rung1-k0,vqjjeikf,finished,1787,117112832,3.4246,2.7299,2.2183,0,0,0.677,1.151,3.43,0.017,+0.736@1371,2.7361->2.7249,final loss >> min loss,,,
+rung1-k0-ccot,p77qfbss,finished,1787,117112832,3.4189,2.7269,2.219,0,0,0.718,1.155,3.985,0.021,+0.742@1371,2.7414->2.7242,final loss >> min loss,,,
+rung1-k4,00w5n2eh,finished,1787,117112832,3.4184,2.7287,2.2171,0,0,0.681,1.22,5.92,0.018,+0.737@1371,2.7353->2.7238,final loss >> min loss,,,
+rung1b-k4-lora16-a32,c24fysea,finished,1787,117112832,3.4182,2.7129,2.205,0,0,0.647,1.203,3.839,0.019,+0.733@1371,2.7212->2.7087,final loss >> min loss,,,
+rung2-k4-unfreeze500,8cb7qoxf,finished,1787,117112832,3.4184,2.698,2.1928,0,0,0.889,1.353,5.255,0.098,+0.733@1371,2.7049->2.6933,final loss >> min loss,500.0,2.922/2.890,0.727/1.065
+rung3-k4-l2sp1e-3,erf6e4ru,finished,1787,117112832,3.4184,2.7114,2.2039,0,0,0.89,1.351,9.935,0.095,+0.731@1371,2.7181->2.7067,final loss >> min loss,500.0,2.923/2.891,0.717/1.057

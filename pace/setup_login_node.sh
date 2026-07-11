@@ -50,7 +50,7 @@ if [ ! -d data/pg19_olmo_len4096 ]; then
 fi
 
 # ── 5. eval datasets (BABILong <=128k, LongMemEval, GSM8K, MC) ──────────────
-# python evals/download_datasets.py
+python evals/download_datasets.py
 
 echo "Setup done. Submit runs from the repo root:"
 echo "  sbatch pace/rung1_frozen_loop.sbatch                    # K=4"

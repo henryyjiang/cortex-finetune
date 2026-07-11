@@ -45,3 +45,28 @@ else:
         token          = token,
     )
     print(f"Saved → {ROOT / 'BABILong'}")
+
+# ---------------------------------------------------------------------------
+# MC + GSM8K: eval_multiple_choice.py / eval_gsm8k.py call load_dataset()
+# straight against the hub; compute nodes run with HF_HUB_OFFLINE=1, so warm
+# the HF cache here with the EXACT same calls the evals make.
+# ---------------------------------------------------------------------------
+from datasets import load_dataset
+
+MC_PREFETCH = [
+    ("hellaswag",     lambda: load_dataset("Rowan/hellaswag", split="validation")),
+    ("winogrande",    lambda: load_dataset("allenai/winogrande", "winogrande_xl",
+                                           split="validation")),
+    ("arc_easy",      lambda: load_dataset("allenai/ai2_arc", "ARC-Easy",
+                                           split="validation")),
+    ("arc_challenge", lambda: load_dataset("allenai/ai2_arc", "ARC-Challenge",
+                                           split="validation")),
+    ("piqa",          lambda: load_dataset("ybisk/piqa", "default", split="validation",
+                                           revision="refs/convert/parquet")),
+    ("gsm8k",         lambda: load_dataset("openai/gsm8k", "main", split="test")),
+]
+
+for name, fetch in MC_PREFETCH:
+    print(f"Prefetching {name} into the HF cache ...")
+    ds = fetch()
+    print(f"  {name}: {len(ds)} examples cached")
