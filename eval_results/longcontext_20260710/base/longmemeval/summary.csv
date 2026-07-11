@@ -1,6 +1,0 @@
-model,bucket,correct,total,accuracy
-olmo8-cortex,≤5turns,1,200,0.0050
-olmo8-cortex,≤10turns,0,3,0.0000
-olmo8-cortex,≤20turns,0,0,0.0000
-olmo8-cortex,≤50turns,0,0,0.0000
-olmo8-cortex,>50turns,0,0,0.0000

@@ -22,7 +22,8 @@ from typing import Optional
 import torch
 from transformers import AutoTokenizer
 
-from model_utils import load_checkpoint, has_cross_state, to_num_steps
+from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
+                         ccot_prime)
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +110,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--T",              type=int, default=None,
                    help="Recurrence depth at eval (None = use checkpoint mean_recurrence)")
     p.add_argument("--max_new_tokens", type=int, default=256)
+    p.add_argument("--ccot_passes",    type=int, default=0,
+                   help="Mixed CCoT+CoT: run N silent full forward passes over "
+                        "the prompt first, carrying M_cross between passes "
+                        "(latent 'thinking'), then generate the CoT with the "
+                        "primed buffer as read-only context. Requires a model "
+                        "with cross state (K>0 or ccot_direct); 0 = off.")
     p.add_argument("--max_examples",   type=int, default=0, help="0 = all")
     p.add_argument("--out_dir",        default="eval_results/gsm8k")
     p.add_argument("--dtype",          default="bfloat16", choices=["float32", "bfloat16"])
@@ -121,7 +128,8 @@ def parse_args() -> argparse.Namespace:
 
 @torch.no_grad()
 def generate(model, tokenizer, prompt: str, max_new_tokens: int,
-             T: Optional[int], device: torch.device, seq_len: int = 2048) -> str:
+             T: Optional[int], device: torch.device, seq_len: int = 2048,
+             ccot_passes: int = 0) -> str:
     input_ids = tokenizer(prompt, add_special_tokens=False, return_tensors="pt").input_ids
     max_prompt = seq_len - max_new_tokens
     if input_ids.shape[1] > max_prompt:
@@ -129,11 +137,15 @@ def generate(model, tokenizer, prompt: str, max_new_tokens: int,
     input_ids = input_ids.to(device)
 
     num_steps = to_num_steps(T)
+    # Mixed CCoT+CoT: latent multi-pass 'thinking' over the prompt before
+    # explicit CoT generation.  m_cross stays fixed during generation.
+    m_cross   = ccot_prime(model, input_ids, num_steps, ccot_passes)
     generated = input_ids
     eos_id    = tokenizer.eos_token_id
 
     for _ in range(max_new_tokens):
-        out      = model(input_ids=generated, num_steps=num_steps)
+        out      = model(input_ids=generated, num_steps=num_steps,
+                         m_cross_in=m_cross, return_m_cross=False)
         next_tok = out["logits"][0, -1].argmax(dim=-1, keepdim=True).unsqueeze(0)
         generated = torch.cat([generated, next_tok], dim=1)
         if eos_id is not None and next_tok.item() == eos_id:
@@ -162,7 +174,12 @@ def main() -> None:
         tokenizer.pad_token = tokenizer.eos_token
 
     T = args.T
-    print(f"T={T if T is not None else cfg.mean_recurrence}")
+    print(f"T={T if T is not None else cfg.mean_recurrence}  "
+          f"ccot_passes={args.ccot_passes}")
+    if args.ccot_passes > 0 and not has_cross_state(model):
+        print("WARNING: --ccot_passes set but the model has no cross state "
+              "(no M_cross / DirectCCoT) — the passes would be identical "
+              "no-ops. Running as plain CoT.")
 
     from datasets import load_dataset
     ds = load_dataset("openai/gsm8k", "main", split="test")
@@ -178,7 +195,8 @@ def main() -> None:
         if gold_ans is None:
             continue
         response = generate(model, tokenizer, build_prompt(ex["question"]),
-                            args.max_new_tokens, T, device)
+                            args.max_new_tokens, T, device,
+                            ccot_passes=args.ccot_passes)
         pred_ans   = extract_answer(response)
         is_correct = pred_ans is not None and normalize(pred_ans) == normalize(gold_ans)
         if is_correct:

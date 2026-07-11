@@ -35,8 +35,22 @@ export WANDB_DIR=$SCRATCH
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MEMORY_SLOTS=${MEMORY_SLOTS:-4}
+MEMORY_SLOTS_ITER=${MEMORY_SLOTS_ITER:-0}   # short-term M_iter (per loop iteration); 0 = off
 CCOT_DIRECT=${CCOT_DIRECT:-false}
+# Buffer-depth knobs: training only ever showed the buffer <= cross_chunks-1
+# accumulated writes before its last read, so eval-time states (16+ writes)
+# were off-distribution.  CROSS_CHUNKS=8 on the existing 4096 data gives
+# 512-token windows (no re-prep, same memory).  For 1024-token windows at
+# depth 8, prep data/pg19_olmo_len8192 (prepare_pg19_dataset.py
+# --max_length 8192) and set MAX_LENGTH=8192 DATA_PATH=data/pg19_olmo_len8192
+# CROSS_CHUNKS=8 — retained graph doubles; use the H200 variant if A100-80 OOMs.
+MAX_LENGTH=${MAX_LENGTH:-4096}
+CROSS_CHUNKS=${CROSS_CHUNKS:-4}
+DATA_PATH=${DATA_PATH:-data/pg19_olmo_len4096}
 ARM="k${MEMORY_SLOTS}"; [ "$CCOT_DIRECT" = "true" ] && ARM="${ARM}-ccot"
+[ "$MEMORY_SLOTS_ITER" -gt 0 ] && ARM="${ARM}-ki${MEMORY_SLOTS_ITER}"
+[ "$CROSS_CHUNKS" -ne 4 ] && ARM="${ARM}-cc${CROSS_CHUNKS}"
+[ "$MAX_LENGTH" -ne 4096 ] && ARM="${ARM}-len${MAX_LENGTH}"
 RUN_NAME=${RUN_NAME:-rung1-${ARM}}
 
 # throttle stays ON in every rung (harmless on the frozen loop) so optimizer
@@ -45,8 +59,8 @@ python train.py \
     --run_name $RUN_NAME \
     --out_path cortex-retro-ft \
     --model_name ckpts/olmo8-cortex \
-    --preprocessed_data_path data/pg19_olmo_len4096 \
-    --max_length 4096 \
+    --preprocessed_data_path $DATA_PATH \
+    --max_length $MAX_LENGTH \
     --epochs 1 \
     --micro_batch_size 1 \
     --batch_size 16 \
@@ -61,7 +75,8 @@ python train.py \
     --cortex.use_memory true \
     --cortex.memory_lr 5e-4 \
     --cortex.memory_slots $MEMORY_SLOTS \
+    --cortex.memory_slots_iter $MEMORY_SLOTS_ITER \
     --cortex.ccot_direct $CCOT_DIRECT \
-    --cortex.cross_chunks 4 \
+    --cortex.cross_chunks $CROSS_CHUNKS \
     --cortex.eos_from_tokens true \
     --cortex.freeze_loop true

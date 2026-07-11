@@ -120,22 +120,35 @@ class TestBabilong:
     def test_eval_one_k4_carries_and_returns_bool(self, tok):
         import eval_babilong as eb
         model = _build_raven(use_memory=True, memory_slots=4)
-        chunks = eb.encode_and_chunk(tok, self._ctx(), "where is mary", seq_len=8)
-        assert len(chunks) > 1, "test needs multiple chunks to exercise M_cross carry"
-        res = eb.eval_one(model, tok, self._ctx(), "where is mary", "office", T=3, seq_len=8)
-        assert isinstance(res, bool)
+        suffix = eb.build_suffix("qa1", "where is mary")
+        prime, final = eb.split_context(tok, self._ctx(), suffix, seq_len=8,
+                                        max_new_tokens=2)
+        assert len(prime) > 1, "test needs multiple chunks to exercise M_cross carry"
+        assert final.shape[1] <= 8 - 2, "final chunk must reserve generation room"
+        ok, pred = eb.eval_one(model, tok, self._ctx(), "where is mary", "office",
+                               T=3, seq_len=8, max_new_tokens=2, task="qa1")
+        assert isinstance(ok, bool) and isinstance(pred, str)
 
     def test_eval_one_k0_runs(self, tok):
         import eval_babilong as eb
         model = _build_raven(use_memory=False)
-        res = eb.eval_one(model, tok, self._ctx(), "where is mary", "office", T=3, seq_len=8)
-        assert isinstance(res, bool)
+        ok, pred = eb.eval_one(model, tok, self._ctx(), "where is mary", "office",
+                               T=3, seq_len=8, max_new_tokens=2, task="qa1")
+        assert isinstance(ok, bool) and isinstance(pred, str)
 
     def test_eval_one_directccot_runs(self, tok):
         import eval_babilong as eb
         model = _build_raven(use_memory=True, memory_slots=0, ccot_direct=True)
-        res = eb.eval_one(model, tok, self._ctx(), "where is mary", "office", T=3, seq_len=8)
-        assert isinstance(res, bool)
+        ok, pred = eb.eval_one(model, tok, self._ctx(), "where is mary", "office",
+                               T=3, seq_len=8, max_new_tokens=2, task="qa1")
+        assert isinstance(ok, bool) and isinstance(pred, str)
+
+    def test_contains_answer(self):
+        import eval_babilong as eb
+        assert eb.contains_answer("the kitchen.", "kitchen")
+        assert eb.contains_answer("Kitchen\n", "kitchen")
+        assert not eb.contains_answer("kitchenette", "kitchen")
+        assert not eb.contains_answer("", "kitchen")
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +164,25 @@ class TestGSM8K:
         out = eg.generate(model, tok, "what is two plus two", max_new_tokens=4,
                           T=3, device=device, seq_len=32)
         assert isinstance(out, str)
+
+    def test_generate_with_ccot_passes(self, tok):
+        # Mixed CCoT+CoT: latent passes prime M_cross before generation.
+        import eval_gsm8k as eg
+        model = _build_raven(use_memory=True, memory_slots=4)
+        device = torch.device("cpu")
+        out = eg.generate(model, tok, "what is two plus two", max_new_tokens=4,
+                          T=3, device=device, seq_len=32, ccot_passes=2)
+        assert isinstance(out, str)
+
+    def test_ccot_prime_returns_buffer_only_with_cross_state(self, tok):
+        from model_utils import ccot_prime, to_num_steps
+        ids = tok("some prompt words here", return_tensors="pt").input_ids
+        m_k4 = _build_raven(use_memory=True, memory_slots=4)
+        buf = ccot_prime(m_k4, ids, to_num_steps(3), passes=2)
+        assert buf is not None and buf.shape[1] == 4
+        m_k0 = _build_raven(use_memory=False)
+        assert ccot_prime(m_k0, ids, to_num_steps(3), passes=2) is None
+        assert ccot_prime(m_k4, ids, to_num_steps(3), passes=0) is None
 
     def test_extract_answer(self):
         import eval_gsm8k as eg

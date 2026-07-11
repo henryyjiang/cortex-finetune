@@ -101,3 +101,67 @@ def load_checkpoint(
 
     model = model.to(device=device, dtype=dtype).eval()
     return model, config
+
+
+@torch.no_grad()
+def prime_cross_state(model, chunks, num_steps, passes_per_chunk=1):
+    """Run priming chunks through the model, carrying M_cross across them.
+    passes_per_chunk > 1 runs each chunk through the FULL model that many
+    times (M_cross carried pass-to-pass), so the buffer gets multiple writes
+    per chunk instead of one — the multi-pass fill the LM2 buffer design
+    intends.  Returns the final buffer, or None for models without cross
+    state (base / parcae-style) — those see only the final prediction chunk,
+    which is exactly the no-memory control condition."""
+    if not has_cross_state(model) or not chunks:
+        return None
+    device = next(model.parameters()).device
+    m_cross = None
+    for chunk in chunks:
+        chunk = chunk.to(device)
+        for _ in range(max(passes_per_chunk, 1)):
+            out = model(input_ids=chunk, num_steps=num_steps,
+                        m_cross_in=m_cross, return_m_cross=True)
+            m_cross = out.get("m_cross")
+    return m_cross
+
+
+@torch.no_grad()
+def ccot_prime(model, input_ids, num_steps, passes, m_cross_init=None):
+    """Mixed CCoT: run `passes` full silent forward passes over the SAME
+    tokens, feeding each pass's M_cross write into the next pass's read —
+    latent multi-pass 'thinking' before any token is generated.  m_cross_init
+    seeds the first pass (e.g. a buffer primed on earlier context chunks).
+    Returns the final buffer (m_cross_init unchanged when the model has no
+    cross state or passes <= 0)."""
+    if passes <= 0 or not has_cross_state(model):
+        return m_cross_init
+    device = next(model.parameters()).device
+    input_ids = input_ids.to(device)
+    m_cross = m_cross_init
+    for _ in range(passes):
+        out = model(input_ids=input_ids, num_steps=num_steps,
+                    m_cross_in=m_cross, return_m_cross=True)
+        m_cross = out.get("m_cross")
+    return m_cross
+
+
+@torch.no_grad()
+def greedy_generate(model, tokenizer, input_ids, max_new_tokens, num_steps,
+                    m_cross=None, stop_on_newline=False):
+    """Greedy decoding by full re-forward each step (no KV cache — matches the
+    original eval_gsm8k generate).  An optional primed m_cross buffer is held
+    fixed as read-only context for every step.  Returns the generated text."""
+    device = next(model.parameters()).device
+    generated = input_ids.to(device)
+    prompt_len = generated.shape[1]
+    eos_id = tokenizer.eos_token_id
+    for _ in range(max_new_tokens):
+        out = model(input_ids=generated, num_steps=num_steps,
+                    m_cross_in=m_cross, return_m_cross=False)
+        next_tok = out["logits"][0, -1].argmax(dim=-1).view(1, 1)
+        generated = torch.cat([generated, next_tok], dim=1)
+        if eos_id is not None and next_tok.item() == eos_id:
+            break
+        if stop_on_newline and "\n" in tokenizer.decode(generated[0, prompt_len:]):
+            break
+    return tokenizer.decode(generated[0, prompt_len:], skip_special_tokens=True)

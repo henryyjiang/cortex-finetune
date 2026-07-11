@@ -16,7 +16,10 @@ ROOT.mkdir(exist_ok=True)
 
 token = os.environ.get("HF_TOKEN") or None
 
-if not (ROOT / "LongMemEval" / "longmemeval_oracle").exists():
+# longmemeval_s is what eval_longmemeval.py now uses by default (the real
+# ~115k-token haystack); check for it, not oracle, so a partial old download
+# gets re-fetched instead of skipped forever.
+if not (ROOT / "LongMemEval" / "longmemeval_s").exists():
     print("Downloading xiaowu0162/LongMemEval ...")
     snapshot_download(
         repo_id   = "xiaowu0162/LongMemEval",
