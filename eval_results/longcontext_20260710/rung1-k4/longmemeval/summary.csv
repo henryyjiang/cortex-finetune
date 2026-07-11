@@ -1,0 +1,6 @@
+model,bucket,correct,total,accuracy
+final_checkpoint,≤5turns,0,200,0.0000
+final_checkpoint,≤10turns,0,3,0.0000
+final_checkpoint,≤20turns,0,0,0.0000
+final_checkpoint,≤50turns,0,0,0.0000
+final_checkpoint,>50turns,0,0,0.0000

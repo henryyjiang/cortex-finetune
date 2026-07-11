@@ -1,0 +1,29 @@
+{
+  "final_checkpoint": {
+    "\u22645turns": {
+      "correct": 0,
+      "total": 200,
+      "accuracy": 0.0
+    },
+    "\u226410turns": {
+      "correct": 0,
+      "total": 3,
+      "accuracy": 0.0
+    },
+    "\u226420turns": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226450turns": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    ">50turns": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    }
+  }
+}
