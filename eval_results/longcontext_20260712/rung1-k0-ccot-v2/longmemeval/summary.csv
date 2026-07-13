@@ -1,0 +1,6 @@
+model,bucket,correct,total,accuracy
+final_checkpoint,≤5sess,0,0,0.0000
+final_checkpoint,≤10sess,0,0,0.0000
+final_checkpoint,≤20sess,0,0,0.0000
+final_checkpoint,≤50sess,14,200,0.0700
+final_checkpoint,>50sess,8,200,0.0400
