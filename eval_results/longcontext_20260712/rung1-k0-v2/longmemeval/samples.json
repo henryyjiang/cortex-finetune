@@ -1,0 +1,142 @@
+[
+  {
+    "bucket": ">50sess",
+    "question": "What degree did I graduate with?",
+    "gold": "Business Administration",
+    "pred": " I graduated with a bachelor's degree.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How long is my daily commute to work?",
+    "gold": "45 minutes each way",
+    "pred": " 1 hour and 30 minutes.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I redeem a $5 coupon on coffee creamer?",
+    "gold": "Target",
+    "pred": " I redeemed a $5.00 coffee creamer on Monday, and I redeemed a $5.00 coffee creamer on Tuesday. I redeemed a $5",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What play did I attend at the local community theater?",
+    "gold": "The Glass Menagerie",
+    "pred": " I attended the play called \"The Little Girl Lost\" at the local community theater.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What is the name of the playlist I created on Spotify?",
+    "gold": "Summer Vibes",
+    "pred": " The name of the audio-visual program I created on Spotify is \"The\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What was my last name before I changed it?",
+    "gold": "Johnson",
+    "pred": " My last name was John.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where do I take yoga classes?",
+    "gold": "Serenity Yoga",
+    "pred": " I take my classes at the Down Dog studio in the city.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What color did I repaint my bedroom walls?",
+    "gold": "a lighter shade of gray",
+    "pred": " I repainted my bedroom walls with a dark blue color.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "When did I volunteer at the local animal shelter's fundraising dinner?",
+    "gold": "February 14th",
+    "pred": " I volunteered at the local animal shelter's fundraising dinner in the past, and I'm looking forward to the event with great interest and enthusiasm.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I buy my new tennis racket from?",
+    "gold": "the sports store downtown",
+    "pred": " I bought it from a sporting goods store.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What was my previous occupation?",
+    "gold": "Marketing specialist at a small startup",
+    "pred": " I was a sales representative in the automobile industry.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How much did I spend on a designer handbag?",
+    "gold": "$800",
+    "pred": " I spent $150 on a designer handbag.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How many playlists do I have on Spotify?",
+    "gold": "20",
+    "pred": " I have 1 audio and 1 text audio.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I attend for my study abroad program?",
+    "gold": "University of Melbourne in Australia",
+    "pred": " I attended the University of California, Berkeley, for my study abroad program.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What was the discount I got on my first purchase from the new clothing brand?",
+    "gold": "10%",
+    "pred": " The discount was 10% on the first purchase from the new clothing brand.\n\n",
+    "correct": true
+  },
+  {
+    "bucket": ">50sess",
+    "question": "How long did it take me to assemble the IKEA bookshelf?",
+    "gold": "4 hours",
+    "pred": " It took me about 2 hours to assemble the IKEA bookshelf. I had to get the bookshelves, the nails, the screws, and the",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What did I buy for my sister's birthday gift?",
+    "gold": "a yellow dress",
+    "pred": " I bought a pair of shoes for my sister's birthday gift. I thought they would be a nice\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What speed is my new internet plan?",
+    "gold": "500 Mbps",
+    "pred": " 100 megabits per second\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "How many shirts did I pack for my 5-day trip to Costa Rica?",
+    "gold": "7",
+    "pred": " 5 shirts\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What was my previous stance on spirituality?",
+    "gold": "A staunch atheist",
+    "pred": " I was a materialistic, materialistic, materialistic, materialistic, materialistic, materialistic, materialistic, materialistic, materialistic, materialistic",
+    "correct": false
+  }
+]
