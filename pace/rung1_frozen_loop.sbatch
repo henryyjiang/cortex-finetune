@@ -47,10 +47,30 @@ CCOT_DIRECT=${CCOT_DIRECT:-false}
 MAX_LENGTH=${MAX_LENGTH:-4096}
 CROSS_CHUNKS=${CROSS_CHUNKS:-4}
 DATA_PATH=${DATA_PATH:-data/pg19_olmo_len4096}
+# Signal/gate arms (2026-07-13 plan — the carry ablation showed the memory
+# pathway is ALIVE but signal-bound at ~0.004 nats on plain PG-19):
+#   DISTILL_COEFF=1.0 [DISTILL_WINDOW=2048]  full-window-teacher KL (fix #1).
+#     Adds ~2 GB teacher weights + retained fp32 chunk logits — submit on H200:
+#       DISTILL_COEFF=1.0 sbatch --gres=gpu:H200:1 --constraint=H200 \
+#           pace/rung1_frozen_loop.sbatch
+#     Run pace/eval_teacher_advantage.sbatch FIRST; keep DISTILL_WINDOW below
+#     the LM-loss cliff it reports (generation cliff was ~1.5-2k).
+#   DATA_PATH=data/pg19_olmo_recall25_len4096  recall-supervised mix (fix #2;
+#     prep on a login node with tools/prepare_recall_mix.py).
+#   READ_INIT=1e-3  nonzero memory-read init (bootstrap-gate fix #3; step-0 is
+#     no longer bitwise base — the small version of what v1's clobber tested
+#     at large scale).
+DISTILL_COEFF=${DISTILL_COEFF:-0}
+DISTILL_WINDOW=${DISTILL_WINDOW:-2048}
+DISTILL_TEMP=${DISTILL_TEMP:-1.0}
+READ_INIT=${READ_INIT:-0}
 ARM="k${MEMORY_SLOTS}"; [ "$CCOT_DIRECT" = "true" ] && ARM="${ARM}-ccot"
 [ "$MEMORY_SLOTS_ITER" -gt 0 ] && ARM="${ARM}-ki${MEMORY_SLOTS_ITER}"
 [ "$CROSS_CHUNKS" -ne 4 ] && ARM="${ARM}-cc${CROSS_CHUNKS}"
 [ "$MAX_LENGTH" -ne 4096 ] && ARM="${ARM}-len${MAX_LENGTH}"
+[ "$DISTILL_COEFF" != "0" ] && ARM="${ARM}-dstl${DISTILL_COEFF}w${DISTILL_WINDOW}"
+[ "$READ_INIT" != "0" ] && ARM="${ARM}-ri${READ_INIT}"
+case "$DATA_PATH" in *recall*) ARM="${ARM}-rcl";; esac
 RUN_NAME=${RUN_NAME:-rung1-${ARM}}
 
 # throttle stays ON in every rung (harmless on the frozen loop) so optimizer
@@ -79,4 +99,8 @@ python train.py \
     --cortex.ccot_direct $CCOT_DIRECT \
     --cortex.cross_chunks $CROSS_CHUNKS \
     --cortex.eos_from_tokens true \
-    --cortex.freeze_loop true
+    --cortex.freeze_loop true \
+    --cortex.distill_coeff $DISTILL_COEFF \
+    --cortex.distill_window $DISTILL_WINDOW \
+    --cortex.distill_temp $DISTILL_TEMP \
+    --cortex.read_init_scale $READ_INIT
