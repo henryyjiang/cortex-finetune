@@ -1,0 +1,142 @@
+[
+  {
+    "bucket": ">50sess",
+    "question": "What degree did I graduate with?",
+    "gold": "Business Administration",
+    "pred": " B.A. (Bachelor of Arts) in English Literature and History, with a\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How long is my daily commute to work?",
+    "gold": "45 minutes each way",
+    "pred": " 1 hour and 30 minutes\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I redeem a $5 coupon on coffee creamer?",
+    "gold": "Target",
+    "pred": " I redeemed a $5.00 coffee creamer on the 15th of March, 1917, at the\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What play did I attend at the local community theater?",
+    "gold": "The Glass Menagerie",
+    "pred": " \"The Play of the People\" was the play I attended at the local community theater. I was\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What is the name of the playlist I created on Spotify?",
+    "gold": "Summer Vibes",
+    "pred": " \"The Music of the People\" by John Brown\n\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What was my last name before I changed it?",
+    "gold": "Johnson",
+    "pred": " \"Helen\"\n\n\n\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where do I take yoga classes?",
+    "gold": "Serenity Yoga",
+    "pred": " I take my classes at the Down Dog studio in the city of New York, where I can get\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What color did I repaint my bedroom walls?",
+    "gold": "a lighter shade of gray",
+    "pred": " You should have used a dark blue color for the walls. Dark blue is a good color for walls, as it is not too light or too dark, and",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "When did I volunteer at the local animal shelter's fundraising dinner?",
+    "gold": "February 14th",
+    "pred": " I volunteered at the local animal shelter's fundraising dinner in the past, and I'm looking forward to the event again.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I buy my new tennis racket from?",
+    "gold": "the sports store downtown",
+    "pred": " I bought my new tennis racket from a sporting goods store.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What was my previous occupation?",
+    "gold": "Marketing specialist at a small startup",
+    "pred": " My previous occupation was a teacher in a high school.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How much did I spend on a designer handbag?",
+    "gold": "$800",
+    "pred": " $150.00\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How many playlists do I have on Spotify?",
+    "gold": "20",
+    "pred": " 1",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I attend for my study abroad program?",
+    "gold": "University of Melbourne in Australia",
+    "pred": " I attended the University of California, specifically the University of\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What was the discount I got on my first purchase from the new clothing brand?",
+    "gold": "10%",
+    "pred": " The discount was 20% on the first purchase from the new clothing brand. The original price of the garment was $100, and the new brand offered a",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "How long did it take me to assemble the IKEA bookshelf?",
+    "gold": "4 hours",
+    "pred": " 15 minutes\n\n\n\n\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What did I buy for my sister's birthday gift?",
+    "gold": "a yellow dress",
+    "pred": " I bought a new book for my sister's birthday gift. I got it from the library, and it's a\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What speed is my new internet plan?",
+    "gold": "500 Mbps",
+    "pred": " 100 megabits per second (100 megabits/s) or 100 megabits per second (100 megabits/s) or 100",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "How many shirts did I pack for my 5-day trip to Costa Rica?",
+    "gold": "7",
+    "pred": " 10 shirts\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What was my previous stance on spirituality?",
+    "gold": "A staunch atheist",
+    "pred": " I was a materialist, and I believed in the materialistic theory that\n",
+    "correct": false
+  }
+]
