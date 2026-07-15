@@ -8,6 +8,8 @@ cortex_graft.py and gated behind config flags (default off).
 
   LSTMBuffer  — LM2-style K-slot LSTM-gated memory (M_cross / M_iter)
   DirectCCoT  — Coconut-style K=0 carry (single carried vector, no slots)
+  AccumCCoT   — AutoCompressor-style accumulating multi-vector carry
+                (per-chunk summary vectors concatenated, never overwritten)
 """
 from __future__ import annotations
 
@@ -264,3 +266,135 @@ class DirectCCoT(nn.Module):
     def read(self, state: torch.Tensor) -> torch.Tensor:
         """state [B, 1, D] → delta [B, 1, D], broadcast-added over positions."""
         return self.in_proj(state)
+
+
+# ---------------------------------------------------------------------------
+# Accumulating multi-vector carry (AutoCompressor-style, arXiv 2305.14788)
+# ---------------------------------------------------------------------------
+
+class AccumCCoT(nn.Module):
+    """
+    AutoCompressor-style accumulating carry: each chunk is compressed into
+    `n_vec` summary vectors which are APPENDED to the carried state (summary
+    accumulation — Chevalier et al. 2023 §3), never overwritten.  Later chunks
+    read the concatenation of ALL previous chunks' vectors.
+
+    Motivated by the 2026-07-14 signal-round null: the single overwritten
+    DirectCCoT vector (and the K=4 gated buffer) learned nothing even from
+    dense recall signal.  The published working configuration differs in
+    exactly the properties this module adds: carry WIDTH (AC: 50 vectors per
+    segment vs our 1) and ACCUMULATION (concat, direct pathway from every
+    chunk to every later chunk, no gate to fight through).
+
+    write (extract): n_vec learned query embeddings cross-attend over h_T
+           (slot-distinct by construction, like LSTMBuffer's candidate
+           attention but write-once — no gates, no buffer feedback).  The
+           vectors are tanh(LN(·))-bounded so the read attention sees
+           controlled scale.  Vectors are appended to the state; the module
+           itself never trims during training (the train loop asserts the
+           chunk count fits); at eval a FIFO cap `max_vecs` bounds memory on
+           arbitrarily long chunk chains.
+    read:  cross-attention (sequence queries the accumulated vectors) with a
+           zero-init out_proj — injection is a no-op at step 0 (step-0 == base
+           model, same recipe as LSTMBuffer.read / DirectCCoT.in_proj).
+
+    Because vectors are write-once, per-chunk slices of the state stay
+    separable — the train loop can implement AutoCompressor's
+    "stop-gradient after N compression steps" by slice-detaching rows older
+    than N chunks (see train.py --cortex.carry_grad_chunks).
+    """
+
+    def __init__(self, hidden_size: int, n_vec: int = 4, n_heads: int = 4,
+                 max_vecs: int = 64) -> None:
+        super().__init__()
+        assert hidden_size % n_heads == 0
+        assert max_vecs >= n_vec
+        self.hidden_size = hidden_size
+        self.n_vec       = n_vec
+        self.n_heads     = n_heads
+        self.head_dim    = hidden_size // n_heads
+        self.max_vecs    = max_vecs
+
+        # ── Write path (extraction) ─────────────────────────────────────────
+        # Learned query embeddings — the analog of AutoCompressor's <Sum>_i
+        # summary token embeddings.  Embedding-like: no weight decay / Muon.
+        self.vec_emb = nn.Parameter(torch.empty(n_vec, hidden_size))
+        nn.init.normal_(self.vec_emb, std=0.02)
+        self.vec_emb._no_weight_decay = True
+
+        self.wq_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.wk_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.wv_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.vec_ln  = nn.LayerNorm(hidden_size)
+
+        # ── Read path ────────────────────────────────────────────────────────
+        self.q_proj   = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.k_proj   = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.v_proj   = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.out_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        nn.init.zeros_(self.out_proj.weight)  # additive injection starts at zero
+
+    def extract(
+        self,
+        h_T: torch.Tensor,
+        pool_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """h_T [B, S, D] → this chunk's summary vectors [B, n_vec, D].
+        pool_mask [B, S] bool optionally restricts the extraction attention to
+        the open document's suffix (same semantics as LSTMBuffer.write)."""
+        B, S, D = h_T.shape
+        K, nh, hd = self.n_vec, self.n_heads, self.head_dim
+
+        q = self.wq_proj(self.vec_emb).view(K, nh, hd).transpose(0, 1)         # [nh, K, hd]
+        q = q.unsqueeze(0).expand(B, -1, -1, -1)                               # [B, nh, K, hd]
+        k = self.wk_proj(h_T).view(B, S, nh, hd).transpose(1, 2)               # [B, nh, S, hd]
+        v = self.wv_proj(h_T).view(B, S, nh, hd).transpose(1, 2)               # [B, nh, S, hd]
+
+        scores = (q @ k.transpose(-2, -1)) / math.sqrt(hd)                     # [B, nh, K, S]
+        if pool_mask is not None:
+            # Same safe-mask trick as LSTMBuffer.write: lanes with no allowed
+            # position attend unmasked and are zeroed below (the caller also
+            # zeroes such lanes' appended vectors via valid_write).
+            valid     = pool_mask.any(dim=1)                                   # [B]
+            safe_mask = pool_mask | (~valid).unsqueeze(1)                      # [B, S]
+            scores    = scores.masked_fill(
+                ~safe_mask.view(B, 1, 1, S), torch.finfo(scores.dtype).min
+            )
+        attended = F.softmax(scores, dim=-1) @ v                               # [B, nh, K, hd]
+        attended = attended.transpose(1, 2).contiguous().view(B, K, D)
+        if pool_mask is not None:
+            attended = attended * valid.view(B, 1, 1).to(attended.dtype)
+
+        # vec_emb residual keeps vector identity; tanh(LN) bounds the scale
+        # the read attention's k/v projections see (mirrors LSTMBuffer's
+        # tanh(LN(...)) candidates).
+        return torch.tanh(self.vec_ln(attended + self.vec_emb.unsqueeze(0)))
+
+    def append(self, state: Optional[torch.Tensor],
+               new_vecs: torch.Tensor) -> torch.Tensor:
+        """Concatenate this chunk's vectors onto the accumulated state and
+        apply the FIFO cap.  state None = first chunk (empty accumulation)."""
+        if state is None:
+            out = new_vecs
+        else:
+            out = torch.cat([state, new_vecs], dim=1)
+        if out.shape[1] > self.max_vecs:
+            out = out[:, -self.max_vecs:]
+        return out
+
+    def read(self, h: torch.Tensor, state: torch.Tensor) -> torch.Tensor:
+        """
+        h     : [B, S, D] — current queries
+        state : [B, N, D] — accumulated summary vectors (N = chunks seen × n_vec)
+        Returns [B, S, D] delta to add into h.
+        """
+        B, S, D = h.shape
+        N, nh, hd = state.shape[1], self.n_heads, self.head_dim
+
+        q = self.q_proj(h).view(B, S, nh, hd).transpose(1, 2)
+        k = self.k_proj(state).view(B, N, nh, hd).transpose(1, 2)
+        v = self.v_proj(state).view(B, N, nh, hd).transpose(1, 2)
+
+        attn = F.softmax((q @ k.transpose(-2, -1)) / math.sqrt(hd), dim=-1)
+        out  = (attn @ v).transpose(1, 2).contiguous().view(B, S, D)
+        return self.out_proj(out)

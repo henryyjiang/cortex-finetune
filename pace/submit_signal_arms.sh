@@ -65,6 +65,61 @@ arms)
     echo "  RUN=<name> DATA=data/pg19_olmo_val_recall100_len4096 \\"
     echo "      sbatch pace/eval_carry_ablation.sbatch   # carry delta on probe data"
     ;;
+final)
+    # FINAL BOLT-ON ROUND (2026-07-14 plan, post-signal-round-null) — 5 arms.
+    #
+    # Dense/no-boundary-crossing 2x2 (LM2-style: memory trains entirely
+    # within-window, carry becomes an inference-time question):
+    #   data axis:   PG-19 vs nemotron-math replay (the base RDM's own
+    #                continued-pretraining distribution)
+    #   memory axis: M_iter K=4 (LM2 per-position buffer) vs ccot_iter
+    #                (per-position Coconut carry across loop iterations)
+    # Both at MAX_LENGTH=1024 (the base's in-distribution window — it was
+    # continued-pretrained at 1024; no cliff) and CROSS_CHUNKS=1 (no chain).
+    # PG-19 at len1024 is ~29M tokens/epoch (one doc per row, truncated) →
+    # EPOCHS=4 ≈ the 117M-token budget of the earlier rungs.
+    #
+    # Arm A (AutoCompressor-CCoT): accumulating multi-vector carry +
+    # stop-grad-after-2 + randomized segments, on the recall mix.  EPOCHS=3
+    # ≈ 350M tokens — will NOT finish in 16h; submit with a longer walltime
+    # (sbatch --time=48:00:00 below; if inferno rejects it, drop to 16h and
+    # resume from the last checkpoint).
+    #
+    # Login-node prep (once, before submitting):
+    #   python tools/prepare_pg19_dataset.py --tokenizer ckpts/olmo8-cortex \
+    #       --out data/pg19_olmo_len1024 --max_length 1024
+    #   python tools/prepare_packed_dataset.py --tokenizer ckpts/olmo8-cortex \
+    #       --out data/nemotron_math_olmo_len1024 --max_length 1024 \
+    #       --max_tokens 130_000_000
+    PG1K=data/pg19_olmo_len1024
+    NEMO=data/nemotron_math_olmo_len1024
+    for D in $PG1K $NEMO; do
+        [ -d "$D" ] || { echo "missing $D — run the login-node prep in this file's header"; exit 1; }
+    done
+    # dense 2x2
+    MEMORY_SLOTS=0 MEMORY_SLOTS_ITER=4 MAX_LENGTH=1024 CROSS_CHUNKS=1 \
+        EPOCHS=4 DATA_PATH=$PG1K sbatch pace/rung1_frozen_loop.sbatch
+    MEMORY_SLOTS=0 CCOT_ITER=true MAX_LENGTH=1024 CROSS_CHUNKS=1 \
+        EPOCHS=4 DATA_PATH=$PG1K sbatch pace/rung1_frozen_loop.sbatch
+    MEMORY_SLOTS=0 MEMORY_SLOTS_ITER=4 MAX_LENGTH=1024 CROSS_CHUNKS=1 \
+        DATA_PATH=$NEMO sbatch pace/rung1_frozen_loop.sbatch
+    MEMORY_SLOTS=0 CCOT_ITER=true MAX_LENGTH=1024 CROSS_CHUNKS=1 \
+        DATA_PATH=$NEMO sbatch pace/rung1_frozen_loop.sbatch
+    # Arm A: AC-CCoT on the recall mix
+    MEMORY_SLOTS=0 ACCUM_CCOT=true CARRY_GRAD_CHUNKS=2 RANDOM_SEGMENTS=true \
+        EPOCHS=3 DATA_PATH=data/pg19_olmo_recall25_len4096 \
+        sbatch --time=48:00:00 pace/rung1_frozen_loop.sbatch
+    echo ""
+    echo "Submitted final arms:"
+    echo "  rung1-k0-ki4-cc1-len1024-ep4        rung1-k0-ci-cc1-len1024-ep4"
+    echo "  rung1-k0-ki4-cc1-len1024-nemo       rung1-k0-ci-cc1-len1024-nemo"
+    echo "  rung1-k0-acc4v-tb2-rs-ep3-rcl"
+    echo ""
+    echo "NOTE: the dense 2x2 arms train memory WITHIN-window only — their"
+    echo "cross-window carry is evaluated at inference (eval-side carry"
+    echo "support for M_iter/ccot_iter is the next code task; Arm A evals"
+    echo "run on the existing carry-ablation/longcontext harness unchanged)."
+    ;;
 *)
-    echo "usage: bash pace/submit_signal_arms.sh probe|arms"; exit 1;;
+    echo "usage: bash pace/submit_signal_arms.sh probe|arms|final"; exit 1;;
 esac

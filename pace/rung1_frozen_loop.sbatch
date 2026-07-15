@@ -64,13 +64,35 @@ DISTILL_COEFF=${DISTILL_COEFF:-0}
 DISTILL_WINDOW=${DISTILL_WINDOW:-2048}
 DISTILL_TEMP=${DISTILL_TEMP:-1.0}
 READ_INIT=${READ_INIT:-0}
+# Final-arms round (2026-07-14 plan):
+#   CCOT_ITER=true          per-position Coconut carry across loop iterations
+#                           (dense within-window; pair with CROSS_CHUNKS=1
+#                           MAX_LENGTH=1024 for the no-boundary-crossing arms)
+#   ACCUM_CCOT=true         AutoCompressor accumulating carry (Arm A);
+#                           ACCUM_VECS per-chunk vectors (default 4)
+#   CARRY_GRAD_CHUNKS=2     stop-gradient after 2 chunks (AC recipe)
+#   RANDOM_SEGMENTS=true    randomized chunk boundaries (AC recipe)
+#   EPOCHS=n                multiple passes over the data (token budget)
+CCOT_ITER=${CCOT_ITER:-false}
+ACCUM_CCOT=${ACCUM_CCOT:-false}
+ACCUM_VECS=${ACCUM_VECS:-4}
+ACCUM_MAX=${ACCUM_MAX:-64}
+CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-0}
+RANDOM_SEGMENTS=${RANDOM_SEGMENTS:-false}
+EPOCHS=${EPOCHS:-1}
 ARM="k${MEMORY_SLOTS}"; [ "$CCOT_DIRECT" = "true" ] && ARM="${ARM}-ccot"
+[ "$ACCUM_CCOT" = "true" ] && ARM="${ARM}-acc${ACCUM_VECS}v"
+[ "$CCOT_ITER" = "true" ] && ARM="${ARM}-ci"
 [ "$MEMORY_SLOTS_ITER" -gt 0 ] && ARM="${ARM}-ki${MEMORY_SLOTS_ITER}"
 [ "$CROSS_CHUNKS" -ne 4 ] && ARM="${ARM}-cc${CROSS_CHUNKS}"
 [ "$MAX_LENGTH" -ne 4096 ] && ARM="${ARM}-len${MAX_LENGTH}"
 [ "$DISTILL_COEFF" != "0" ] && ARM="${ARM}-dstl${DISTILL_COEFF}w${DISTILL_WINDOW}"
 [ "$READ_INIT" != "0" ] && ARM="${ARM}-ri${READ_INIT}"
+[ "$CARRY_GRAD_CHUNKS" -gt 0 ] && ARM="${ARM}-tb${CARRY_GRAD_CHUNKS}"
+[ "$RANDOM_SEGMENTS" = "true" ] && ARM="${ARM}-rs"
+[ "$EPOCHS" -gt 1 ] && ARM="${ARM}-ep${EPOCHS}"
 case "$DATA_PATH" in *recall*) ARM="${ARM}-rcl";; esac
+case "$DATA_PATH" in *nemotron*|*nemo*) ARM="${ARM}-nemo";; esac
 RUN_NAME=${RUN_NAME:-rung1-${ARM}}
 
 # throttle stays ON in every rung (harmless on the frozen loop) so optimizer
@@ -81,7 +103,7 @@ python train.py \
     --model_name ckpts/olmo8-cortex \
     --preprocessed_data_path $DATA_PATH \
     --max_length $MAX_LENGTH \
-    --epochs 1 \
+    --epochs $EPOCHS \
     --micro_batch_size 1 \
     --batch_size 16 \
     --optim_config.lr 1e-4 \
@@ -103,4 +125,10 @@ python train.py \
     --cortex.distill_coeff $DISTILL_COEFF \
     --cortex.distill_window $DISTILL_WINDOW \
     --cortex.distill_temp $DISTILL_TEMP \
-    --cortex.read_init_scale $READ_INIT
+    --cortex.read_init_scale $READ_INIT \
+    --cortex.ccot_iter $CCOT_ITER \
+    --cortex.accum_ccot $ACCUM_CCOT \
+    --cortex.accum_vecs $ACCUM_VECS \
+    --cortex.accum_max $ACCUM_MAX \
+    --cortex.carry_grad_chunks $CARRY_GRAD_CHUNKS \
+    --cortex.random_segments $RANDOM_SEGMENTS

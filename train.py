@@ -22,6 +22,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, get_scheduler, Aut
 from datasets import load_dataset, Dataset, load_from_disk
 from contextlib import nullcontext
 from stateful_parquet_dataset import get_parquet_dataloader
+from cortex_memory.chunking import random_chunk_sizes, detach_old_vecs
 from dataclasses import dataclass, field
 from jsonargparse import CLI
 from ellisadam import ELLISAdam
@@ -171,12 +172,47 @@ class CLISettings:
     #                       evals/eval_teacher_advantage.py first to locate it.
     # distill_temp        : KL softmax temperature (loss scaled by temp^2).
     # read_init_scale     : bootstrap-gate fix: init the memory READ projections
-    #                       (LSTMBuffer.out_proj / DirectCCoT.in_proj) to
-    #                       N(0, scale^2) instead of exactly zero, so the write
-    #                       path gets nonzero gradient from step 0 (at R=0 the
-    #                       write grads are exactly zero until R grows).  Keep
-    #                       small (~1e-3): step-0 is no longer bitwise base.
+    #                       (LSTMBuffer.out_proj / DirectCCoT.in_proj /
+    #                       AccumCCoT.out_proj) to N(0, scale^2) instead of
+    #                       exactly zero, so the write path gets nonzero
+    #                       gradient from step 0 (at R=0 the write grads are
+    #                       exactly zero until R grows).  Keep small (~1e-3):
+    #                       step-0 is no longer bitwise base.
     #                       0 = designed zero-init (default).
+    # ccot_iter           : per-position DirectCCoT carried across LOOP
+    #                       ITERATIONS (final-arms round, dense/no-boundary-
+    #                       crossing 2x2): Coconut-faithful twin of M_iter —
+    #                       write proj(h) per position at the end of each loop
+    #                       iteration, read it at the start of the next.  All
+    #                       gradients are within-window; train at
+    #                       cross_chunks=1.  Mutually exclusive with
+    #                       memory_slots_iter > 0 (keep arms clean).
+    # accum_ccot          : AutoCompressor-style accumulating carry (final-
+    #                       arms round, Arm A): each chunk compressed into
+    #                       accum_vecs summary vectors APPENDED to the carried
+    #                       state (never overwritten; direct pathway from
+    #                       every chunk to every later chunk).  Requires
+    #                       memory_slots == 0 and not ccot_direct.
+    # accum_vecs          : summary vectors extracted per chunk (AC used 50
+    #                       per 1024-2048-token segment at 2.7-7B scale; 4-8
+    #                       is proportionate at 1B with D=2048).
+    # accum_max           : FIFO cap on accumulated vectors — only binds at
+    #                       eval on long chunk chains (training asserts
+    #                       cross_chunks * accum_vecs <= accum_max).
+    # carry_grad_chunks   : stop-gradient horizon in chunks (AutoCompressor:
+    #                       gradients stop after 2 compression steps — no
+    #                       quality penalty, big graph-memory saving; frees
+    #                       memory for denser cadence, e.g. cross_chunks=8).
+    #                       accum_ccot: exact per-chunk slice detach (write-
+    #                       once rows stay separable).  LSTMBuffer/DirectCCoT
+    #                       (mixed state, rows not separable): the whole
+    #                       carry is detached every N chunks = TBPTT-N.
+    #                       0 = full-chain BPTT (pre-existing behavior).
+    # random_segments     : randomized segmenting (AutoCompressor): jitter the
+    #                       chunk boundaries ±25% of the even size each micro-
+    #                       batch, so the carry is robust to variable segment
+    #                       lengths at eval.  Incompatible with distillation
+    #                       (distill_window bookkeeping assumes even chunks).
     cortex: dict[str, Any] = field(
         default_factory=lambda: dict(
             use_memory=False, memory_slots=0, memory_slots_iter=0, memory_heads=4,
@@ -185,6 +221,8 @@ class CLISettings:
             l2sp_coeff=0.0, memory_lr=0.0, lora_rank=0, lora_alpha=32.0,
             distill_coeff=0.0, distill_window=2048, distill_temp=1.0,
             read_init_scale=0.0,
+            ccot_iter=False, accum_ccot=False, accum_vecs=4, accum_max=64,
+            carry_grad_chunks=0, random_segments=False,
         )
     )
 
@@ -218,6 +256,36 @@ class CLISettings:
                 "cortex.distill_window must exceed the chunk length — otherwise "
                 "the teacher sees exactly the student's context and the KL "
                 "target carries no cross-chunk information"
+            )
+        if self.cortex["accum_ccot"]:
+            assert self.cortex["memory_slots"] == 0 and not self.cortex["ccot_direct"], (
+                "cortex.accum_ccot replaces the K-slot buffer / DirectCCoT — "
+                "set memory_slots=0 and ccot_direct=false"
+            )
+            assert self.cortex["cross_chunks"] > 1, (
+                "cortex.accum_ccot is a cross-segment carry — it only trains "
+                "through the chunk chain (cross_chunks > 1)"
+            )
+            assert self.cortex["cross_chunks"] * self.cortex["accum_vecs"] \
+                <= self.cortex["accum_max"], (
+                "accum_max must hold every chunk's vectors during training "
+                "(cross_chunks * accum_vecs) — the FIFO cap is an eval device, "
+                "silently trimming during training would break the stop-grad "
+                "slice bookkeeping"
+            )
+        if self.cortex["ccot_iter"]:
+            assert self.cortex["memory_slots_iter"] == 0, (
+                "cortex.ccot_iter and memory_slots_iter are the two arms of "
+                "the dense within-window comparison — run one at a time"
+            )
+        if self.cortex["random_segments"]:
+            assert self.cortex["cross_chunks"] > 1, (
+                "cortex.random_segments varies the chunk boundaries — needs "
+                "cross_chunks > 1"
+            )
+            assert self.cortex["distill_coeff"] == 0, (
+                "cortex.random_segments is incompatible with distillation "
+                "(distill_window bookkeeping assumes even chunks)"
             )
         if self.is_parquet_dataset:
             assert (self.parquet_dataset_max_tokens is not None) or (self.max_steps != 0), "if using parquet need to specify max tokens or max steps"
@@ -477,6 +545,14 @@ def reset_cortex_graft_init(model, read_init_scale: float = 0.0):
     if ccot is not None:
         torch.nn.init.eye_(ccot.state_proj.weight); fixed.append("ccot.state_proj=eye")
         fixed.append("ccot." + _read_init(ccot.in_proj.weight, "in_proj"))
+    ci = getattr(cortex, "ccot_iter", None)                    # DirectCCoT (per-iter)
+    if ci is not None:
+        torch.nn.init.eye_(ci.state_proj.weight); fixed.append("ccot_iter.state_proj=eye")
+        fixed.append("ccot_iter." + _read_init(ci.in_proj.weight, "in_proj"))
+    acc = getattr(cortex, "accum", None)                       # AccumCCoT
+    if acc is not None:
+        torch.nn.init.normal_(acc.vec_emb, std=0.02)
+        fixed.append("accum.[vec_emb~N," + _read_init(acc.out_proj.weight, "out_proj") + "]")
     # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
     #     some module lacked reset_parameters and slipped through.
     bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]
@@ -550,13 +626,19 @@ def startup(cfg: CLISettings):
     if cfg.cortex["use_memory"]:
         for _k in ("use_memory", "memory_slots", "memory_slots_iter",
                    "memory_heads", "ccot_direct", "h_T_proj",
-                   "lora_rank", "lora_alpha"):
+                   "lora_rank", "lora_alpha",
+                   "ccot_iter", "accum_ccot", "accum_vecs", "accum_max"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
                   f"K_iter={cfg.cortex['memory_slots_iter']} "
                   f"ccot_direct={cfg.cortex['ccot_direct']} "
+                  f"ccot_iter={cfg.cortex['ccot_iter']} "
+                  f"accum_ccot={cfg.cortex['accum_ccot']} "
+                  f"(vecs={cfg.cortex['accum_vecs']}/max={cfg.cortex['accum_max']}) "
                   f"cross_chunks={cfg.cortex['cross_chunks']} "
+                  f"carry_grad_chunks={cfg.cortex['carry_grad_chunks']} "
+                  f"random_segments={cfg.cortex['random_segments']} "
                   f"lora_rank={cfg.cortex['lora_rank']}")
     if cfg.init_from_scratch:
         # https://huggingface.co/smcleish/Recurrent-Llama-3.2-2-4-2-untrained/blob/main/raven_modeling_minimal_with_init.py
@@ -1259,11 +1341,23 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 distill_coeff = float(cfg.cortex["distill_coeff"])
                 # the student's chunk forward must surface logits for the KL
                 distill_details = {**output_details, "return_logits": True}
+                grad_chunks = int(cfg.cortex["carry_grad_chunks"])
+                accum_on    = bool(cfg.cortex["accum_ccot"])
                 with model.no_sync() if is_accumulating and state["distributed"] else nullcontext():
-                    # .contiguous(): torch.chunk returns non-contiguous views and
-                    # the model's loss does labels.view(-1), which requires contiguity.
-                    x_chunks = [c.contiguous() for c in torch.chunk(input_ids, n_chunks, dim=1)]
-                    y_chunks = [c.contiguous() for c in torch.chunk(labels, n_chunks, dim=1)]
+                    # .contiguous(): torch.chunk/split return non-contiguous views
+                    # and the model's loss does labels.view(-1), which requires
+                    # contiguity.
+                    if cfg.cortex["random_segments"]:
+                        # AutoCompressor-style randomized segmenting: jitter the
+                        # boundaries ±25% each micro-batch (global RNG; ranks
+                        # may draw different sizes — harmless, every param
+                        # participates in every micro-step either way).
+                        sizes = random_chunk_sizes(input_ids.shape[1], n_chunks)
+                        x_chunks = [c.contiguous() for c in torch.split(input_ids, sizes, dim=1)]
+                        y_chunks = [c.contiguous() for c in torch.split(labels, sizes, dim=1)]
+                    else:
+                        x_chunks = [c.contiguous() for c in torch.chunk(input_ids, n_chunks, dim=1)]
+                        y_chunks = [c.contiguous() for c in torch.chunk(labels, n_chunks, dim=1)]
                     m_cross = None
                     chunk_losses = []
                     kl_terms = []
@@ -1271,6 +1365,19 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     n_ng = n_wg = 0
                     for gi, (xc, yc) in enumerate(zip(x_chunks, y_chunks)):
                         chunk_end += xc.shape[1]
+                        # Stop-gradient horizon (AutoCompressor: predicting the
+                        # adjacent segment suffices to learn compression).
+                        if grad_chunks > 0 and m_cross is not None:
+                            if accum_on:
+                                # write-once rows: exact slice detach of vectors
+                                # older than grad_chunks chunks
+                                m_cross = detach_old_vecs(
+                                    m_cross, int(cfg.cortex["accum_vecs"]), grad_chunks)
+                            elif gi % grad_chunks == 0:
+                                # gated/overwritten state (rows not separable):
+                                # detach the whole carry every grad_chunks
+                                # chunks = truncated BPTT with window N
+                                m_cross = m_cross.detach()
                         # distill chunks >= 2 only: on chunk 1 teacher and
                         # student contexts are identical, the KL is pure noise.
                         do_distill = (teacher is not None and gi > 0
