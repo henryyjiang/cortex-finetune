@@ -179,12 +179,52 @@ class CortexMemory(nn.Module):
         else:
             self.h_T_proj = None
 
+        # Inference-time iter-state carry (dense/no-boundary-crossing arms):
+        # a seed set via set_iter_carry() initializes the NEXT forward's
+        # per-position buffers instead of zeros.  Persistent across begin()
+        # (which consumes it) — lives outside _reset_runtime on purpose.
+        self._pending_iter_seed: Optional[torch.Tensor] = None  # [B,Ki,D]
+        self._pending_ci_seed:   Optional[torch.Tensor] = None  # [B,1,D]
+
         self._reset_runtime()
 
     @property
     def has_cross_state(self) -> bool:
         return (self.m_cross is not None or self.ccot_direct is not None
                 or self.accum is not None)
+
+    @property
+    def has_iter_state(self) -> bool:
+        return self.m_iter is not None or self.ccot_iter is not None
+
+    # ── inference-time iter-state carry (eval-side; training never calls) ────
+    def set_iter_carry(
+        self,
+        iter_state: Optional[torch.Tensor] = None,
+        ccot_state: Optional[torch.Tensor] = None,
+    ) -> None:
+        """Seed the NEXT forward's per-position buffers with a previous
+        window's pooled state (broadcast to every position).  Consumed by
+        begin(); forwards without a preceding call start from zeros exactly
+        as before."""
+        self._pending_iter_seed = iter_state
+        self._pending_ci_seed   = ccot_state
+
+    def get_iter_state(self, batch: int, seq_len: int, pool: str = "last"):
+        """Pool the final per-position buffers of the just-finished forward
+        into carryable states: (m_iter [B,Ki,D] | None, ccot [B,1,D] | None).
+        pool='last' takes the final position (causally complete — its state
+        reflects the whole window through attention); 'mean' averages."""
+        assert pool in ("last", "mean")
+
+        def _pool(buf, k):
+            if buf is None:
+                return None
+            v = buf.reshape(batch, seq_len, k, buf.shape[-1])
+            return v[:, -1] if pool == "last" else v.mean(dim=1)
+
+        return (_pool(self._iter_buf, self.memory_slots_iter),
+                _pool(self._ccot_iter_buf, 1))
 
     # ── per-call runtime ────────────────────────────────────────────────────
     def _reset_runtime(self) -> None:
@@ -195,6 +235,8 @@ class CortexMemory(nn.Module):
         self._valid_write:     Optional[torch.Tensor] = None  # [B] bool
         self._iter_buf:        Optional[torch.Tensor] = None  # [B*S,Ki,D]
         self._ccot_iter_buf:   Optional[torch.Tensor] = None  # [B*S,1,D]
+        self._iter_seed:       Optional[torch.Tensor] = None  # [B,Ki,D] this call
+        self._ci_seed:         Optional[torch.Tensor] = None  # [B,1,D]  this call
 
     def begin(
         self,
@@ -206,6 +248,9 @@ class CortexMemory(nn.Module):
     ) -> None:
         """Call once at the start of forward(), before iterate_forward."""
         self._reset_runtime()
+        # consume any pending iter-carry seed (inference-time dense carry)
+        self._iter_seed, self._pending_iter_seed = self._pending_iter_seed, None
+        self._ci_seed,   self._pending_ci_seed   = self._pending_ci_seed,   None
         self._cross_buf = m_cross_in
         if eos_mask is not None and self.has_cross_state:
             crm, pool, reset, valid = compute_eos_masks(eos_mask, seq_len, device, dtype)
@@ -231,20 +276,37 @@ class CortexMemory(nn.Module):
             delta = self.ccot_direct.read(self._cross_buf)            # [B,1,D] broadcast
             x = x + (delta * self._cross_read_mask if self._cross_read_mask is not None else delta)
 
-        # M_iter per-position short-term read (zero at the first iteration)
+        # M_iter per-position short-term read (zero at the first iteration,
+        # or the broadcast carry seed when one was set — inference-time carry)
         if self.m_iter is not None:
             B, S, D = x.shape
             if self._iter_buf is None:
-                self._iter_buf = x.new_zeros(B * S, self.memory_slots_iter, D)
+                self._iter_buf = (
+                    self._seed_expand(self._iter_seed, B, S, x)
+                    if self._iter_seed is not None
+                    else x.new_zeros(B * S, self.memory_slots_iter, D))
             x = x + self.m_iter.read(x.reshape(B * S, 1, D), self._iter_buf).reshape(B, S, D)
 
         # ccot_iter per-position read of the previous loop iteration's carry
         # (no read at the first iteration — nothing written yet, matching
-        # Coconut where the first forward has no latent thought to consume).
-        if self.ccot_iter is not None and self._ccot_iter_buf is not None:
+        # Coconut where the first forward has no latent thought to consume —
+        # unless a carry seed was set, which the first iteration then reads).
+        if self.ccot_iter is not None:
             B, S, D = x.shape
-            x = x + self.ccot_iter.read(self._ccot_iter_buf).reshape(B, S, D)
+            if self._ccot_iter_buf is None and self._ci_seed is not None:
+                self._ccot_iter_buf = self._seed_expand(self._ci_seed, B, S, x)
+            if self._ccot_iter_buf is not None:
+                x = x + self.ccot_iter.read(self._ccot_iter_buf).reshape(B, S, D)
         return x
+
+    @staticmethod
+    def _seed_expand(seed: torch.Tensor, B: int, S: int,
+                     like: torch.Tensor) -> torch.Tensor:
+        """[B,K,D] pooled carry → [B*S,K,D]: every position of the new window
+        starts from the previous window's pooled state."""
+        K, D = seed.shape[1], seed.shape[2]
+        return (seed.to(device=like.device, dtype=like.dtype)
+                .unsqueeze(1).expand(B, S, K, D).reshape(B * S, K, D))
 
     def iter_write(self, x: torch.Tensor) -> None:
         """Write each position's state into its own M_iter slots / ccot_iter
@@ -252,7 +314,10 @@ class CortexMemory(nn.Module):
         if self.m_iter is not None:
             B, S, D = x.shape
             if self._iter_buf is None:
-                self._iter_buf = x.new_zeros(B * S, self.memory_slots_iter, D)
+                self._iter_buf = (
+                    self._seed_expand(self._iter_seed, B, S, x)
+                    if self._iter_seed is not None
+                    else x.new_zeros(B * S, self.memory_slots_iter, D))
             self._iter_buf = self.m_iter.write(x.reshape(B * S, 1, D), self._iter_buf)
         if self.ccot_iter is not None:
             B, S, D = x.shape

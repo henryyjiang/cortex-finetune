@@ -223,6 +223,77 @@ class TestCCoTIter:
 
 
 # ---------------------------------------------------------------------------
+# inference-time iter-state carry (set_iter_carry / get_iter_state)
+# ---------------------------------------------------------------------------
+
+class TestIterCarry:
+
+    def test_get_state_shapes(self):
+        model = FakeRaven(use_memory=True, memory_slots=0, memory_slots_iter=2,
+                          ccot_iter=True)
+        model(_ids(), (0, 2))
+        it, ci = model.cortex.get_iter_state(B, S, pool="last")
+        assert it.shape == (B, 2, H)
+        assert ci.shape == (B, 1, H)
+
+    def test_last_pool_is_final_position(self):
+        model = FakeRaven(use_memory=True, memory_slots=0, memory_slots_iter=2)
+        model(_ids(), (0, 2))
+        buf = model.cortex._iter_buf.reshape(B, S, 2, H)
+        it, _ = model.cortex.get_iter_state(B, S, pool="last")
+        assert torch.allclose(it, buf[:, -1])
+
+    def test_seed_changes_next_forward_m_iter(self):
+        # also proves the seed is consumed once: b (post-seed) == c (unseeded)
+        model = FakeRaven(use_memory=True, memory_slots=0, memory_slots_iter=2)
+        nn.init.normal_(model.cortex.m_iter.out_proj.weight, std=0.05)
+        ids = _ids()
+        seed = torch.randn(B, 2, H)
+        model.cortex.set_iter_carry(seed, None)
+        torch.manual_seed(9); a = model(ids, (0, 2))
+        torch.manual_seed(9); b = model(ids, (0, 2))   # seed consumed — no carry
+        torch.manual_seed(9); c = model(ids, (0, 2))   # unseeded again
+        assert not torch.allclose(a["logits"], b["logits"])
+        assert torch.allclose(b["logits"], c["logits"])
+
+    def test_seed_read_at_first_iteration_ccot_iter(self):
+        """With a seed, ccot_iter reads at iteration 1 (where unseeded it
+        reads nothing) — the mechanism that makes cross-window carry work."""
+        model = FakeRaven(use_memory=True, memory_slots=0, ccot_iter=True)
+        nn.init.normal_(model.cortex.ccot_iter.in_proj.weight, std=0.05)
+        ids = _ids()
+        model.cortex.set_iter_carry(None, torch.randn(B, 1, H))
+        torch.manual_seed(10); a = model(ids, (0, 1))  # single iteration
+        torch.manual_seed(10); b = model(ids, (0, 1))
+        assert not torch.allclose(a["logits"], b["logits"])
+
+    def test_zero_init_seed_is_noop(self):
+        """Untrained read (zero out_proj/in_proj) → seeding changes nothing:
+        the carried condition == zeroed condition at step 0, mirroring the
+        cross-carry ablation's chunk-1 control property."""
+        model = FakeRaven(use_memory=True, memory_slots=0, memory_slots_iter=2,
+                          ccot_iter=True)
+        ids = _ids()
+        model.cortex.set_iter_carry(torch.randn(B, 2, H), torch.randn(B, 1, H))
+        torch.manual_seed(11); a = model(ids, (0, 2))
+        torch.manual_seed(11); b = model(ids, (0, 2))
+        assert torch.allclose(a["logits"], b["logits"])
+
+    def test_chunk_chain_carry(self):
+        """End-to-end: pool window 1's state, seed window 2 — window 2's
+        logits must differ from an unseeded window 2 (active read)."""
+        model = FakeRaven(use_memory=True, memory_slots=0, memory_slots_iter=2)
+        nn.init.normal_(model.cortex.m_iter.out_proj.weight, std=0.05)
+        w1, w2 = _ids(), _ids()
+        model(w1, (0, 2))
+        it, ci = model.cortex.get_iter_state(B, S, pool="last")
+        model.cortex.set_iter_carry(it, ci)
+        torch.manual_seed(12); a = model(w2, (0, 2))
+        torch.manual_seed(12); b = model(w2, (0, 2))
+        assert not torch.allclose(a["logits"], b["logits"])
+
+
+# ---------------------------------------------------------------------------
 # chunking helpers (imported by train.py — real code under test)
 # ---------------------------------------------------------------------------
 
