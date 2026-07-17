@@ -1,0 +1,29 @@
+{
+  "olmo8-cortex": {
+    "\u22645sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226410sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226420sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226450sess": {
+      "correct": 1,
+      "total": 200,
+      "accuracy": 0.005
+    },
+    ">50sess": {
+      "correct": 0,
+      "total": 200,
+      "accuracy": 0.0
+    }
+  }
+}

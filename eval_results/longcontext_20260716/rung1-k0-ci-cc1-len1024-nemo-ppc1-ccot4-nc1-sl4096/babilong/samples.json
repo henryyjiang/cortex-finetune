@@ -1,0 +1,638 @@
+{
+  "qa1": [
+    {
+      "bucket": "1k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " bathroom\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " The answer is the word \"garden.\"\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Mary? ",
+      "gold": "kitchen",
+      "pred": " bathroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is John? ",
+      "gold": "kitchen",
+      "pred": " Hallway\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Sandra? ",
+      "gold": "bedroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " to the\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " where I\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is Mary? ",
+      "gold": "kitchen",
+      "pred": " Where is the\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is John? ",
+      "gold": "kitchen",
+      "pred": " John\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is Sandra? ",
+      "gold": "bedroom",
+      "pred": " to the\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " \"I\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " the re, the re, the re, the re,",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is Mary? ",
+      "gold": "kitchen",
+      "pred": " The\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is John? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is Sandra? ",
+      "gold": "bedroom",
+      "pred": " \"I\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " and, and\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is Mary? ",
+      "gold": "kitchen",
+      "pred": " 1, and\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is John? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is Sandra? ",
+      "gold": "bedroom",
+      "pred": " He\u2019s to the\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " I, and the\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " to be. I, and to be. I, and",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is Mary? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is John? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is Sandra? ",
+      "gold": "bedroom",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " I, and the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is Mary? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is John? ",
+      "gold": "kitchen",
+      "pred": " He, and he, and he, and he, and",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is Sandra? ",
+      "gold": "bedroom",
+      "pred": " to\n",
+      "correct": false
+    }
+  ],
+  "qa2": [
+    {
+      "bucket": "1k",
+      "question": "Where is the football? ",
+      "gold": "kitchen",
+      "pred": " The answer is the place where the football is located. In",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is the milk? ",
+      "gold": "garden",
+      "pred": " bathroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " office\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " office\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is the apple? ",
+      "gold": "kitchen",
+      "pred": " office\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is the football? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is the milk? ",
+      "gold": "garden",
+      "pred": " and\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " The\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " The\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is the apple? ",
+      "gold": "kitchen",
+      "pred": " and\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is the football? ",
+      "gold": "kitchen",
+      "pred": " to the\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is the milk? ",
+      "gold": "garden",
+      "pred": " And the F, and the light, and the light,",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " I, and the\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " \"I, and the\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is the apple? ",
+      "gold": "kitchen",
+      "pred": " He. He\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is the football? ",
+      "gold": "kitchen",
+      "pred": " the, and the\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is the milk? ",
+      "gold": "garden",
+      "pred": " 0, the, and, and, the, and",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " And the\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is the apple? ",
+      "gold": "kitchen",
+      "pred": " The\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is the football? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is the milk? ",
+      "gold": "garden",
+      "pred": " and\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " \"I, but he, but the\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " to be. I was. And he was. I was",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is the apple? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the football? ",
+      "gold": "kitchen",
+      "pred": " He, and he, and he, but I, and",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the milk? ",
+      "gold": "garden",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " to be the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the apple? ",
+      "gold": "bedroom",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the apple? ",
+      "gold": "kitchen",
+      "pred": " to be, and the\n",
+      "correct": false
+    }
+  ],
+  "qa3": [
+    {
+      "bucket": "1k",
+      "question": "Where was the football before the garden? ",
+      "gold": "kitchen",
+      "pred": " classroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the football before the hallway? ",
+      "gold": "garden",
+      "pred": " classroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the football before the hallway? ",
+      "gold": "office",
+      "pred": " room\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the apple before the office? ",
+      "gold": "kitchen",
+      "pred": " classroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the milk before the hallway? ",
+      "gold": "garden",
+      "pred": " classroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the football before the garden? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the apple before the kitchen? ",
+      "gold": "bathroom",
+      "pred": " Where was the room. Mary. Mary went to the room",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the apple before the garden? ",
+      "gold": "kitchen",
+      "pred": " Where was the\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the apple before the bedroom? ",
+      "gold": "garden",
+      "pred": " Mary. Mary\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the football before the bathroom? ",
+      "gold": "kitchen",
+      "pred": " Where was the\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the football before the garden? ",
+      "gold": "kitchen",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the apple before the kitchen? ",
+      "gold": "bathroom",
+      "pred": " to the. \"I. I. I. I.",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the apple before the garden? ",
+      "gold": "kitchen",
+      "pred": " the. The. The\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the apple before the bedroom? ",
+      "gold": "garden",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the football before the bathroom? ",
+      "gold": "kitchen",
+      "pred": " the. The. The. The. The. The.",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the football before the garden? ",
+      "gold": "kitchen",
+      "pred": " to the\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the apple before the kitchen? ",
+      "gold": "bathroom",
+      "pred": " 1, 1, 1, 1,",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the apple before the garden? ",
+      "gold": "kitchen",
+      "pred": " I, I, I, I, I, I,",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the apple before the bedroom? ",
+      "gold": "garden",
+      "pred": " I'm\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the football before the bathroom? ",
+      "gold": "kitchen",
+      "pred": " and\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the football before the garden? ",
+      "gold": "kitchen",
+      "pred": " and the man, and\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the apple before the kitchen? ",
+      "gold": "bathroom",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the apple before the garden? ",
+      "gold": "kitchen",
+      "pred": " and the. The\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the apple before the bedroom? ",
+      "gold": "garden",
+      "pred": " \"I, and the\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the football before the bathroom? ",
+      "gold": "kitchen",
+      "pred": " I. I. I. I. I. I.",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the football before the garden? ",
+      "gold": "kitchen",
+      "pred": " but he, but he, but he, but he,",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the apple before the kitchen? ",
+      "gold": "bathroom",
+      "pred": " the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the apple before the garden? ",
+      "gold": "kitchen",
+      "pred": " as to me, as to me, as to me,",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the apple before the bedroom? ",
+      "gold": "garden",
+      "pred": " He, the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the football before the bathroom? ",
+      "gold": "kitchen",
+      "pred": " The\n",
+      "correct": false
+    }
+  ]
+}

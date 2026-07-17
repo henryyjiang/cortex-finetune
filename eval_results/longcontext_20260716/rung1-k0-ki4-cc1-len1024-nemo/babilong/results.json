@@ -1,0 +1,100 @@
+{
+  "final_checkpoint": {
+    "qa1": {
+      "1k": {
+        "correct": 10,
+        "total": 100,
+        "accuracy": 0.1
+      },
+      "2k": {
+        "correct": 9,
+        "total": 100,
+        "accuracy": 0.09
+      },
+      "4k": {
+        "correct": 11,
+        "total": 100,
+        "accuracy": 0.11
+      },
+      "8k": {
+        "correct": 13,
+        "total": 100,
+        "accuracy": 0.13
+      },
+      "16k": {
+        "correct": 11,
+        "total": 100,
+        "accuracy": 0.11
+      },
+      "32k": {
+        "correct": 11,
+        "total": 100,
+        "accuracy": 0.11
+      }
+    },
+    "qa2": {
+      "1k": {
+        "correct": 10,
+        "total": 100,
+        "accuracy": 0.1
+      },
+      "2k": {
+        "correct": 8,
+        "total": 100,
+        "accuracy": 0.08
+      },
+      "4k": {
+        "correct": 9,
+        "total": 100,
+        "accuracy": 0.09
+      },
+      "8k": {
+        "correct": 8,
+        "total": 100,
+        "accuracy": 0.08
+      },
+      "16k": {
+        "correct": 7,
+        "total": 100,
+        "accuracy": 0.07
+      },
+      "32k": {
+        "correct": 4,
+        "total": 100,
+        "accuracy": 0.04
+      }
+    },
+    "qa3": {
+      "1k": {
+        "correct": 14,
+        "total": 100,
+        "accuracy": 0.14
+      },
+      "2k": {
+        "correct": 17,
+        "total": 100,
+        "accuracy": 0.17
+      },
+      "4k": {
+        "correct": 11,
+        "total": 100,
+        "accuracy": 0.11
+      },
+      "8k": {
+        "correct": 14,
+        "total": 100,
+        "accuracy": 0.14
+      },
+      "16k": {
+        "correct": 12,
+        "total": 100,
+        "accuracy": 0.12
+      },
+      "32k": {
+        "correct": 13,
+        "total": 100,
+        "accuracy": 0.13
+      }
+    }
+  }
+}

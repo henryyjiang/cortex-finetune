@@ -1,0 +1,6 @@
+model,bucket,correct,total,accuracy
+olmo8-cortex,≤5sess,0,0,0.0000
+olmo8-cortex,≤10sess,0,0,0.0000
+olmo8-cortex,≤20sess,0,0,0.0000
+olmo8-cortex,≤50sess,19,200,0.0950
+olmo8-cortex,>50sess,19,200,0.0950
