@@ -1,4 +1,0 @@
-run,id,state,steps,tokens,loss_start,loss_final,loss_min,nan_loss_rows,skipped_updates,gnorm_p50,gnorm_p99,gnorm_max,clip_active_frac,max_loss_jump,end_trend,FLAGS
-rung1-k0-rcl,xqz5wa4m,finished,1787,117112832,3.4319,2.7276,2.213,0,0,0.676,1.162,3.684,0.02,+0.738@1371,2.7330->2.7221,final loss >> min loss
-rung1-k4-rcl,jrq2y4xj,finished,1787,117112832,3.4257,2.7269,2.2121,0,0,0.68,1.213,4.008,0.02,+0.739@1371,2.7326->2.7214,final loss >> min loss
-rung1-k4-ri1e-3,o37dqxjn,finished,1787,117112832,3.4194,2.7288,2.2169,0,0,0.681,1.219,3.549,0.021,+0.736@1371,2.7352->2.7237,final loss >> min loss

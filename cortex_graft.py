@@ -22,15 +22,16 @@ Config flags (getattr defaults)
   memory_slots_iter   : int  = 0       K for M_iter (per-position); 0 disables
   memory_heads        : int  = 4       attention heads in both buffers
   ccot_direct         : bool = False   K=0 Coconut carry (only when memory_slots==0)
-  ccot_iter           : bool = False   per-position Coconut carry ACROSS LOOP
-                                       ITERATIONS (dense, within-window — the
-                                       DirectCCoT twin of M_iter; no cross-
-                                       segment state, trains at cross_chunks=1)
   accum_ccot          : bool = False   AutoCompressor-style accumulating carry
                                        (only when memory_slots==0, replaces
                                        ccot_direct's single overwritten vector)
   accum_vecs          : int  = 4       summary vectors extracted per chunk
   accum_max           : int  = 64      FIFO cap on accumulated vectors (eval)
+  gated_accum         : bool = False   gated-accumulation LM2 variant: the K-slot
+                                       M_cross becomes a GatedAccumBuffer —
+                                       AccumCCoT's extraction write, LM2 gated
+                                       merge (requires memory_slots > 0; target
+                                       k=16/32).  h_T_proj is skipped for it.
   h_T_proj            : bool = True     R4 mitigation projection before M_cross write
   lora_rank           : int  = 0       LoRA-on-loop rank (0 disables; see LoopLoRA)
   lora_alpha          : float = 32     LoRA scaling numerator (scale = alpha/rank)
@@ -50,7 +51,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from cortex_memory.buffers import LSTMBuffer, DirectCCoT, AccumCCoT
+from cortex_memory.buffers import LSTMBuffer, DirectCCoT, AccumCCoT, GatedAccumBuffer
 from cortex_memory.eos import compute_eos_masks, apply_write_reset, apply_valid_write
 
 
@@ -147,8 +148,16 @@ class CortexMemory(nn.Module):
 
         # M_cross: LM2 K-slot buffer (K>0) XOR DirectCCoT K=0 carry XOR
         # AccumCCoT accumulating carry (K=0; takes precedence over ccot_direct
-        # — train.py asserts they are not both set).
-        self.m_cross = LSTMBuffer(D, K, nh) if K > 0 else None
+        # — train.py asserts they are not both set).  gated_accum swaps the
+        # K-slot buffer for the GatedAccumBuffer (extraction write + LM2 gated
+        # merge) — same state shape and write/read signatures, so the whole
+        # m_cross path below is shared.
+        if K > 0:
+            self.m_cross = (GatedAccumBuffer(D, K, nh)
+                            if bool(getattr(config, "gated_accum", False))
+                            else LSTMBuffer(D, K, nh))
+        else:
+            self.m_cross = None
         self.accum   = (
             AccumCCoT(D, int(getattr(config, "accum_vecs", 4)), nh,
                       int(getattr(config, "accum_max", 64)))
@@ -161,30 +170,18 @@ class CortexMemory(nn.Module):
         )
         # M_iter: per-position short-term buffer (independent of M_cross).
         self.m_iter = LSTMBuffer(D, Ki, nh) if Ki > 0 else None
-        # ccot_iter: per-position DirectCCoT carried across LOOP ITERATIONS —
-        # the Coconut-faithful twin of M_iter (dense within-window read/write,
-        # no slots/gates, no cross-segment state).  Sequence dim folds into
-        # the batch exactly like M_iter, so causality holds by construction.
-        self.ccot_iter = (
-            DirectCCoT(D) if bool(getattr(config, "ccot_iter", False)) else None
-        )
 
         # R4 dual-role mitigation: project h_T before the M_cross write so the
         # buffer path and the coda path see independent representations.
-        # Identity-init → no-op at step 0.  LM2 mode only.
-        if self.m_cross is not None and bool(getattr(config, "h_T_proj", True)):
+        # Identity-init → no-op at step 0.  LSTMBuffer mode only — the
+        # GatedAccumBuffer's extraction wk/wv already decouple the write path
+        # from the coda path (same reason AccumCCoT takes raw h_T).
+        if isinstance(self.m_cross, LSTMBuffer) and bool(getattr(config, "h_T_proj", True)):
             self.h_T_proj = nn.Linear(D, D, bias=False)
             nn.init.eye_(self.h_T_proj.weight)
             self.h_T_proj.weight._no_weight_decay = True
         else:
             self.h_T_proj = None
-
-        # Inference-time iter-state carry (dense/no-boundary-crossing arms):
-        # a seed set via set_iter_carry() initializes the NEXT forward's
-        # per-position buffers instead of zeros.  Persistent across begin()
-        # (which consumes it) — lives outside _reset_runtime on purpose.
-        self._pending_iter_seed: Optional[torch.Tensor] = None  # [B,Ki,D]
-        self._pending_ci_seed:   Optional[torch.Tensor] = None  # [B,1,D]
 
         self._reset_runtime()
 
@@ -192,39 +189,6 @@ class CortexMemory(nn.Module):
     def has_cross_state(self) -> bool:
         return (self.m_cross is not None or self.ccot_direct is not None
                 or self.accum is not None)
-
-    @property
-    def has_iter_state(self) -> bool:
-        return self.m_iter is not None or self.ccot_iter is not None
-
-    # ── inference-time iter-state carry (eval-side; training never calls) ────
-    def set_iter_carry(
-        self,
-        iter_state: Optional[torch.Tensor] = None,
-        ccot_state: Optional[torch.Tensor] = None,
-    ) -> None:
-        """Seed the NEXT forward's per-position buffers with a previous
-        window's pooled state (broadcast to every position).  Consumed by
-        begin(); forwards without a preceding call start from zeros exactly
-        as before."""
-        self._pending_iter_seed = iter_state
-        self._pending_ci_seed   = ccot_state
-
-    def get_iter_state(self, batch: int, seq_len: int, pool: str = "last"):
-        """Pool the final per-position buffers of the just-finished forward
-        into carryable states: (m_iter [B,Ki,D] | None, ccot [B,1,D] | None).
-        pool='last' takes the final position (causally complete — its state
-        reflects the whole window through attention); 'mean' averages."""
-        assert pool in ("last", "mean")
-
-        def _pool(buf, k):
-            if buf is None:
-                return None
-            v = buf.reshape(batch, seq_len, k, buf.shape[-1])
-            return v[:, -1] if pool == "last" else v.mean(dim=1)
-
-        return (_pool(self._iter_buf, self.memory_slots_iter),
-                _pool(self._ccot_iter_buf, 1))
 
     # ── per-call runtime ────────────────────────────────────────────────────
     def _reset_runtime(self) -> None:
@@ -234,9 +198,6 @@ class CortexMemory(nn.Module):
         self._write_reset:     Optional[torch.Tensor] = None  # [B] bool
         self._valid_write:     Optional[torch.Tensor] = None  # [B] bool
         self._iter_buf:        Optional[torch.Tensor] = None  # [B*S,Ki,D]
-        self._ccot_iter_buf:   Optional[torch.Tensor] = None  # [B*S,1,D]
-        self._iter_seed:       Optional[torch.Tensor] = None  # [B,Ki,D] this call
-        self._ci_seed:         Optional[torch.Tensor] = None  # [B,1,D]  this call
 
     def begin(
         self,
@@ -248,9 +209,6 @@ class CortexMemory(nn.Module):
     ) -> None:
         """Call once at the start of forward(), before iterate_forward."""
         self._reset_runtime()
-        # consume any pending iter-carry seed (inference-time dense carry)
-        self._iter_seed, self._pending_iter_seed = self._pending_iter_seed, None
-        self._ci_seed,   self._pending_ci_seed   = self._pending_ci_seed,   None
         self._cross_buf = m_cross_in
         if eos_mask is not None and self.has_cross_state:
             crm, pool, reset, valid = compute_eos_masks(eos_mask, seq_len, device, dtype)
@@ -276,54 +234,23 @@ class CortexMemory(nn.Module):
             delta = self.ccot_direct.read(self._cross_buf)            # [B,1,D] broadcast
             x = x + (delta * self._cross_read_mask if self._cross_read_mask is not None else delta)
 
-        # M_iter per-position short-term read (zero at the first iteration,
-        # or the broadcast carry seed when one was set — inference-time carry)
+        # M_iter per-position short-term read (zero at the first iteration)
         if self.m_iter is not None:
             B, S, D = x.shape
             if self._iter_buf is None:
-                self._iter_buf = (
-                    self._seed_expand(self._iter_seed, B, S, x)
-                    if self._iter_seed is not None
-                    else x.new_zeros(B * S, self.memory_slots_iter, D))
+                self._iter_buf = x.new_zeros(B * S, self.memory_slots_iter, D)
             x = x + self.m_iter.read(x.reshape(B * S, 1, D), self._iter_buf).reshape(B, S, D)
-
-        # ccot_iter per-position read of the previous loop iteration's carry
-        # (no read at the first iteration — nothing written yet, matching
-        # Coconut where the first forward has no latent thought to consume —
-        # unless a carry seed was set, which the first iteration then reads).
-        if self.ccot_iter is not None:
-            B, S, D = x.shape
-            if self._ccot_iter_buf is None and self._ci_seed is not None:
-                self._ccot_iter_buf = self._seed_expand(self._ci_seed, B, S, x)
-            if self._ccot_iter_buf is not None:
-                x = x + self.ccot_iter.read(self._ccot_iter_buf).reshape(B, S, D)
         return x
 
-    @staticmethod
-    def _seed_expand(seed: torch.Tensor, B: int, S: int,
-                     like: torch.Tensor) -> torch.Tensor:
-        """[B,K,D] pooled carry → [B*S,K,D]: every position of the new window
-        starts from the previous window's pooled state."""
-        K, D = seed.shape[1], seed.shape[2]
-        return (seed.to(device=like.device, dtype=like.dtype)
-                .unsqueeze(1).expand(B, S, K, D).reshape(B * S, K, D))
-
     def iter_write(self, x: torch.Tensor) -> None:
-        """Write each position's state into its own M_iter slots / ccot_iter
-        carry, after the core layers (end of one loop iteration)."""
-        if self.m_iter is not None:
-            B, S, D = x.shape
-            if self._iter_buf is None:
-                self._iter_buf = (
-                    self._seed_expand(self._iter_seed, B, S, x)
-                    if self._iter_seed is not None
-                    else x.new_zeros(B * S, self.memory_slots_iter, D))
-            self._iter_buf = self.m_iter.write(x.reshape(B * S, 1, D), self._iter_buf)
-        if self.ccot_iter is not None:
-            B, S, D = x.shape
-            # DirectCCoT.write pools over the sequence dim — folding S into
-            # the batch makes that a per-position identity pool (mean of 1).
-            self._ccot_iter_buf = self.ccot_iter.write(x.reshape(B * S, 1, D))
+        """Write each position's state into its own M_iter slots, after the
+        core layers (end of one loop iteration)."""
+        if self.m_iter is None:
+            return
+        B, S, D = x.shape
+        if self._iter_buf is None:
+            self._iter_buf = x.new_zeros(B * S, self.memory_slots_iter, D)
+        self._iter_buf = self.m_iter.write(x.reshape(B * S, 1, D), self._iter_buf)
 
     # ── hook called in forward() after iterate_forward ──────────────────────
     def cross_write(self, h_T: torch.Tensor) -> Optional[torch.Tensor]:

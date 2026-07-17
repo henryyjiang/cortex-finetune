@@ -22,6 +22,13 @@
 #   RUN=rung1-k0-ccot-v2 sbatch pace/eval_carry_ablation.sbatch
 #   RUN=rung2-k4-unfreeze500 sbatch pace/eval_carry_ablation.sbatch
 # (rung1-k0-v2 has no cross state — the script refuses it by design.)
+#
+# A0.1 slice ablation (AccumCCoT models only, two-track plan): also run the
+# carried-with-oldest/newest-vectors-dropped conditions — is all the signal
+# in the most recent chunk's vectors?
+#   RUN=rung1-k0-acc4v-tb2-rs-ep3-rcl SLICE_ABLATE=both \
+#       sbatch pace/eval_carry_ablation.sbatch
+# SLICE_N (default 0 = one chunk's worth) / SLICE_OP (drop|zero) refine it.
 
 cd $SLURM_SUBMIT_DIR
 
@@ -46,7 +53,14 @@ OUT="eval_results/carry_ablation_${EVAL_TAG}/${RUN}"
 mkdir -p "$OUT"
 echo "=== carry ablation: $RUN -> $OUT ==="
 
+SLICE_ABLATE=${SLICE_ABLATE:-none}
+SLICE_N=${SLICE_N:-0}
+SLICE_OP=${SLICE_OP:-drop}
+
 python evals/eval_carry_ablation.py \
     --model_name "$MODEL_DIR" \
     --data "$DATA" \
+    --slice_ablate "$SLICE_ABLATE" \
+    --slice_n "$SLICE_N" \
+    --slice_op "$SLICE_OP" \
     --out_dir "$OUT"

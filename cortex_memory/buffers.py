@@ -6,10 +6,13 @@ modules know nothing about the host model: they operate on [B, S, D] hidden
 states and [B, K, D] buffers.  They are grafted into RavenForCausalLM via
 cortex_graft.py and gated behind config flags (default off).
 
-  LSTMBuffer  — LM2-style K-slot LSTM-gated memory (M_cross / M_iter)
-  DirectCCoT  — Coconut-style K=0 carry (single carried vector, no slots)
-  AccumCCoT   — AutoCompressor-style accumulating multi-vector carry
-                (per-chunk summary vectors concatenated, never overwritten)
+  LSTMBuffer       — LM2-style K-slot LSTM-gated memory (M_cross / M_iter)
+  DirectCCoT       — Coconut-style K=0 carry (single carried vector, no slots)
+  AccumCCoT        — AutoCompressor-style accumulating multi-vector carry
+                     (per-chunk summary vectors concatenated, never overwritten)
+  GatedAccumBuffer — gated-accumulation LM2 variant: K fixed slots written via
+                     AccumCCoT's extraction attention, merged by the LM2 gate
+                     (append vs gated-overwrite is the only difference vs AccumCCoT)
 """
 from __future__ import annotations
 
@@ -269,6 +272,53 @@ class DirectCCoT(nn.Module):
 
 
 # ---------------------------------------------------------------------------
+# Shared extraction attention (AutoCompressor-style summary vectors)
+# ---------------------------------------------------------------------------
+
+def _extract_summary_vectors(
+    mod: nn.Module,
+    h_T: torch.Tensor,
+    pool_mask: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """h_T [B, S, D] → K summary vectors [B, K, D] via K learned query
+    embeddings (mod.vec_emb) cross-attending over h_T, with a vec_emb residual
+    and tanh(LN(·)) bounding.
+
+    Shared by AccumCCoT.extract and GatedAccumBuffer.extract so the two arms'
+    write paths are mathematically identical — any behavioral difference
+    between them is then attributable to append vs gated-overwrite alone.
+    Expects mod to provide: vec_emb [K, D], wq_proj/wk_proj/wv_proj, vec_ln,
+    n_heads, head_dim."""
+    B, S, D = h_T.shape
+    K, nh, hd = mod.vec_emb.shape[0], mod.n_heads, mod.head_dim
+
+    q = mod.wq_proj(mod.vec_emb).view(K, nh, hd).transpose(0, 1)           # [nh, K, hd]
+    q = q.unsqueeze(0).expand(B, -1, -1, -1)                               # [B, nh, K, hd]
+    k = mod.wk_proj(h_T).view(B, S, nh, hd).transpose(1, 2)                # [B, nh, S, hd]
+    v = mod.wv_proj(h_T).view(B, S, nh, hd).transpose(1, 2)                # [B, nh, S, hd]
+
+    scores = (q @ k.transpose(-2, -1)) / math.sqrt(hd)                     # [B, nh, K, S]
+    if pool_mask is not None:
+        # Same safe-mask trick as LSTMBuffer.write: lanes with no allowed
+        # position attend unmasked and are zeroed below (the caller also
+        # zeroes such lanes' written rows via valid_write).
+        valid     = pool_mask.any(dim=1)                                   # [B]
+        safe_mask = pool_mask | (~valid).unsqueeze(1)                      # [B, S]
+        scores    = scores.masked_fill(
+            ~safe_mask.view(B, 1, 1, S), torch.finfo(scores.dtype).min
+        )
+    attended = F.softmax(scores, dim=-1) @ v                               # [B, nh, K, hd]
+    attended = attended.transpose(1, 2).contiguous().view(B, K, D)
+    if pool_mask is not None:
+        attended = attended * valid.view(B, 1, 1).to(attended.dtype)
+
+    # vec_emb residual keeps vector identity; tanh(LN) bounds the scale
+    # the read attention's k/v projections see (mirrors LSTMBuffer's
+    # tanh(LN(...)) candidates).
+    return torch.tanh(mod.vec_ln(attended + mod.vec_emb.unsqueeze(0)))
+
+
+# ---------------------------------------------------------------------------
 # Accumulating multi-vector carry (AutoCompressor-style, arXiv 2305.14788)
 # ---------------------------------------------------------------------------
 
@@ -342,33 +392,7 @@ class AccumCCoT(nn.Module):
         """h_T [B, S, D] → this chunk's summary vectors [B, n_vec, D].
         pool_mask [B, S] bool optionally restricts the extraction attention to
         the open document's suffix (same semantics as LSTMBuffer.write)."""
-        B, S, D = h_T.shape
-        K, nh, hd = self.n_vec, self.n_heads, self.head_dim
-
-        q = self.wq_proj(self.vec_emb).view(K, nh, hd).transpose(0, 1)         # [nh, K, hd]
-        q = q.unsqueeze(0).expand(B, -1, -1, -1)                               # [B, nh, K, hd]
-        k = self.wk_proj(h_T).view(B, S, nh, hd).transpose(1, 2)               # [B, nh, S, hd]
-        v = self.wv_proj(h_T).view(B, S, nh, hd).transpose(1, 2)               # [B, nh, S, hd]
-
-        scores = (q @ k.transpose(-2, -1)) / math.sqrt(hd)                     # [B, nh, K, S]
-        if pool_mask is not None:
-            # Same safe-mask trick as LSTMBuffer.write: lanes with no allowed
-            # position attend unmasked and are zeroed below (the caller also
-            # zeroes such lanes' appended vectors via valid_write).
-            valid     = pool_mask.any(dim=1)                                   # [B]
-            safe_mask = pool_mask | (~valid).unsqueeze(1)                      # [B, S]
-            scores    = scores.masked_fill(
-                ~safe_mask.view(B, 1, 1, S), torch.finfo(scores.dtype).min
-            )
-        attended = F.softmax(scores, dim=-1) @ v                               # [B, nh, K, hd]
-        attended = attended.transpose(1, 2).contiguous().view(B, K, D)
-        if pool_mask is not None:
-            attended = attended * valid.view(B, 1, 1).to(attended.dtype)
-
-        # vec_emb residual keeps vector identity; tanh(LN) bounds the scale
-        # the read attention's k/v projections see (mirrors LSTMBuffer's
-        # tanh(LN(...)) candidates).
-        return torch.tanh(self.vec_ln(attended + self.vec_emb.unsqueeze(0)))
+        return _extract_summary_vectors(self, h_T, pool_mask)
 
     def append(self, state: Optional[torch.Tensor],
                new_vecs: torch.Tensor) -> torch.Tensor:
@@ -394,6 +418,131 @@ class AccumCCoT(nn.Module):
         q = self.q_proj(h).view(B, S, nh, hd).transpose(1, 2)
         k = self.k_proj(state).view(B, N, nh, hd).transpose(1, 2)
         v = self.v_proj(state).view(B, N, nh, hd).transpose(1, 2)
+
+        attn = F.softmax((q @ k.transpose(-2, -1)) / math.sqrt(hd), dim=-1)
+        out  = (attn @ v).transpose(1, 2).contiguous().view(B, S, D)
+        return self.out_proj(out)
+
+
+# ---------------------------------------------------------------------------
+# Gated-accumulation LM2 buffer (extraction write + gated fixed-K state)
+# ---------------------------------------------------------------------------
+
+class GatedAccumBuffer(nn.Module):
+    """
+    Gated-accumulation LM2 variant (two-track plan §A1 buffer-choice note,
+    promoted to a Track-B retrofit option 2026-07-17): a FIXED buffer of
+    n_slots vectors (target k=16/32) whose write path is AccumCCoT's
+    extraction rather than the original LSTMBuffer candidate machinery.
+
+    Motivation: the LSTMBuffer write derives its per-slot candidates from the
+    buffer's own content (slots query h_T, then an LN→MLP→LN refinement) — in
+    effect it stores gated snapshots of the loop block's final hidden state.
+    AccumCCoT's extraction was the first write path to show a real carry
+    signal (+0.024 nats, 2026-07-17 read), so this buffer writes the same
+    way: n_slots LEARNED query embeddings cross-attend over the loop-final
+    h_T (content-independent, slot-distinct by construction, tanh(LN)-
+    bounded), and only the MERGE differs — the LM2 gated update
+    (new = fg ⊙ buffer + ig ⊙ candidate) replaces AccumCCoT's append.  The
+    extraction is shared code (`_extract_summary_vectors`), so append vs
+    gated-overwrite is the ONLY load-bearing difference between the arms —
+    this buffer is the forgetting-controlled counterpart at constant memory.
+
+    Gate computation (LM2 create_gates, per-slot input signal):
+      combined = gate_proj_in(candidate) + gate_proj_mem(tanh(buffer))
+      ig, fg   = chunk(combined, 2, dim=-1); sigmoid(· + bias)
+    The input side uses each slot's OWN candidate (slot-resolved) instead of
+    LSTMBuffer's pooled mean — each slot's gates weigh what it would write
+    against what it holds.  Forget bias +1.0 biases toward retention at init
+    (LM2 §3.3).  As with LSTMBuffer, gate_proj_mem (memory feedback) only
+    receives gradient through a cross-chunk chain of >= 3 segments.
+
+    read: cross-attention with a zero-init out_proj — no-op at step 0
+    (step-0 == base model, same recipe as every other buffer here).
+
+    Signature-compatible with LSTMBuffer (write(h_T, buffer, pool_mask) /
+    read(h, buffer)), so it drops into the graft's m_cross path — same-shape
+    state, so apply_write_reset / apply_valid_write work unchanged.  The
+    graft does NOT apply h_T_proj to this buffer: the extraction's wk/wv
+    projections already decouple the write path from the coda path (the same
+    reason AccumCCoT takes raw h_T).
+    """
+
+    def __init__(self, hidden_size: int, n_slots: int, n_heads: int = 4) -> None:
+        super().__init__()
+        assert hidden_size % n_heads == 0
+        self.hidden_size = hidden_size
+        self.n_slots     = n_slots
+        self.n_heads     = n_heads
+        self.head_dim    = hidden_size // n_heads
+
+        # ── Write path (extraction — identical layout to AccumCCoT) ─────────
+        # n_slots learned query embeddings, one per slot.  Embedding-like:
+        # exempt from weight decay and Muon Newton-Schulz.
+        self.vec_emb = nn.Parameter(torch.empty(n_slots, hidden_size))
+        nn.init.normal_(self.vec_emb, std=0.02)
+        self.vec_emb._no_weight_decay = True
+
+        self.wq_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.wk_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.wv_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.vec_ln  = nn.LayerNorm(hidden_size)
+
+        # ── Gated update (LM2 create_gates) ─────────────────────────────────
+        # Both gates from one combined 2·D signal, split evenly into ig/fg.
+        self.gate_proj_in  = nn.Linear(hidden_size, hidden_size * 2)  # candidate side
+        self.gate_proj_mem = nn.Linear(hidden_size, hidden_size * 2)  # memory side
+        self.forget_bias   = nn.Parameter(torch.ones(1))   # +1.0 per LM2 §3.3
+        self.input_bias    = nn.Parameter(torch.zeros(1))
+
+        # ── Read path ────────────────────────────────────────────────────────
+        self.q_proj   = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.k_proj   = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.v_proj   = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.out_proj = nn.Linear(hidden_size, hidden_size, bias=False)
+        nn.init.zeros_(self.out_proj.weight)  # additive injection starts at zero
+
+    def extract(
+        self,
+        h_T: torch.Tensor,
+        pool_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """h_T [B, S, D] → n_slots candidate vectors [B, K, D] (AccumCCoT's
+        extraction, identical math via the shared helper)."""
+        return _extract_summary_vectors(self, h_T, pool_mask)
+
+    def write(
+        self,
+        h_T: torch.Tensor,
+        buffer: torch.Tensor,
+        pool_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        h_T      : [B, S, D]  — final Loop state
+        buffer   : [B, K, D]  — current K-slot buffer
+        pool_mask: [B, S] bool, optional — positions the write may use.
+        Returns updated buffer [B, K, D]: fg ⊙ buffer + ig ⊙ candidate.
+        """
+        candidate = self.extract(h_T, pool_mask)                       # [B, K, D]
+        combined  = (self.gate_proj_in(candidate)
+                     + self.gate_proj_mem(torch.tanh(buffer)))         # [B, K, 2D]
+        ig_logits, fg_logits = combined.chunk(2, dim=-1)               # each [B, K, D]
+        ig = torch.sigmoid(ig_logits + self.input_bias)
+        fg = torch.sigmoid(fg_logits + self.forget_bias)
+        return fg * buffer + ig * candidate
+
+    def read(self, h: torch.Tensor, buffer: torch.Tensor) -> torch.Tensor:
+        """
+        h     : [B, S, D]  — current queries
+        buffer: [B, K, D]  — K-slot memory (keys/values)
+        Returns [B, S, D] delta to add into h.
+        """
+        B, S, D = h.shape
+        K, nh, hd = self.n_slots, self.n_heads, self.head_dim
+
+        q = self.q_proj(h).view(B, S, nh, hd).transpose(1, 2)
+        k = self.k_proj(buffer).view(B, K, nh, hd).transpose(1, 2)
+        v = self.v_proj(buffer).view(B, K, nh, hd).transpose(1, 2)
 
         attn = F.softmax((q @ k.transpose(-2, -1)) / math.sqrt(hd), dim=-1)
         out  = (attn @ v).transpose(1, 2).contiguous().view(B, S, D)

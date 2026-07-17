@@ -47,47 +47,29 @@ CCOT_DIRECT=${CCOT_DIRECT:-false}
 MAX_LENGTH=${MAX_LENGTH:-4096}
 CROSS_CHUNKS=${CROSS_CHUNKS:-4}
 DATA_PATH=${DATA_PATH:-data/pg19_olmo_len4096}
-# Signal/gate arms (2026-07-13 plan — the carry ablation showed the memory
-# pathway is ALIVE but signal-bound at ~0.004 nats on plain PG-19):
-#   DISTILL_COEFF=1.0 [DISTILL_WINDOW=2048]  full-window-teacher KL (fix #1).
-#     Adds ~2 GB teacher weights + retained fp32 chunk logits — submit on H200:
-#       DISTILL_COEFF=1.0 sbatch --gres=gpu:H200:1 --constraint=H200 \
-#           pace/rung1_frozen_loop.sbatch
-#     Run pace/eval_teacher_advantage.sbatch FIRST; keep DISTILL_WINDOW below
-#     the LM-loss cliff it reports (generation cliff was ~1.5-2k).
-#   DATA_PATH=data/pg19_olmo_recall25_len4096  recall-supervised mix (fix #2;
-#     prep on a login node with tools/prepare_recall_mix.py).
-#   READ_INIT=1e-3  nonzero memory-read init (bootstrap-gate fix #3; step-0 is
-#     no longer bitwise base — the small version of what v1's clobber tested
-#     at large scale).
-DISTILL_COEFF=${DISTILL_COEFF:-0}
-DISTILL_WINDOW=${DISTILL_WINDOW:-2048}
-DISTILL_TEMP=${DISTILL_TEMP:-1.0}
-READ_INIT=${READ_INIT:-0}
-# Final-arms round (2026-07-14 plan):
-#   CCOT_ITER=true          per-position Coconut carry across loop iterations
-#                           (dense within-window; pair with CROSS_CHUNKS=1
-#                           MAX_LENGTH=1024 for the no-boundary-crossing arms)
-#   ACCUM_CCOT=true         AutoCompressor accumulating carry (Arm A);
+# DATA_PATH=data/pg19_olmo_recall25_len4096 — the recall-supervised mix
+#   (default Track-A data; prep on a login node with tools/prepare_recall_mix.py).
+# AccumCCoT recipe knobs (two-track plan, Track A):
+#   ACCUM_CCOT=true         AutoCompressor accumulating carry;
 #                           ACCUM_VECS per-chunk vectors (default 4)
 #   CARRY_GRAD_CHUNKS=2     stop-gradient after 2 chunks (AC recipe)
 #   RANDOM_SEGMENTS=true    randomized chunk boundaries (AC recipe)
 #   EPOCHS=n                multiple passes over the data (token budget)
-CCOT_ITER=${CCOT_ITER:-false}
 ACCUM_CCOT=${ACCUM_CCOT:-false}
 ACCUM_VECS=${ACCUM_VECS:-4}
 ACCUM_MAX=${ACCUM_MAX:-64}
+# GATED_ACCUM=true (with MEMORY_SLOTS=16/32): gated-accumulation LM2 variant —
+# AccumCCoT's extraction write, LM2 gated merge (append-vs-gated-overwrite arm).
+GATED_ACCUM=${GATED_ACCUM:-false}
 CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-0}
 RANDOM_SEGMENTS=${RANDOM_SEGMENTS:-false}
 EPOCHS=${EPOCHS:-1}
 ARM="k${MEMORY_SLOTS}"; [ "$CCOT_DIRECT" = "true" ] && ARM="${ARM}-ccot"
 [ "$ACCUM_CCOT" = "true" ] && ARM="${ARM}-acc${ACCUM_VECS}v"
-[ "$CCOT_ITER" = "true" ] && ARM="${ARM}-ci"
+[ "$GATED_ACCUM" = "true" ] && ARM="${ARM}-ga"
 [ "$MEMORY_SLOTS_ITER" -gt 0 ] && ARM="${ARM}-ki${MEMORY_SLOTS_ITER}"
 [ "$CROSS_CHUNKS" -ne 4 ] && ARM="${ARM}-cc${CROSS_CHUNKS}"
 [ "$MAX_LENGTH" -ne 4096 ] && ARM="${ARM}-len${MAX_LENGTH}"
-[ "$DISTILL_COEFF" != "0" ] && ARM="${ARM}-dstl${DISTILL_COEFF}w${DISTILL_WINDOW}"
-[ "$READ_INIT" != "0" ] && ARM="${ARM}-ri${READ_INIT}"
 [ "$CARRY_GRAD_CHUNKS" -gt 0 ] && ARM="${ARM}-tb${CARRY_GRAD_CHUNKS}"
 [ "$RANDOM_SEGMENTS" = "true" ] && ARM="${ARM}-rs"
 [ "$EPOCHS" -gt 1 ] && ARM="${ARM}-ep${EPOCHS}"
@@ -122,13 +104,9 @@ python train.py \
     --cortex.cross_chunks $CROSS_CHUNKS \
     --cortex.eos_from_tokens true \
     --cortex.freeze_loop true \
-    --cortex.distill_coeff $DISTILL_COEFF \
-    --cortex.distill_window $DISTILL_WINDOW \
-    --cortex.distill_temp $DISTILL_TEMP \
-    --cortex.read_init_scale $READ_INIT \
-    --cortex.ccot_iter $CCOT_ITER \
     --cortex.accum_ccot $ACCUM_CCOT \
     --cortex.accum_vecs $ACCUM_VECS \
     --cortex.accum_max $ACCUM_MAX \
+    --cortex.gated_accum $GATED_ACCUM \
     --cortex.carry_grad_chunks $CARRY_GRAD_CHUNKS \
     --cortex.random_segments $RANDOM_SEGMENTS

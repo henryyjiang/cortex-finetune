@@ -7,6 +7,8 @@ tests exercise the real implementation instead of a mirror copy.
   random_chunk_sizes  — AutoCompressor-style randomized segmenting
   detach_old_vecs     — AutoCompressor-style stop-gradient after N chunks
                         (AccumCCoT write-once state; exact slice detach)
+  ablate_vec_slice    — eval-side oldest/newest slice ablation of the
+                        AccumCCoT state (A0 diagnostics, two-track plan)
 """
 from __future__ import annotations
 
@@ -65,3 +67,41 @@ def detach_old_vecs(
     if state.shape[1] <= keep:
         return state
     return torch.cat([state[:, :-keep].detach(), state[:, -keep:]], dim=1)
+
+
+def ablate_vec_slice(
+    state: Optional[torch.Tensor],
+    n: int,
+    which: str = "oldest",
+    op: str = "drop",
+) -> Optional[torch.Tensor]:
+    """Eval-side slice ablation of the AccumCCoT accumulated state (A0.1
+    diagnostic, two-track plan): remove the oldest or newest `n` vectors
+    before a read.  Rows are write-once and appended in chunk order, so
+    'oldest' = rows [:n] (the earliest chunks' vectors) and 'newest' =
+    rows [-n:] (the most recent chunk's).
+
+    op='drop' (default) removes the rows from the state — the clean ablation:
+    the read attention renormalizes over the remaining vectors only.
+    op='zero' zeroes the rows in place instead; NOTE this is confounded — a
+    zeroed row still receives softmax mass in the read (its key is zero, not
+    -inf), diluting attention over the surviving vectors.  'zero' exists only
+    to mirror the whole-carry "zeroed" condition's mechanics; prefer 'drop'
+    for attribution.
+
+    Returns None when the state is None; a [B, 0, D] state when drop removes
+    every row (callers should pass None to the model in that case).
+    """
+    assert which in ("oldest", "newest") and op in ("drop", "zero")
+    if state is None or n <= 0:
+        return state
+    if n >= state.shape[1]:
+        return state[:, :0] if op == "drop" else torch.zeros_like(state)
+    if op == "drop":
+        return state[:, n:] if which == "oldest" else state[:, :-n]
+    out = state.clone()
+    if which == "oldest":
+        out[:, :n] = 0
+    else:
+        out[:, -n:] = 0
+    return out
