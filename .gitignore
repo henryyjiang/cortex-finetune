@@ -7,4 +7,5 @@ outputs*/
 *.core
 inductor_cache/
 huginn_llama/
-convert_pretrained_model/models/
+convert_pretrained_model/models/wandb/
+cortex-retrofit/retro-*

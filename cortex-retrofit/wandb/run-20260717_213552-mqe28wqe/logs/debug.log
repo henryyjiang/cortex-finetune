@@ -1,0 +1,44 @@
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_setup.py:_flush():81] Current SDK version is 0.28.0
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_setup.py:_flush():81] Configure stats pid to 2709571
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_init.py:setup_run_log_directory():725] Logging user logs to cortex-retrofit/wandb/run-20260717_213552-mqe28wqe/logs/debug.log
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_init.py:setup_run_log_directory():726] Logging internal logs to cortex-retrofit/wandb/run-20260717_213552-mqe28wqe/logs/debug-internal.log
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_init.py:init():768] calling init triggers
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_init.py:init():773] wandb.init called with sweep_config: {}
+config: {'run_name': 'retro-b0-k32-ga-mr8', 'out_path': 'cortex-retrofit', 'resume_path': None, 'save_n_mins_before_timeout': None, 'preprocessed_data_path': 'data/nemotron_math_olmo_len4096', 'dataset_location': 'openai/gsm8k', 'dataset_args': {'q_col': 'question', 'a_col': 'answer'}, 'dataset_config': 'main', 'max_length': 4096, 'max_samples': None, 'micro_batch_size': 1, 'compile': False, 'max_steps': 1500, 'epochs': 1, 'batch_size': 4, 'optim_config': {'lr': 5e-05, 'weight_decay': 0.0001, 'betas': (0.9, 0.95), 'eps': 1e-08}, 'scheduler_args': {'warmup': 0.0025, 'cooldown': 0.6, 'min_lr_ratio': 0.001}, 'save_interval': 500, 'model_name': 'ckpts/olmo-retrofit-cortex', 'wandb_disabled': False, 'seed': 74, 'fix_num_steps': False, 'init_from_scratch': False, 'take_loss_over_all_tokens': False, 'max_grad_norm': 1.0, 'max_nonfinite_skips': 20, 'override_mean_backprop_depth': 0, 'override_mean_recurrence': 0, 'bf16_true': False, 'compile_warmup_routine': False, 'no_amp': False, 'is_parquet_dataset': False, 'ignore_past_parquet_dataset': False, 'parquet_dataset_max_tokens': None, 'ignore_past_scheduler': False, 'mean_recurrence_schedule': {'turn_on': True, 'warmup': 0.75, 'max_mean_rec': 8, 'warmup_type': '1-sqrt'}, 'mean_backprop_depth_schedule': {'turn_on': False, 'warmup': 0.1, 'max_backprop': 8, 'start': 1}, 'no_monkeypatch_on_jonas_init': False, 'throttle': False, 'non_recurrent_model': False, 'muon': {'use_muon': True, 'lr': 0.001, 'weight_decay': 0.0001}, 'use_ellis_adam': {'use_ellis_adam': False, 'decouple_wd': True, 'tensor_wise_gradient_normalization': False, 'tensor_wise_finite_check': False, 'running_init': True, 'atan_adam': True, 'update_clipping': True}, 'parquet_epoching_flag_use_with_real_caution': 1, 'cortex': {'use_memory': True, 'memory_slots': 32, 'memory_slots_iter': 0, 'memory_heads': 4, 'ccot_direct': False, 'h_T_proj': True, 'cross_chunks': 4, 'freeze_loop': False, 'freeze_loop_until_step': 0, 'eos_from_tokens': True, 'l2sp_coeff': 0.0, 'memory_lr': 0.0005, 'lora_rank': 0, 'lora_alpha': 32.0, 'accum_ccot': False, 'accum_vecs': 4, 'accum_max': 64, 'gated_accum': True, 'carry_grad_chunks': 0, 'random_segments': False}, 'amp_args': {'device_type': 'cuda', 'dtype': torch.bfloat16, 'enabled': True, 'cache_enabled': False}, 'token_id_col_name': 'input_ids', 'world_size': 1, '_wandb': {}}
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_init.py:init():816] starting backend
+2026-07-17 21:35:52,750 INFO    MainThread:2709571 [wandb_init.py:init():831] sending inform_init request
+2026-07-17 21:35:52,913 INFO    MainThread:2709571 [wandb_init.py:init():836] backend started and connected
+2026-07-17 21:35:52,915 INFO    MainThread:2709571 [wandb_init.py:init():906] updated telemetry
+2026-07-17 21:35:52,934 INFO    MainThread:2709571 [wandb_init.py:init():929] communicating run to backend with 90.0 second timeout
+2026-07-17 21:35:53,359 INFO    MainThread:2709571 [wandb_init.py:init():974] starting run threads in backend
+2026-07-17 21:35:53,558 INFO    MainThread:2709571 [wandb_run.py:_console_start():2523] atexit reg
+2026-07-17 21:35:53,558 INFO    MainThread:2709571 [wandb_run.py:_redirect():2373] redirect: wrap_raw
+2026-07-17 21:35:53,558 INFO    MainThread:2709571 [wandb_run.py:_redirect():2442] Wrapping output streams.
+2026-07-17 21:35:53,558 INFO    MainThread:2709571 [wandb_run.py:_redirect():2465] Redirects installed.
+2026-07-17 21:35:53,562 INFO    MainThread:2709571 [wandb_init.py:init():1012] run started, returning control to user process
+2026-07-17 21:53:41,560 INFO    wandb-AsyncioManager-main:2709571 [service_client.py:_forward_responses():122] [no run ID] Reached EOF.
+2026-07-17 21:53:41,561 INFO    wandb-AsyncioManager-main:2709571 [mailbox.py:close():154] [no run ID] Closing mailbox, abandoning 2 handles.
+2026-07-17 21:53:41,561 ERROR   wandb-AsyncioManager-main:2709571 [asyncio_manager.py:fn_wrap_exceptions():184] Uncaught exception in run_soon callback.
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_manager.py", line 182, in fn_wrap_exceptions
+    await fn()
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/wandb/sdk/lib/run_messages.py", line 90, in loop
+    await asyncio_compat.race(
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_compat.py", line 278, in race
+    async with open_task_group(race=True) as tg:
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/contextlib.py", line 217, in __aexit__
+    await anext(self.gen)
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_compat.py", line 240, in open_task_group
+    await task_group._wait_all(race=race, timeout=exit_timeout)
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/wandb/sdk/lib/asyncio_compat.py", line 180, in _wait_all
+    raise exc
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/wandb/sdk/lib/run_messages.py", line 113, in _print_all
+    result = await handle.wait_async(timeout=None)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/wandb/sdk/mailbox/mailbox_handle.py", line 127, in wait_async
+    response = await self._handle.wait_async(timeout=timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/wandb/sdk/mailbox/response_handle.py", line 123, in wait_async
+    raise HandleAbandonedError()
+wandb.sdk.mailbox.mailbox_handle.HandleAbandonedError
