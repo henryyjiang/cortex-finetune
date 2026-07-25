@@ -24,12 +24,16 @@
 # NO stabilizers here (no throttle/L2-SP/spectral reg); watch train/total_norm
 # and reintroduce one at a time only if instability shows.
 #
-# Arms (submit all three; the control gives the parity reference on OUR data):
+# Arms:
 #   MEMORY_MODE=accum sbatch pace/b0_retrofit_parity.sbatch   # AccumCCoT (4 vec, tb2)
 #   MEMORY_MODE=gated sbatch pace/b0_retrofit_parity.sbatch   # GatedAccumBuffer k=32
 #   MEMORY_MODE=off   sbatch pace/b0_retrofit_parity.sbatch   # no-carry control
 # (MEMORY_MODE=off still runs use_memory + the same chunked 1024-token windows
 #  — it just carries nothing, so data exposure and window length match.)
+# Budget note (2026-07-25): the gate needs only off + accum.  The 2026-07-17
+# gated arm tracked accum bit-for-bit-close through update 284 before the
+# quota kill, so defer MEMORY_MODE=gated until the accum gate passes and B1
+# actually wants a gated candidate.
 #
 # Prep (login node, once):
 #   python tools/prepare_cortex_checkpoint.py \
@@ -61,6 +65,28 @@ export HF_HOME=$SCRATCH/hf_cache
 export HF_HUB_OFFLINE=1
 export WANDB_DIR=$SCRATCH
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# --- out_path MUST live on scratch -----------------------------------------
+# The 2026-07-17 round died on "disk quota exceeded": train.py uses out_path
+# as BOTH the wandb project name AND the write dir (wandb.init(project=
+# cfg.out_path, dir=cfg.out_path) — WANDB_DIR is ignored), and the relative
+# "cortex-retrofit" resolved into $HOME.  The acc4v arm's update-500
+# checkpoint blew the home quota and took all three arms down.  Keep the
+# relative name (preserves the wandb project) and symlink it to scratch,
+# matching the cortex-retro-ft convention.
+OUT_DIR=cortex-retrofit
+if [ ! -L "$OUT_DIR" ]; then
+    if [ -e "$OUT_DIR" ]; then
+        echo "ERROR: $OUT_DIR exists in \$HOME but is not a symlink to scratch."
+        echo "  It is what killed the 2026-07-17 round.  Move or delete it"
+        echo "  (rm -rf $OUT_DIR) and resubmit; this script will re-create it"
+        echo "  as a symlink to \$SCRATCH/cortex-retrofit."
+        exit 1
+    fi
+    mkdir -p "$SCRATCH/cortex-retrofit"
+    ln -s "$SCRATCH/cortex-retrofit" "$OUT_DIR"
+fi
+# ---------------------------------------------------------------------------
 
 MEMORY_MODE=${MEMORY_MODE:-accum}          # accum | gated | off
 MAX_STEPS=${MAX_STEPS:-1500}               # parity gate; B1 = 50000

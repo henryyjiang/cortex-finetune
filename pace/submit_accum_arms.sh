@@ -9,11 +9,16 @@
 #   RANDOM_SEGMENTS=true EPOCHS=3 DATA_PATH=data/pg19_olmo_recall25_len4096
 #
 # `accum_vecs` (per-chunk compression fidelity) and `carry_grad_chunks`
-# (gradient horizon) are the two dials pointed at qa3/>=4k.  Run A0 first
-# (SLICE_ABLATE=both pace/eval_carry_ablation.sbatch + pace/diag_accum_buffer
-# .sbatch) — if the oldest-vector ablation confirms all signal lives in the
-# newest vectors, the horizon arms are the priority; if fidelity looks
-# saturated, the vec arms are.
+# (gradient horizon) are the two dials pointed at qa3/>=4k.
+#
+# A0 READ (2026-07-25, eval_results/{carry_ablation,diag_accum_buffer}
+# _20260717): oldest-drop costs ~nothing (0.001-0.0035 nats), newest-drop
+# kills most of the 0.024 delta, and new-vs-old vector cosine is 0.94 flat to
+# 64 vecs (redundant gist writes, no collapse/OOD at depth 16).  Pre-
+# registered rule fires: the tb2 horizon binds -> HORIZON FIRST (tb4), vecs
+# second.  Budget order: run `horizon` alone this round (cc8-tb8 auto-skips
+# while the len8192 recall prep is absent — leave it absent); `vecs`,
+# `nemo`/`gated` re-runs, and cc8-tb8 wait for the tb4 read.
 #
 # Usage (from ~/cortex-finetune on the cluster):
 #   bash pace/submit_accum_arms.sh round1    # the 2026-07-17 test round:
