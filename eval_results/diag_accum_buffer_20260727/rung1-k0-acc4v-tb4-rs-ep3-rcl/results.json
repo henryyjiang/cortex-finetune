@@ -1,0 +1,378 @@
+{
+  "per_chunk": {
+    "chunk1": {
+      "n": 50,
+      "n_vecs": 4,
+      "new_norm_mean": 5.806507110595703,
+      "new_norm_std": 0.07364404946565628,
+      "state_norm_mean": 5.806507110595703,
+      "new_vs_old_cos": null,
+      "loss": 2.4493541717529297,
+      "distinct_ratio": 0.6968749761581421
+    },
+    "chunk2": {
+      "n": 50,
+      "n_vecs": 8,
+      "new_norm_mean": 5.807028293609619,
+      "new_norm_std": 0.056301821023225784,
+      "state_norm_mean": 5.806767463684082,
+      "new_vs_old_cos": 0.8996603488922119,
+      "loss": 2.7973058223724365,
+      "distinct_ratio": 0.7012500166893005
+    },
+    "chunk3": {
+      "n": 50,
+      "n_vecs": 12,
+      "new_norm_mean": 5.819063663482666,
+      "new_norm_std": 0.046577345579862595,
+      "state_norm_mean": 5.810866832733154,
+      "new_vs_old_cos": 0.8984590768814087,
+      "loss": 2.8291003704071045,
+      "distinct_ratio": 0.7331249713897705
+    },
+    "chunk4": {
+      "n": 50,
+      "n_vecs": 16,
+      "new_norm_mean": 5.813922882080078,
+      "new_norm_std": 0.040488213300704956,
+      "state_norm_mean": 5.811630725860596,
+      "new_vs_old_cos": 0.8979929089546204,
+      "loss": 2.8988046646118164,
+      "distinct_ratio": 0.7106249928474426
+    },
+    "chunk5": {
+      "n": 50,
+      "n_vecs": 20,
+      "new_norm_mean": 5.816160678863525,
+      "new_norm_std": 0.041766971349716187,
+      "state_norm_mean": 5.812536716461182,
+      "new_vs_old_cos": 0.898332417011261,
+      "loss": 2.8852362632751465,
+      "distinct_ratio": 0.7230241894721985
+    },
+    "chunk6": {
+      "n": 50,
+      "n_vecs": 24,
+      "new_norm_mean": 5.8216166496276855,
+      "new_norm_std": 0.041584309190511703,
+      "state_norm_mean": 5.814050197601318,
+      "new_vs_old_cos": 0.897826075553894,
+      "loss": 2.9029035568237305,
+      "distinct_ratio": 0.7362499833106995
+    },
+    "chunk7": {
+      "n": 50,
+      "n_vecs": 28,
+      "new_norm_mean": 5.823680400848389,
+      "new_norm_std": 0.034732114523649216,
+      "state_norm_mean": 5.815425872802734,
+      "new_vs_old_cos": 0.8978378176689148,
+      "loss": 2.921565294265747,
+      "distinct_ratio": 0.7350000143051147
+    },
+    "chunk8": {
+      "n": 50,
+      "n_vecs": 32,
+      "new_norm_mean": 5.816771030426025,
+      "new_norm_std": 0.0422547347843647,
+      "state_norm_mean": 5.815593719482422,
+      "new_vs_old_cos": 0.8980342745780945,
+      "loss": 2.9471166133880615,
+      "distinct_ratio": 0.7212499976158142
+    },
+    "chunk9": {
+      "n": 50,
+      "n_vecs": 36,
+      "new_norm_mean": 5.812175273895264,
+      "new_norm_std": 0.036338746547698975,
+      "state_norm_mean": 5.815214157104492,
+      "new_vs_old_cos": 0.898749589920044,
+      "loss": 2.9178173542022705,
+      "distinct_ratio": 0.7081249952316284
+    },
+    "chunk10": {
+      "n": 50,
+      "n_vecs": 40,
+      "new_norm_mean": 5.8171916007995605,
+      "new_norm_std": 0.041874583810567856,
+      "state_norm_mean": 5.8154120445251465,
+      "new_vs_old_cos": 0.897966206073761,
+      "loss": 2.917132616043091,
+      "distinct_ratio": 0.690625011920929
+    },
+    "chunk11": {
+      "n": 50,
+      "n_vecs": 44,
+      "new_norm_mean": 5.806338310241699,
+      "new_norm_std": 0.08303100615739822,
+      "state_norm_mean": 5.814587593078613,
+      "new_vs_old_cos": 0.8984917998313904,
+      "loss": 2.9526479244232178,
+      "distinct_ratio": 0.6893749833106995
+    },
+    "chunk12": {
+      "n": 49,
+      "n_vecs": 48,
+      "new_norm_mean": 5.816697120666504,
+      "new_norm_std": 0.038559604436159134,
+      "state_norm_mean": 5.815765857696533,
+      "new_vs_old_cos": 0.8985249400138855,
+      "loss": 2.914029121398926,
+      "distinct_ratio": 0.717968225479126
+    },
+    "chunk13": {
+      "n": 49,
+      "n_vecs": 52,
+      "new_norm_mean": 5.801731586456299,
+      "new_norm_std": 0.08392506092786789,
+      "state_norm_mean": 5.814687252044678,
+      "new_vs_old_cos": 0.8989917039871216,
+      "loss": 2.9152698516845703,
+      "distinct_ratio": 0.7142857313156128
+    },
+    "chunk14": {
+      "n": 48,
+      "n_vecs": 56,
+      "new_norm_mean": 5.801565647125244,
+      "new_norm_std": 0.06310807913541794,
+      "state_norm_mean": 5.814546585083008,
+      "new_vs_old_cos": 0.8991811275482178,
+      "loss": 2.8750107288360596,
+      "distinct_ratio": 0.740234375
+    },
+    "chunk15": {
+      "n": 46,
+      "n_vecs": 60,
+      "new_norm_mean": 5.810953617095947,
+      "new_norm_std": 0.036824777722358704,
+      "state_norm_mean": 5.8136372566223145,
+      "new_vs_old_cos": 0.8986717462539673,
+      "loss": 2.9114768505096436,
+      "distinct_ratio": 0.7072010636329651
+    },
+    "chunk16": {
+      "n": 46,
+      "n_vecs": 64,
+      "new_norm_mean": 5.809133052825928,
+      "new_norm_std": 0.07848414778709412,
+      "state_norm_mean": 5.813354969024658,
+      "new_vs_old_cos": 0.8985438346862793,
+      "loss": 2.89375638961792,
+      "distinct_ratio": 0.7178953289985657
+    }
+  },
+  "gen_samples": [
+    {
+      "sample": 0,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": "de a song,\n            And a song he heard;\n          And he was a king,\n            And he was a king,\n          And he was a king,\n"
+        },
+        {
+          "chunk": 2,
+          "text": " character,\nas on the face and hands, or as the same labor of the hands softens\nthe muscles of the face. But the difference is not so"
+        },
+        {
+          "chunk": 3,
+          "text": "ither, and he is\ndelighted to find himself in a country where there are no politics. I\nhave seen a man, who had never heard of"
+        },
+        {
+          "chunk": 4,
+          "text": "      And with a will\n        You go to the world,\n        You'll find it all new,\n        And you'll find it strange,\n        And you"
+        },
+        {
+          "chunk": 5,
+          "text": " but I have a sort of feeling that\nthe Pacific is the Lethe of the future. It is the Lethe of the\nuniverse, the Let"
+        },
+        {
+          "chunk": 6,
+          "text": "says, \"I have been in the West of the world, and I have seen the sun rise\nin the morning, and set in the evening, and"
+        },
+        {
+          "chunk": 7,
+          "text": " the \"Great River,\" I was in the mood to\nwrite. I had a good deal of leisure, and I wrote a letter to a friend\nfrom"
+        },
+        {
+          "chunk": 8,
+          "text": ", a natural spring in another, a natural\ncistern in a third, and a natural reservoir in a fourth. I have\nremembered, too"
+        },
+        {
+          "chunk": 9,
+          "text": " is good, and the forests are good. The forests of\nthe United States are not good, and the soil is not good. The forests\nare not"
+        },
+        {
+          "chunk": 10,
+          "text": " and the faithful writer, to whom they are\naddressed. I have seen a man, who had never seen a tree, who had never\nheard a"
+        },
+        {
+          "chunk": 11,
+          "text": "! from the hillside, and a loud WHOO! from the herd,\nand a loud HURRAH! from the herd, and a loud H"
+        },
+        {
+          "chunk": 12,
+          "text": "of mutual leering and laughing at each other, and a mutual\ninterchange of gifts and courtesies, and a mutual exchange of\ncompliments"
+        },
+        {
+          "chunk": 13,
+          "text": " philosophers, \"you will not\nperceive that, as perceiving a general thing, you will not perceive that,\nas perceiving a universal thing, you"
+        },
+        {
+          "chunk": 14,
+          "text": " were not visible to\nthe eye. I saw the trees, but I did not see the house. I saw the\npark, but I did not see"
+        },
+        {
+          "chunk": 15,
+          "text": " is the philosophy of the present. He is\nalways in the act of doing. He is the man who is never satisfied with\nhis work, but always"
+        },
+        {
+          "chunk": 16,
+          "text": "\n\n\n\nProduced by the\nRemember this year, and the\nRemember this year, and the\nRemember this year, and the\nRemember this year, and"
+        }
+      ]
+    },
+    {
+      "sample": 1,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": " are calling to one another in the swamp. The night-sparrow\nand the bluebird are silent, but the nightingale, the nightingale"
+        },
+        {
+          "chunk": 2,
+          "text": " will believe\nme, it was not only a perfect flower, but a perfect anemone. The\npetals were of a rich, deep blue,"
+        },
+        {
+          "chunk": 3,
+          "text": "Birds of the United Kingdom,\"\nwe learn that the English birds return to their wintering grounds in\nFebruary, March, and April, whereas the Massachusetts birds"
+        },
+        {
+          "chunk": 4,
+          "text": "eda_ and the _Cypripedium_ and the _Cypripedium\nglaberrum_,--we who have found in its other chosen"
+        },
+        {
+          "chunk": 5,
+          "text": " the\n\"Mayflower\" is the _Lilium_, the \"May\" the _Lilium_, the \"Plymouth\"\nthe _L"
+        },
+        {
+          "chunk": 6,
+          "text": "a la mode_,--is worthy of\nthe name. She is a noble tree, and her branches are of the finest\ndescription. The bark is smooth"
+        },
+        {
+          "chunk": 7,
+          "text": " species of the wild flowers, and to name them with a tolerable\ncertainty. The botanist, who has been a long time collecting, is"
+        },
+        {
+          "chunk": 8,
+          "text": " community have never seen a frost\non the ground, or a snow-storm, or a frost-blow, or a snow-shoe, or a\n"
+        },
+        {
+          "chunk": 9,
+          "text": " at Rome in the year 753, when the sun was supposed\nto have been set in the heavens. The first of the three months was\nApril,"
+        },
+        {
+          "chunk": 10,
+          "text": " the flowers, and stood with her hands clasped before her, and\nher eyes fixed on the basket, as if she were trying to find some\nsomething"
+        },
+        {
+          "chunk": 11,
+          "text": "pt, and said, \"Oh, how I wish I could\nsee my mother!\" and then, \"Oh, how I wish I could see my father"
+        },
+        {
+          "chunk": 12,
+          "text": ". But it is not so. The lower nature has not died out, but has\nbecome a part of the higher, and has taken on a new"
+        },
+        {
+          "chunk": 13,
+          "text": "ye, Elsie,\" he said, \"and God bless you.\"\n\nShe was silent for a moment, then said, \"I am glad to see you again"
+        },
+        {
+          "chunk": 14,
+          "text": " gone, and some of you\nwill be glad. And, Sophy, I don't want to be a burden to you, and I don't\n"
+        },
+        {
+          "chunk": 15,
+          "text": ".\"\n\nHe was gone, and Elsie was left alone. She was not sorry, for she had\nnot yet learned to be afraid of the dark. She"
+        },
+        {
+          "chunk": 16,
+          "text": " for them. He had never\nprayed over a dead child without a sigh of regret, and he had never\nprayed over a dead mother without a"
+        }
+      ]
+    },
+    {
+      "sample": 2,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": " The\nexposition of a case is a kind of argument, but it is not an argument\nabout the case itself. The argument about the case is the"
+        },
+        {
+          "chunk": 2,
+          "text": ", is to change the current\nof thought, to change the current of opinion, to change the current\nof emotion, to change the current of action,"
+        },
+        {
+          "chunk": 3,
+          "text": "more general form, the question, \"Is it better for a boy of good\nintellectual ability and capacity for making friends, to go to a large\n"
+        },
+        {
+          "chunk": 4,
+          "text": ". You will find that the more you get at\nsuch practice the more you will be able to use your judgment in\ndiscussing the matter in hand"
+        },
+        {
+          "chunk": 5,
+          "text": "39. This city should have a system of street railways.\n\n40. This city should have a system of street railways.\n\n41. This city should have a system"
+        },
+        {
+          "chunk": 6,
+          "text": " are not arguments of\nreason, but arguments of feeling. The same is true of the arguments of\nreligion, which are not arguments of reason, but"
+        },
+        {
+          "chunk": 7,
+          "text": "answer depends on the way in which the evidence is presented. The\nquestion of the suffrage of women is a question of state policy, and\nthe answer"
+        },
+        {
+          "chunk": 8,
+          "text": " been won, or that the\nConstitution of the United States is or is not the best Constitution\nin the world, or that the Declaration of Independence is"
+        },
+        {
+          "chunk": 9,
+          "text": " cause of freedom as any other section of the country, the\nopinions of the people were the exact opposite. The South was the\ncountry where the most"
+        },
+        {
+          "chunk": 10,
+          "text": " general\nprinciples, which are the common law of the English-speaking world. The\ngeneral principles are the principles of the common law of the English\n"
+        },
+        {
+          "chunk": 11,
+          "text": " is\nnot infrequent for a man to make a bad use of the moral argument, and\nto make a good use of the aesthetic argument, and to"
+        },
+        {
+          "chunk": 12,
+          "text": " the history of the last fifty years of a\nquestion of fact which has been discussed in the newspapers.\n\n13. Give an example of a question of fact which"
+        },
+        {
+          "chunk": 13,
+          "text": " your own. The\nreasons for this are that you may be able to meet the arguments of your\nopponent, and that you may be able to"
+        },
+        {
+          "chunk": 14,
+          "text": ",\nit is well to remember that the notes should be brief and to the point.\nThey should be so brief that the student can easily grasp the main\npoints"
+        },
+        {
+          "chunk": 15,
+          "text": " PHRASES AND FABLES\n\n                         DICTIONARIES OF PHRASES AND FABLES\n\n                         DICTIONARIES OF PHR"
+        },
+        {
+          "chunk": 16,
+          "text": " state\nofficials, to the various organizations of citizens, to the\nuniversity, to the state legislature, to the courts, to the press, to"
+        }
+      ]
+    }
+  ],
+  "config": {
+    "chunk_len": 1024,
+    "n_vec": 4,
+    "gen_tokens": 32
+  }
+}
