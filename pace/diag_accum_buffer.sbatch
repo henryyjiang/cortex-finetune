@@ -20,6 +20,19 @@
 #       --out data/pg19_olmo_val_len16384 --max_length 16384 --split validation
 #
 #   RUN=rung1-k0-acc4v-tb2-rs-ep3-rcl sbatch pace/diag_accum_buffer.sbatch
+#
+# B1 / retrofit checkpoints (2026-07-29): OUT_ROOT / CKPT_NAME / BASE
+# overrides, Track-A values as defaults.  B1 writes to cortex-retrofit, gates
+# read an intermediate model_only_chkpt_<step>, and B1 derives from the
+# UNTRAINED conversion (ckpts/olmo-retrofit-cortex) — merging the wrong base's
+# config into the eval checkpoint is silent and wrong.
+#   OUT_ROOT=cortex-retrofit CKPT_NAME=model_only_chkpt_20000 \
+#       BASE=ckpts/olmo-retrofit-cortex RUN=retro-b1-acc4v-tb2-mr8 \
+#       EVAL_TAG=b1-20000 sbatch pace/diag_accum_buffer.sbatch
+# NOTE for B1 reads: this diagnostic runs on PG-19, while B1 trains on
+# nemotron, so the ABSOLUTE loss/norms are off-distribution (same caveat as
+# the acc4v-nemo read: cos 0.53 vs 0.94, norms 1.03 vs 5.81).  What transfers
+# is the SHAPE across chunk depth — drift, collapse, generation degradation.
 
 cd $SLURM_SUBMIT_DIR
 
@@ -37,9 +50,14 @@ EVAL_TAG=${EVAL_TAG:-$(date +%Y%m%d)}
 DATA=${DATA:-data/pg19_olmo_val_len16384}
 CHUNK_LEN=${CHUNK_LEN:-1024}
 GEN_TOKENS=${GEN_TOKENS:-32}
-MODEL_DIR="cortex-retro-ft/$RUN/final_checkpoint"
+OUT_ROOT=${OUT_ROOT:-cortex-retro-ft}
+CKPT_NAME=${CKPT_NAME:-final_checkpoint}
+BASE=${BASE:-ckpts/olmo8-cortex}
+MODEL_DIR="$OUT_ROOT/$RUN/$CKPT_NAME"
 
-python tools/prepare_eval_checkpoint.py --base ckpts/olmo8-cortex \
+[ -d "$MODEL_DIR" ] || { echo "No such checkpoint: $MODEL_DIR"; exit 1; }
+
+python tools/prepare_eval_checkpoint.py --base "$BASE" \
     --dirs "$MODEL_DIR"
 
 OUT="eval_results/diag_accum_buffer_${EVAL_TAG}/${RUN}"

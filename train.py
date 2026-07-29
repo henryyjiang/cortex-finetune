@@ -284,10 +284,46 @@ def get_flux_timeleft():
     )
     return int(result.stdout.strip())
 
+def parse_slurm_timeleft(raw: str) -> int:
+    """Seconds from a Slurm `squeue -o %L` duration: [[D-]HH:]MM:SS."""
+    raw = raw.strip()
+    days, _, rest = raw.rpartition("-")
+    parts = [int(p) for p in rest.split(":")]
+    while len(parts) < 3:
+        parts.insert(0, 0)
+    h, m, s = parts
+    return ((int(days) if days else 0) * 24 + h) * 3600 + m * 60 + s
+
+def get_slurm_timeleft():
+    job_id = os.getenv("SLURM_JOB_ID")
+    if job_id is None:
+        raise RuntimeError("SLURM_JOB_ID not set")
+    result = subprocess.run(
+        ["squeue", "-h", "-j", job_id, "-o", "%L"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        text=True
+    )
+    return parse_slurm_timeleft(result.stdout)
+
+def get_timeleft():
+    """Seconds of walltime left, on either scheduler.
+
+    Upstream only spoke Flux (LLNL).  On PACE/Slurm the `flux` binary does not
+    exist, so `subprocess.run(..., check=True)` raised FileNotFoundError and
+    killed the run at the first step that checked — i.e.
+    --save_n_mins_before_timeout was unusable here.  Slurm is tried first
+    because that is where we run; Flux stays as the upstream path.
+    """
+    if os.getenv("SLURM_JOB_ID") is not None:
+        return get_slurm_timeleft()
+    return get_flux_timeleft()
+
 has_completed_timeout_save = False
 def check_if_save(save_n_mins_before_timeout):
     global has_completed_timeout_save
-    if (save_n_mins_before_timeout * 60 > get_flux_timeleft()) and (not has_completed_timeout_save):
+    if (save_n_mins_before_timeout * 60 > get_timeleft()) and (not has_completed_timeout_save):
         has_completed_timeout_save = True
         return True
     return False

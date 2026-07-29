@@ -124,3 +124,54 @@ class TestRealForwardChain:
                 if "core_block" in n and p.grad is not None
                 and p.grad.abs().sum() > 0]
         assert core, "no core_block param received gradient — loop not plastic"
+
+    def test_cotraining_grads_reach_loop_and_memory_gated(self, base):
+        """Same co-training invariant for the GatedAccumBuffer candidate.
+
+        accum had this coverage and gated did not (noted 2026-07-29 while
+        picking the B1 arm).  gated is wired as MEMORY_MODE=gated and is the
+        planned third arm, so the gap is worth closing before it runs.
+
+        Two gated-specific points beyond the accum version:
+          * the buffer lives on cortex.m_cross (LSTMBuffer's slot), not
+            cortex.accum, so it travels a different graft path;
+          * gate_proj_mem is the memory-FEEDBACK side and only receives
+            gradient through a chain of >= 3 segments (documented on both
+            GatedAccumBuffer and LSTMBuffer).  The 3-chunk chain here is
+            exactly that minimum, so a zero grad would mean the feedback gate
+            never trains — which is why carry_grad_chunks stays 0 for gated.
+        """
+        mem = _build_raven(use_memory=True, memory_slots=32,
+                           gated_accum=True).train()
+        buf = mem.cortex.m_cross
+        with torch.no_grad():
+            nn.init.normal_(buf.out_proj.weight, std=0.05)
+        m_cross, losses = None, []
+        for _ in range(3):
+            ids = _ids()
+            out = mem(input_ids=ids, num_steps=NS, labels=ids,
+                      m_cross_in=m_cross, return_m_cross=True)
+            m_cross = out["m_cross"]
+            losses.append(out["loss"])
+        torch.stack(losses).mean().backward()
+
+        assert buf.vec_emb.grad is not None and buf.vec_emb.grad.abs().sum() > 0, \
+            "extraction queries received no gradient"
+        assert buf.gate_proj_mem.weight.grad is not None \
+            and buf.gate_proj_mem.weight.grad.abs().sum() > 0, \
+            "memory-feedback gate received no gradient over a 3-segment chain"
+        core = [p for n, p in mem.named_parameters()
+                if "core_block" in n and p.grad is not None
+                and p.grad.abs().sum() > 0]
+        assert core, "no core_block param received gradient — loop not plastic"
+
+    def test_gated_state_is_fixed_size_through_iterate_forward(self, base):
+        """The append-vs-gated contrast, asserted: accum's state GROWS by
+        accum_vecs per chunk (test above), gated's stays at n_slots."""
+        mem = _build_raven(use_memory=True, memory_slots=32, gated_accum=True)
+        m_cross = None
+        for _ in range(3):
+            out = mem(input_ids=_ids(), num_steps=NS,
+                      m_cross_in=m_cross, return_m_cross=True)
+            m_cross = out["m_cross"]
+            assert m_cross.shape[1] == 32

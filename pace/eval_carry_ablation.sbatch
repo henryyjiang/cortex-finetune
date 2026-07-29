@@ -29,6 +29,18 @@
 #   RUN=rung1-k0-acc4v-tb2-rs-ep3-rcl SLICE_ABLATE=both \
 #       sbatch pace/eval_carry_ablation.sbatch
 # SLICE_N (default 0 = one chunk's worth) / SLICE_OP (drop|zero) refine it.
+#
+# B1 / retrofit checkpoints (2026-07-29): three things differ from a Track-A
+# rung run, so each is an override with the Track-A value as the default —
+#   OUT_ROOT  Track A writes to cortex-retro-ft; B1 writes to cortex-retrofit.
+#   CKPT_NAME B1 gates read an INTERMEDIATE model_only_chkpt_<step>, not the
+#             final_checkpoint (the chain is still running).
+#   BASE      B1 derives from the UNTRAINED conversion, not the trained olmo8
+#             RDM.  Merging the wrong base's config into the eval checkpoint is
+#             silent and wrong, so this must track the run's --model_name.
+#   OUT_ROOT=cortex-retrofit CKPT_NAME=model_only_chkpt_20000 \
+#       BASE=ckpts/olmo-retrofit-cortex RUN=retro-b1-k32-ga-mr8 \
+#       EVAL_TAG=b1-20000 sbatch pace/eval_carry_ablation.sbatch
 
 cd $SLURM_SUBMIT_DIR
 
@@ -44,9 +56,14 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 [ -n "$RUN" ] || { echo "Set RUN=<run_name>"; exit 1; }
 EVAL_TAG=${EVAL_TAG:-$(date +%Y%m%d)}
 DATA=${DATA:-data/pg19_olmo_val_len4096}
-MODEL_DIR="cortex-retro-ft/$RUN/final_checkpoint"
+OUT_ROOT=${OUT_ROOT:-cortex-retro-ft}
+CKPT_NAME=${CKPT_NAME:-final_checkpoint}
+BASE=${BASE:-ckpts/olmo8-cortex}
+MODEL_DIR="$OUT_ROOT/$RUN/$CKPT_NAME"
 
-python tools/prepare_eval_checkpoint.py --base ckpts/olmo8-cortex \
+[ -d "$MODEL_DIR" ] || { echo "No such checkpoint: $MODEL_DIR"; exit 1; }
+
+python tools/prepare_eval_checkpoint.py --base "$BASE" \
     --dirs "$MODEL_DIR"
 
 OUT="eval_results/carry_ablation_${EVAL_TAG}/${RUN}"

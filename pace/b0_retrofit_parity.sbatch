@@ -35,6 +35,20 @@
 # quota kill, so defer MEMORY_MODE=gated until the accum gate passes and B1
 # actually wants a gated candidate.
 #
+# GATE RESULT (2026-07-25, jobs 11476638/39): PASSED.  base and accum tracked
+# within ~0.007 nats over the full 10.4 -> 1.06 descent (steps 1..1110),
+# grad norms matched, no stabilizers needed.  Both arms then OOMed on
+# A100-80GB at wandb-step ~1110 — right where the mean-recurrence 1-sqrt
+# warmup (0.75 * 1500 = 1125 steps) tops out at 8: our 4096-token rows chain
+# 4 x 1024 chunks into ONE backward, retaining 4x the activation graph of
+# McLeish's per-1024-row micro-batching, which no longer fits at full depth.
+# Genuine capacity OOM (expandable_segments was on; only ~12 MiB reserved-
+# unallocated).  DO NOT rerun B0 for the last 390 steps — the parity question
+# is answered.  B1 (MAX_STEPS=50000) spends ~90% of its life at max
+# recurrence, so it MUST change one of: H200 (--gres=gpu:H200:1
+# --constraint=H200), activation checkpointing, or per-chunk backward with
+# carry-only retention (code change).
+#
 # Prep (login node, once):
 #   python tools/prepare_cortex_checkpoint.py \
 #       --src smcleish/Recurrent-OLMo-2-0425-untrained \
