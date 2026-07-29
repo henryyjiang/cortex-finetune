@@ -67,6 +67,13 @@ def main() -> int:
             sys.path.insert(0, p)
 
     import test_b0_retrofit as mod
+    import test_cortex_eval
+
+    # Report WHICH raven config was picked up.  It is not in this repo -- it
+    # comes from the sibling recurrent-pretraining checkout locally, or from a
+    # prepared checkpoint snapshot on the cluster -- so naming the resolved
+    # path is the difference between a diagnosable failure and a guess.
+    print(f"raven config: {test_cortex_eval._CONFIG_SRC or 'NOT FOUND'}")
 
     # The `base` fixture is a plain function under the stub; build it once, the
     # same way scope="module" would.

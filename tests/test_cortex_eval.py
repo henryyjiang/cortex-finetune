@@ -3,7 +3,7 @@ Phase-3 end-to-end eval-harness test.
 
 Runs the ACTUAL ported eval functions (eval_babilong.eval_one,
 eval_gsm8k.generate, eval_multiple_choice.score_completion) against a real,
-tiny grafted RavenForCausalLM with a stub tokenizer — validating the whole
+tiny grafted RavenForCausalLM with a stub tokenizer -- validating the whole
 eval pipeline (chunked M_cross carry, greedy generation, completion scoring)
 end-to-end without downloading a 1B checkpoint or any dataset.
 
@@ -27,14 +27,41 @@ sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, "evals"))
 
 VOCAB = 256
-_CONFIG_SRC = os.path.join(os.path.dirname(REPO), "recurrent-pretraining",
-                           "recpre", "raven_config_minimal.py")
+
+# raven_config_minimal.py is not in this repo -- it arrives either from the
+# sibling recurrent-pretraining checkout (local dev) or inside a prepared
+# checkpoint snapshot (prepare_cortex_checkpoint.py copytrees the whole HF
+# snapshot into ckpts/<name>/, and trust_remote_code models ship their config
+# module).  On PACE the sibling repo does NOT exist -- recurrent-pretraining is
+# local-only and was never pushed -- so a single hardcoded path made every
+# real-raven test skip on the ONE machine where it can actually run
+# (2026-07-29).  Search instead, most-explicit first.
+def _find_raven_config():
+    env = os.environ.get("RAVEN_CONFIG")
+    cands = ([env] if env else []) + [
+        os.path.join(os.path.dirname(REPO), "recurrent-pretraining",
+                     "recpre", "raven_config_minimal.py"),
+        os.path.join(REPO, "ckpts", "olmo-retrofit-cortex",
+                     "raven_config_minimal.py"),
+        os.path.join(REPO, "ckpts", "olmo8-cortex",
+                     "raven_config_minimal.py"),
+    ]
+    for c in cands:
+        if c and os.path.exists(c):
+            return c
+    return None
+
+
+_CONFIG_SRC = _find_raven_config()
 
 
 def _build_raven(**flags):
     """Tiny real RavenForCausalLM (olmo variant) with the cortex graft."""
-    if not os.path.exists(_CONFIG_SRC):
-        pytest.skip(f"raven_config_minimal.py not found at {_CONFIG_SRC}")
+    if _CONFIG_SRC is None:
+        pytest.skip("raven_config_minimal.py not found -- looked in the sibling "
+                    "recurrent-pretraining checkout and ckpts/{olmo-retrofit-"
+                    "cortex,olmo8-cortex}.  Set RAVEN_CONFIG=<path> to point "
+                    "at it explicitly.")
     tmp = tempfile.mkdtemp(prefix="evaltest_")
     pkg = os.path.join(tmp, "evalpkg")
     os.makedirs(pkg)
@@ -108,7 +135,7 @@ def test_shims():
 
 
 # ---------------------------------------------------------------------------
-# BABILong eval_one — the headline K>0 vs K=0 path (chunked M_cross carry)
+# BABILong eval_one -- the headline K>0 vs K=0 path (chunked M_cross carry)
 # ---------------------------------------------------------------------------
 
 class TestBabilong:
@@ -152,7 +179,7 @@ class TestBabilong:
 
 
 # ---------------------------------------------------------------------------
-# GSM8K generate — greedy decode loop through the grafted model
+# GSM8K generate -- greedy decode loop through the grafted model
 # ---------------------------------------------------------------------------
 
 class TestGSM8K:
@@ -190,7 +217,7 @@ class TestGSM8K:
 
 
 # ---------------------------------------------------------------------------
-# Multiple choice — completion log-prob scoring
+# Multiple choice -- completion log-prob scoring
 # ---------------------------------------------------------------------------
 
 class TestMultipleChoice:
