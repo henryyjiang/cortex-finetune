@@ -22,6 +22,8 @@ Exit 0 = every parity invariant held.  Anything else = do not submit B1.
 """
 from __future__ import annotations
 
+import importlib.machinery
+import importlib.util
 import os
 import sys
 import traceback
@@ -43,8 +45,24 @@ def _install_pytest_stub() -> None:
     referenced, so the stub stays this small.  If a future test reaches for
     pytest.mark/parametrize/raises, this will AttributeError loudly rather
     than silently skip it -- which is the behaviour we want.
+
+    __spec__ MUST be a real ModuleSpec, not the None that types.ModuleType
+    defaults to.  transformers' optional-dependency probing calls
+    importlib.util.find_spec("pytest"), and find_spec raises
+    "ValueError: pytest.__spec__ is None" for any module already in
+    sys.modules whose spec is None -- which broke the raven import on the
+    cluster (2026-07-29).  With a real spec, find_spec succeeds, the follow-up
+    importlib.metadata.version("pytest") raises PackageNotFoundError, and the
+    caller correctly concludes pytest is unavailable.
+
+    We always stub, even if real pytest happens to be installed: under real
+    pytest, @fixture turns `base` into a fixture object that cannot be called
+    directly, so mod.base() would break.  Keeping one code path makes this
+    runner behave identically everywhere.
     """
     stub = types.ModuleType("pytest")
+    stub.__spec__ = importlib.machinery.ModuleSpec("pytest", loader=None)
+    stub.__version__ = "0.0.0+cortex-stub"
 
     def fixture(*args, **kwargs):
         # Support both @fixture and @fixture(scope="module").
