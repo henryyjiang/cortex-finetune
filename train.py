@@ -294,31 +294,91 @@ def parse_slurm_timeleft(raw: str) -> int:
     h, m, s = parts
     return ((int(days) if days else 0) * 24 + h) * 3600 + m * 60 + s
 
-def get_slurm_timeleft():
+def _query_slurm_deadline():
+    """Job end time as epoch seconds, or None if it cannot be determined.
+
+    Prefers $SLURM_JOB_END_TIME (exported by many Slurm builds, epoch seconds,
+    no subprocess at all) and falls back to ONE squeue call.
+    """
+    end = os.getenv("SLURM_JOB_END_TIME")
+    if end:
+        try:
+            return float(end)
+        except ValueError:
+            pass
     job_id = os.getenv("SLURM_JOB_ID")
     if job_id is None:
-        raise RuntimeError("SLURM_JOB_ID not set")
-    result = subprocess.run(
-        ["squeue", "-h", "-j", job_id, "-o", "%L"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=True,
-        text=True
-    )
-    return parse_slurm_timeleft(result.stdout)
+        return None
+    try:
+        result = subprocess.run(
+            ["squeue", "-h", "-j", job_id, "-o", "%L"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=False, text=True, timeout=60,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return time.time() + parse_slurm_timeleft(result.stdout)
+    except Exception:
+        pass
+    return None
+
+
+def _query_flux_deadline():
+    try:
+        result = subprocess.run(
+            ["flux", "job", "timeleft"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=False, text=True, timeout=60,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return time.time() + int(result.stdout.strip())
+    except Exception:
+        pass
+    return None
+
+
+_timeleft_deadline = None      # epoch seconds; resolved exactly once
+_timeleft_resolved = False
+
 
 def get_timeleft():
     """Seconds of walltime left, on either scheduler.
 
-    Upstream only spoke Flux (LLNL).  On PACE/Slurm the `flux` binary does not
-    exist, so `subprocess.run(..., check=True)` raised FileNotFoundError and
-    killed the run at the first step that checked — i.e.
-    --save_n_mins_before_timeout was unusable here.  Slurm is tried first
-    because that is where we run; Flux stays as the upstream path.
+    Resolve the deadline ONCE, then do pure local clock arithmetic.  Two
+    incidents drove this shape, both worth not repeating:
+
+    1. Upstream only spoke Flux (LLNL).  On PACE/Slurm there is no `flux`
+       binary, so `subprocess.run(..., check=True)` raised FileNotFoundError
+       and killed the run at the first step that checked.
+
+    2. Replacing it with a per-step `squeue` call was WORSE (B1 jobs
+       11561763/64, 2026-07-30).  check_if_save runs every optimizer step, so
+       two jobs at ~2,000 steps/h issued ~4,000 squeue calls an hour between
+       them.  At 04:01:02, 7.1h in, the controller returned non-zero to BOTH
+       jobs inside the same millisecond and check=True turned that transient
+       scheduler hiccup into a fatal CalledProcessError.  Training was
+       perfectly healthy at the time; ~4,600 steps of progress were lost.
+
+    So: no repeated subprocess calls, and a helper whose whole job is to
+    PROTECT a run must never be able to kill it.  Any failure to determine the
+    deadline disables pre-timeout saves (returns inf) rather than raising --
+    the periodic save_interval checkpoints are the fallback.
     """
-    if os.getenv("SLURM_JOB_ID") is not None:
-        return get_slurm_timeleft()
-    return get_flux_timeleft()
+    global _timeleft_deadline, _timeleft_resolved
+    if not _timeleft_resolved:
+        _timeleft_resolved = True
+        _timeleft_deadline = (_query_slurm_deadline()
+                              if os.getenv("SLURM_JOB_ID") is not None
+                              else _query_flux_deadline())
+        if _timeleft_deadline is None:
+            print("[timeout-save] could not determine the walltime deadline; "
+                  "pre-timeout saves are DISABLED (periodic save_interval "
+                  "checkpoints still run).")
+        else:
+            print(f"[timeout-save] walltime deadline resolved: "
+                  f"{_timeleft_deadline - time.time():.0f}s from now")
+    if _timeleft_deadline is None:
+        return float("inf")
+    return _timeleft_deadline - time.time()
 
 has_completed_timeout_save = False
 def check_if_save(save_n_mins_before_timeout):

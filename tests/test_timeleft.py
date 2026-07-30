@@ -72,3 +72,63 @@ class TestSaveTrigger:
 
     def test_silent_early_in_a_48h_job(self):
         assert not self.THRESHOLD_S > parse_slurm_timeleft("47:30:00")
+
+
+# --- mirror of train.py:get_timeleft's resolve-once + fail-open contract ----
+# Regression guard for the B1 kill (jobs 11561763/64, 2026-07-30): a per-step
+# `squeue` with check=True turned one transient controller error into a fatal
+# CalledProcessError in BOTH jobs at 7.1h, losing ~4,600 healthy steps.
+class _Timeleft:
+    """Same structure as train.py: resolve once, fail open to inf."""
+
+    def __init__(self, query):
+        self._query = query          # stands in for _query_slurm_deadline
+        self.deadline = None
+        self.resolved = False
+        self.calls = 0
+
+    def get(self, now):
+        if not self.resolved:
+            self.resolved = True
+            self.calls += 1
+            self.deadline = self._query(now)
+        if self.deadline is None:
+            return float("inf")
+        return self.deadline - now
+
+
+class TestResolveOnceAndFailOpen:
+
+    def test_scheduler_is_queried_exactly_once(self):
+        """The bug was ~4,000 controller calls/hour across two jobs."""
+        t = _Timeleft(lambda now: now + 3600)
+        for step in range(10_000):
+            t.get(now=1000.0 + step)
+        assert t.calls == 1
+
+    def test_countdown_uses_local_clock(self):
+        t = _Timeleft(lambda now: now + 3600)
+        assert t.get(now=0.0) == 3600
+        assert t.get(now=1800.0) == 1800
+        assert t.get(now=3540.0) == 60
+
+    def test_query_failure_returns_inf_not_raise(self):
+        """A helper that exists to PROTECT the run must never kill it."""
+        t = _Timeleft(lambda now: None)
+        assert t.get(now=0.0) == float("inf")
+
+    def test_failure_disables_saves_rather_than_firing_constantly(self):
+        """inf must read as 'lots of time left', not 'save now, every step'."""
+        t = _Timeleft(lambda now: None)
+        assert not (20 * 60 > t.get(now=0.0))
+
+    def test_failure_is_not_retried_every_step(self):
+        t = _Timeleft(lambda now: None)
+        for step in range(1000):
+            t.get(now=float(step))
+        assert t.calls == 1
+
+    def test_trigger_fires_once_deadline_approaches(self):
+        t = _Timeleft(lambda now: now + 48 * 3600)
+        assert not (20 * 60 > t.get(now=0.0))            # start of a 48h job
+        assert 20 * 60 > t.get(now=48 * 3600 - 600)      # 10 min left
