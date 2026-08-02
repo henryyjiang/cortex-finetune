@@ -1,0 +1,378 @@
+{
+  "per_chunk": {
+    "chunk1": {
+      "n": 50,
+      "n_vecs": 4,
+      "new_norm_mean": 10.263875961303711,
+      "new_norm_std": 0.02769479528069496,
+      "state_norm_mean": 10.263875961303711,
+      "new_vs_old_cos": null,
+      "loss": 4.922674655914307,
+      "distinct_ratio": 0.604758083820343
+    },
+    "chunk2": {
+      "n": 50,
+      "n_vecs": 8,
+      "new_norm_mean": 10.342390060424805,
+      "new_norm_std": 0.03509862348437309,
+      "state_norm_mean": 10.303132057189941,
+      "new_vs_old_cos": 0.00040393127710558474,
+      "loss": 4.784715175628662,
+      "distinct_ratio": 0.6063134670257568
+    },
+    "chunk3": {
+      "n": 50,
+      "n_vecs": 12,
+      "new_norm_mean": 10.365234375,
+      "new_norm_std": 0.029907546937465668,
+      "state_norm_mean": 10.323834419250488,
+      "new_vs_old_cos": 0.0004646572342608124,
+      "loss": 4.779845237731934,
+      "distinct_ratio": 0.6107862591743469
+    },
+    "chunk4": {
+      "n": 50,
+      "n_vecs": 16,
+      "new_norm_mean": 10.368188858032227,
+      "new_norm_std": 0.021919209510087967,
+      "state_norm_mean": 10.334921836853027,
+      "new_vs_old_cos": 0.0005046729929745197,
+      "loss": 4.792478084564209,
+      "distinct_ratio": 0.5643652081489563
+    },
+    "chunk5": {
+      "n": 50,
+      "n_vecs": 20,
+      "new_norm_mean": 10.363831520080566,
+      "new_norm_std": 0.024081077426671982,
+      "state_norm_mean": 10.340703964233398,
+      "new_vs_old_cos": 0.0005226071807555854,
+      "loss": 4.7235026359558105,
+      "distinct_ratio": 0.6091330647468567
+    },
+    "chunk6": {
+      "n": 50,
+      "n_vecs": 24,
+      "new_norm_mean": 10.365379333496094,
+      "new_norm_std": 0.02154478058218956,
+      "state_norm_mean": 10.344817161560059,
+      "new_vs_old_cos": 0.0005165222100913525,
+      "loss": 4.712452411651611,
+      "distinct_ratio": 0.6315524578094482
+    },
+    "chunk7": {
+      "n": 50,
+      "n_vecs": 28,
+      "new_norm_mean": 10.367598533630371,
+      "new_norm_std": 0.022647513076663017,
+      "state_norm_mean": 10.348071098327637,
+      "new_vs_old_cos": 0.000544530397746712,
+      "loss": 4.732965469360352,
+      "distinct_ratio": 0.6173992156982422
+    },
+    "chunk8": {
+      "n": 50,
+      "n_vecs": 32,
+      "new_norm_mean": 10.366218566894531,
+      "new_norm_std": 0.024444209411740303,
+      "state_norm_mean": 10.35033893585205,
+      "new_vs_old_cos": 0.0005534850060939789,
+      "loss": 4.819347858428955,
+      "distinct_ratio": 0.5575806498527527
+    },
+    "chunk9": {
+      "n": 50,
+      "n_vecs": 36,
+      "new_norm_mean": 10.366231918334961,
+      "new_norm_std": 0.021663246676325798,
+      "state_norm_mean": 10.352106094360352,
+      "new_vs_old_cos": 0.0005451890174299479,
+      "loss": 4.7670674324035645,
+      "distinct_ratio": 0.6398588418960571
+    },
+    "chunk10": {
+      "n": 50,
+      "n_vecs": 40,
+      "new_norm_mean": 10.371743202209473,
+      "new_norm_std": 0.018943529576063156,
+      "state_norm_mean": 10.354068756103516,
+      "new_vs_old_cos": 0.0005497193778865039,
+      "loss": 4.7351155281066895,
+      "distinct_ratio": 0.6207458972930908
+    },
+    "chunk11": {
+      "n": 50,
+      "n_vecs": 44,
+      "new_norm_mean": 10.378323554992676,
+      "new_norm_std": 0.029386069625616074,
+      "state_norm_mean": 10.35627555847168,
+      "new_vs_old_cos": 0.0005442934343591332,
+      "loss": 4.805872440338135,
+      "distinct_ratio": 0.5889717936515808
+    },
+    "chunk12": {
+      "n": 49,
+      "n_vecs": 48,
+      "new_norm_mean": 10.37043571472168,
+      "new_norm_std": 0.020952537655830383,
+      "state_norm_mean": 10.356544494628906,
+      "new_vs_old_cos": 0.0005509965703822672,
+      "loss": 4.735256195068359,
+      "distinct_ratio": 0.5958690047264099
+    },
+    "chunk13": {
+      "n": 49,
+      "n_vecs": 52,
+      "new_norm_mean": 10.36817741394043,
+      "new_norm_std": 0.019820543006062508,
+      "state_norm_mean": 10.357440948486328,
+      "new_vs_old_cos": 0.0005226786597631872,
+      "loss": 4.779972076416016,
+      "distinct_ratio": 0.5992429256439209
+    },
+    "chunk14": {
+      "n": 48,
+      "n_vecs": 56,
+      "new_norm_mean": 10.369071006774902,
+      "new_norm_std": 0.021345386281609535,
+      "state_norm_mean": 10.358343124389648,
+      "new_vs_old_cos": 0.0005522396531887352,
+      "loss": 4.691104412078857,
+      "distinct_ratio": 0.6066448092460632
+    },
+    "chunk15": {
+      "n": 46,
+      "n_vecs": 60,
+      "new_norm_mean": 10.371216773986816,
+      "new_norm_std": 0.02007637359201908,
+      "state_norm_mean": 10.360257148742676,
+      "new_vs_old_cos": 0.0005502293934114277,
+      "loss": 4.730691432952881,
+      "distinct_ratio": 0.5805574655532837
+    },
+    "chunk16": {
+      "n": 46,
+      "n_vecs": 64,
+      "new_norm_mean": 10.369948387145996,
+      "new_norm_std": 0.023918235674500465,
+      "state_norm_mean": 10.360862731933594,
+      "new_vs_old_cos": 0.000576642865780741,
+      "loss": 4.698970317840576,
+      "distinct_ratio": 0.5491005182266235
+    }
+  },
+  "gen_samples": [
+    {
+      "sample": 0,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": "ed a little bit of the ground,\n          And he found a little bit of the ground,\n          And he found a little bit of the ground,\n          And"
+        },
+        {
+          "chunk": 2,
+          "text": " mind, but\nthe same kind of smoothness of mind, and a greater degree of\nhappiness of mind, and a greater degree of\nh"
+        },
+        {
+          "chunk": 3,
+          "text": "ence to the\nin the direction of the river, and sometimes to the other side. I\noften to the other side, and sometimes to the other side"
+        },
+        {
+          "chunk": 4,
+          "text": "      And take the air,\n      And the water,\n      And the wind,\n      And the sea,\n      And the ground,\n      And the ground,\n     "
+        },
+        {
+          "chunk": 5,
+          "text": " but I am sure that it is, and that it is, and that it is, and that it is, and that it is, and that it is"
+        },
+        {
+          "chunk": 6,
+          "text": "has been a friend of the British government for many years. He is a\nheathman, a man, and a friend of the British government. He"
+        },
+        {
+          "chunk": 7,
+          "text": " St. Mary's, and of the great\nhailstone of the Great River, and of the great\nhailstone of the Great River, and"
+        },
+        {
+          "chunk": 8,
+          "text": " of the field, and a natural source of\nthe other. I have found that the whole of the\nin the field is a source of\nthe whole"
+        },
+        {
+          "chunk": 9,
+          "text": " is not too thin. They are the source of all\nthe world's natural resources. They are the source of all the world's\nnatural resources. They"
+        },
+        {
+          "chunk": 10,
+          "text": " he made the following\nbook of the most important and important\nwords of all time: \"The Sun, the Moon, the Earth, the Moon, the"
+        },
+        {
+          "chunk": 11,
+          "text": "! I heard a very large, very large, very\nlarge, very large, very large, very large, very large, very large, very large\n"
+        },
+        {
+          "chunk": 12,
+          "text": "of mutual action. And yet we are so young, and so young, that we are\nall the same age, and so young, that we are all"
+        },
+        {
+          "chunk": 13,
+          "text": " sun, is\nthe most important thing to know. \"You will not know that the sun is\nthe most important thing to know. You will not know"
+        },
+        {
+          "chunk": 14,
+          "text": " were not visible to\nthe eye, and the ground was not visible to the eye. I\nsaw the ground, the trees, the gables,"
+        },
+        {
+          "chunk": 15,
+          "text": " is that he is the most important\nto us, and that he is the most important to us. He is the most important to us.\nThe most important"
+        },
+        {
+          "chunk": 16,
+          "text": "# The Math Forum  \n**Stage: **  \n**Challenge Level: 1**\n\n## The Math of the 4th century."
+        }
+      ]
+    },
+    {
+      "sample": 1,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": " are always in the same place, and which are\nthe most beautiful of all. The hylas are\nthe most beautiful of all, and the most"
+        },
+        {
+          "chunk": 2,
+          "text": "\nhave ever seen one, you will know that it is a very beautiful thing.\nIt was a very beautiful thing, and it was very beautiful to see\n"
+        },
+        {
+          "chunk": 3,
+          "text": "The Art of the Art of the Art of the Art of the Art of the Art of the Art of the Art of the Art of the Art of the Art"
+        },
+        {
+          "chunk": 4,
+          "text": "eda_ in the _Marsa_ of the _Marsa_ in the _Marsa_ of the _Marsa_ in the"
+        },
+        {
+          "chunk": 5,
+          "text": " the\nEnglish name is a modification of the Latin name, and the\nEnglish name is a modification of the Greek name. The\nEnglish name is a modification"
+        },
+        {
+          "chunk": 6,
+          "text": "is the most\nbeech, and that it is the most beautiful ever, and that it is the most\nbeech ever, and that it is the"
+        },
+        {
+          "chunk": 7,
+          "text": " things that we see, and to distinguish them from the things that we\nsaw. They are all the same, and all the same, and all the"
+        },
+        {
+          "chunk": 8,
+          "text": " world have been\nthe same age as the last person to be born. And yet, the\nsick and sick have been so long as the world has"
+        },
+        {
+          "chunk": 9,
+          "text": " by the great French\nand Greek mathematician, Ren\u00e9 Descartes.\nThe point was first accurately\nat a conference held by the great French\nand"
+        },
+        {
+          "chunk": 10,
+          "text": " the flowers she had picked, and she ran away, leaving her\nthe flowers on the bed. \"I love these flowers,\" she said, \"and I"
+        },
+        {
+          "chunk": 11,
+          "text": " all know, and which she\nis now, and which she is now, and which she is now, and which she\nis now, and which she"
+        },
+        {
+          "chunk": 12,
+          "text": " of her life. And I am sure that this is the reason why I have always\nhated to be a man. I am a woman, but I"
+        },
+        {
+          "chunk": 13,
+          "text": "ye, I shall never see you again. I shall never see you again. I shall never see you again. I shall never see you again. I shall"
+        },
+        {
+          "chunk": 14,
+          "text": " in trouble. And\nI'm sorry for the fact that I'm not in trouble. I'm not in trouble for\nthe fact that I'm not in"
+        },
+        {
+          "chunk": 15,
+          "text": ".\"\n\n\"Good night, my son. I shall see you at the end of the night. I shall see you at the end of the night. I shall"
+        },
+        {
+          "chunk": 16,
+          "text": " for him. He\nalso had no doubt that he was a man of great worth, and that he\nis a man of great worth, and that he"
+        }
+      ]
+    },
+    {
+      "sample": 2,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": " We must be able to\nunderstand the difference between the two kinds of writing.\n2. The difference between argument and\n   - (a) the writing"
+        },
+        {
+          "chunk": 2,
+          "text": ", is to\nmake a person understand something. We shall not\nbe able to make a person understand anything unless he\nis able to understand it. We"
+        },
+        {
+          "chunk": 3,
+          "text": "well-posed argument, the author must be able to make a clear distinction between\nthe two kinds of arguments that are possible, and the latter must be able"
+        },
+        {
+          "chunk": 4,
+          "text": ". And it will give you practice in\nthe application of the results of these exercises to the particular\nsolutions of the problems you have before you begin to"
+        },
+        {
+          "chunk": 5,
+          "text": "39. This city should build a new road system.\n\n40. This city should build a new road system.\n\n41. This city should build a new road system"
+        },
+        {
+          "chunk": 6,
+          "text": " are\nthe subject of our will to do it. And the\npractical will of doing something is the subject of our will to do it. And\n"
+        },
+        {
+          "chunk": 7,
+          "text": "solutions are not so much the same, but they are similar in that they are\nthe same in that they are based on the same general principles. The"
+        },
+        {
+          "chunk": 8,
+          "text": " been a\nproposition of the National Government, and that\nthe National Government has not yet decided whether\nthe National Government has decided whether\nthe National Government"
+        },
+        {
+          "chunk": 9,
+          "text": " cause of equality, the question of the\nhence of the question of the\nhence of the question of the\nhence of the question of the"
+        },
+        {
+          "chunk": 10,
+          "text": "\ncases, and are therefore of great importance in\nthe business of legal reasoning. It is therefore necessary\nto make the study of law as simple as possible"
+        },
+        {
+          "chunk": 11,
+          "text": " is\nthe human mind that is most likely to be the most important\nin our study of human behavior. We must therefore be prepared for\nthe fact that"
+        },
+        {
+          "chunk": 12,
+          "text": " the history of the last fifty years of\nthe last twenty years of the last twenty years of the last twenty years of\nthe last twenty years of the last"
+        },
+        {
+          "chunk": 13,
+          "text": " the other side's\npreparation for the other side. This is the reason why it is so important to\nbe familiar with the other side of the argument"
+        },
+        {
+          "chunk": 14,
+          "text": ", I have found that\nthe most important thing to do is to make the subject clear, and that\nthe reader may be able to understand it. This"
+        },
+        {
+          "chunk": 15,
+          "text": " FRACTIONS\nThe whole is greater than the part.\n\nThe whole is less than the part.\n\nThe whole is equal to the part.\n\nThe whole is greater"
+        },
+        {
+          "chunk": 16,
+          "text": "\nto the press, to the radio, to the radio, to the radio, to the radio, to the radio, to the radio, to the radio"
+        }
+      ]
+    }
+  ],
+  "config": {
+    "chunk_len": 1024,
+    "n_vec": 4,
+    "gen_tokens": 32
+  }
+}
