@@ -46,7 +46,7 @@ import torch
 import torch.nn.functional as F
 
 from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
-                         greedy_generate, _unwrap)
+                         greedy_generate, accumulating_buffer)
 
 
 def parse_args() -> argparse.Namespace:
@@ -88,10 +88,10 @@ def main() -> None:
                                  args.memory_slots, dtype, device)
     if not has_cross_state(model):
         raise SystemExit("Model has no cross state — nothing to diagnose.")
-    accum = getattr(_unwrap(model).cortex, "accum", None)
+    accum = accumulating_buffer(model)
     if accum is None:
-        raise SystemExit("Not an AccumCCoT model — this diagnostic reads the "
-                         "accumulated write-once state.")
+        raise SystemExit("Not an accumulating model (--cortex.prefix_memory "
+                         "accum) — this diagnostic reads the write-once state.")
     n_vec = int(accum.n_vec)
     num_steps = to_num_steps(args.T if args.T is not None else int(cfg.mean_recurrence))
     print(f"T={int(num_steps[0])}  chunk_len={args.chunk_len}  "

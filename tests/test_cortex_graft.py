@@ -76,16 +76,30 @@ class FakeRaven(nn.Module):
     def forward(self, input_ids, num_steps, labels=None,
                 m_cross_in=None, return_m_cross=False, eos_mask=None):
         input_embeds = self.wte(input_ids)
+        n_prefix = n_summary = 0
         if self.cortex is not None:                       # ← graft hook (begin)
             self.cortex.begin(m_cross_in, eos_mask, input_ids.shape[1],
                               input_ids.device, input_embeds.dtype)
+            # ← graft hook (summary seeding, once, from the loaded wte)
+            if (self.cortex.prefix is not None
+                    and not bool(self.cortex.prefix.summary_seeded)):
+                self.cortex.init_summary_from_embedding(self.wte.weight)
+            # ← graft hook (prefix splice).  emb_scale is 1 here; the real
+            # model passes self.emb_scale.
+            position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0)
+            input_embeds, _, n_prefix, n_summary = self.cortex.prefix_pack(
+                input_embeds, position_ids, 1.0)
         x = self.iterate_forward(input_embeds, num_steps)
         h_T = x
         new_m_cross = None
-        if self.cortex is not None:                       # ← graft hook (M_cross write)
+        # ← graft hook (M_cross write); prefix memory writes after the coda
+        if self.cortex is not None and self.cortex.prefix is None:
             new_m_cross = self.cortex.cross_write(h_T)
         for block in self.coda:
             x = block(x)
+        if self.cortex is not None and self.cortex.prefix is not None:
+            # ← graft hook (prefix unpack: summary states ARE the new carry)
+            x, new_m_cross = self.cortex.prefix_unpack(x, n_prefix, n_summary)
         logits = self.lm_head(x).float()
         out = {"logits": logits}
         if labels is not None:
@@ -94,6 +108,46 @@ class FakeRaven(nn.Module):
         if return_m_cross:
             out["m_cross"] = new_m_cross
         return out
+
+
+class CausalBlock(nn.Module):
+    """Single-head causal self-attention + a linear."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.qkv = nn.Linear(H, 3 * H, bias=False)
+        self.weight = nn.Parameter(torch.zeros(1))   # so freeze selectors match
+        self.out = nn.Linear(H, H)
+
+    def forward(self, x):
+        # Written out rather than via scaled_dot_product_attention, whose CPU
+        # kernels are not available for every dtype/shape these tests use.
+        q, k, v = self.qkv(x).chunk(3, dim=-1)
+        scores = (q @ k.transpose(-2, -1)) / (H ** 0.5)
+        causal = torch.ones(x.shape[1], x.shape[1], dtype=torch.bool).tril()
+        scores = scores.masked_fill(~causal, torch.finfo(scores.dtype).min)
+        return self.out(x + nn.functional.softmax(scores, dim=-1) @ v)
+
+
+class AttnRaven(FakeRaven):
+    """FakeRaven with real causal attention in the loop and coda.
+
+    FakeRaven is deliberately POSITION-WISE, which is fine for the buffers that
+    inject an additive delta but useless for prefix memory: its read IS the base
+    model's attention over the prepended vectors, so in a position-wise model
+    the carry columns can never reach a real token.  A "carry changes the
+    logits" assertion would then pass for the wrong reason — a longer packed
+    sequence draws a different initialize_state, which moves the logits all by
+    itself.  Prefix tests use this subclass so the mixing is genuine.
+
+    It is a SUBCLASS rather than a change to FakeRaven because two EOS tests and
+    the loop-freeze tests are written against position-wise behaviour.
+    """
+
+    def __init__(self, **mem_flags):
+        super().__init__(**mem_flags)
+        self.core_block = nn.ModuleList([CausalBlock() for _ in range(2)])
+        self.coda       = nn.ModuleList([CausalBlock() for _ in range(1)])
 
 
 def _ids(b=B, s=S):
@@ -179,38 +233,6 @@ class TestMCross:
         out2["loss"].backward()
         g = model.cortex.m_cross.gate_proj_in.weight.grad
         assert g is not None and g.norm() > 0
-
-
-# ---------------------------------------------------------------------------
-# DirectCCoT (K=0 carry)
-# ---------------------------------------------------------------------------
-
-class TestDirectCCoT:
-
-    def test_enabled_at_k0(self):
-        model = FakeRaven(use_memory=True, memory_slots=0, ccot_direct=True)
-        assert model.cortex.ccot_direct is not None
-        assert model.cortex.m_cross is None
-        assert model.cortex.has_cross_state
-
-    def test_lm2_takes_precedence(self):
-        model = FakeRaven(use_memory=True, memory_slots=K, ccot_direct=True)
-        assert model.cortex.ccot_direct is None
-        assert model.cortex.m_cross is not None
-
-    def test_write_shape(self):
-        model = FakeRaven(use_memory=True, ccot_direct=True)
-        out = model(_ids(), (0, 1), return_m_cross=True)
-        assert out["m_cross"].shape == (B, 1, H)
-
-    def test_carry_changes_next_call(self):
-        model = FakeRaven(use_memory=True, ccot_direct=True)
-        _activate_cross_read(model)
-        ids = _ids()
-        mc = model(ids, (0, 2), return_m_cross=True)["m_cross"].detach()
-        torch.manual_seed(3); a = model(ids, (0, 2), m_cross_in=mc)
-        torch.manual_seed(3); b = model(ids, (0, 2), m_cross_in=None)
-        assert not torch.allclose(a["logits"], b["logits"])
 
 
 # ---------------------------------------------------------------------------

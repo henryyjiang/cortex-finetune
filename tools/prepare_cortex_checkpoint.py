@@ -70,7 +70,16 @@ def main() -> int:
     ap.add_argument("--memory_slots", type=int, default=None)
     ap.add_argument("--memory_slots_iter", type=int, default=None)
     ap.add_argument("--memory_heads", type=int, default=None)
-    ap.add_argument("--ccot_direct", action="store_true")
+    # AutoCompressor-faithful prefix carry (supersedes the retired
+    # --ccot_direct / accum_ccot / gated_accum flags, which now raise).
+    ap.add_argument("--prefix_memory", choices=["accum", "gated"], default=None)
+    ap.add_argument("--accum_vecs", type=int, default=None,
+                    help="summary vectors written per chunk (prefix memory)")
+    ap.add_argument("--accum_max", type=int, default=None,
+                    help="FIFO cap on accumulated vectors (prefix accum only)")
+    ap.add_argument("--summary_init_token", type=int, default=None,
+                    help="token whose embedding seeds the summary slots; "
+                         "omit to use the config's eos_token_id")
     args = ap.parse_args()
 
     grafted = os.path.join(REPO, "convert_pretrained_model",
@@ -93,18 +102,18 @@ def main() -> int:
     cfg["auto_map"]["AutoModelForCausalLM"] = "raven_modeling_minimal_cortex.RavenForCausalLM"
     if args.use_memory:
         cfg["use_memory"] = True
-    for k in ("memory_slots", "memory_slots_iter", "memory_heads"):
+    for k in ("memory_slots", "memory_slots_iter", "memory_heads",
+              "prefix_memory", "accum_vecs", "accum_max", "summary_init_token"):
         v = getattr(args, k)
         if v is not None:
             cfg[k] = v
-    if args.ccot_direct:
-        cfg["ccot_direct"] = True
     with open(cfg_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
 
     print(f"\nDone. Train with (from the repo root):\n"
           f"  python train.py --model_name {args.dst} "
-          f"--cortex.use_memory true --cortex.memory_slots 4 --cortex.cross_chunks 4 ...")
+          f"--cortex.use_memory true --cortex.prefix_memory accum "
+          f"--cortex.accum_vecs 32 --cortex.accum_max 128 --cortex.cross_chunks 4 ...")
     return 0
 
 

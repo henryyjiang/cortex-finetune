@@ -691,20 +691,39 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
         prepared_attn_mask = None  # self.compile_mask(input_ids, attention_mask, past_key_values)
         block_idx = torch.tensor(-1, device=torch.device("cpu"), dtype=torch.long)  # count in tensors for compile
 
+        # cortex: set up per-call memory runtime (carried buffer + EOS masks).
+        # Must run BEFORE prefix_pack, which consults the EOS masks, and is
+        # given the REAL sequence length (not the padded one).
+        n_prefix = n_summary = 0
+        if self.cortex is not None:
+            self.cortex.begin(
+                m_cross_in, eos_mask, input_embeds.shape[1],
+                input_embeds.device, input_embeds.dtype,
+            )
+            # Seed summary embeddings from the EOS token embedding, once, on
+            # the first forward.  Cannot happen in __init__: wte is still
+            # random there, so from_pretrained would overwrite the seed (or we
+            # would copy noise).  The already-seeded flag is a persistent
+            # buffer, so a resumed or eval-loaded checkpoint does NOT get its
+            # trained summary_emb overwritten here.
+            if (self.cortex.prefix is not None
+                    and not bool(self.cortex.prefix.summary_seeded)):
+                self.cortex.init_summary_from_embedding(self.transformer.wte.weight)
+            # cortex prefix memory: splice [carry | tokens | summary slots]
+            # into the stream so the base model's OWN attention does the
+            # reading and writing.  No-op unless --cortex.prefix_memory is set.
+            # emb_scale is passed because the splice happens AFTER the
+            # embedding rescale above (see prefix_pack).
+            input_embeds, position_ids, n_prefix, n_summary = self.cortex.prefix_pack(
+                input_embeds, position_ids, self.emb_scale
+            )
+
         freqs_cis = self.rotary_emb(input_embeds, position_ids)
 
         # Non-recurrent prelude
         for block in self.transformer.prelude:  # type: ignore # types broken in 2.6+
             block_idx += 1
             input_embeds = block(input_embeds, freqs_cis, block_idx, prepared_attn_mask, past_key_values)
-
-        # cortex: set up per-call memory runtime (carried buffer + EOS masks)
-        # before the recurrence; the core_block_forward hooks read it.
-        if self.cortex is not None:
-            self.cortex.begin(
-                m_cross_in, eos_mask, input_embeds.shape[1],
-                input_embeds.device, input_embeds.dtype,
-            )
 
         # Main recurrence
         x, num_steps_no_grad, num_steps_with_grad, xk, block_idx = self.iterate_forward(
@@ -720,7 +739,12 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
 
         # cortex: write h_T into the cross-segment buffer (before the coda, which
         # always sees the unmodified h_T).  None when no cross-state is active.
-        new_m_cross = self.cortex.cross_write(x) if self.cortex is not None else None
+        # Prefix memory writes AFTER ln_f instead (its summary vectors are the
+        # model's own final hidden states), so cross_write is skipped for it.
+        new_m_cross = (
+            self.cortex.cross_write(x)
+            if (self.cortex is not None and self.cortex.prefix is None) else None
+        )
 
         latent_states = x.clone().detach()
 
@@ -730,6 +754,12 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
             block_idx -= 1
             x = block(x, freqs_cis, block_idx, prepared_attn_mask, past_key_values)
         x = self.transformer.ln_f(x)  # type: ignore # types broken in 2.6+
+
+        # cortex prefix memory: the summary slots' final hidden states ARE the
+        # new carry; strip carry + summary columns so the head and the loss see
+        # only real tokens (labels therefore need no padding).  No-op otherwise.
+        if self.cortex is not None and self.cortex.prefix is not None:
+            x, new_m_cross = self.cortex.prefix_unpack(x, n_prefix, n_summary)
 
         # Prediction head, assuming labels really are labels and not equal to input_ids
         if labels is not None:

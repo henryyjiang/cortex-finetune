@@ -53,7 +53,8 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-from model_utils import load_checkpoint, has_cross_state, to_num_steps, _unwrap
+from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
+                         accumulating_buffer)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from cortex_memory.chunking import ablate_vec_slice  # noqa: E402
@@ -151,11 +152,12 @@ def main() -> None:
     conditions = ["carried", "zeroed"]
     n_vec = slice_n = 0
     if args.slice_ablate != "none":
-        accum = getattr(_unwrap(model).cortex, "accum", None)
+        accum = accumulating_buffer(model)
         if accum is None:
-            raise SystemExit("--slice_ablate needs an AccumCCoT model (write-"
-                             "once rows) — gated/overwritten states are not "
-                             "separable per chunk.")
+            raise SystemExit("--slice_ablate needs an accumulating model "
+                             "(--cortex.prefix_memory accum, write-once rows) — "
+                             "gated/overwritten states are not separable per "
+                             "chunk.")
         n_vec   = int(accum.n_vec)
         slice_n = args.slice_n if args.slice_n > 0 else n_vec
         conditions += (["oldest", "newest"] if args.slice_ablate == "both"

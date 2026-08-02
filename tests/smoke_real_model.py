@@ -55,6 +55,133 @@ def _build_pkg(variant: str, config_src: str) -> str:
     return tmp
 
 
+def prefix_checks(RavenForCausalLM, make_cfg, ids, B, S, run) -> bool:
+    """AutoCompressor-faithful prefix memory, on the REAL model.
+
+    This path has no zero-init read module: the carry is spliced into the token
+    stream and consumed by the base model's own attention, so it is LIVE from
+    step 0.  Every check below is about the splice being correct — shapes, the
+    real-token span, positions, the EOS lanes, and the summary-seeding flag —
+    because a wrong splice still produces a perfectly healthy loss curve.
+    """
+    D, EOS = 64, 127
+    ok = True
+
+    # ── accum: shapes, growth, liveness ─────────────────────────────────────
+    torch.manual_seed(0)
+    ma = RavenForCausalLM(make_cfg(use_memory=True, prefix_memory="accum",
+                                   accum_vecs=8, accum_max=24,
+                                   eos_token_id=EOS)).eval()
+    o1 = run(ma, return_m_cross=True)
+    shape1 = tuple(o1.m_cross.shape)
+    logits_ok = tuple(o1.logits.shape) == (B, S, 128)
+    ok &= shape1 == (B, 8, D) and logits_ok
+    print(f"[prefix accum] first carry {shape1} == (B,8,D): {shape1 == (B, 8, D)} | "
+          f"logits keep the real-token span {tuple(o1.logits.shape)}: {logits_ok}")
+
+    o2 = run(ma, seed=1, m_cross_in=o1.m_cross.detach(), return_m_cross=True)
+    grew = tuple(o2.m_cross.shape) == (B, 16, D)
+    live = not torch.allclose(o2.logits, run(ma, seed=1, m_cross_in=None).logits)
+    ok &= grew and live
+    print(f"[prefix accum] accumulates 8->16: {grew} | carry changes logits at "
+          f"init (no zero-init gate to open): {live}")
+
+    # FIFO: 24-vector cap must clamp on the fourth chunk, not silently grow.
+    st = o2.m_cross.detach()
+    for _ in range(2):
+        st = run(ma, seed=2, m_cross_in=st, return_m_cross=True).m_cross.detach()
+    capped = tuple(st.shape) == (B, 24, D)
+    ok &= capped
+    print(f"[prefix accum] FIFO cap holds at accum_max=24: {capped}")
+
+    # ── seeding: summary_emb == wte[EOS], and the flag survives save/load ────
+    seeded = torch.allclose(ma.cortex.prefix.summary_emb[0],
+                            ma.transformer.wte.weight[EOS])
+    all_rows = torch.allclose(ma.cortex.prefix.summary_emb,
+                              ma.transformer.wte.weight[EOS].expand(8, D))
+    flag = bool(ma.cortex.prefix.summary_seeded)
+    ok &= seeded and all_rows and flag
+    print(f"[prefix seed] summary_emb == wte[eos] on every row: "
+          f"{seeded and all_rows} | seeded flag set: {flag}")
+
+    # A trained summary_emb must NOT be re-seeded when the checkpoint is
+    # reloaded — the flag is a persistent buffer precisely so a resume cannot
+    # reset the write path back to wte[eos] while the loss curve looks fine.
+    with torch.no_grad():
+        ma.cortex.prefix.summary_emb.add_(1.0)
+    trained = ma.cortex.prefix.summary_emb.clone()
+    torch.manual_seed(3)
+    reloaded = RavenForCausalLM(make_cfg(use_memory=True, prefix_memory="accum",
+                                         accum_vecs=8, accum_max=24,
+                                         eos_token_id=EOS)).eval()
+    in_sd = "cortex.prefix.summary_seeded" in ma.state_dict()
+    reloaded.load_state_dict(ma.state_dict())
+    run(reloaded, seed=4)                      # first forward would re-seed
+    kept = torch.allclose(reloaded.cortex.prefix.summary_emb, trained)
+    ok &= in_sd and kept
+    print(f"[prefix seed] flag rides in the state dict: {in_sd} | "
+          f"reload+forward keeps the trained summary_emb: {kept}")
+
+    # ── gradient reaches summary_emb through the chunk chain ────────────────
+    torch.manual_seed(0)
+    mg = RavenForCausalLM(make_cfg(use_memory=True, prefix_memory="accum",
+                                   accum_vecs=4, accum_max=32,
+                                   eos_token_id=EOS)).train()
+    labels = torch.randint(0, 128, (B, S))
+    c1 = mg(ids, num_steps=torch.tensor([0, 3]), return_m_cross=True)
+    c2 = mg(ids, num_steps=torch.tensor([0, 3]), labels=labels,
+            m_cross_in=c1.m_cross)             # un-detached: chunk 2 reads chunk 1
+    c2.loss.backward()
+    g = mg.cortex.prefix.summary_emb.grad
+    grad_ok = g is not None and torch.isfinite(g).all() and g.abs().sum() > 0
+    ok &= bool(grad_ok)
+    print(f"[prefix grad] chunk-2 loss reaches chunk-1's summary_emb: {bool(grad_ok)}")
+
+    # ── EOS: a lane whose document ended must not carry its vectors forward ──
+    torch.manual_seed(0)
+    me = RavenForCausalLM(make_cfg(use_memory=True, prefix_memory="accum",
+                                   accum_vecs=4, accum_max=32,
+                                   eos_token_id=EOS)).eval()
+    prev = me(ids[:1], num_steps=torch.tensor([0, 2]), return_m_cross=True).m_cross
+    eos = torch.zeros(1, S, dtype=torch.bool)
+    eos[0, S - 1] = True                        # doc ends on the last position
+    out = me(ids[:1], num_steps=torch.tensor([0, 2]), return_m_cross=True,
+             eos_mask=eos, m_cross_in=prev)
+    # incoming rows zeroed (ended doc) and this chunk's write zeroed (empty
+    # open suffix) -> the whole carry is zero
+    zeroed = torch.allclose(out.m_cross, torch.zeros_like(out.m_cross))
+    ok &= zeroed
+    print(f"[prefix EOS] ended-doc lane carries zero: {zeroed}")
+
+    # ── gated: same splice, constant width ──────────────────────────────────
+    torch.manual_seed(0)
+    mgt = RavenForCausalLM(make_cfg(use_memory=True, prefix_memory="gated",
+                                    accum_vecs=8, eos_token_id=EOS)).eval()
+    g1 = run(mgt, return_m_cross=True).m_cross.detach()
+    g2 = run(mgt, seed=1, m_cross_in=g1, return_m_cross=True).m_cross.detach()
+    fixed_width = tuple(g1.shape) == (B, 8, D) and tuple(g2.shape) == (B, 8, D)
+    moved = not torch.allclose(g1, g2)
+    ok &= fixed_width and moved
+    print(f"[prefix gated] width constant at n_vec across chunks: {fixed_width} "
+          f"| gate actually updates the state: {moved}")
+
+    # ── emb_scale: slots enter the network exactly as an EOS token would ─────
+    # The toy config has embed_scale = sqrt(n_embd) = 8, so this catches the
+    # mismatch that a scale-1 checkpoint would hide.
+    scale_ok = abs(float(ma.emb_scale) - 8.0) < 1e-6
+    ma.cortex.begin(None, None, S, torch.device("cpu"), torch.float32)  # clear carry
+    packed, _, n_pre, n_sum = ma.cortex.prefix_pack(
+        torch.zeros(B, S, D), torch.arange(S).unsqueeze(0), ma.emb_scale)
+    slot_matches_token = torch.allclose(
+        packed[0, -1], ma.cortex.prefix.summary_emb[-1] * ma.emb_scale)
+    ok &= scale_ok and slot_matches_token and n_pre == 0 and n_sum == 8
+    print(f"[prefix emb_scale] toy scale is {float(ma.emb_scale):.3f} (non-1, so "
+          f"the check bites): {scale_ok} | slot enters at emb_scale x "
+          f"summary_emb: {slot_matches_token}")
+
+    return ok
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("variant", nargs="?", default="olmo", choices=["olmo", "llama"])
@@ -132,11 +259,7 @@ def main() -> int:
     ok &= noop
     print(f"[M_cross] zero-init read is a no-op at init: {noop}")
 
-    torch.manual_seed(0)
-    m2 = RavenForCausalLM(make_cfg(use_memory=True, ccot_direct=True)).eval()
-    ds = tuple(run(m2, return_m_cross=True).m_cross.shape)
-    ok &= ds == (B, 1, 64)
-    print(f"[DirectCCoT] m_cross shape {ds} == (B,1,D): {ds == (B,1,64)}")
+    ok &= prefix_checks(RavenForCausalLM, make_cfg, ids, B, S, run)
 
     torch.manual_seed(0)
     m3 = RavenForCausalLM(make_cfg(use_memory=True, memory_slots=4, memory_slots_iter=4)).train()

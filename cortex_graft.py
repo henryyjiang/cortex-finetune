@@ -51,13 +51,50 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from cortex_memory.buffers import LSTMBuffer, DirectCCoT, AccumCCoT, GatedAccumBuffer
+from cortex_memory.buffers import LSTMBuffer, PrefixAccumBuffer, PrefixGatedBuffer
 from cortex_memory.eos import compute_eos_masks, apply_write_reset, apply_valid_write
 
 
 def memory_enabled(config) -> bool:
     """Master switch — read once in RavenForCausalLM.__init__."""
     return bool(getattr(config, "use_memory", False))
+
+
+def resolve_summary_init_token(config) -> int:
+    """Which token's embedding seeds the prefix summary slots.
+
+    AutoCompressor uses EOS (auto_compressor.py:49) — a real, in-distribution
+    vector the pretrained model already knows how to process.  RavenConfig
+    leaves eos_token_id commented out (raven_config_minimal.py:96), so on a
+    converted checkpoint it is whatever the source config carried, and on a
+    hand-built config it is None.  Resolve explicitly and fail loudly rather
+    than silently seeding from token 0 or from noise: a badly seeded summary
+    slot degrades the carry without producing any visible symptom in the loss
+    curve, which is the failure mode this project keeps paying for.
+
+    Order: cortex.summary_init_token (>= 0) wins, else config.eos_token_id
+    (first entry if it is a list, as some configs carry several).
+    """
+    explicit = int(getattr(config, "summary_init_token", -1) or -1)
+    if explicit >= 0:
+        tok = explicit
+    else:
+        eos = getattr(config, "eos_token_id", None)
+        if isinstance(eos, (list, tuple)):
+            eos = eos[0] if eos else None
+        if eos is None:
+            raise ValueError(
+                "prefix memory needs a token to seed its summary embeddings, but "
+                "the config has no eos_token_id.  Pass "
+                "--cortex.summary_init_token <id> (AutoCompressor uses EOS)."
+            )
+        tok = int(eos)
+    vocab = int(getattr(config, "vocab_size", 0) or 0)
+    if vocab and not (0 <= tok < vocab):
+        raise ValueError(
+            f"summary init token {tok} is outside the vocabulary (size {vocab})"
+        )
+    return tok
 
 
 # ── LoRA-on-loop (experiment-ladder rung 1b) ────────────────────────────────
@@ -146,30 +183,55 @@ class CortexMemory(nn.Module):
         self.memory_slots      = K
         self.memory_slots_iter = Ki
 
-        # M_cross: LM2 K-slot buffer (K>0) XOR DirectCCoT K=0 carry XOR
-        # AccumCCoT accumulating carry (K=0; takes precedence over ccot_direct
-        # — train.py asserts they are not both set).  gated_accum swaps the
-        # K-slot buffer for the GatedAccumBuffer (extraction write + LM2 gated
-        # merge) — same state shape and write/read signatures, so the whole
-        # m_cross path below is shared.
-        if K > 0:
-            self.m_cross = (GatedAccumBuffer(D, K, nh)
-                            if bool(getattr(config, "gated_accum", False))
-                            else LSTMBuffer(D, K, nh))
-        else:
-            self.m_cross = None
-        self.accum   = (
-            AccumCCoT(D, int(getattr(config, "accum_vecs", 4)), nh,
-                      int(getattr(config, "accum_max", 64)))
-            if (K == 0 and bool(getattr(config, "accum_ccot", False))) else None
-        )
-        self.ccot_direct = (
-            DirectCCoT(D)
-            if (K == 0 and self.accum is None
-                and bool(getattr(config, "ccot_direct", False))) else None
-        )
+        # M_cross: the original LM2 K-slot buffer (K>0), kept as the
+        # pre-AutoCompressor baseline arm.  DirectCCoT, AccumCCoT and
+        # GatedAccumBuffer were removed 2026-08-02 — superseded by the Prefix*
+        # pair below (see cortex_memory/buffers.py for why).
+        # RETIRED FLAGS.  These selected buffers that no longer exist.  Failing
+        # loudly matters more than usual here: silently ignoring one of them
+        # yields a run with NO cross-segment memory that still logs a healthy
+        # loss curve, i.e. a null result that looks like a real measurement.
+        for dead, replacement in (("accum_ccot", "--cortex.prefix_memory accum"),
+                                  ("gated_accum", "--cortex.prefix_memory gated"),
+                                  ("ccot_direct", "(removed; no replacement)")):
+            if bool(getattr(config, dead, False)):
+                raise ValueError(
+                    f"cortex.{dead} was retired on 2026-08-02 along with the buffer "
+                    f"it selected. Use {replacement} instead."
+                )
+
+        self.m_cross = LSTMBuffer(D, K, nh) if K > 0 else None
+        self.accum = None        # retained attrs: the hooks below still branch
+        self.ccot_direct = None  # on them, and eval/test code reads them
         # M_iter: per-position short-term buffer (independent of M_cross).
         self.m_iter = LSTMBuffer(D, Ki, nh) if Ki > 0 else None
+
+        # ── AutoCompressor-faithful prefix memory ───────────────────────────
+        # --cortex.prefix_memory accum|gated selects it and DISABLES every
+        # path above: there is no read module and no extraction attention, so
+        # read_into/cross_write are bypassed entirely.  The carry is spliced
+        # into the token stream by the modeling file (prefix_pack) and read
+        # back out of the post-ln_f states (prefix_unpack).
+        pmode = str(getattr(config, "prefix_memory", "") or "").lower()
+        n_vec = int(getattr(config, "accum_vecs", 32))
+        if pmode == "accum":
+            self.prefix = PrefixAccumBuffer(
+                D, n_vec, int(getattr(config, "accum_max", 128)))
+        elif pmode == "gated":
+            self.prefix = PrefixGatedBuffer(D, n_vec)
+        elif pmode:
+            raise ValueError(f"prefix_memory must be '', 'accum' or 'gated'; got {pmode!r}")
+        else:
+            self.prefix = None
+        if self.prefix is not None:
+            # Prefix mode owns the cross-segment state exclusively.
+            self.m_cross = self.accum = self.ccot_direct = None
+            # Resolve now, at build time, so a missing or invalid seed token fails
+            # before the data loader and the wandb run exist rather than on the
+            # first forward of a queued 48h job.
+            self.summary_init_token = resolve_summary_init_token(config)
+        else:
+            self.summary_init_token = -1
 
         # R4 dual-role mitigation: project h_T before the M_cross write so the
         # buffer path and the coda path see independent representations.
@@ -188,7 +250,94 @@ class CortexMemory(nn.Module):
     @property
     def has_cross_state(self) -> bool:
         return (self.m_cross is not None or self.ccot_direct is not None
-                or self.accum is not None)
+                or self.accum is not None or self.prefix is not None)
+
+    def init_summary_from_embedding(self, wte_weight: torch.Tensor) -> None:
+        """Seed the summary embeddings from a real token (AutoCompressor uses
+        EOS).  Called by the model AFTER the base weights are loaded — at
+        __init__ time wte is still random, so doing it there would copy noise.
+        The token id was resolved and validated in __init__."""
+        if self.prefix is not None:
+            self.prefix.init_from_token_embedding(wte_weight, self.summary_init_token)
+
+    # ── prefix-memory hooks (called from the model's forward) ───────────────
+    def prefix_pack(self, input_embeds: torch.Tensor,
+                    position_ids: torch.Tensor,
+                    emb_scale: float = 1.0):
+        """Splice the carry into the token stream, AutoCompressor-style.
+
+        Layout: [carried vectors | real tokens | summary slots].  Under the
+        model's causal mask this reproduces auto_compressor.py:85 exactly —
+        real tokens see every carried vector, and the summary slots at the end
+        see the whole chunk.  The summary slots also see each other causally,
+        which is the ONLY thing that stops n_vec identically-initialised slots
+        from collapsing into copies of one vector.
+
+        Positions: 0 for carried and summary slots (RoPE identity — our analog
+        of AC's pad-position trick), 1..S for real tokens.  Every index stays
+        inside the trained window even though the packed sequence is longer.
+
+        emb_scale: the model multiplies wte(ids) by config.init_values
+        ["embed_scale"] BEFORE this splice, so a summary slot seeded from
+        wte[eos] would otherwise enter the network 1/emb_scale times smaller
+        than the very token it was copied from — silently undoing the
+        in-distribution initialisation.  Scaling the slots here makes
+        `summary_emb == wte[eos]` enter exactly as an EOS token would.  The
+        CARRIED vectors are deliberately NOT scaled: they are post-ln_f hidden
+        states, not embeddings, and AutoCompressor feeds its summaries straight
+        back into inputs_embeds unscaled.  For the converted OLMo checkpoints
+        emb_scale is 1.0 anyway (convert_olmo.py:80 pins it), so this only
+        matters for other bases and for toy configs.
+
+        Returns (packed_embeds, packed_position_ids, n_prefix, n_summary).
+        """
+        if self.prefix is None:
+            return input_embeds, position_ids, 0, 0
+
+        B, S, _ = input_embeds.shape
+        parts, n_pre = [], 0
+
+        state = self._carried_state()
+        if state is not None and state.shape[1] > 0:
+            state = state.to(device=input_embeds.device, dtype=input_embeds.dtype)
+            parts.append(state)
+            n_pre = state.shape[1]
+        parts.append(input_embeds)
+
+        slots = self.prefix.summary_slots(B, input_embeds.dtype, input_embeds.device)
+        if emb_scale != 1.0:
+            slots = slots * emb_scale
+        parts.append(slots)
+        n_sum = slots.shape[1]
+
+        pos = position_ids[:, :S] + 1
+        pos = torch.cat([pos.new_zeros(pos.shape[0], n_pre), pos,
+                         pos.new_zeros(pos.shape[0], n_sum)], dim=1)
+        return torch.cat(parts, dim=1), pos, n_pre, n_sum
+
+    def prefix_unpack(self, x: torch.Tensor, n_pre: int, n_sum: int):
+        """Split the post-ln_f states back apart.
+
+        The summary slots' final hidden states ARE the new carry — no
+        extraction module, no tanh/LN bounding (auto_compressor.py:123).
+        Returns (real_token_states, new_carry).
+        """
+        if self.prefix is None or n_sum == 0:
+            return x, None
+        end = x.shape[1] - n_sum
+        real, new_vecs = x[:, n_pre:end], x[:, end:]
+        if self._valid_write is not None:
+            # Lane's open suffix is empty -> nothing to carry from this chunk.
+            new_vecs = new_vecs * self._valid_write.view(-1, 1, 1).to(new_vecs.dtype)
+        return real, self.prefix.merge(self._carried_state(), new_vecs)
+
+    def _carried_state(self) -> Optional[torch.Tensor]:
+        """Incoming carry with ended-document lanes zeroed (a finished doc's
+        vectors must not leak into the next one)."""
+        state = self._cross_buf
+        if state is not None and self._write_reset is not None:
+            state = state * (~self._write_reset).view(-1, 1, 1).to(state.dtype)
+        return state
 
     # ── per-call runtime ────────────────────────────────────────────────────
     def _reset_runtime(self) -> None:

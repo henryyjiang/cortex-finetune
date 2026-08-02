@@ -149,9 +149,48 @@ def main() -> int:
     import eval_babilong as eb
     model.eval()
     ctx = " ".join(f"fact{i} mary office" for i in range(20))
-    res = eb.eval_one(model, Tok(), ctx, "where mary", "office", T=3, seq_len=8)
-    ok &= isinstance(res, bool)
+    res = eb.eval_one(model, Tok(), ctx, "where mary", "office", T=3, seq_len=8,
+                      max_new_tokens=4, task="qa1")
+    # eval_one returns (correct, generated_text)
+    ok &= isinstance(res, tuple) and isinstance(res[0], bool)
     print(f"[6] eval_one (chunked M_cross carry) ran end-to-end -> {res}")
+
+    # ── same route, prefix memory ───────────────────────────────────────────
+    # The arm the next retrofit run actually trains.  Worth a second pass
+    # through prepare -> trust_remote_code because the summary slots are seeded
+    # from the LOADED wte, so this is the only place that proves the seeding
+    # sees real weights rather than the random ones from __init__.
+    pdst = os.path.join(tmp, "cortex_prefix")
+    r = subprocess.run(
+        [sys.executable, os.path.join(REPO, "tools", "prepare_cortex_checkpoint.py"),
+         "--src", base, "--dst", pdst, "--variant", "olmo", "--use_memory",
+         "--memory_slots", "0", "--prefix_memory", "accum",
+         "--accum_vecs", "8", "--accum_max", "32",
+         "--summary_init_token", str(VOCAB - 1)],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0, r.stderr
+    pm = AutoModelForCausalLM.from_pretrained(pdst, trust_remote_code=True,
+                                              torch_dtype=torch.float32)
+    built = pm.cortex is not None and pm.cortex.prefix is not None
+    print(f"[7] prefix checkpoint prepared + loaded | buffer built: {built}")
+
+    pm.train()
+    mc, losses = None, []
+    for xc, yc in zip(xs, ys):
+        out = pm(input_ids=xc, labels=yc, num_steps=torch.tensor([0, 3]),
+                 m_cross_in=mc, return_m_cross=True)
+        mc = out["m_cross"]
+        losses.append(out["loss"])
+    torch.stack(losses).mean().backward()
+    seeded = torch.allclose(pm.cortex.prefix.summary_emb,
+                            pm.transformer.wte.weight[VOCAB - 1].expand(8, 64))
+    g = pm.cortex.prefix.summary_emb.grad
+    pgrad = g is not None and bool(g.abs().sum() > 0)
+    grew = tuple(mc.shape) == (2, 16, 64)
+    ok &= built and seeded and pgrad and grew
+    print(f"[8] prefix cross-chunk train step: seeded from LOADED wte {seeded} | "
+          f"summary_emb grad {pgrad} | carry accumulated to {tuple(mc.shape)}")
 
     shutil.rmtree(tmp, ignore_errors=True)
     print("\n=== FULL END-TO-END: " + ("PASS ===" if ok else "FAIL ==="))

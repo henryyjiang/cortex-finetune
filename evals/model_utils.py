@@ -52,6 +52,29 @@ def has_cross_state(model) -> bool:
     return cortex is not None and cortex.has_cross_state
 
 
+def accumulating_buffer(model):
+    """The model's WRITE-ONCE accumulating carry buffer, or None.
+
+    The slice ablation and the buffer diagnostic both need per-chunk rows to
+    stay separable: each chunk appends exactly `n_vec` rows and nothing ever
+    rewrites an older one.  That holds for the prefix ACCUM buffer (and for the
+    retired AccumCCoT), and NOT for either gated buffer, whose merge mixes the
+    whole state — there the k-th chunk's contribution cannot be recovered, so
+    both tools must refuse rather than report a meaningless number.
+
+    Duck-typed on the append-buffer contract (n_vec + max_vecs) so it keeps
+    working for old checkpoints whose buffer class has since been retired.
+    """
+    cortex = getattr(_unwrap(model), "cortex", None)
+    if cortex is None:
+        return None
+    for attr in ("prefix", "accum"):
+        buf = getattr(cortex, attr, None)
+        if buf is not None and hasattr(buf, "max_vecs") and hasattr(buf, "n_vec"):
+            return buf
+    return None
+
+
 def to_num_steps(T: Optional[int]):
     if T is None:
         return None

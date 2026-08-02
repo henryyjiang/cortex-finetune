@@ -45,7 +45,8 @@ import shutil
 MODELING_FILE = "raven_modeling_minimal_cortex.py"
 CONFIG_FILE = "raven_config_minimal.py"
 CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads",
-                "ccot_direct", "h_T_proj", "lora_rank", "lora_alpha",
+                "prefix_memory", "accum_vecs", "accum_max",
+                "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 
 

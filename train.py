@@ -47,6 +47,16 @@ class CLISettings:
     run_name: str = "default-run"
     out_path: str = "huginn_llama"
     resume_path: Optional[str] = None
+    # branch_path: start a NEW arm from a shared earlier run (the two-phase
+    # retrofit: one healing phase, then two memory arms).  Unlike resume_path
+    # it tolerates a model that has grown parameters — the gated arm adds the
+    # LM2 gate on top of the healing phase's summary embeddings — and it does
+    # NOT restore the optimizer or the dataloader position, because the arms
+    # switch to a different dataset at the branch.  The LR schedule, the
+    # mean-recurrence ramp and the step counter DO continue, which is the
+    # whole point: both arms sit at the same place on one schedule.
+    # Applied identically to every arm, so the branch cannot advantage one.
+    branch_path: Optional[str] = None
     save_n_mins_before_timeout: Optional[int] = None
     # data
     preprocessed_data_path: Optional[str] = None
@@ -62,6 +72,11 @@ class CLISettings:
     compile: bool = False
     # training
     max_steps: int = 0
+    # stop_at_step: end THIS phase early without moving the schedule horizon.
+    # max_steps drives both the LR cosine and the mean-recurrence ramp, so it
+    # must stay fixed across every phase and every resume of a multi-phase run;
+    # this is the knob for "heal for 91,552 steps, then branch".  0 = off.
+    stop_at_step: int = 0
     epochs: int = 1
     batch_size: int = 32
     optim_config: dict[str, Any] = field(
@@ -199,6 +214,18 @@ class CLISettings:
             l2sp_coeff=0.0, memory_lr=0.0, lora_rank=0, lora_alpha=32.0,
             accum_ccot=False, accum_vecs=4, accum_max=64,
             gated_accum=False,
+            # prefix_memory: '' | 'accum' | 'gated' — the AutoCompressor-
+            # faithful carry (2026-08-02).  'accum' = PrefixAccumBuffer
+            # (append), 'gated' = PrefixGatedBuffer (LM2 gate at fixed width).
+            # Selecting it disables every other cross-segment path: the carry
+            # is spliced into the token stream and read by the base model's own
+            # attention, so there is no read module to configure.
+            prefix_memory="",
+            # summary_init_token: token whose embedding seeds the summary
+            # slots (AutoCompressor uses EOS).  -1 = take config.eos_token_id;
+            # set it explicitly when the checkpoint config carries none, which
+            # RavenConfig by default does not.
+            summary_init_token=-1,
             carry_grad_chunks=0, random_segments=False,
         )
     )
@@ -218,11 +245,42 @@ class CLISettings:
             self.amp_args["cache_enabled"] = self.compile and (not self.bf16_true) # can only use cache if compiled and in float32
 
         assert self.batch_size % self.micro_batch_size == 0, "grad accum steps must be an int"
+        assert not (self.max_steps and self.stop_at_step
+                    and self.stop_at_step > self.max_steps), (
+            "stop_at_step is an early stop inside the max_steps horizon")
+        assert not (self.resume_path and self.branch_path), (
+            "resume_path continues THIS run; branch_path starts a new arm from "
+            "another run.  Set exactly one."
+        )
         if self.cortex["l2sp_coeff"] > 0:
             assert self.cortex["use_memory"] and self.cortex["cross_chunks"] > 1, (
                 "cortex.l2sp_coeff is only applied inside the cross-chunk fwd/bwd "
                 "path (requires cortex.use_memory and cortex.cross_chunks > 1)"
             )
+        if self.cortex["prefix_memory"]:
+            assert self.cortex["prefix_memory"] in ("accum", "gated"), (
+                "cortex.prefix_memory must be '', 'accum' or 'gated'; got "
+                f"{self.cortex['prefix_memory']!r}"
+            )
+            assert self.cortex["use_memory"], "cortex.prefix_memory needs use_memory=true"
+            assert self.cortex["cross_chunks"] > 1, (
+                "cortex.prefix_memory is a cross-segment carry — it only trains "
+                "through the chunk chain (cross_chunks > 1)"
+            )
+            assert not (self.cortex["accum_ccot"] or self.cortex["gated_accum"]
+                        or self.cortex["ccot_direct"] or self.cortex["memory_slots"]), (
+                "cortex.prefix_memory replaces every other cross-segment path — "
+                "set memory_slots=0 and accum_ccot/gated_accum/ccot_direct=false"
+            )
+            if self.cortex["prefix_memory"] == "accum":
+                # The FIFO must hold the whole chain, or early chunks are
+                # silently dropped and the arm stops being an accumulation test.
+                assert (self.cortex["cross_chunks"] * self.cortex["accum_vecs"]
+                        <= self.cortex["accum_max"]), (
+                    f"accum_max ({self.cortex['accum_max']}) must hold "
+                    f"cross_chunks x accum_vecs "
+                    f"({self.cortex['cross_chunks']} x {self.cortex['accum_vecs']})"
+                )
         if self.cortex["accum_ccot"]:
             assert self.cortex["memory_slots"] == 0 and not self.cortex["ccot_direct"], (
                 "cortex.accum_ccot replaces the K-slot buffer / DirectCCoT — "
@@ -435,11 +493,32 @@ def save_checkpoint(state, agg_vars_dict, cfg):
     torch.save(ckpt, f"{chkpt_dir}/chkpt.pt")
     print(f"[rank 0] Saved checkpoint @ step {step:,}")
 
-def load_checkpoint(state, cfg, device):
-    ckpt = torch.load(f"{cfg.resume_path}/chkpt.pt", map_location=device)
+def load_checkpoint(state, cfg, device, branch: bool = False):
+    path = cfg.branch_path if branch else cfg.resume_path
+    ckpt = torch.load(f"{path}/chkpt.pt", map_location=device)
     unwrap = get_unwrapped_model(state)
-    unwrap.load_state_dict(ckpt["model"], strict=True)
-    state["optimizer"].load_state_dict(ckpt["optimizer"])
+    if branch:
+        # The arm may have MORE parameters than the phase it branches from
+        # (gated adds the LM2 gate on top of the shared summary embeddings).
+        # Everything else must match exactly: an unexpected key means the
+        # checkpoint is from a different architecture, and a missing key
+        # outside the memory module means part of the backbone silently kept
+        # its freshly-initialised weights.
+        missing, unexpected = unwrap.load_state_dict(ckpt["model"], strict=False)
+        bad = [k for k in missing if not k.startswith("cortex.")]
+        if unexpected or bad:
+            raise RuntimeError(
+                f"branch_path={path} does not match this arm's model: "
+                f"unexpected={unexpected[:8]} non-memory missing={bad[:8]}"
+            )
+        if is_main_process():
+            print(f"[branch] loaded weights from {path}; "
+                  f"{len(missing)} new memory params start fresh: {missing}")
+            print("[branch] optimizer state NOT restored (param set changed); "
+                  "LR schedule, recurrence ramp and step counter continue")
+    else:
+        unwrap.load_state_dict(ckpt["model"], strict=True)
+        state["optimizer"].load_state_dict(ckpt["optimizer"])
 
     if cfg.mean_recurrence_schedule["turn_on"] and ("mean_recurrence_scheduler" in ckpt):
         state["mean_recurrence_scheduler"].load_state_dict(ckpt["mean_recurrence_scheduler"])
@@ -448,13 +527,19 @@ def load_checkpoint(state, cfg, device):
 
     if not cfg.ignore_past_scheduler:
         state["scheduler"].load_state_dict(ckpt["scheduler"])
-    if cfg.is_parquet_dataset and not cfg.ignore_past_parquet_dataset:
+    # A branch switches datasets (healing corpus -> the arms' corpus), so the
+    # saved parquet position is meaningless and restoring it would skip into
+    # the middle of a file that has nothing to do with it.
+    if cfg.is_parquet_dataset and not cfg.ignore_past_parquet_dataset and not branch:
         state["dataloader"].load_state_dict(ckpt["dataloader"])
 
     torch.set_rng_state(ckpt["rng_state"].to("cpu"))
     torch.cuda.set_rng_state_all([rng.to("cpu") for rng in ckpt["cuda_rng_state"]])
-    print(f"Resumed from {cfg.resume_path}")
-    return ckpt["agg_vars_dict"]
+    print(f"{'Branched' if branch else 'Resumed'} from {path}")
+    agg = dict(ckpt["agg_vars_dict"])
+    if branch:
+        agg["data_start_step"] = 1        # fresh corpus, read it from the top
+    return agg
 
 def is_main_process():
     if torch.distributed.is_initialized():
@@ -595,6 +680,22 @@ def reset_cortex_graft_init(model):
     if acc is not None:
         torch.nn.init.normal_(acc.vec_emb, std=0.02)
         fixed.append("accum.[vec_emb~N," + _read_init(acc.out_proj.weight, "out_proj") + "]")
+    pre = getattr(cortex, "prefix", None)          # PrefixAccum / PrefixGated
+    if pre is not None:
+        # summary_emb here is a FINITE placeholder only — it is re-seeded from
+        # wte[eos] on the first forward (see the modeling file).  This function
+        # runs on fresh builds ONLY (caller guards on resume_path is None), so
+        # clearing summary_seeded is both safe and necessary: the base graft dir
+        # carries no cortex tensors, and a bool buffer materialised from meta
+        # can come back as garbage -> read True -> seeding silently skipped.
+        torch.nn.init.normal_(pre.summary_emb, std=0.02)
+        pre.summary_seeded.fill_(False)
+        tags = ["summary_emb~N(reseeded from wte on first forward)"]
+        if hasattr(pre, "forget_bias"):                        # PrefixGatedBuffer
+            torch.nn.init.ones_(pre.forget_bias)               # LM2 3.3 forget bias +1
+            torch.nn.init.zeros_(pre.input_bias)
+            tags += ["forget_bias=1", "input_bias=0"]
+        fixed.append("prefix.[" + ",".join(tags) + "]")
     # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
     #     some module lacked reset_parameters and slipped through.
     bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]
@@ -670,7 +771,7 @@ def startup(cfg: CLISettings):
                    "memory_heads", "ccot_direct", "h_T_proj",
                    "lora_rank", "lora_alpha",
                    "accum_ccot", "accum_vecs", "accum_max",
-                   "gated_accum"):
+                   "gated_accum", "prefix_memory", "summary_init_token"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -679,6 +780,7 @@ def startup(cfg: CLISettings):
                   f"accum_ccot={cfg.cortex['accum_ccot']} "
                   f"(vecs={cfg.cortex['accum_vecs']}/max={cfg.cortex['accum_max']}) "
                   f"gated_accum={cfg.cortex['gated_accum']} "
+                  f"prefix_memory={cfg.cortex['prefix_memory'] or 'off'} "
                   f"cross_chunks={cfg.cortex['cross_chunks']} "
                   f"carry_grad_chunks={cfg.cortex['carry_grad_chunks']} "
                   f"random_segments={cfg.cortex['random_segments']} "
@@ -1349,7 +1451,17 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 n_chunks = int(cfg.cortex["cross_chunks"])
                 eos_id = state["tokenizer"].eos_token_id if cfg.cortex["eos_from_tokens"] else None
                 grad_chunks = int(cfg.cortex["carry_grad_chunks"])
-                accum_on    = bool(cfg.cortex["accum_ccot"])
+                # Write-once state => the stop-gradient horizon can slice-detach
+                # rows older than grad_chunks chunks instead of detaching the
+                # whole carry.  True for the prefix ACCUM buffer (rows appended,
+                # never overwritten) and for the retired accum_ccot; false for
+                # the gated buffers, whose merge mixes rows.  NOTE: keying this
+                # off accum_ccot alone silently downgraded prefix-accum to
+                # whole-carry TBPTT — the flag it read was retired 2026-08-02.
+                accum_on    = (bool(cfg.cortex["accum_ccot"])
+                               or cfg.cortex["prefix_memory"] == "accum")
+                # Rows appended per chunk: prefix buffers use accum_vecs too.
+                vecs_per_chunk = int(cfg.cortex["accum_vecs"])
                 with model.no_sync() if is_accumulating and state["distributed"] else nullcontext():
                     # .contiguous(): torch.chunk/split return non-contiguous views
                     # and the model's loss does labels.view(-1), which requires
@@ -1376,7 +1488,7 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                                 # write-once rows: exact slice detach of vectors
                                 # older than grad_chunks chunks
                                 m_cross = detach_old_vecs(
-                                    m_cross, int(cfg.cortex["accum_vecs"]), grad_chunks)
+                                    m_cross, vecs_per_chunk, grad_chunks)
                             elif gi % grad_chunks == 0:
                                 # gated/overwritten state (rows not separable):
                                 # detach the whole carry every grad_chunks
@@ -1581,6 +1693,25 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
 
             if cfg.max_steps and optimizer_step >= cfg.max_steps:
                 break
+            # Early stop that does NOT move the schedule horizon.  max_steps is
+            # the denominator for the LR cosine AND the mean-recurrence ramp, so
+            # shortening it to end a phase early would re-run cooldown per phase
+            # (the 2026-06-24 sawtooth, baked into the weights).  This lets the
+            # healing phase end at its own step count while every phase of the
+            # run stays on one 305,176-step schedule.
+            if cfg.stop_at_step and optimizer_step >= cfg.stop_at_step:
+                if is_main_process():
+                    print(f"[stop_at_step] reached {optimizer_step} — ending this "
+                          f"phase (schedule horizon max_steps={cfg.max_steps} "
+                          f"unchanged)")
+                # Make sure the phase's end is resumable/branchable even if it
+                # does not land on a save_interval boundary.
+                save_checkpoint(state, {"data_start_step": data_step,
+                                        "optimizer_step": optimizer_step,
+                                        "total_tokens": total_tokens_to_log,
+                                        "total_tokens_with_loss": total_tokens_with_loss_to_log,
+                                        "elapsed_time": elapsed_time_to_log}, cfg)
+                break
 
     model.eval()
     return state
@@ -1618,8 +1749,8 @@ def main():
     # Set up dist and load model and tokenizer into state
     state, device = startup(cfg)
     data_start_step, optimizer_step, total_tokens, total_tokens_with_loss, elapsed_time = 1, 0, 0, 0, 0.0
-    if cfg.resume_path is not None:
-        agg_dict = load_checkpoint(state, cfg, device)
+    if cfg.resume_path is not None or cfg.branch_path is not None:
+        agg_dict = load_checkpoint(state, cfg, device, branch=cfg.resume_path is None)
         data_start_step, optimizer_step, total_tokens, total_tokens_with_loss, elapsed_time = agg_dict["data_start_step"], agg_dict["optimizer_step"], agg_dict["total_tokens"], agg_dict["total_tokens_with_loss"], agg_dict["elapsed_time"]
         # cfg.max_steps = optimizer_step + cfg.max_steps # make max_steps max NEW steps
 

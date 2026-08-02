@@ -89,63 +89,6 @@ class TestAccumCCoTModule:
 
 
 # ---------------------------------------------------------------------------
-# AccumCCoT through the graft (FakeRaven chain)
-# ---------------------------------------------------------------------------
-
-def _accum_model():
-    return FakeRaven(use_memory=True, memory_slots=0, accum_ccot=True,
-                     accum_vecs=NV, accum_max=12)
-
-
-class TestAccumGraft:
-
-    def test_build_and_precedence(self):
-        # accum_ccot takes precedence over ccot_direct at K=0
-        model = FakeRaven(use_memory=True, memory_slots=0, accum_ccot=True,
-                          ccot_direct=True, accum_vecs=NV, accum_max=12)
-        assert model.cortex.accum is not None
-        assert model.cortex.ccot_direct is None
-        assert model.cortex.has_cross_state
-
-    def test_state_grows_across_chain(self):
-        model = _accum_model()
-        ids = _ids()
-        s1 = model(ids, (0, 1), return_m_cross=True)["m_cross"]
-        assert s1.shape == (B, NV, H)
-        s2 = model(ids, (0, 1), m_cross_in=s1, return_m_cross=True)["m_cross"]
-        assert s2.shape == (B, 2 * NV, H)
-        # accumulation, not overwrite: the first chunk's vectors survive
-        assert torch.allclose(s2[:, :NV], s1)
-
-    def test_zero_init_carry_is_noop(self):
-        model = _accum_model()
-        ids = _ids()
-        state = torch.randn(B, 2 * NV, H)
-        torch.manual_seed(3); a = model(ids, (0, 2), m_cross_in=state)
-        torch.manual_seed(3); b = model(ids, (0, 2), m_cross_in=None)
-        assert torch.allclose(a["logits"], b["logits"])
-
-    def test_carry_changes_logits_when_active(self):
-        model = _accum_model()
-        nn.init.normal_(model.cortex.accum.out_proj.weight, std=0.05)
-        ids = _ids()
-        state = model(ids, (0, 2), return_m_cross=True)["m_cross"].detach()
-        torch.manual_seed(4); a = model(ids, (0, 2), m_cross_in=state)
-        torch.manual_seed(4); b = model(ids, (0, 2), m_cross_in=None)
-        assert not torch.allclose(a["logits"], b["logits"])
-
-    def test_write_grad_through_chain(self):
-        model = _accum_model()
-        nn.init.normal_(model.cortex.accum.out_proj.weight, std=0.05)
-        ids, labels = _ids(), _ids()
-        out1 = model(ids, (0, 2), return_m_cross=True)
-        out2 = model(ids, (0, 2), labels=labels, m_cross_in=out1["m_cross"])
-        out2["loss"].backward()
-        g = model.cortex.accum.vec_emb.grad
-        assert g is not None and g.norm() > 0
-
-
-# ---------------------------------------------------------------------------
 # chunking helpers (imported by train.py — real code under test)
 # ---------------------------------------------------------------------------
 

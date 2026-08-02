@@ -3,7 +3,7 @@ Tests for the A0.1 oldest-vs-newest slice ablation (two-track plan):
 
   ablate_vec_slice      — pure helper in cortex_memory/chunking.py
   eval_carry_ablation   — the eval's chunk_losses reconstruction logic run
-                          against the FakeRaven accum harness (real code)
+                          against an attention-carrying fake model (real code)
 
 Run: /c/Users/henry/miniconda3/envs/cortex/python.exe -m pytest tests/test_slice_ablation.py -v
 """
@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(REPO, "evals"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from cortex_memory.chunking import ablate_vec_slice
-from test_cortex_graft import B, H, S, FakeRaven, _ids
+from test_cortex_graft import B, H, S, VOCAB, AttnRaven, _ids
 
 NV = 3
 
@@ -81,16 +81,19 @@ class TestAblateVecSlice:
 
 
 # ---------------------------------------------------------------------------
-# eval chunk_losses reconstruction (real eval code on FakeRaven)
+# eval chunk_losses reconstruction (real eval code on AttnRaven)
 # ---------------------------------------------------------------------------
 
 def _accum_model(active_read=True):
-    m = FakeRaven(use_memory=True, memory_slots=0, accum_ccot=True,
-                  accum_vecs=NV, accum_max=24)
-    if active_read:
-        with torch.no_grad():
-            nn.init.normal_(m.cortex.accum.out_proj.weight, std=0.05)
-    return m
+    """Prefix ACCUM arm: write-once rows, so per-chunk slices stay separable.
+
+    `active_read` is vestigial — the prefix carry is spliced into the token
+    stream and consumed by the model's own attention, so there is no zero-init
+    read projection to open.  The read is live from the first forward, which is
+    exactly what the reconstruction tests need.
+    """
+    return AttnRaven(use_memory=True, memory_slots=0, prefix_memory="accum",
+                     accum_vecs=NV, accum_max=24, eos_token_id=VOCAB - 1)
 
 
 def _sample(n_chunks=4):
