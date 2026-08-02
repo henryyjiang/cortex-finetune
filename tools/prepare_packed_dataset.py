@@ -79,6 +79,10 @@ def main() -> int:
                     help="tokens per training sequence; rows are max_length+1 long")
     ap.add_argument("--max_tokens", type=int, default=130_000_000,
                     help="stop after packing this many tokens (the corpus is 133B)")
+    ap.add_argument("--skip_tokens", type=int, default=0,
+                    help="discard this many tokens of corpus prefix before "
+                         "packing — use the training pack's --max_tokens here "
+                         "to cut a disjoint val set from the same shards")
     ap.add_argument("--seed", type=int, default=74)
     args = ap.parse_args()
 
@@ -116,7 +120,8 @@ def main() -> int:
     row_len = args.max_length + 1
 
     target_rows = args.max_tokens // args.max_length
-    stats = {"docs": 0, "rows": 0}
+    skip_rows = args.skip_tokens // args.max_length
+    stats = {"docs": 0, "rows": 0, "skipped": 0}
 
     def gen():
         # generator-backed Dataset: rows go straight to arrow, and pyarrow
@@ -136,6 +141,17 @@ def main() -> int:
                     carry.append(eos)  # doc separator (eos_from_tokens-compatible)
                     stats["docs"] += 1
                     while len(carry) >= row_len:
+                        # --skip_tokens: discard the corpus prefix an earlier
+                        # pack already consumed, so a val set cut from the same
+                        # shard is disjoint from training (rows are emitted in
+                        # corpus order; the shuffle below happens after).
+                        if stats["skipped"] < skip_rows:
+                            carry = carry[row_len:]
+                            stats["skipped"] += 1
+                            if stats["skipped"] % 20_000 == 0:
+                                print(f"  skipping {stats['skipped']}/{skip_rows} "
+                                      f"rows", flush=True)
+                            continue
                         yield {"input_ids": carry[:row_len],
                                "attention_mask": [1] * row_len}
                         carry = carry[row_len:]

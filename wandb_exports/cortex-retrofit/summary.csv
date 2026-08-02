@@ -1,0 +1,8 @@
+run,id,state,steps,tokens,loss_start,loss_final,loss_min,nan_loss_rows,skipped_updates,gnorm_p50,gnorm_p99,gnorm_max,clip_active_frac,max_loss_jump,end_trend,FLAGS
+retro-b0-acc4v-tb2-mr8,vdr0npgd,failed,766,12550144,9.1718,1.5247,0.9314,0,0,1.547,41.8,99.009,1.0,+1.285@44,1.5792->1.5330,final loss >> min loss
+retro-b0-base-mr8,1ri85pqa,failed,1110,18186240,9.3122,1.5063,0.9255,0,0,1.444,28.227,96.772,1.0,+1.139@308,1.4661->1.4695  [NOT IMPROVING],final loss >> min loss
+retro-b0-k32-ga-mr8,mqe28wqe,failed,478,7831552,8.9615,1.6452,0.9159,0,0,1.847,47.58,105.209,1.0,+1.136@308,1.6712->1.6281,final loss >> min loss
+retro-b1-acc4v-tb2-mr8,wchs6jvf,finished,24414,399998976,1.3864,1.256,0.6259,0,0,0.851,1.633,123.691,0.087,+3.384@24025,1.2982->1.2521,final loss >> min loss
+retro-b1-acc4v-tb2-mr8,gmwzs3p9,failed,14579,238862336,9.9313,1.4012,0.6575,0,0,0.896,6.48,156.863,0.239,+3.617@5826,1.2977->1.2891,final loss >> min loss
+retro-b1-base-mr8,x072k70p,finished,24414,399998976,1.3883,1.2628,0.6292,0,0,0.848,1.384,8.706,0.076,+1.594@18237,1.3047->1.2459,final loss >> min loss
+retro-b1-base-mr8,q66jmumr,failed,14579,238862336,10.2934,1.4064,0.658,0,0,0.893,5.594,86.748,0.229,+1.423@12859,1.3008->1.2900,final loss >> min loss
