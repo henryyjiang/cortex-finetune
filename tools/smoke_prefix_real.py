@@ -110,7 +110,19 @@ def run_chain(model, x, y, eos_id, n_chunks, num_steps, carry_grad_chunks,
         out = model(xc.to(device), labels=yc.to(device), num_steps=num_steps,
                     m_cross_in=m_cross, return_m_cross=True,
                     eos_mask=(xc == eos_id).to(device))
-        m_cross = out["m_cross"]
+        # .get, not ["m_cross"]: ModelOutput drops None-valued fields, so
+        # bracket-indexing raises KeyError instead of returning None (train.py
+        # documents the same trap).  None here means the forward never ran the
+        # prefix splice -- see the modeling-file check in main().
+        m_cross = out.get("m_cross")
+        if m_cross is None:
+            raise RuntimeError(
+                "forward returned no m_cross with return_m_cross=True and a "
+                "prefix buffer active.  The checkpoint dir's COPY of "
+                "raven_modeling_minimal_cortex.py predates the prefix rewrite, "
+                "so prefix_pack/prefix_unpack never ran and this model has NO "
+                "cross-segment memory.  Re-run tools/prepare_cortex_checkpoint.py "
+                "against the base.")
         losses.append(out["loss"])
         shapes.append(tuple(m_cross.shape))
         # Fix A on real weights: the rows written by earlier chunks must come
@@ -173,6 +185,33 @@ def main() -> int:
           f"got {cortex.prefix_pos!r}")
     check("prefix_eos_reset is off (2026-08-04)", cortex.prefix_eos_reset is False,
           f"got {cortex.prefix_eos_reset!r}")
+
+    # The checks above read cortex_graft.py, which is imported LIVE from the repo
+    # root -- they pass whenever the graft is current, regardless of the model.
+    # But raven_modeling_minimal_cortex.py is COPIED into each checkpoint dir by
+    # prepare_cortex_checkpoint.py, so a dir prepared before the 2026-08-02
+    # prefix rewrite carries a forward() that never calls prefix_pack.  Then
+    # cortex.prefix exists, every flag check passes, the loss curve looks
+    # healthy, and the run has NO cross-segment memory: recurring bug class 2.
+    # Nothing else in this script could tell the difference, so check the source
+    # of the forward that actually got loaded.
+    import inspect
+    try:
+        src = inspect.getsource(type(model).forward)
+        loaded_from = inspect.getfile(type(model))
+    except (OSError, TypeError):
+        src, loaded_from = "", "<unavailable>"
+    check("loaded modeling file splices the prefix",
+          "prefix_pack" in src and "prefix_unpack" in src,
+          os.path.basename(loaded_from))
+    if "prefix_pack" not in src:
+        print(f"\n     {loaded_from}\n"
+              f"     predates the prefix rewrite.  Re-prepare it:\n"
+              f"       python tools/prepare_cortex_checkpoint.py --variant olmo \\\n"
+              f"           --src {args.model_name} --dst {args.model_name}\n"
+              f"     (--src == --dst is safe: it re-copies the modeling file and\n"
+              f"      re-patches config.json in place.)")
+        return 1
 
     eos_id = cortex.summary_init_token
     n_vec = cortex.prefix.n_vec
