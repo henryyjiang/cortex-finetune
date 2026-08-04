@@ -162,16 +162,23 @@ class TestSplice:
         out2 = m(_ids(), (0, 1), m_cross_in=out["m_cross"].detach())
         assert out2["logits"].shape == (B, S, VOCAB)
 
-    def test_positions_are_zero_for_slots_and_shifted_for_tokens(self):
+    def test_carry_at_zero_tokens_shifted_slots_at_the_tail(self):
+        """Position layout (prefix_pos='tail', 2026-08-04).  The carry stays at
+        0 — it is at the FRONT, so real tokens already query it at positive
+        offsets — while the summary slots continue the token numbering so the
+        WRITE also reads at positive offsets.  See prefix_pack for why position 0
+        for a trailing slot is not the RoPE analog of AutoCompressor's OPT trick."""
         m = _model()
         m.cortex.begin(torch.randn(B, 2 * NV, H), None, S,
                        torch.device("cpu"), torch.float32)
         _, pos, n_pre, n_sum = m.cortex.prefix_pack(
             torch.zeros(B, S, H), torch.arange(S).unsqueeze(0))
         assert (n_pre, n_sum) == (2 * NV, NV)
-        assert torch.all(pos[:, :n_pre] == 0) and torch.all(pos[:, -n_sum:] == 0)
+        assert torch.all(pos[:, :n_pre] == 0)
         assert torch.equal(pos[0, n_pre:n_pre + S], torch.arange(1, S + 1))
-        assert int(pos.max()) == S            # stays inside the trained window
+        assert torch.equal(pos[0, -n_sum:], torch.arange(S + 1, S + 1 + NV))
+        # still inside the trained window: S + n_vec, not S + n_pre + n_vec
+        assert int(pos.max()) == S + NV
 
     def test_layout_is_carry_tokens_summary(self):
         m = _model()
@@ -293,13 +300,34 @@ class TestChain:
 # ---------------------------------------------------------------------------
 
 class TestEos:
+    """Document-boundary policy for the PREFIX carry.
 
-    def test_ended_document_carries_nothing(self):
+    Changed 2026-08-04.  The old policy treated any EOS in the chunk as a full
+    memory reset, which on EOS-separated packed data (what B2 trains on) switched
+    the read off for the majority of chunks — see CortexMemory._carried_state.
+    The default is now to carry across boundaries, matching what the backbone's
+    own attention already does inside a chunk; prefix_eos_reset=True restores the
+    old policy and these tests pin both.
+    """
+
+    def test_carry_survives_a_boundary_by_default(self):
         m = _model()
         ids = _ids(b=1)
         prev = m(ids, (0, 1), return_m_cross=True)["m_cross"].detach()
         eos = torch.zeros(1, S, dtype=torch.bool)
         eos[0, S - 1] = True                       # doc ends on the last position
+        out = m(ids, (0, 1), m_cross_in=prev, return_m_cross=True, eos_mask=eos)
+        # the previous chunk's rows are still there, un-zeroed
+        assert torch.allclose(out["m_cross"][:, :NV], prev[:, :NV])
+        # ...and this chunk still contributed a real (non-zero) summary
+        assert out["m_cross"][:, -NV:].abs().sum() > 0
+
+    def test_legacy_reset_zeroes_an_ended_document(self):
+        m = _model(prefix_eos_reset=True)
+        ids = _ids(b=1)
+        prev = m(ids, (0, 1), return_m_cross=True)["m_cross"].detach()
+        eos = torch.zeros(1, S, dtype=torch.bool)
+        eos[0, S - 1] = True
         out = m(ids, (0, 1), m_cross_in=prev, return_m_cross=True, eos_mask=eos)
         assert torch.allclose(out["m_cross"], torch.zeros_like(out["m_cross"]))
 
@@ -312,8 +340,8 @@ class TestEos:
         out = m(ids, (0, 1), m_cross_in=prev, return_m_cross=True, eos_mask=eos)
         assert out["m_cross"].abs().sum() > 0
 
-    def test_only_the_ended_lane_is_reset(self):
-        m = _model()
+    def test_legacy_reset_is_per_lane(self):
+        m = _model(prefix_eos_reset=True)
         ids = _ids(b=2)
         prev = m(ids, (0, 1), return_m_cross=True)["m_cross"].detach()
         eos = torch.zeros(2, S, dtype=torch.bool)
@@ -321,6 +349,16 @@ class TestEos:
         out = m(ids, (0, 1), m_cross_in=prev, return_m_cross=True, eos_mask=eos)
         assert torch.allclose(out["m_cross"][0], torch.zeros_like(out["m_cross"][0]))
         assert out["m_cross"][1].abs().sum() > 0
+
+    def test_default_never_appends_a_zero_row(self):
+        """A zero row would be spliced back as a zero-valued attention target,
+        which still takes softmax mass (a zero key scores 0, not -inf)."""
+        m = _model()
+        ids = _ids(b=2)
+        eos = torch.zeros(2, S, dtype=torch.bool)
+        eos[0, S - 1] = True                       # the degenerate empty-suffix lane
+        out = m(ids, (0, 1), m_cross_in=None, return_m_cross=True, eos_mask=eos)
+        assert out["m_cross"][0].abs().sum() > 0
 
 
 # ---------------------------------------------------------------------------

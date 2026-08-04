@@ -27,6 +27,14 @@ Config flags (getattr defaults)
                                        ccot_direct's single overwritten vector)
   accum_vecs          : int  = 4       summary vectors extracted per chunk
   accum_max           : int  = 64      FIFO cap on accumulated vectors (eval)
+  prefix_pos          : str  = "tail"  where the trailing summary slots sit in
+                                       POSITION space: "tail" = continue the
+                                       chunk's numbering (S+1..S+n_vec), "zero"
+                                       = the pre-2026-08-04 layout, everything
+                                       non-token at position 0.  See prefix_pack.
+  prefix_eos_reset    : bool = False   zero the WHOLE incoming carry on any chunk
+                                       containing an EOS.  Was unconditional
+                                       before 2026-08-04; see _carried_state.
   gated_accum         : bool = False   gated-accumulation LM2 variant: the K-slot
                                        M_cross becomes a GatedAccumBuffer —
                                        AccumCCoT's extraction write, LM2 gated
@@ -230,8 +238,15 @@ class CortexMemory(nn.Module):
             # before the data loader and the wandb run exist rather than on the
             # first forward of a queued 48h job.
             self.summary_init_token = resolve_summary_init_token(config)
+            self.prefix_pos = str(getattr(config, "prefix_pos", "tail") or "tail").lower()
+            if self.prefix_pos not in ("tail", "zero"):
+                raise ValueError(
+                    f"cortex.prefix_pos must be 'tail' or 'zero'; got {self.prefix_pos!r}")
+            self.prefix_eos_reset = bool(getattr(config, "prefix_eos_reset", False))
         else:
             self.summary_init_token = -1
+            self.prefix_pos = "tail"
+            self.prefix_eos_reset = False
 
         # R4 dual-role mitigation: project h_T before the M_cross write so the
         # buffer path and the coda path see independent representations.
@@ -263,7 +278,9 @@ class CortexMemory(nn.Module):
     # ── prefix-memory hooks (called from the model's forward) ───────────────
     def prefix_pack(self, input_embeds: torch.Tensor,
                     position_ids: torch.Tensor,
-                    emb_scale: float = 1.0):
+                    emb_scale: float = 1.0,
+                    write: bool = True,
+                    read: bool = True):
         """Splice the carry into the token stream, AutoCompressor-style.
 
         Layout: [carried vectors | real tokens | summary slots].  Under the
@@ -273,9 +290,35 @@ class CortexMemory(nn.Module):
         which is the ONLY thing that stops n_vec identically-initialised slots
         from collapsing into copies of one vector.
 
-        Positions: 0 for carried and summary slots (RoPE identity — our analog
-        of AC's pad-position trick), 1..S for real tokens.  Every index stays
-        inside the trained window even though the packed sequence is longer.
+        Positions: carried vectors at 0, real tokens at 1..S, and — under the
+        default prefix_pos="tail" — the summary slots at S+1..S+n_vec, i.e.
+        continuing the chunk's own numbering.
+
+        The old layout ("zero") put the summary slots at position 0 as well, on
+        the theory that this was our RoPE analog of AutoCompressor's pad-position
+        trick.  It is not.  That trick lives in
+        OPTLearnedPositionalEmbeddingWithPadding, and OPT positions are ADDITIVE,
+        so "no position" means adding a zero vector.  AutoCompressor's own RoPE
+        model (LlamaAutoCompressorModel) overrides nothing and uses plain
+        contiguous positions.  Under RoPE, a slot at position 0 sitting at the
+        END of the sequence queries every real token at a NEGATIVE relative
+        offset (-1 .. -S) — a regime a causal LM never sees in training, since
+        pos_q >= pos_k always holds.  Measured on a pretrained RoPE LM, that
+        layout also collapses the slots onto each other: centred slot-slot
+        cosine 0.94 and effective rank 2.1 of 32, versus 0.22 / 4.2 with the
+        tail layout.  n_vec was buying ~2 independent directions, not 32.
+
+        The CARRIED vectors stay at position 0 under both layouts.  They sit at
+        the FRONT, so real tokens already query them at positive offsets (+1..+S)
+        — the read side was never in the untrained regime — and keeping the real
+        tokens at 1..S is what lets a cached decode step continue the prefill's
+        numbering without knowing how many carried columns the prefill had
+        (see the read=False note below).  The cost is that the carry has no
+        recency order in position space; that is a separate, unmeasured question.
+
+        Every index stays inside the trained window: n_pre + S + n_vec columns
+        span positions 0..S+n_vec (1056 at S=1024, n_vec=32), against a 1024
+        continued-pretraining window and a ~1.5k usable range.
 
         emb_scale: the model multiplies wte(ids) by config.init_values
         ["embed_scale"] BEFORE this splice, so a summary slot seeded from
@@ -289,53 +332,139 @@ class CortexMemory(nn.Module):
         emb_scale is 1.0 anyway (convert_olmo.py:80 pins it), so this only
         matters for other bases and for toy configs.
 
+        write / read exist for KV-CACHED GENERATION and both default to True,
+        so the training call site is unchanged (bit-identical) by construction.
+
+          write=False  omit the trailing summary slots.  During decoding the
+            buffer is held fixed and the write is discarded anyway, so the
+            slots are pure wasted compute — but with a KV cache they are worse
+            than wasted.  A cached single-token query runs with is_causal=False
+            (raven_modeling_minimal_olmo.py:450) and therefore attends to EVERY
+            cached key; slots left in the cache would silently be read by the
+            generated tokens, which the uncached causal mask never permits.
+          read=False   omit the carried vectors.  Only for INCREMENTAL cached
+            steps, where the carry is already resident in the cache from the
+            prefill call and re-splicing it would double-count it and corrupt
+            the cache's absolute position keys.
+
+        The +1 position shift is applied whenever prefix memory is active, even
+        when nothing is spliced, so that a cached decode step continues the
+        prefill's 1..S numbering rather than restarting at S.
+
         Returns (packed_embeds, packed_position_ids, n_prefix, n_summary).
         """
         if self.prefix is None:
             return input_embeds, position_ids, 0, 0
 
         B, S, _ = input_embeds.shape
-        parts, n_pre = [], 0
+        parts, n_pre, n_sum = [], 0, 0
 
-        state = self._carried_state()
-        if state is not None and state.shape[1] > 0:
-            state = state.to(device=input_embeds.device, dtype=input_embeds.dtype)
-            parts.append(state)
-            n_pre = state.shape[1]
+        if read:
+            state = self._carried_state()
+            if state is not None and state.shape[1] > 0:
+                state = state.to(device=input_embeds.device, dtype=input_embeds.dtype)
+                parts.append(state)
+                n_pre = state.shape[1]
         parts.append(input_embeds)
 
-        slots = self.prefix.summary_slots(B, input_embeds.dtype, input_embeds.device)
-        if emb_scale != 1.0:
-            slots = slots * emb_scale
-        parts.append(slots)
-        n_sum = slots.shape[1]
+        if write:
+            slots = self.prefix.summary_slots(B, input_embeds.dtype, input_embeds.device)
+            if emb_scale != 1.0:
+                slots = slots * emb_scale
+            parts.append(slots)
+            n_sum = slots.shape[1]
 
         pos = position_ids[:, :S] + 1
-        pos = torch.cat([pos.new_zeros(pos.shape[0], n_pre), pos,
-                         pos.new_zeros(pos.shape[0], n_sum)], dim=1)
-        return torch.cat(parts, dim=1), pos, n_pre, n_sum
+        if n_sum and self.prefix_pos == "tail" and pos.shape[1] > 0:
+            # Continue the chunk's numbering, so every summary->token offset is
+            # positive.  Derived from the LAST real position rather than from S
+            # so a cached prefill (whose position_ids do not start at 0) stays
+            # consistent.
+            sum_pos = pos[:, -1:] + torch.arange(
+                1, n_sum + 1, device=pos.device, dtype=pos.dtype).unsqueeze(0)
+        else:
+            sum_pos = pos.new_zeros(pos.shape[0], n_sum)
+        pos = torch.cat([pos.new_zeros(pos.shape[0], n_pre), pos, sum_pos], dim=1)
+        packed = parts[0] if len(parts) == 1 else torch.cat(parts, dim=1)
+        return packed, pos, n_pre, n_sum
 
     def prefix_unpack(self, x: torch.Tensor, n_pre: int, n_sum: int):
         """Split the post-ln_f states back apart.
 
         The summary slots' final hidden states ARE the new carry — no
         extraction module, no tanh/LN bounding (auto_compressor.py:123).
+
+        n_sum == 0 is the write=False (generation) case: there is no new carry,
+        but the n_pre carried columns must STILL be stripped or the head would
+        emit logits for them.  Harmless for greedy decoding, which only reads
+        logits[:, -1] and the carry sits at the front — but it silently breaks
+        any loss or full-sequence scoring, so strip unconditionally.
         Returns (real_token_states, new_carry).
         """
-        if self.prefix is None or n_sum == 0:
+        if self.prefix is None:
             return x, None
         end = x.shape[1] - n_sum
+        if n_sum == 0:
+            return x[:, n_pre:], None
         real, new_vecs = x[:, n_pre:end], x[:, end:]
-        if self._valid_write is not None:
-            # Lane's open suffix is empty -> nothing to carry from this chunk.
+        if self._valid_write is not None and self.prefix_eos_reset:
+            # Lane's open suffix is empty (the chunk ends ON an EOS) -> carry
+            # nothing from it.  Tied to prefix_eos_reset because it is the same
+            # document-boundary-as-memory-reset policy, and under the default
+            # (carry across boundaries) it is actively harmful: in PREFIX mode
+            # pool_mask never restricts the write anyway — the summary slots are
+            # read by the model's own causal attention over the WHOLE chunk — so
+            # this would discard a perfectly good summary and append a row of
+            # zeros to an accumulating state, which then gets spliced back as
+            # zero-valued attention targets.  Rare (it needs the chunk's last
+            # token to be an EOS) but silent.
             new_vecs = new_vecs * self._valid_write.view(-1, 1, 1).to(new_vecs.dtype)
         return real, self.prefix.merge(self._carried_state(), new_vecs)
 
     def _carried_state(self) -> Optional[torch.Tensor]:
-        """Incoming carry with ended-document lanes zeroed (a finished doc's
-        vectors must not leak into the next one)."""
+        """The incoming carry, as the prefix splice and the merge should see it.
+
+        Until 2026-08-04 this unconditionally zeroed the carry for any lane whose
+        chunk contained an EOS.  That is far too blunt for prefix memory and it
+        was switching the read OFF for the majority of B2's training chunks:
+
+          * `write_reset` is `has_eos` for the WHOLE chunk, so one document
+            boundary anywhere zeroed the carry for every position — including the
+            prefix of tokens that legitimately continue the previous document.
+            tools/prepare_packed_dataset.py joins documents with EOS separators,
+            so on FineWeb-Edu (~1.1k-token documents, 1024-token chunks) roughly
+            60% of chunks lost their carry entirely; at 500-token documents, 87%.
+          * the per-position mask that HAS the right semantics
+            (`cross_read_mask`: positions <= the first EOS may read) is computed
+            in begin() and then discarded here — only read_into consumes it, and
+            that is a no-op in prefix mode.  The bolt-on buffers used it, so this
+            was a regression introduced by the prefix rewrite, not a carry-over.
+          * zeroing does not REMOVE the columns.  A zero key scores 0 against
+            every query — a mid-range logit, not -inf — so 64-96 dead columns
+            went on absorbing ~3-5% of the softmax mass at every layer.
+          * the evals never pass eos_mask, so eval always saw a live carry while
+            training mostly did not.
+
+        Default is now OFF, i.e. the carry is read by the whole chunk.  The
+        justification is that the backbone already does exactly this: the modeling
+        file runs with prepared_attn_mask=None and is_causal=True, so base
+        attention is UNMASKED across document boundaries inside a chunk.  Resetting
+        the memory at boundaries held it to a stricter standard than the model it
+        is grafted into.  AutoCompressor and RMT likewise carry across packed
+        boundaries.
+
+        prefix_eos_reset=True restores the old behaviour.  The principled middle
+        option — a per-position block mask so post-boundary tokens cannot attend
+        to the carry columns — needs the flex_attention path that the modeling
+        file currently leaves disabled; see the note in prefix_pack.
+
+        The WRITE side is unchanged: pool_mask still restricts the summary to the
+        open document's suffix and _valid_write still zeroes lanes with no open
+        suffix, both applied in prefix_unpack.
+        """
         state = self._cross_buf
-        if state is not None and self._write_reset is not None:
+        if (state is not None and self._write_reset is not None
+                and self.prefix_eos_reset):
             state = state * (~self._write_reset).view(-1, 1, 1).to(state.dtype)
         return state
 

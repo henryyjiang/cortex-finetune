@@ -678,6 +678,8 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
         m_cross_in: Optional[torch.Tensor] = None,   # carried cross-segment buffer
         return_m_cross: bool = False,                # surface the updated buffer
         eos_mask: Optional[torch.Tensor] = None,     # [B, S] bool, packed-doc boundaries
+        prefix_write: bool = True,                   # append summary slots (see prefix_pack)
+        prefix_read: bool = True,                    # splice carried vectors (see prefix_pack)
         **kwargs,
     ) -> CausalLMOutputRecurrentLatents:
         # Support multiple position formats:
@@ -723,8 +725,12 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
             # reading and writing.  No-op unless --cortex.prefix_memory is set.
             # emb_scale is passed because the splice happens AFTER the
             # embedding rescale above (see prefix_pack).
+            # prefix_write/prefix_read are True on every training and scoring
+            # call (the packed layout is unchanged); the eval decode loop sets
+            # them False so the KV cache stays correct.  See prefix_pack.
             input_embeds, position_ids, n_prefix, n_summary = self.cortex.prefix_pack(
-                input_embeds, position_ids, self.emb_scale
+                input_embeds, position_ids, self.emb_scale,
+                write=prefix_write, read=prefix_read,
             )
 
         freqs_cis = self.rotary_emb(input_embeds, position_ids)

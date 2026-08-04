@@ -23,7 +23,7 @@ import torch
 from transformers import AutoTokenizer
 
 from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
-                         ccot_prime)
+                         ccot_prime, greedy_generate)
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +116,10 @@ def parse_args() -> argparse.Namespace:
                         "(latent 'thinking'), then generate the CoT with the "
                         "primed buffer as read-only context. Requires a model "
                         "with cross state (K>0 or ccot_direct); 0 = off.")
+    p.add_argument("--no_cache",       action="store_true",
+                   help="Decode by re-forwarding the whole prefix each step "
+                        "(the pre-2026-08-03 behaviour). ~2 orders of magnitude "
+                        "slower; kept as the reference path for debugging.")
     p.add_argument("--max_examples",   type=int, default=0, help="0 = all")
     p.add_argument("--out_dir",        default="eval_results/gsm8k")
     p.add_argument("--dtype",          default="bfloat16", choices=["float32", "bfloat16"])
@@ -126,10 +130,15 @@ def parse_args() -> argparse.Namespace:
 # Generation
 # ---------------------------------------------------------------------------
 
+def _answer_complete(new_text: str) -> bool:
+    """CoT is done once a '####' line has been closed."""
+    return "####" in new_text and "\n" in new_text.split("####")[-1]
+
+
 @torch.no_grad()
 def generate(model, tokenizer, prompt: str, max_new_tokens: int,
              T: Optional[int], device: torch.device, seq_len: int = 2048,
-             ccot_passes: int = 0) -> str:
+             ccot_passes: int = 0, use_cache: bool = True) -> str:
     input_ids = tokenizer(prompt, add_special_tokens=False, return_tensors="pt").input_ids
     max_prompt = seq_len - max_new_tokens
     if input_ids.shape[1] > max_prompt:
@@ -138,23 +147,15 @@ def generate(model, tokenizer, prompt: str, max_new_tokens: int,
 
     num_steps = to_num_steps(T)
     # Mixed CCoT+CoT: latent multi-pass 'thinking' over the prompt before
-    # explicit CoT generation.  m_cross stays fixed during generation.
-    m_cross   = ccot_prime(model, input_ids, num_steps, ccot_passes)
-    generated = input_ids
-    eos_id    = tokenizer.eos_token_id
-
-    for _ in range(max_new_tokens):
-        out      = model(input_ids=generated, num_steps=num_steps,
-                         m_cross_in=m_cross, return_m_cross=False)
-        next_tok = out["logits"][0, -1].argmax(dim=-1, keepdim=True).unsqueeze(0)
-        generated = torch.cat([generated, next_tok], dim=1)
-        if eos_id is not None and next_tok.item() == eos_id:
-            break
-        decoded_new = tokenizer.decode(generated[0, input_ids.shape[1]:])
-        if "####" in decoded_new and "\n" in decoded_new.split("####")[-1]:
-            break
-
-    return tokenizer.decode(generated[0, input_ids.shape[1]:], skip_special_tokens=True)
+    # explicit CoT generation.  m_cross stays fixed during generation — the CoT
+    # tokens stay inside the window here (8-shot prompt + 256 new < seq_len), so
+    # the model reads them from context and a frozen buffer costs nothing.  That
+    # stops being true once prompt + CoT overflows the window, which is where a
+    # write at segment boundaries becomes necessary.
+    m_cross = ccot_prime(model, input_ids, num_steps, ccot_passes)
+    return greedy_generate(model, tokenizer, input_ids, max_new_tokens,
+                           num_steps, m_cross=m_cross, use_cache=use_cache,
+                           stop_fn=_answer_complete)
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +197,8 @@ def main() -> None:
             continue
         response = generate(model, tokenizer, build_prompt(ex["question"]),
                             args.max_new_tokens, T, device,
-                            ccot_passes=args.ccot_passes)
+                            ccot_passes=args.ccot_passes,
+                            use_cache=not args.no_cache)
         pred_ans   = extract_answer(response)
         is_correct = pred_ans is not None and normalize(pred_ans) == normalize(gold_ans)
         if is_correct:

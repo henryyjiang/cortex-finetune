@@ -170,21 +170,88 @@ def ccot_prime(model, input_ids, num_steps, passes, m_cross_init=None):
 
 @torch.no_grad()
 def greedy_generate(model, tokenizer, input_ids, max_new_tokens, num_steps,
-                    m_cross=None, stop_on_newline=False):
-    """Greedy decoding by full re-forward each step (no KV cache — matches the
-    original eval_gsm8k generate).  An optional primed m_cross buffer is held
-    fixed as read-only context for every step.  Returns the generated text."""
+                    m_cross=None, stop_on_newline=False, use_cache=True,
+                    stop_fn=None):
+    """Greedy decoding.  An optional primed m_cross buffer is held fixed as
+    read-only context for every step.  Returns the generated text.
+
+    stop_fn(decoded_so_far) -> bool ends generation early; stop_on_newline is
+    the common case kept as its own flag.  eval_gsm8k passes a stop_fn rather
+    than keeping its own copy of this loop, so there is one decode path to get
+    right instead of two.
+
+    use_cache=True (default) decodes incrementally against a HuginnDynamicCache:
+    prefill the prompt once, then forward ONE token per step.  The uncached path
+    (use_cache=False) re-forwards the whole prefix every step — it is the
+    original eval_gsm8k behaviour, kept as the reference implementation that
+    tests/smoke_kv_cache.py checks the cached path against.  Both must produce
+    identical text; the cached path is ~2 orders of magnitude cheaper.
+
+    Prefix-memory models need two things for the cache to be CORRECT, not just
+    fast (see cortex_graft.prefix_pack):
+      * prefix_write=False everywhere — a cached single-token query runs with
+        is_causal=False and would otherwise attend to the summary slots, which
+        the uncached causal mask never allows;
+      * prefix_read=False on incremental steps — the carry is already in the
+        cache from the prefill, and re-splicing it would double-count it and
+        shift every absolute position key the cache uses.
+
+    NOT bit-identical to the uncached path, and it cannot be: initialize_state
+    draws s0 ~ trunc_normal(std=sqrt(2/(5*n_embd))) with the shape of whatever
+    it is handed (raven_modeling_minimal_olmo.py:982), so a forward over 1 token
+    and a forward over the whole prefix consume different draws.  The two paths
+    are distributionally equivalent samples of the same model, not replays of
+    one computation.  tests/smoke_kv_cache.py pins the part that IS meant to be
+    exact by passing init_scale=0.0, which makes s0 deterministically zero and
+    isolates the cache/packing arithmetic from the noise.
+    """
     device = next(model.parameters()).device
     generated = input_ids.to(device)
     prompt_len = generated.shape[1]
     eos_id = tokenizer.eos_token_id
-    for _ in range(max_new_tokens):
-        out = model(input_ids=generated, num_steps=num_steps,
-                    m_cross_in=m_cross, return_m_cross=False)
+
+    def _stop(tok) -> bool:
+        if eos_id is not None and tok.item() == eos_id:
+            return True
+        if not (stop_on_newline or stop_fn):
+            return False
+        new = tokenizer.decode(generated[0, prompt_len:])
+        if stop_on_newline and "\n" in new:
+            return True
+        return bool(stop_fn(new)) if stop_fn else False
+
+    if not use_cache:
+        for _ in range(max_new_tokens):
+            out = model(input_ids=generated, num_steps=num_steps,
+                        m_cross_in=m_cross, return_m_cross=False,
+                        prefix_write=False)
+            next_tok = out["logits"][0, -1].argmax(dim=-1).view(1, 1)
+            generated = torch.cat([generated, next_tok], dim=1)
+            if _stop(next_tok):
+                break
+        return tokenizer.decode(generated[0, prompt_len:], skip_special_tokens=True)
+
+    # Prefill: whole prompt, carry spliced in, no summary slots.
+    pos = torch.arange(prompt_len, device=device).unsqueeze(0)
+    out = model(input_ids=generated, num_steps=num_steps, position_ids=pos,
+                m_cross_in=m_cross, return_m_cross=False,
+                use_cache=True, prefix_write=False, prefix_read=True)
+    cache = out.past_key_values
+    next_tok = out["logits"][0, -1].argmax(dim=-1).view(1, 1)
+    generated = torch.cat([generated, next_tok], dim=1)
+
+    for i in range(max_new_tokens - 1):
+        if _stop(next_tok):
+            break
+        # Absolute index of the token being fed; prefix_pack re-applies the
+        # same +1 shift the prefill used, so the numbering is continuous.
+        pos = torch.tensor([[prompt_len + i]], device=device)
+        out = model(input_ids=next_tok, num_steps=num_steps, position_ids=pos,
+                    m_cross_in=m_cross, return_m_cross=False,
+                    past_key_values=cache, use_cache=True,
+                    prefix_write=False, prefix_read=False)
+        cache = out.past_key_values
         next_tok = out["logits"][0, -1].argmax(dim=-1).view(1, 1)
         generated = torch.cat([generated, next_tok], dim=1)
-        if eos_id is not None and next_tok.item() == eos_id:
-            break
-        if stop_on_newline and "\n" in tokenizer.decode(generated[0, prompt_len:]):
-            break
+
     return tokenizer.decode(generated[0, prompt_len:], skip_special_tokens=True)

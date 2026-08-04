@@ -87,6 +87,14 @@ def _build_raven(**flags):
         model = RavenForCausalLM(cfg).eval()
     except Exception as e:
         shutil.rmtree(tmp, ignore_errors=True)
+        # A retired cortex flag raises ValueError BY DESIGN (cortex_graft.py
+        # fails loud rather than running a silently memory-less arm).  Lumping
+        # that in with "transformers skew?" made 7 dead-arm tests look like an
+        # environment problem on a machine where the environment is fine — the
+        # exact reporting failure this repo keeps paying for.  Name it.
+        if isinstance(e, ValueError) and "was retired on" in str(e):
+            pytest.skip(f"test targets a retired buffer, delete it with the "
+                        f"AccumCCoT/GatedAccumBuffer/DirectCCoT sweep: {e}")
         pytest.skip(f"cannot build raven base (transformers skew?): {type(e).__name__}: {e}")
     return model
 

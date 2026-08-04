@@ -226,6 +226,18 @@ class CLISettings:
             # set it explicitly when the checkpoint config carries none, which
             # RavenConfig by default does not.
             summary_init_token=-1,
+            # prefix_pos: 'tail' (default) puts the trailing summary slots at
+            # S+1..S+n_vec, continuing the chunk's numbering, so the write reads
+            # the chunk at POSITIVE relative offsets.  'zero' is the layout used
+            # up to 2026-08-04 (everything non-token at position 0), which put
+            # the whole write in a negative-offset RoPE regime the base model was
+            # never trained on.  Kept only to reproduce those runs.
+            prefix_pos="tail",
+            # prefix_eos_reset: zero the WHOLE incoming carry on any chunk that
+            # contains an EOS.  Unconditional before 2026-08-04, which switched
+            # the read off for ~60% of chunks on EOS-separated packed data.  See
+            # CortexMemory._carried_state for the full reasoning.
+            prefix_eos_reset=False,
             carry_grad_chunks=0, random_segments=False,
         )
     )
@@ -771,7 +783,8 @@ def startup(cfg: CLISettings):
                    "memory_heads", "ccot_direct", "h_T_proj",
                    "lora_rank", "lora_alpha",
                    "accum_ccot", "accum_vecs", "accum_max",
-                   "gated_accum", "prefix_memory", "summary_init_token"):
+                   "gated_accum", "prefix_memory", "summary_init_token",
+                   "prefix_pos", "prefix_eos_reset"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -781,6 +794,8 @@ def startup(cfg: CLISettings):
                   f"(vecs={cfg.cortex['accum_vecs']}/max={cfg.cortex['accum_max']}) "
                   f"gated_accum={cfg.cortex['gated_accum']} "
                   f"prefix_memory={cfg.cortex['prefix_memory'] or 'off'} "
+                  f"prefix_pos={cfg.cortex['prefix_pos']} "
+                  f"prefix_eos_reset={cfg.cortex['prefix_eos_reset']} "
                   f"cross_chunks={cfg.cortex['cross_chunks']} "
                   f"carry_grad_chunks={cfg.cortex['carry_grad_chunks']} "
                   f"random_segments={cfg.cortex['random_segments']} "

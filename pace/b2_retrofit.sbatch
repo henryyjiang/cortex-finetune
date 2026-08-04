@@ -52,6 +52,59 @@
 #    pack ran dry, not because it finished.  B2 is 5B tokens per arm, and the
 #    packs are built past the budget so the loader cannot exhaust (see PREP).
 #
+# WHY PHASE 0 WAS RESTARTED (2026-08-04)
+# --------------------------------------
+# The first phase-0 attempt (wandb 4vop2ym8) was cancelled at ~9h / ~24k steps
+# after a code audit found two defects in the prefix path.  Both are fixed and
+# flag-gated; both were silent, i.e. the loss curve looked perfectly healthy.
+#
+# A. THE READ WAS OFF FOR MOST CHUNKS.  CortexMemory._carried_state zeroed the
+#    WHOLE incoming carry for any lane whose chunk contained an EOS, and
+#    write_reset is has_eos for the entire chunk — so one document boundary
+#    anywhere killed the carry for every position, including the tokens before
+#    it that continue the previous document.  tools/prepare_packed_dataset.py
+#    joins documents with EOS separators and this run sets eos_from_tokens=true,
+#    so on FineWeb-Edu (~1.1k-token docs, 1024-token chunks) roughly 60% of
+#    chunks lost their carry; at 500-token docs, 87%.  Worse, zeroing does not
+#    REMOVE the columns — a zero key scores 0, not -inf — so 64-96 dead columns
+#    kept absorbing ~3-5% of the softmax mass at every layer.  The per-position
+#    mask with the right semantics (cross_read_mask) was computed and then
+#    discarded, because only read_into consumes it and that is a no-op in prefix
+#    mode; the bolt-on buffers DID use it, so this was a regression introduced
+#    by the prefix rewrite.  Now --cortex.prefix_eos_reset false (the default):
+#    the carry is read by the whole chunk.  The justification is that the
+#    backbone already does exactly this — the modeling file runs with
+#    prepared_attn_mask=None and is_causal=True, so base attention is unmasked
+#    across document boundaries inside a chunk.  AC and RMT also carry across
+#    packed boundaries.  The principled middle option (a per-position block mask
+#    so post-boundary tokens cannot attend to the carry) needs the flex_attention
+#    path the modeling file leaves disabled, and was not worth the restart delay.
+#
+# B. THE WRITE READ THE CHUNK AT NEGATIVE ROPE OFFSETS.  prefix_pack put the
+#    trailing summary slots at position 0, on the theory that this was our RoPE
+#    analog of AutoCompressor's pad-position trick.  It is not: that trick is in
+#    OPTLearnedPositionalEmbeddingWithPadding, OPT positions are ADDITIVE, so
+#    "no position" means adding a zero vector — and AC's own RoPE model
+#    (LlamaAutoCompressorModel) overrides nothing and uses contiguous positions.
+#    A slot at position 0 sitting at the END of the sequence queries every real
+#    token at a negative relative offset (-1..-1024), which a causal LM never
+#    sees (pos_q >= pos_k always).  Measured on a pretrained RoPE LM, that layout
+#    also collapses the slots: centred slot-slot cosine 0.94 and effective rank
+#    2.1 of 32, vs 0.22 / 4.2 with the tail layout — accum_vecs=32 was buying
+#    about two independent directions.  Now --cortex.prefix_pos tail: slots at
+#    S+1..S+n_vec.  The CARRY stays at position 0; it sits at the front, so real
+#    tokens already query it at positive offsets, and keeping real tokens at 1..S
+#    is what lets a cached decode step continue the prefill's numbering.
+#
+# Set --cortex.prefix_eos_reset true --cortex.prefix_pos zero to reproduce the
+# cancelled attempt exactly.  Neither flag existed before 2026-08-04, so a dir
+# whose config.json predates it will pick up the NEW defaults — re-prepare eval
+# checkpoints rather than assuming they carry their training-time arrangement.
+#
+# Gate this restart on pace/eval_write_capacity.sbatch rather than on the loss
+# curve: it asks whether the carry can reconstruct the chunk it just encoded,
+# which is the one question the carry ablation cannot answer.
+#
 # NOT a from-scratch run, and NOT a finetune.  ckpts/olmo-retrofit-cortex is
 # smcleish/Recurrent-OLMo-2-0425-untrained: PRETRAINED OLMo-2-0425-1B weights
 # in an untrained (4,6,4)-with-loop-x8 ARRANGEMENT (convert_olmo.py:92-133).
@@ -238,6 +291,9 @@ MAX_LENGTH=${MAX_LENGTH:-4096}
 ACCUM_VECS=${ACCUM_VECS:-32}
 ACCUM_MAX=${ACCUM_MAX:-128}                # 4 chunks x 32 vecs — the assert is exact
 CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-2}  # AC's stop-gradient after 2 compressions
+# 2026-08-04 restart defaults; set true/zero to reproduce the cancelled 4vop2ym8.
+PREFIX_EOS_RESET=${PREFIX_EOS_RESET:-false}  # carry survives a document boundary
+PREFIX_POS=${PREFIX_POS:-tail}               # summary slots at S+1..S+n_vec
 SAVE_INTERVAL=${SAVE_INTERVAL:-2500}
 RESUME_PATH=${RESUME_PATH:-}
 BRANCH_PATH=${BRANCH_PATH:-}
@@ -298,6 +354,7 @@ echo "=== B2 $RUN_NAME | phase=$PHASE | prefix=$PREFIX_MODE | data=$DATA_PATH ==
 echo "    max_steps=$MAX_STEPS (horizon)  stop_at_step=$STOP_AT_STEP"
 echo "    full recurrence $MAX_MEAN_REC at step $(python -c "import math;print(math.ceil($RAMP_WARMUP*$MAX_STEPS))")"
 echo "    tokens at horizon: $(( MAX_STEPS * 4 * MAX_LENGTH ))"
+echo "    prefix_pos=$PREFIX_POS  prefix_eos_reset=$PREFIX_EOS_RESET (2026-08-04 fixes)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
 python train.py \
@@ -335,5 +392,7 @@ python train.py \
     --cortex.carry_grad_chunks $CARRY_GRAD_CHUNKS \
     --cortex.cross_chunks $CROSS_CHUNKS \
     --cortex.eos_from_tokens true \
+    --cortex.prefix_eos_reset $PREFIX_EOS_RESET \
+    --cortex.prefix_pos $PREFIX_POS \
     --cortex.freeze_loop false \
     $CHAIN_ARGS
