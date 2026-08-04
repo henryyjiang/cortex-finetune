@@ -60,6 +60,13 @@ def fix_checkpoint(ckpt_dir: str, base_dir: str) -> None:
 
     # 1. grafted modeling file (+ config file, usually already copied by the
     #    config-side custom_object_save).
+    # Copy when missing AND refresh when different.  "Only if missing" left stale
+    # copies in place forever: cortex_graft.py is imported live from the repo
+    # root, but this modeling file is a snapshot, so an old dir runs an old
+    # forward() against a new graft.  On 2026-08-04 that combination turned out
+    # to have been running ckpts/olmo-retrofit-cortex with a pre-prefix-rewrite
+    # forward — every config flag correct, no cross-segment memory, healthy loss
+    # curve.  A refresh is cheap; a silent mechanism mismatch is not.
     for fname in (MODELING_FILE, CONFIG_FILE):
         src = os.path.join(base_dir, fname)
         dst = os.path.join(ckpt_dir, fname)
@@ -68,6 +75,9 @@ def fix_checkpoint(ckpt_dir: str, base_dir: str) -> None:
         if not os.path.isfile(dst):
             shutil.copy(src, dst)
             actions.append(f"copied {fname}")
+        elif open(dst, encoding="utf-8").read() != open(src, encoding="utf-8").read():
+            shutil.copy(src, dst)
+            actions.append(f"REFRESHED stale {fname}")
 
     # 2 + 3. config.json surgery.
     with open(cfg_path, encoding="utf-8") as f:

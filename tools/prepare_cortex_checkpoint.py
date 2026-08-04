@@ -51,6 +51,15 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def _materialise_source(src: str, dst: str) -> None:
     if os.path.isdir(src):
+        if os.path.exists(dst) and os.path.samefile(src, dst):
+            # Refresh-in-place: --src == --dst is the normal way to re-install a
+            # STALE modeling file, which is not a hypothetical.  The graft
+            # (cortex_graft.py) is imported live from the repo root but this
+            # modeling file is a COPY, so a dir prepared before a graft change
+            # silently runs the old forward while every config flag looks right.
+            # copytree would raise SameFileError on every entry here.
+            print("      --src == --dst: refreshing in place, weights untouched")
+            return
         shutil.copytree(src, dst, dirs_exist_ok=True)
         return
     # treat as an HF hub id
@@ -92,7 +101,14 @@ def main() -> int:
     _materialise_source(args.src, args.dst)
 
     print(f"[2/3] installing grafted modeling file ({args.variant})")
-    shutil.copy(grafted, os.path.join(args.dst, "raven_modeling_minimal_cortex.py"))
+    dst_model = os.path.join(args.dst, "raven_modeling_minimal_cortex.py")
+    stale = (os.path.isfile(dst_model)
+             and open(dst_model, encoding="utf-8").read()
+             != open(grafted, encoding="utf-8").read())
+    shutil.copy(grafted, dst_model)
+    if stale:
+        print("      REPLACED a stale copy.  Anything trained or evaluated with "
+              "that dir was running a different forward() than the repo's.")
 
     print("[3/3] patching config.json (auto_map + memory flags)")
     cfg_path = os.path.join(args.dst, "config.json")
