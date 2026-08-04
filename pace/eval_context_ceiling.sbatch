@@ -55,6 +55,20 @@
 #
 # ~21 forwards per sample at n=50, no backward graph — minutes, not hours.
 # CONTEXT_LENS overrides the sweep (default "128 256 512 1024").
+#
+# Two decompositions of the same measurement, both off by default (2026-08-04),
+# for the question "how do we recover MORE of the available nats":
+#   CARRY_PLUS="128 256"  also scores carry AND k real tokens together, and
+#                         reports the residual over k-alone.  The k=0 floor is
+#                         not where a deployed model sits — the tail of the
+#                         previous chunk is free — so a residual near zero says
+#                         the carry is re-supplying local context and the real
+#                         headroom is (best ceiling - ceiling(k)).  Costs one
+#                         extra forward per k per chunk.
+#   POS_BUCKETS=4         splits each chunk's NLL into 4 position bands.  Free.
+#                         Cross-chunk information is a boundary effect; this is
+#                         where you see whether the oracle's nats are all in the
+#                         first band and whether the carry delivers there.
 
 cd $SLURM_SUBMIT_DIR
 
@@ -75,6 +89,8 @@ BASE=${BASE:-ckpts/olmo8-cortex}
 MAX_EXAMPLES=${MAX_EXAMPLES:-50}
 N_CHUNKS=${N_CHUNKS:-4}
 CONTEXT_LENS=${CONTEXT_LENS:-"128 256 512 1024"}
+CARRY_PLUS=${CARRY_PLUS:-}
+POS_BUCKETS=${POS_BUCKETS:-0}
 T_EVAL=${T_EVAL:-}
 
 # MODEL= points straight at a base dir (pure ceiling, no arm); otherwise RUN=
@@ -101,5 +117,7 @@ python evals/eval_context_ceiling.py \
     --n_chunks "$N_CHUNKS" \
     --context_lens $CONTEXT_LENS \
     --max_examples "$MAX_EXAMPLES" \
+    ${CARRY_PLUS:+--carry_plus $CARRY_PLUS} \
+    --pos_buckets "$POS_BUCKETS" \
     ${T_EVAL:+--T "$T_EVAL"} \
     --out_dir "$OUT"

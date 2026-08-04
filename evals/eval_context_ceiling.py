@@ -25,6 +25,30 @@ Headline outputs
   carry_equiv_tok  the k whose ceiling matches carry_delta, by interpolation --
                    "our 32-vector carry is worth about N tokens of real context"
 
+Two optional decompositions, both off by default (2026-08-04).  The headline
+fraction-recovered treats the ceiling as one number, and it is not: it is spread
+over positions inside the chunk, and part of it is ALREADY supplied by the
+tokens the model can see anyway.
+
+  --carry_plus K   also score (carry AND K real preceding tokens) together, and
+                   report the RESIDUAL   L(K alone) - L(carry + K).
+                   The plain carry_delta is measured against a k=0 floor no
+                   deployed model ever sits at -- the last K tokens of the
+                   previous chunk are free at inference.  If the residual is ~0
+                   the carry is a local-context surrogate and the addressable
+                   headroom is (best ceiling - ceiling(K)), not the whole
+                   ceiling.  That changes the denominator, i.e. the number the
+                   paper reports.
+
+  --pos_buckets N  split every condition's NLL into N equal position bands
+                   inside the chunk.  Costs no extra forwards.  Cross-chunk
+                   information is a boundary effect: if the oracle's nats are
+                   front-loaded and the carry's are flat, the read is not doing
+                   boundary work.  It also prices the chunk-length lever --
+                   halving the chunk doubles the boundaries, so a front-loaded
+                   ceiling means total recoverable nats scale with the number of
+                   chunks, not just with the per-boundary delta.
+
 Read it two ways.  If the ceiling is large and the carry recovers a few percent,
 the mechanism is the problem.  If the ceiling is itself ~0.02-0.03 nats, then
 Track A's +0.024 was already near it and the line is a characterised negative
@@ -73,6 +97,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--context_lens", type=int, nargs="+",
                    default=[128, 256, 512, 1024],
                    help="real preceding tokens to prepend (k=0 is always run)")
+    p.add_argument("--carry_plus", type=int, nargs="*", default=[],
+                   help="also score carry AND k real preceding tokens together, "
+                        "and report the residual L(k alone) - L(carry + k) -- "
+                        "what the carry adds ON TOP of context that is free at "
+                        "inference.  One extra forward per k per chunk.")
+    p.add_argument("--pos_buckets", type=int, default=0,
+                   help="split each chunk's NLL into N equal position bands "
+                        "(0 = off).  Free -- no extra forwards.")
     p.add_argument("--max_examples", type=int, default=50, help="0 = all rows")
     p.add_argument("--seed",         type=int, default=1234)
     p.add_argument("--out_dir",      default="eval_results/context_ceiling")
@@ -81,13 +113,33 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _bucket_nll(ce, mc, n_buckets):
+    """Mean NLL inside each of `n_buckets` equal position bands of the chunk.
+    A band whose tokens are all masked out yields None rather than a nan, so a
+    short final chunk cannot poison the pooled band means."""
+    out = []
+    for idx in torch.chunk(torch.arange(ce.numel()), n_buckets):
+        w = float(mc[idx].sum())
+        out.append(float((ce[idx] * mc[idx]).sum() / w) if w > 0 else None)
+    return out
+
+
 @torch.no_grad()
-def _score(model, ctx, xc, yc, mc, state, num_steps, device, seed):
+def _score(model, ctx, xc, yc, mc, state, num_steps, device, seed,
+           bucket_out=None, n_buckets=0):
     """NLL of chunk `xc` given `ctx` real preceding tokens and/or carry `state`.
 
     The context is prepended as ordinary tokens with natural contiguous
     positions -- this is the oracle condition, so nothing about it should be
     special-cased.  Only the chunk's own positions are scored.
+
+    `ctx` and `state` are independent: passing both is the carry_plus condition
+    (the carry on top of context the model would have anyway), passing neither
+    is the k=0 floor.
+
+    When `bucket_out` is given it receives the per-position-band means for this
+    same forward -- the decomposition is a slice of the CE vector already
+    computed, so it costs nothing.
     """
     torch.manual_seed(seed)                      # identical s0 across conditions
     n_tok = int(mc.sum())
@@ -99,7 +151,10 @@ def _score(model, ctx, xc, yc, mc, state, num_steps, device, seed):
                 m_cross_in=state, return_m_cross=False)
     logits = out["logits"][0, off:].float()
     ce = F.cross_entropy(logits, yc.to(device), reduction="none")
-    return float((ce * mc.to(device)).sum() / n_tok)
+    mcd = mc.to(device)
+    if bucket_out is not None and n_buckets:
+        bucket_out.append(_bucket_nll(ce, mcd, n_buckets))
+    return float((ce * mcd).sum() / n_tok)
 
 
 @torch.no_grad()
@@ -153,6 +208,15 @@ def main() -> None:
           f"carry condition: {'on' if with_carry else 'OFF (no cross state)'}")
     print(f"context lens: 0 + {args.context_lens}")
 
+    cplus_lens = sorted(args.carry_plus) if with_carry else []
+    if args.carry_plus and not with_carry:
+        print("  (--carry_plus ignored: this model has no cross state)")
+    elif cplus_lens:
+        print(f"carry_plus:   carry + {cplus_lens} real tokens")
+    nb = max(0, args.pos_buckets)
+    if nb:
+        print(f"position bands: {nb} per chunk")
+
     from datasets import load_from_disk
     ds = load_from_disk(args.data)
     n = len(ds) if args.max_examples == 0 else min(args.max_examples, len(ds))
@@ -162,6 +226,13 @@ def main() -> None:
     # per_chunk[cond][g] = per-sample losses; g indexes chunks 2..n_chunks
     per_chunk = {c: [[] for _ in range(args.n_chunks)] for c in conds}
     carry_ch = [[] for _ in range(args.n_chunks)]
+    cplus_ch = {k: [[] for _ in range(args.n_chunks)] for k in cplus_lens}
+    # pos_rows[label] = one band-list per accepted (sample, chunk), appended in
+    # lockstep across labels so bands stay paired the same way the scalars are.
+    labels = ([f"k{k}" for k in conds]
+              + (["carry"] if with_carry else [])
+              + [f"carry+{k}" for k in cplus_lens])
+    pos_rows = {lab: [] for lab in labels} if nb else {}
     t_start = time.time()
 
     for si in range(n):
@@ -178,21 +249,36 @@ def main() -> None:
             off += 0 if g == 0 else x_ch[g - 1].numel()
             if g == 0:
                 continue                          # no preceding context to give
+            bands = {lab: [] for lab in labels} if nb else {}
             vals = {}
             for k in conds:
                 ctx = x[max(0, off - k):off] if k else None
                 vals[k] = _score(model, ctx, x_ch[g], y_ch[g], m_ch[g], None,
-                                 num_steps, device, seed)
-            cv = None
+                                 num_steps, device, seed,
+                                 bands.get(f"k{k}"), nb)
+            cv, cpv = None, {}
             if with_carry:
                 st = carry_before(model, x, args.n_chunks, g, num_steps, seed, device)
                 cv = _score(model, None, x_ch[g], y_ch[g], m_ch[g], st,
-                            num_steps, device, seed)
-            if all(v is not None for v in vals.values()) and (cv is not None or not with_carry):
+                            num_steps, device, seed, bands.get("carry"), nb)
+                for k in cplus_lens:
+                    # the SAME carry, plus context the model has for free at
+                    # inference -- one extra forward, no extra write chain
+                    cpv[k] = _score(model, x[max(0, off - k):off], x_ch[g],
+                                    y_ch[g], m_ch[g], st, num_steps, device,
+                                    seed, bands.get(f"carry+{k}"), nb)
+            ok = (all(v is not None for v in vals.values())
+                  and (cv is not None or not with_carry)
+                  and all(v is not None for v in cpv.values()))
+            if ok:
                 for k in conds:
                     per_chunk[k][g].append(vals[k])
                 if with_carry:
                     carry_ch[g].append(cv)
+                    for k in cplus_lens:
+                        cplus_ch[k][g].append(cpv[k])
+                for lab in pos_rows:
+                    pos_rows[lab].append(bands[lab][0])
         if si == 0:
             dt = time.time() - t_start
             print(f"  sample 1 took {dt:.1f}s -> ETA {dt * n / 60:.0f} min")
@@ -259,6 +345,51 @@ def main() -> None:
                   f"k={best_k}): real context over this span does not help this "
                   f"model, so there is no ceiling for a carry to recover.  That is "
                   f"the measured form of 'the base cannot use a long window'.")
+
+        # ---- carry on top of free context ---------------------------------
+        if cplus_lens:
+            print(f"\n  carry + real context (n={len(base)}).  residual = what the "
+                  f"carry adds\n  ON TOP of context that is free at inference:")
+            for k in cplus_lens:
+                vals = [v for g in range(1, args.n_chunks) for v in cplus_ch[k][g]]
+                alone = [v for g in range(1, args.n_chunks) for v in per_chunk[k][g]]
+                tot, se_t = _paired(base, vals)          # vs the k=0 floor
+                res, se_r = _paired(alone, vals)         # vs k real tokens alone
+                results[f"carry_plus_k{k}"] = {
+                    "delta_vs_k0": tot, "se_vs_k0": se_t,
+                    "residual_vs_k_alone": res, "se_residual": se_r,
+                }
+                frac = (f"  = {100 * res / d:.0f}% of the standalone carry delta"
+                        if d > 0 else "  (standalone carry delta <= 0)")
+                print(f"    carry+{k:<5} : total {tot:+.5f} (SE {se_t:.5f})   "
+                      f"residual {res:+.5f} (SE {se_r:.5f}){frac}")
+            print("  A residual near zero means the carry is a LOCAL-CONTEXT")
+            print("  SURROGATE: it re-supplies what the last k tokens already give,")
+            print("  so the headroom worth chasing is (best ceiling - ceiling(k)),")
+            print("  not the whole ceiling.")
+
+    # ---- position bands ----------------------------------------------------
+    if nb and pos_rows.get("k0"):
+        print(f"\n  position bands inside the chunk (n={len(pos_rows['k0'])} "
+              f"chunk-instances), delta vs k=0 in the SAME band:")
+        edges = [f"{100 * i // nb}-{100 * (i + 1) // nb}%" for i in range(nb)]
+        print("  " + f"{'condition':<14}" + "".join(f"{e:>12}" for e in edges))
+        results["position_bands"] = {"n_buckets": nb, "bands": edges, "delta": {}}
+        for lab in labels:
+            if lab == "k0":
+                continue
+            row, keep = [], []
+            for j in range(nb):
+                a = [r[j] for r, s in zip(pos_rows["k0"], pos_rows[lab])
+                     if r[j] is not None and s[j] is not None]
+                b = [s[j] for r, s in zip(pos_rows["k0"], pos_rows[lab])
+                     if r[j] is not None and s[j] is not None]
+                keep.append(_paired(a, b)[0] if a else None)
+                row.append(f"{keep[-1]:>+12.5f}" if a else f"{'-':>12}")
+            results["position_bands"]["delta"][lab] = keep
+            print("  " + f"{lab:<14}" + "".join(row))
+        print("  Front-loaded oracle + flat carry => the read is not doing")
+        print("  boundary work, and shorter chunks multiply the addressable nats.")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

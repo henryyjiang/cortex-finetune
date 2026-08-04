@@ -16,6 +16,16 @@ scale:
     ceiling has no equivalent, and returning the largest k would read as a
     real measurement.
 
+The two decompositions added on top (2026-08-04) have their own failure modes:
+
+  * carry_plus is only meaningful if `ctx` and `state` are genuinely
+    independent -- if passing both silently dropped one, the residual would
+    come out equal to either the carry delta or exactly zero, and both are
+    readings the experiment is meant to distinguish;
+  * the position bands must partition the chunk and must average only the
+    tokens the mask keeps, or a padded final chunk turns a band into nan and
+    the "where do the nats live" table reads as a hole in the middle.
+
 Run: /c/Users/henry/miniconda3/envs/cortex-retro/python.exe -m pytest tests/ -q
 """
 from __future__ import annotations
@@ -112,6 +122,76 @@ class TestScoring:
         a = ecc._score(m, None, xc, yc, mc, None, NS, DEV, 7)
         b = ecc._score(m, None, xc, yc, mc, None, NS, DEV, 7)
         assert a == b
+
+
+class TestBuckets:
+    """Position bands -- the 'where in the chunk do the nats live' table."""
+
+    def test_bands_partition_the_chunk(self):
+        ce = torch.arange(8, dtype=torch.float)
+        mc = torch.ones(8)
+        assert ecc._bucket_nll(ce, mc, 4) == [0.5, 2.5, 4.5, 6.5]
+
+    def test_mask_excludes_pads_from_the_band_mean(self):
+        ce = torch.tensor([1.0, 9.0, 1.0, 9.0])
+        mc = torch.tensor([1.0, 0.0, 1.0, 0.0])
+        assert ecc._bucket_nll(ce, mc, 2) == [1.0, 1.0]
+
+    def test_fully_masked_band_is_none_not_nan(self):
+        """A short final chunk must leave a hole, not a nan that poisons the
+        pooled mean of that band across samples."""
+        ce = torch.tensor([1.0, 2.0, 3.0, 4.0])
+        mc = torch.tensor([1.0, 1.0, 0.0, 0.0])
+        out = ecc._bucket_nll(ce, mc, 2)
+        assert out[0] == 1.5 and out[1] is None
+
+    def test_score_fills_buckets_and_keeps_the_scalar(self):
+        m = _model(memory=False)
+        x, y, ym = _sample()
+        xc, yc, mc = x[:CL], y[:CL], ym[:CL]
+        out = []
+        v = ecc._score(m, None, xc, yc, mc, None, NS, DEV, 7, out, 4)
+        assert v is not None and len(out) == 1 and len(out[0]) == 4
+        # the bands average back to the scalar (uniform mask, equal-size bands)
+        assert abs(sum(out[0]) / 4 - v) < 1e-4
+
+    def test_buckets_are_opt_in(self):
+        m = _model(memory=False)
+        x, y, ym = _sample()
+        a = ecc._score(m, None, x[:CL], y[:CL], ym[:CL], None, NS, DEV, 7)
+        b = ecc._score(m, None, x[:CL], y[:CL], ym[:CL], None, NS, DEV, 7, [], 0)
+        assert a == b
+
+
+class TestCarryPlus:
+    """carry + real context -- the residual denominator."""
+
+    def test_context_and_carry_are_independent_inputs(self):
+        """Passing both must differ from passing either alone; if one were
+        silently dropped the residual would be a fixed artefact."""
+        m = _model()
+        x, y, ym = _sample()
+        g = 2
+        xc, yc, mc = x[g * CL:(g + 1) * CL], y[g * CL:(g + 1) * CL], ym[g * CL:(g + 1) * CL]
+        st = ecc.carry_before(m, x, NC, g, NS, 7, DEV)
+        ctx = x[g * CL - CL // 2:g * CL]
+        both = ecc._score(m, ctx, xc, yc, mc, st, NS, DEV, 7)
+        ctx_only = ecc._score(m, ctx, xc, yc, mc, None, NS, DEV, 7)
+        carry_only = ecc._score(m, None, xc, yc, mc, st, NS, DEV, 7)
+        assert both != ctx_only and both != carry_only
+
+    def test_only_the_chunk_is_scored_with_both(self):
+        """The logit slice must still drop the context columns when a carry is
+        also present -- the carry adds rows the offset must NOT count."""
+        m = _model()
+        x, y, ym = _sample()
+        g = 2
+        xc, yc, mc = x[g * CL:(g + 1) * CL], y[g * CL:(g + 1) * CL], ym[g * CL:(g + 1) * CL]
+        st = ecc.carry_before(m, x, NC, g, NS, 7, DEV)
+        vals = [ecc._score(m, x[g * CL - k:g * CL] if k else None, xc, yc, mc,
+                           st, NS, DEV, 7) for k in (0, CL // 2, CL)]
+        assert all(v is not None and v == v for v in vals)
+        assert max(vals) - min(vals) < 5.0
 
 
 class TestCarryBefore:

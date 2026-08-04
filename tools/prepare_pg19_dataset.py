@@ -23,6 +23,17 @@ Run on a LOGIN node (needs internet for the first download; ~11 GB for PG-19):
         --out data/pg19_olmo_len4096 \
         --max_length 4096
 
+The script is corpus-agnostic — --dataset/--split/--text_col point it anywhere,
+and --min_tokens keeps only documents that actually span the window, which is
+what makes a corpus able to carry cross-chunk signal at all.  A code pack (a
+function defined in chunk 1 and called in chunk 4 is the long-range dependency
+prose does not have):
+
+    python tools/prepare_pg19_dataset.py \
+        --tokenizer ckpts/olmo8-cortex --dataset codeparrot/codeparrot-clean-valid \
+        --split train --text_col content --min_tokens 3500 \
+        --out data/code_olmo_val_len4096 --max_length 4096
+
 Then train with:
     python train.py --preprocessed_data_path data/pg19_olmo_len4096 --max_length 4096 ...
 """
@@ -43,7 +54,16 @@ def main() -> int:
     ap.add_argument("--max_length", type=int, default=4096,
                     help="tokens per training sequence; rows are max_length+1 long")
     ap.add_argument("--max_samples", type=int, default=None,
-                    help="cap the number of documents (None = all)")
+                    help="cap the number of documents (None = all); applied "
+                         "BEFORE --min_tokens, so raise it when filtering hard")
+    ap.add_argument("--min_tokens", type=int, default=0,
+                    help="drop documents shorter than this many real tokens "
+                         "(0 = keep all).  A document that does not span the "
+                         "window contributes no cross-chunk signal at all — "
+                         "chunk g is then a different document than g-1, and "
+                         "the measurable ceiling is ~0 by construction.  Set it "
+                         "near max_length to build a long-document pack out of "
+                         "a corpus whose median document is short.")
     ap.add_argument("--num_proc", type=int, default=16)
     args = ap.parse_args()
 
@@ -84,6 +104,19 @@ def main() -> int:
 
     tokenized = ds.map(tokenize, batched=True, batch_size=64,
                        num_proc=args.num_proc, remove_columns=ds.column_names)
+
+    if args.min_tokens:
+        before = len(tokenized)
+        # count real tokens, not row length — every row is row_len long, the
+        # mask is what says how much of it is document.
+        tokenized = tokenized.filter(
+            lambda r: sum(r["attention_mask"]) >= args.min_tokens,
+            num_proc=args.num_proc)
+        print(f"min_tokens={args.min_tokens}: kept {len(tokenized)}/{before} documents")
+        if len(tokenized) == 0:
+            raise SystemExit("No document survived --min_tokens; lower it or "
+                             "raise --max_samples")
+
     tokenized.save_to_disk(args.out)
 
     n_full = sum(1 for m in tokenized[:1000]["attention_mask"] if m[-1] == 1)
