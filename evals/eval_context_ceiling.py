@@ -41,13 +41,24 @@ tokens the model can see anyway.
                    paper reports.
 
   --pos_buckets N  split every condition's NLL into N equal position bands
-                   inside the chunk.  Costs no extra forwards.  Cross-chunk
-                   information is a boundary effect: if the oracle's nats are
-                   front-loaded and the carry's are flat, the read is not doing
-                   boundary work.  It also prices the chunk-length lever --
-                   halving the chunk doubles the boundaries, so a front-loaded
-                   ceiling means total recoverable nats scale with the number of
-                   chunks, not just with the per-boundary delta.
+                   inside the chunk.  Costs no extra forwards.  Context
+                   substitution is a boundary effect, so the oracle's nats
+                   should be front-loaded; read the CARRY's profile against the
+                   ORACLE's, not against flat.  Tracking it = stitching the
+                   seam; staying flat = supplying something that is not the
+                   previous chunk's text.  It also prices the chunk-length lever
+                   -- halving the chunk doubles the boundaries, so a
+                   front-loaded ceiling means total recoverable nats scale with
+                   the number of chunks, not just the per-boundary delta.
+
+A NOTE ON WHAT THE CEILING BOUNDS (2026-08-04).  The oracle bounds SUBSTITUTING
+FOR THE PREVIOUS CHUNK'S TEXT.  It is not a bound on a carry used as working
+memory for the model's own intermediate computation: the measured ceiling is
+this base model's ability to exploit raw tokens, and that ability collapses at a
+2048-token window (-0.977).  A carry holding precomputed results can exceed it,
+because it delivers what the model would otherwise spend depth re-deriving.
+Recovery above 100% is therefore a reportable outcome, not a bug -- it is what
+the "carry BEATS every measured oracle" branch below exists to say.
 
 Read it two ways.  If the ceiling is large and the carry recovers a few percent,
 the mechanism is the problem.  If the ceiling is itself ~0.02-0.03 nats, then
@@ -388,8 +399,10 @@ def main() -> None:
                 row.append(f"{keep[-1]:>+12.5f}" if a else f"{'-':>12}")
             results["position_bands"]["delta"][lab] = keep
             print("  " + f"{lab:<14}" + "".join(row))
-        print("  Front-loaded oracle + flat carry => the read is not doing")
-        print("  boundary work, and shorter chunks multiply the addressable nats.")
+        print("  Compare the carry's PROFILE to the oracle's, not to flat.  A")
+        print("  front-loaded oracle is the boundary effect; a carry that tracks")
+        print("  it is stitching the seam, a carry that stays flat across bands")
+        print("  is supplying something that is not the previous chunk's text.")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
