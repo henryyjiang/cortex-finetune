@@ -73,6 +73,13 @@ echo "=== carry ablation: $RUN -> $OUT ==="
 SLICE_ABLATE=${SLICE_ABLATE:-none}
 SLICE_N=${SLICE_N:-0}
 SLICE_OP=${SLICE_OP:-drop}
+# T_EVAL: recurrence to evaluate at.  Unset = the checkpoint's own
+# config.mean_recurrence, which is NOT always the recurrence the arm trained at:
+# checkpoints derived from ckpts/olmo-retrofit-cortex inherit mean_recurrence=32
+# from the UNTRAINED base config (confirmed 2026-08-04 on the B1 gate, which
+# prints 32 while B1 was an mr8 run sitting at ~recurrence 4 at step 22,500).
+# Evaluating a memory arm at 8x its training depth is a real confound — set this.
+T_EVAL=${T_EVAL:-}
 
 python evals/eval_carry_ablation.py \
     --model_name "$MODEL_DIR" \
@@ -80,4 +87,5 @@ python evals/eval_carry_ablation.py \
     --slice_ablate "$SLICE_ABLATE" \
     --slice_n "$SLICE_N" \
     --slice_op "$SLICE_OP" \
+    ${T_EVAL:+--T "$T_EVAL"} \
     --out_dir "$OUT"

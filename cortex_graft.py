@@ -59,7 +59,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from cortex_memory.buffers import LSTMBuffer, PrefixAccumBuffer, PrefixGatedBuffer
+from cortex_memory.buffers import (AccumCCoT, DirectCCoT, GatedAccumBuffer,
+                                   LSTMBuffer, PrefixAccumBuffer, PrefixGatedBuffer)
 from cortex_memory.eos import compute_eos_masks, apply_write_reset, apply_valid_write
 
 
@@ -191,26 +192,44 @@ class CortexMemory(nn.Module):
         self.memory_slots      = K
         self.memory_slots_iter = Ki
 
-        # M_cross: the original LM2 K-slot buffer (K>0), kept as the
-        # pre-AutoCompressor baseline arm.  DirectCCoT, AccumCCoT and
-        # GatedAccumBuffer were removed 2026-08-02 — superseded by the Prefix*
-        # pair below (see cortex_memory/buffers.py for why).
-        # RETIRED FLAGS.  These selected buffers that no longer exist.  Failing
-        # loudly matters more than usual here: silently ignoring one of them
-        # yields a run with NO cross-segment memory that still logs a healthy
-        # loss curve, i.e. a null result that looks like a real measurement.
-        for dead, replacement in (("accum_ccot", "--cortex.prefix_memory accum"),
-                                  ("gated_accum", "--cortex.prefix_memory gated"),
-                                  ("ccot_direct", "(removed; no replacement)")):
-            if bool(getattr(config, dead, False)):
-                raise ValueError(
-                    f"cortex.{dead} was retired on 2026-08-02 along with the buffer "
-                    f"it selected. Use {replacement} instead."
-                )
+        # LEGACY cross-segment buffers (Track A, B1).  Superseded by the Prefix*
+        # pair below, but NOT deleted: every Track-A and B1 checkpoint carries
+        # accum_ccot / gated_accum / ccot_direct in its config.json, so refusing
+        # to build them makes the entire published results table unloadable and
+        # un-re-measurable.  That is exactly what happened between 2026-08-02 and
+        # 2026-08-04, when this block raised instead: the write-capacity
+        # diagnostic could not even open the checkpoint whose -0.01282 carry
+        # delta it was written to explain.
+        #
+        # The original raise existed to prevent a SILENT no-memory run.  Building
+        # the real buffer cannot cause that — the mechanism is genuinely present
+        # — so the protection belongs where the risk actually is: train.py's
+        # config validation refuses to START a new run on a retired mechanism,
+        # while loading an old checkpoint for evaluation works.
+        legacy_accum  = bool(getattr(config, "accum_ccot", False))
+        legacy_gated  = bool(getattr(config, "gated_accum", False))
+        legacy_direct = bool(getattr(config, "ccot_direct", False))
+        n_vec_legacy  = int(getattr(config, "accum_vecs", 4))
+        max_vec_legacy = int(getattr(config, "accum_max", 64))
 
-        self.m_cross = LSTMBuffer(D, K, nh) if K > 0 else None
-        self.accum = None        # retained attrs: the hooks below still branch
-        self.ccot_direct = None  # on them, and eval/test code reads them
+        if legacy_gated and K > 0:
+            self.m_cross = GatedAccumBuffer(D, K, nh)
+        elif K > 0:
+            self.m_cross = LSTMBuffer(D, K, nh)
+        else:
+            self.m_cross = None
+        # AccumCCoT and DirectCCoT are the K == 0 mechanisms; accum wins if both
+        # are somehow set, matching the pre-retirement selection order.
+        self.accum = AccumCCoT(D, n_vec_legacy, nh, max_vec_legacy) \
+            if (legacy_accum and K == 0) else None
+        self.ccot_direct = DirectCCoT(D) \
+            if (legacy_direct and K == 0 and self.accum is None) else None
+        if legacy_accum or legacy_gated or legacy_direct:
+            which = ("accum_ccot" if legacy_accum else
+                     "gated_accum" if legacy_gated else "ccot_direct")
+            print(f"[cortex] LEGACY buffer active: {which}. Superseded by "
+                  f"--cortex.prefix_memory; supported for loading and evaluating "
+                  f"Track-A / B1 checkpoints, not for new training runs.")
         # M_iter: per-position short-term buffer (independent of M_cross).
         self.m_iter = LSTMBuffer(D, Ki, nh) if Ki > 0 else None
 
@@ -232,6 +251,12 @@ class CortexMemory(nn.Module):
         else:
             self.prefix = None
         if self.prefix is not None:
+            if legacy_accum or legacy_gated or legacy_direct:
+                raise ValueError(
+                    "cortex.prefix_memory cannot be combined with the legacy "
+                    "accum_ccot / gated_accum / ccot_direct flags — they are "
+                    "different cross-segment mechanisms and prefix mode would "
+                    "silently win.  Clear the legacy flag from config.json.")
             # Prefix mode owns the cross-segment state exclusively.
             self.m_cross = self.accum = self.ccot_direct = None
             # Resolve now, at build time, so a missing or invalid seed token fails

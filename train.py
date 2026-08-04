@@ -269,6 +269,22 @@ class CLISettings:
                 "cortex.l2sp_coeff is only applied inside the cross-chunk fwd/bwd "
                 "path (requires cortex.use_memory and cortex.cross_chunks > 1)"
             )
+        # Retired mechanisms: refuse to START a run on one.  The check lives here
+        # rather than in cortex_graft.CortexMemory because the graft is also the
+        # LOAD path for every Track-A and B1 checkpoint, whose config.json still
+        # carries these flags — raising there made the entire historical results
+        # table unloadable (found 2026-08-04, when the write-capacity diagnostic
+        # could not open the checkpoint it was written to explain).  New training
+        # runs are the only place the flag is a mistake rather than a fact.
+        for dead, replacement in (("accum_ccot", "--cortex.prefix_memory accum"),
+                                  ("gated_accum", "--cortex.prefix_memory gated"),
+                                  ("ccot_direct", "(retired; no replacement)")):
+            if self.cortex.get(dead):
+                raise ValueError(
+                    f"cortex.{dead} selects a mechanism retired on 2026-08-02. "
+                    f"Use {replacement} for new runs.  (Evaluating an existing "
+                    f"checkpoint that carries this flag still works — the graft "
+                    f"builds the legacy buffer for the load path.)")
         if self.cortex["prefix_memory"]:
             assert self.cortex["prefix_memory"] in ("accum", "gated"), (
                 "cortex.prefix_memory must be '', 'accum' or 'gated'; got "

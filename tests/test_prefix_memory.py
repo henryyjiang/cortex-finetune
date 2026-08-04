@@ -113,12 +113,29 @@ class TestBuild:
         assert not hasattr(m.cortex.prefix, "out_proj")
         assert not hasattr(m.cortex.prefix, "q_proj")
 
+    @pytest.mark.parametrize("dead,slots,attr", [("accum_ccot", 0, "accum"),
+                                                 ("gated_accum", 4, "m_cross"),
+                                                 ("ccot_direct", 0, "ccot_direct")])
+    def test_retired_flags_still_LOAD(self, dead, slots, attr):
+        """The graft must still build these.  Every Track-A and B1 checkpoint
+        carries one of them in its config.json, so raising here (as it did from
+        2026-08-02 to 2026-08-04) makes the whole historical results table
+        unloadable — the write-capacity diagnostic could not open the very
+        checkpoint it was written to explain.  The no-silent-null protection
+        moved to train.py, which refuses to START a run on a retired mechanism;
+        building the real buffer cannot produce a silent null because the
+        mechanism is genuinely present."""
+        m = AttnRaven(use_memory=True, memory_slots=slots, **{dead: True})
+        assert getattr(m.cortex, attr) is not None
+        assert m.cortex.has_cross_state
+
     @pytest.mark.parametrize("dead", ["accum_ccot", "gated_accum", "ccot_direct"])
-    def test_retired_flags_raise(self, dead):
-        """Silently ignoring one of these yields a run with NO memory that
-        still logs a healthy curve — a null that looks like a measurement."""
-        with pytest.raises(ValueError, match="retired"):
-            AttnRaven(use_memory=True, memory_slots=0, **{dead: True})
+    def test_retired_flags_cannot_be_combined_with_prefix(self, dead):
+        """Two different cross-segment mechanisms at once: prefix mode would
+        silently win and the legacy flag would read as honoured."""
+        with pytest.raises(ValueError, match="legacy"):
+            AttnRaven(use_memory=True, memory_slots=0, prefix_memory="accum",
+                      accum_vecs=NV, eos_token_id=EOS, **{dead: True})
 
     def test_unknown_mode_raises(self):
         with pytest.raises(ValueError, match="prefix_memory"):
