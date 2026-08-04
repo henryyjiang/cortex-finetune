@@ -67,6 +67,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dtype", default="float32", choices=["float32", "bfloat16"])
     p.add_argument("--full", action="store_true",
                    help="B2's real geometry: chunk_len 1024, T 8 (needs a GPU)")
+    p.add_argument("--quick", action="store_true",
+                   help="chunk_len 64 — every check still fires, ~4x less compute "
+                        "than the default; use this on a CPU login node")
     return p.parse_args()
 
 
@@ -86,13 +89,21 @@ def build_model(args):
 
 
 def run_chain(model, x, y, eos_id, n_chunks, num_steps, carry_grad_chunks,
-              accum_vecs, device):
-    """train.py's cortex_fwd_bwd, minus DDP/autocast/L2-SP.  Returns a report."""
+              accum_vecs, device, verbose=False):
+    """train.py's cortex_fwd_bwd, minus DDP/autocast/L2-SP.  Returns a report.
+
+    verbose prints per-chunk progress: on a CPU login node one chunk of the 1B
+    model takes minutes, and a silent run is indistinguishable from a hang."""
     x_chunks = [c.contiguous() for c in torch.chunk(x, n_chunks, dim=1)]
     y_chunks = [c.contiguous() for c in torch.chunk(y, n_chunks, dim=1)]
 
     m_cross, losses, shapes, preserved = None, [], [], []
     for gi, (xc, yc) in enumerate(zip(x_chunks, y_chunks)):
+        t0 = time.time()
+        if verbose:
+            print(f"  chunk {gi + 1}/{n_chunks} ({xc.shape[1]} tok, carry "
+                  f"{0 if m_cross is None else m_cross.shape[1]}) ...",
+                  end="", flush=True)
         prev = None if m_cross is None else m_cross.detach().clone()
         if carry_grad_chunks > 0 and m_cross is not None:
             m_cross = detach_old_vecs(m_cross, accum_vecs, carry_grad_chunks)
@@ -108,8 +119,16 @@ def run_chain(model, x, y, eos_id, n_chunks, num_steps, carry_grad_chunks,
             preserved.append(bool(torch.allclose(
                 m_cross[:, :prev.shape[1]].detach().float(), prev.float(),
                 atol=1e-3, rtol=1e-3)))
+        if verbose:
+            print(f" loss {float(losses[-1].detach()):.4f}  "
+                  f"[{time.time() - t0:.1f}s]", flush=True)
     total = torch.stack(losses).mean()
+    if verbose:
+        print("  backward (one pass over the whole chain) ...", end="", flush=True)
+    t0 = time.time()
     total.backward()
+    if verbose:
+        print(f" [{time.time() - t0:.1f}s]", flush=True)
     return {"losses": [float(l.detach()) for l in losses], "shapes": shapes,
             "preserved": preserved, "total": float(total.detach())}
 
@@ -118,7 +137,17 @@ def main() -> int:
     args = parse_args()
     if args.full:
         args.chunk_len, args.T = 1024, 8
+    elif args.quick:
+        args.chunk_len = 64
     torch.manual_seed(0)
+    if args.device == "cpu":
+        # ~14 distinct layers applied 4 + 6*T + 4 times over the packed sequence,
+        # so this is minutes per chunk at 1B on a shared login core.  Say so
+        # before the first long silence rather than after it.
+        print(f"note: CPU run, expect ~{max(1, args.chunk_len // 64)}-"
+              f"{max(2, args.chunk_len // 24)} min total at chunk_len="
+              f"{args.chunk_len}, T={args.T}.  --quick is ~4x faster; "
+              f"--device cuda on an interactive GPU node is ~100x.")
 
     print(f"loading {args.model_name} ({args.dtype}, {args.device}) ...")
     t0 = time.time()
@@ -157,15 +186,19 @@ def main() -> int:
     # Real-ish batch: random ids with EOS separators, so the document-boundary
     # path is exercised rather than skipped.
     ids = torch.randint(0, cfg.vocab_size, (1, S + 1))
-    ids[0, args.chunk_len + args.chunk_len // 2] = eos_id      # boundary in chunk 2
-    ids[0, 2 * args.chunk_len + 10] = eos_id                   # and in chunk 3
+    # One document boundary inside every chunk after the first, at a different
+    # offset each time.  Derived from cross_chunks rather than hardcoded: fixed
+    # indices assumed >= 3 chunks and went out of bounds at --cross_chunks 2.
+    for gi in range(1, args.cross_chunks):
+        off = args.chunk_len // (gi + 1)
+        ids[0, gi * args.chunk_len + off] = eos_id
     x, y = ids[:, :-1], ids[:, 1:]
 
     num_steps = torch.tensor([args.T // 2, args.T - args.T // 2])
     print(f"\n-- forward/backward chain (num_steps={num_steps.tolist()}) --")
     t0 = time.time()
     rep = run_chain(model, x, y, eos_id, args.cross_chunks, num_steps,
-                    args.carry_grad_chunks, n_vec, args.device)
+                    args.carry_grad_chunks, n_vec, args.device, verbose=True)
     print(f"  {time.time() - t0:.1f}s")
 
     print("\n-- checks --")

@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64GB
 #SBATCH --gres=gpu:A100:1
-#SBATCH -t 4:00:00
+#SBATCH -t 8:00:00
 #SBATCH -q inferno
 #SBATCH -o logs/Report-%j.out
 #SBATCH --mail-type=END,FAIL
@@ -54,8 +54,17 @@
 #       BASE=ckpts/olmo-retrofit-cortex RUN=retro-b2-heal \
 #       EVAL_TAG=b2-heal sbatch pace/eval_write_capacity.sbatch
 #
-# Cost is ~4 scoring forwards per chunk plus one write chain, i.e. roughly 2x
-# the carry ablation.  An A100-40 is enough; this never builds a backward graph.
+# COST.  Five forwards per chunk (four conditions + one write-chain pass) vs the
+# carry ablation's two, i.e. 2.5x per sample.  The first attempt inherited the
+# ablation's 4h walltime at n=150 and was killed; 8h and n=60 now.  n=60 is
+# ample here — the reconstruction delta is far larger than the ~0.001 nats the
+# ablation needs 150 samples to resolve.  The script prints an ETA after the
+# first sample, so check the log early rather than at the walltime.
+#   MAX_EXAMPLES=20 T_EVAL=8   # a cheap timing probe before committing 8h
+# T_EVAL overrides the recurrence; unset means the checkpoint's own
+# config.mean_recurrence, which prepare_eval_checkpoint.py prints in the log.
+# Verify it matches the arm (B1 is mr8) — the UNTRAINED base config carries 32.
+# An A100-40 is enough; this never builds a backward graph.
 
 cd $SLURM_SUBMIT_DIR
 
@@ -74,8 +83,9 @@ DATA=${DATA:-data/pg19_olmo_val_len4096}
 OUT_ROOT=${OUT_ROOT:-cortex-retro-ft}
 CKPT_NAME=${CKPT_NAME:-final_checkpoint}
 BASE=${BASE:-ckpts/olmo8-cortex}
-MAX_EXAMPLES=${MAX_EXAMPLES:-150}
+MAX_EXAMPLES=${MAX_EXAMPLES:-60}
 N_CHUNKS=${N_CHUNKS:-4}
+T_EVAL=${T_EVAL:-}
 MODEL_DIR="$OUT_ROOT/$RUN/$CKPT_NAME"
 
 [ -d "$MODEL_DIR" ] || { echo "No such checkpoint: $MODEL_DIR"; exit 1; }
@@ -96,4 +106,5 @@ python evals/eval_write_capacity.py \
     --data "$DATA" \
     --n_chunks "$N_CHUNKS" \
     --max_examples "$MAX_EXAMPLES" \
+    ${T_EVAL:+--T "$T_EVAL"} \
     --out_dir "$OUT"

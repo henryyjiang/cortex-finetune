@@ -55,6 +55,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import torch
@@ -79,7 +80,10 @@ def parse_args() -> argparse.Namespace:
                    help="Tokenized PG-19 dataset dir (load_from_disk; rows = max_length+1 ids)")
     p.add_argument("--n_chunks",     type=int, default=4,
                    help="Sub-windows per sample (match training cross_chunks)")
-    p.add_argument("--max_examples", type=int, default=150, help="0 = all rows")
+    p.add_argument("--max_examples", type=int, default=60,
+                   help="0 = all rows.  60 is ample: the reconstruction delta is "
+                        "far larger than the ~0.001-nat carry delta the ablation "
+                        "needs 150 samples to resolve.")
     p.add_argument("--seed",         type=int, default=1234)
     p.add_argument("--out_dir",      default="eval_results/write_capacity")
     p.add_argument("--dtype",        default="bfloat16", choices=["float32", "bfloat16"])
@@ -191,6 +195,7 @@ def main() -> None:
     # before the loop starts.  Without this, sample 0 would silently fall back to
     # a None carry and score `shuf` identically to `none`, inflating the
     # information delta by exactly one sample.
+    t_start = time.time()
     xs, _, _ = sample(n - 1)
     prev_states = states_for_sample(model, xs, args.n_chunks, num_steps,
                                     args.seed + n - 1, device)
@@ -205,8 +210,18 @@ def main() -> None:
                 for c in CONDS:
                     per_chunk[c][g].append(rows[c][g])
         prev_states = states
-        if (si + 1) % 25 == 0:
-            print(f"  {si + 1}/{n} samples...")
+        if si == 0:
+            # This job does ~5 forwards per chunk (one write chain + four
+            # conditions), i.e. ~2.5x the carry ablation's two, so an ETA after
+            # the first sample is what turns "is it hung?" into a decision
+            # BEFORE the walltime runs out.
+            dt = time.time() - t_start
+            print(f"  sample 1 took {dt:.1f}s -> ETA {dt * n / 60:.0f} min "
+                  f"for {n} samples ({len(CONDS) + 1} forwards x {args.n_chunks} "
+                  f"chunks each at T={int(num_steps[0])})")
+        elif (si + 1) % 10 == 0:
+            print(f"  {si + 1}/{n} samples  "
+                  f"[{(time.time() - t_start) / 60:.0f} min elapsed]")
 
     results = {}
     print("\n  {:<7} {:>5} {:>9} {:>9} {:>9} {:>9} {:>12} {:>12}".format(

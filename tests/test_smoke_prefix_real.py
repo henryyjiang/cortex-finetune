@@ -32,21 +32,27 @@ DEV = "cpu"
 
 
 def _model(**kw):
+    # Seed before EVERY build: _build_raven random-inits, so two calls otherwise
+    # give different weights and any cross-model comparison (e.g. the
+    # stop-gradient test below) is uncontrolled and passes or fails by luck.
+    torch.manual_seed(1234)
     return _build_raven(use_memory=True, memory_slots=0, prefix_memory="accum",
                         accum_vecs=NV, accum_max=64, eos_token_id=EOS, **kw).train()
 
 
-def _batch():
+def _batch(n_chunks=NC):
+    """Mirrors main()'s batch construction: one EOS inside every chunk after
+    the first, placed relative to n_chunks."""
     torch.manual_seed(0)
-    ids = torch.randint(0, VOCAB - 1, (1, CL * NC + 1))
-    ids[0, CL + CL // 2] = EOS               # boundary inside chunk 2
-    ids[0, 2 * CL + 3] = EOS                 # and inside chunk 3
+    ids = torch.randint(0, VOCAB - 1, (1, CL * n_chunks + 1))
+    for gi in range(1, n_chunks):
+        ids[0, gi * CL + CL // (gi + 1)] = EOS
     return ids[:, :-1], ids[:, 1:]
 
 
-def _run(model, carry_grad_chunks=2):
-    x, y = _batch()
-    return run_chain(model, x, y, EOS, NC, torch.tensor([1, 1]),
+def _run(model, carry_grad_chunks=2, n_chunks=NC):
+    x, y = _batch(n_chunks)
+    return run_chain(model, x, y, EOS, n_chunks, torch.tensor([1, 1]),
                      carry_grad_chunks, NV, DEV)
 
 
@@ -84,6 +90,15 @@ class TestChain:
         loop = [p for n, p in m.named_parameters()
                 if "core_block" in n and p.grad is not None]
         assert loop and all(torch.isfinite(p.grad).all() for p in loop)
+
+    def test_two_chunk_chain_works(self):
+        """--cross_chunks 2 is the cheapest way to reach the real chunk_len on a
+        short GPU session, and it used to crash: the EOS offsets were hardcoded
+        for >= 3 chunks and indexed past the end of the sequence."""
+        m = _model()
+        rep = _run(m, n_chunks=2)
+        assert rep["shapes"] == [(1, NV, m.config.n_embd), (1, 2 * NV, m.config.n_embd)]
+        assert all(rep["preserved"])
 
     def test_stop_gradient_horizon_is_applied(self):
         """carry_grad_chunks must shorten the graph — with a 1-chunk horizon the

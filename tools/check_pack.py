@@ -13,15 +13,24 @@ Tokens per step = batch_size * max_length.
     python tools/check_pack.py --data data/fineweb_edu_olmo_len4096 \
         --steps 91552 --batch_size 4
 
-    # B2 phase 0 (healing, --stop_at_step 91552) and a full arm (305,176):
-    python tools/check_pack.py --data data/fineweb_edu_olmo_len4096 --steps 91552
-    python tools/check_pack.py --data data/nemotron_math_olmo_len4096_4b --steps 305176
+--steps is the steps SERVED FROM THIS PACK, which for a phase in a resume chain
+is not max_steps.  B2 runs one 305,176-step horizon across two corpora:
 
-Exit code is 1 when the pack is short, so it can gate a submit script.
+    heal  data/fineweb_edu_olmo_len4096       steps 0 -> 91,552    =  91,552
+    arm   data/nemotron_math_olmo_len4096_4b  steps 91,552 -> 305,176 = 213,624
+
+so:
+    python tools/check_pack.py --data data/fineweb_edu_olmo_len4096      --steps 91552
+    python tools/check_pack.py --data data/nemotron_math_olmo_len4096_4b --steps 213624
+
+Passing the horizon (305,176) for the arm pack over-states its need by 43%.
+
+Exit code is 1 when the pack is short or missing, so it can gate a submit script.
 """
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 
@@ -44,6 +53,14 @@ def main() -> int:
     a = parse_args()
     from datasets import load_from_disk
 
+    if not os.path.isdir(a.data):
+        # This is meant to gate a submit script, so a missing pack should read
+        # as a clean FAIL, not a traceback.
+        print(f"FAIL: no pack at {a.data}\n"
+              f"  Build it with tools/prepare_packed_dataset.py - the PREP block "
+              f"at the top of pace/b2_retrofit.sbatch has the exact two-step "
+              f"download+pack commands.  Set HF_HOME=$SCRATCH/hf_cache first.")
+        return 1
     ds = load_from_disk(a.data)
     rows = len(ds)
     row_len = len(ds[0]["input_ids"])
