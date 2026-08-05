@@ -187,6 +187,54 @@
 # Prefix memory adds ~12% more sequence on top (32 carry + 32 summary columns
 # per 1024-token chunk at cross_chunks=4).
 #
+# CHUNK GEOMETRY: THE ARMS RUN AT cross_chunks=8, HEALING STAYS AT 4
+# (decided 2026-08-04 on the ceil2 probe round; digits in the numbers table)
+#
+# The oracle ceiling collapse past a ~1280-token window was a WINDOW-LENGTH
+# ARTIFACT, not a property of the model or the data.  Measured on the same base,
+# same 50 PG-19 rows, only the chunk size differing:
+#
+#     k real tokens |  1024-tok chunks  |  512-tok chunks
+#         128       |      +0.0871      |     +0.1613
+#         256       |    +0.1036 (peak) |     +0.1958
+#         512       |      +0.0003      |   +0.2277 (still rising)
+#        1024       |      -0.977       |        —
+#
+# At cross_chunks=4 the carry was being asked to summarise a 1024-token chunk
+# into a 2048-token window where the base scores -0.977 — a span the model
+# cannot use even VERBATIM.  At cross_chunks=8 the window is 1024, inside the
+# usable range, and nothing collapses.  Track A read at 8 chunks (trained at 4,
+# so the mismatch penalty is already paid) delivers carry +0.0433 vs +0.0237 —
+# 1.83x, and 2.1x more total nats per document.  Nemotron's own ceiling dies
+# even faster with distance than PG-19's (-0.048 already at k512), so the arm
+# corpus needs this more than the healing corpus does.
+#
+# Honest cost, do not hide it on a slide: shorter chunks mean less local
+# context, so the no-carry baseline RISES 0.058 nats while the carry returns
+# 0.043.  Finer chunking is a better INSTRUMENT for the mechanism question, not
+# a free win in raw NLL.
+#
+# Why healing stays at 4: it is mid-flight and restarting costs ~40% of a
+# 1.5B-token phase to buy a geometry match that the Track-A measurement shows
+# is not needed — that number was itself obtained across exactly this mismatch.
+#
+# THREE FLAGS MOVE TOGETHER.  cross_chunks=8 alone will NOT start:
+#   accum_max 128 -> 256      train.py:306 asserts cross_chunks x accum_vecs <=
+#                             accum_max and B2 sits exactly on the boundary
+#                             (4x32=128).  It is a plain int in the buffer's
+#                             merge(), no parameter tensor, so raising it is
+#                             resume-safe.  NEVER satisfy the assert by lowering
+#                             accum_vecs — summary_emb is nn.Parameter(n_vec, D)
+#                             and changing it re-inits the trained write path.
+#   carry_grad_chunks 2 -> 4  keeps the trained fraction of the chain at 50%
+#                             (2 of 4 -> 4 of 8) and is MEMORY-NEUTRAL:
+#                             4 x 512 = 2 x 1024 = 2048 tokens of backward graph.
+# Position budget goes DOWN (chunk 8 packs 512 + 224 carry + 32 = 768 vs 1152),
+# so this cannot introduce a new OOM or a RoPE range problem.
+# Gate it with:  python tools/smoke_prefix_real.py --cross_chunks 8 --accum_max 256
+# Every eval on these arms then needs N_CHUNKS=8, or it reads an 8-trained arm
+# at the wrong geometry.
+#
 # TOKEN MATH (16,384 tok/step: 4 rows x 4096, each row = 4 x 1024 chunks)
 #     76,294 steps = 1.25B   full recurrence 8 reached (inside healing)
 #     91,552 steps = 1.50B   healing ends, arms branch          <- STOP_AT_STEP
@@ -286,11 +334,12 @@ STOP_AT_STEP=${STOP_AT_STEP:-0}            # end this phase early, horizon uncha
 MAX_MEAN_REC=${MAX_MEAN_REC:-8}
 RAMP_WARMUP=${RAMP_WARMUP:-0.25}           # full recurrence at step 76,294
 MODEL=${MODEL:-ckpts/olmo-retrofit-cortex}
-CROSS_CHUNKS=${CROSS_CHUNKS:-4}
 MAX_LENGTH=${MAX_LENGTH:-4096}
-ACCUM_VECS=${ACCUM_VECS:-32}
-ACCUM_MAX=${ACCUM_MAX:-128}                # 4 chunks x 32 vecs — the assert is exact
-CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-2}  # AC's stop-gradient after 2 compressions
+ACCUM_VECS=${ACCUM_VECS:-32}               # a PARAMETER SHAPE (summary_emb) — never vary mid-chain
+# CROSS_CHUNKS / ACCUM_MAX / CARRY_GRAD_CHUNKS are defaulted PER PHASE in the
+# case block below: healing keeps the 4/128/2 geometry it started on, the arms
+# run at 8/256/4.  See the CHUNK GEOMETRY block in the header.  Setting any of
+# them in the environment still wins.
 # 2026-08-04 restart defaults; set true/zero to reproduce the cancelled 4vop2ym8.
 PREFIX_EOS_RESET=${PREFIX_EOS_RESET:-false}  # carry survives a document boundary
 PREFIX_POS=${PREFIX_POS:-tail}               # summary slots at S+1..S+n_vec
@@ -308,6 +357,11 @@ heal)
     # Running it as gated instead would train a gate that arm A must then
     # carry as dead weight, and the arms would no longer share an ancestor.
     PREFIX_MODE=accum
+    # The geometry this phase STARTED on.  It is mid-flight; changing it here
+    # would make the resume chain internally inconsistent for no measured gain.
+    CROSS_CHUNKS=${CROSS_CHUNKS:-4}
+    ACCUM_MAX=${ACCUM_MAX:-128}                # 4 x 32 — the assert is exact
+    CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-2}  # AC's stop-grad after 2 compressions
     DATA_PATH=${DATA_PATH:-$HEAL_DATA}
     RUN_NAME=${RUN_NAME:-retro-b2-heal};;
 arm)
@@ -316,11 +370,30 @@ arm)
     gated) PREFIX_MODE=gated; ARM=gate${ACCUM_VECS};;
     *) echo "MEMORY_MODE must be accum|gated"; exit 1;;
     esac
+    # 512-token chunks: the ceiling is 2.2x larger there and does not collapse.
+    CROSS_CHUNKS=${CROSS_CHUNKS:-8}
+    ACCUM_MAX=${ACCUM_MAX:-256}                # 8 x 32 — moves WITH cross_chunks
+    CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-4}  # 4 of 8 = the same 50% as 2 of 4
     DATA_PATH=${DATA_PATH:-$ARM_DATA}
-    RUN_NAME=${RUN_NAME:-retro-b2-${ARM}-mr${MAX_MEAN_REC}};;
+    RUN_NAME=${RUN_NAME:-retro-b2-${ARM}-cc${CROSS_CHUNKS}-mr${MAX_MEAN_REC}};;
 *)
     echo "PHASE must be heal|arm"; exit 1;;
 esac
+
+# Pre-flight the assert train.py:306 makes, so a bad combination dies HERE
+# instead of after the scheduler has handed over an H200.
+if [ $(( CROSS_CHUNKS * ACCUM_VECS )) -gt "$ACCUM_MAX" ]; then
+    echo "ERROR: cross_chunks x accum_vecs ($CROSS_CHUNKS x $ACCUM_VECS =" \
+         "$(( CROSS_CHUNKS * ACCUM_VECS ))) exceeds accum_max ($ACCUM_MAX)."
+    echo "  train.py asserts this: the FIFO must hold the whole chain or early"
+    echo "  chunks are silently trimmed and the stop-grad slice bookkeeping breaks."
+    echo "  Raise ACCUM_MAX.  Do NOT lower ACCUM_VECS — it is a parameter shape."
+    exit 1
+fi
+if [ $(( MAX_LENGTH % CROSS_CHUNKS )) -ne 0 ]; then
+    echo "ERROR: MAX_LENGTH ($MAX_LENGTH) is not divisible by CROSS_CHUNKS" \
+         "($CROSS_CHUNKS) — chunks would be ragged."; exit 1
+fi
 
 # Resume continues THIS run (optimizer + scheduler + dataloader + RNG).
 # Branch starts an ARM from the healing phase: weights load non-strictly (the
@@ -355,6 +428,8 @@ echo "    max_steps=$MAX_STEPS (horizon)  stop_at_step=$STOP_AT_STEP"
 echo "    full recurrence $MAX_MEAN_REC at step $(python -c "import math;print(math.ceil($RAMP_WARMUP*$MAX_STEPS))")"
 echo "    tokens at horizon: $(( MAX_STEPS * 4 * MAX_LENGTH ))"
 echo "    prefix_pos=$PREFIX_POS  prefix_eos_reset=$PREFIX_EOS_RESET (2026-08-04 fixes)"
+echo "    geometry: cross_chunks=$CROSS_CHUNKS ($(( MAX_LENGTH / CROSS_CHUNKS ))-tok chunks)" \
+     " accum_vecs=$ACCUM_VECS accum_max=$ACCUM_MAX carry_grad_chunks=$CARRY_GRAD_CHUNKS"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
 python train.py \

@@ -80,10 +80,18 @@ SLICE_OP=${SLICE_OP:-drop}
 # prints 32 while B1 was an mr8 run sitting at ~recurrence 4 at step 22,500).
 # Evaluating a memory arm at 8x its training depth is a real confound — set this.
 T_EVAL=${T_EVAL:-}
+# N_CHUNKS: the chunk geometry to read at.  MUST match the arm's training
+# cross_chunks.  It was not passed at all before 2026-08-04, silently taking the
+# python default of 4 — fine while every arm trained at cross_chunks=4, wrong
+# the moment one does not (B2's arms run at 8 / 512-token chunks).  Reading an
+# 8-trained arm at 4 is the same class of silent config mismatch as evaluating
+# at the wrong recurrence.
+N_CHUNKS=${N_CHUNKS:-4}
 
 python evals/eval_carry_ablation.py \
     --model_name "$MODEL_DIR" \
     --data "$DATA" \
+    --n_chunks "$N_CHUNKS" \
     --slice_ablate "$SLICE_ABLATE" \
     --slice_n "$SLICE_N" \
     --slice_op "$SLICE_OP" \

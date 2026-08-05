@@ -48,6 +48,11 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 [ -n "$RUN" ] || { echo "Set RUN=<run_name>"; exit 1; }
 EVAL_TAG=${EVAL_TAG:-$(date +%Y%m%d)}
 DATA=${DATA:-data/pg19_olmo_val_len16384}
+# CHUNK_LEN must match the arm's TRAINING chunk length (max_length /
+# cross_chunks), or the write is scored off-distribution: 1024 for every
+# Track-A / B1 arm, 512 for B2's cross_chunks=8 arms.  Note the chunk COUNT on
+# a 16k row moves with it (16 chunks at 1024, 32 at 512), so read the shape
+# across depth rather than comparing chunk indices between geometries.
 CHUNK_LEN=${CHUNK_LEN:-1024}
 GEN_TOKENS=${GEN_TOKENS:-32}
 OUT_ROOT=${OUT_ROOT:-cortex-retro-ft}

@@ -4,9 +4,19 @@
 #   heal    one shared healing phase on FineWeb-Edu, prefix accum, to 91,552
 #           steps (1.5B tokens).  Full recurrence 8 lands at step 76,294,
 #           INSIDE this phase, so both arms start at constant recurrence.
+#           Runs at cross_chunks=4 and STAYS there — it is mid-flight.
 #   branch  arm A (accum) and arm B (gated) both branch from the SAME healing
-#           checkpoint onto Nemotron math and run to 305,176 steps (5B).
-#   gate    carry ablation + slice conditions + buffer diagnostic on arm A.
+#           checkpoint onto Nemotron math and run to 305,176 steps (5B), at
+#           cross_chunks=8 (512-token chunks).
+#   gate    carry ablation + slice conditions + buffer diagnostic on arm A,
+#           automatically at the arms' geometry.
+#
+# GEOMETRY CHANGE AT THE BRANCH (2026-08-04, ceil2 probes).  The oracle ceiling
+# is 2.2x larger at 512-token chunks and does not collapse; Track A read at 8
+# chunks nearly doubles its carry delta (+0.0433 vs +0.0237) despite having
+# trained at 4.  The heal is not restarted — that measurement was itself taken
+# across exactly this mismatch.  Full reasoning, and the two flags that must
+# move with cross_chunks, are in the CHUNK GEOMETRY block of b2_retrofit.sbatch.
 #
 # Why a shared healing phase is legitimate: accum's parameters are a strict
 # SUBSET of gated's (summary_emb vs summary_emb + the LM2 gate), so healing as
@@ -63,9 +73,15 @@ TOK_PER_STEP=16384
 
 HEAL_RUN=retro-b2-heal
 ARMS_ALL="accum gated"
+# Arm run names MUST match what b2_retrofit.sbatch derives
+# (retro-b2-${ARM}-cc${CROSS_CHUNKS}-mr${MAX_MEAN_REC}).  ARM_CROSS_CHUNKS is
+# the one value to change if the geometry ever moves again — the sbatch's arm
+# default and this must agree or 'status' / 'resume' / 'gate' look at empty dirs.
+ARM_CROSS_CHUNKS=8          # 512-token chunks; healing stays at 4.  See the
+                            # CHUNK GEOMETRY block in b2_retrofit.sbatch.
 declare -A RUN_OF=(
-    [accum]=retro-b2-acc32-mr8
-    [gated]=retro-b2-gate32-mr8
+    [accum]=retro-b2-acc32-cc${ARM_CROSS_CHUNKS}-mr8
+    [gated]=retro-b2-gate32-cc${ARM_CROSS_CHUNKS}-mr8
 )
 
 # --- newest RESUMABLE checkpoint (checkpoint_<step>/chkpt.pt) ---------------
@@ -165,11 +181,21 @@ branch)
         echo "Submitted: $run branching from $HEAL_RUN step $step (-> $TOTAL_STEPS)"
     done
     echo
-    echo "Branch checks: the arms' first logged loss should sit AT the healing"
-    echo "phase's last value plus the corpus shift (FineWeb-Edu -> Nemotron"
-    echo "math), not at ~10.  Both arms must print the same"
-    echo "'[branch] loaded weights from ...' step, and the gated arm must list"
-    echo "its gate parameters as the only fresh ones."
+    cat <<EOF
+
+Branch checks:
+  * The arms' first logged loss should sit AT the healing phase's last value
+    plus the corpus shift (FineWeb-Edu -> Nemotron math) AND the geometry shift
+    (cross_chunks 4 -> $ARM_CROSS_CHUNKS, i.e. $(( 4096 / ARM_CROSS_CHUNKS ))-token chunks: less local
+    context per chunk, so expect ~+0.06 nats from that alone).  Not ~10.
+  * The banner must read "geometry: cross_chunks=$ARM_CROSS_CHUNKS ... accum_max=256
+    carry_grad_chunks=4".  cross_chunks alone will not start — train.py asserts
+    cross_chunks x accum_vecs <= accum_max, and the sbatch pre-flights it.
+  * Both arms must print the same '[branch] loaded weights from ...' step, and
+    the gated arm must list its gate parameters as the only fresh ones.
+  * Run the smoke gate at the NEW geometry first if you have not already:
+      python tools/smoke_prefix_real.py --cross_chunks $ARM_CROSS_CHUNKS --accum_max 256
+EOF
     ;;
 
 resume)
@@ -205,17 +231,25 @@ gate)
         exit 1
     fi
 
+    # Geometry MUST follow the arms, or the gate reads an 8-trained arm at the
+    # 4-chunk default and reports a number for a regime that was never trained.
+    # T_EVAL likewise: retrofit-derived configs inherit mean_recurrence=32.
+    ARM_CHUNK_LEN=$(( 4096 / ARM_CROSS_CHUNKS ))
     COMMON="OUT_ROOT=$OUT CKPT_NAME=$ckpt_name BASE=$BASE_CKPT RUN=$run EVAL_TAG=b2-$step"
-    env $COMMON SLICE_ABLATE=both sbatch pace/eval_carry_ablation.sbatch
-    echo "Submitted carry ablation + slice conditions: $run @ step $step"
-    env $COMMON sbatch pace/diag_accum_buffer.sbatch
-    echo "Submitted buffer diagnostic:                 $run @ step $step"
+    env $COMMON SLICE_ABLATE=both N_CHUNKS=$ARM_CROSS_CHUNKS T_EVAL=8 \
+        sbatch pace/eval_carry_ablation.sbatch
+    echo "Submitted carry ablation + slice conditions: $run @ step $step" \
+         "(n_chunks=$ARM_CROSS_CHUNKS, T=8)"
+    env $COMMON CHUNK_LEN=$ARM_CHUNK_LEN sbatch pace/diag_accum_buffer.sbatch
+    echo "Submitted buffer diagnostic:                 $run @ step $step" \
+         "(chunk_len=$ARM_CHUNK_LEN)"
 
     gated_run=${RUN_OF[gated]}
     gstep=$(newest_model_only $gated_run)
     if [ -n "$gstep" ]; then
         env OUT_ROOT=$OUT CKPT_NAME=model_only_chkpt_$gstep BASE=$BASE_CKPT \
-            RUN=$gated_run EVAL_TAG=b2-$gstep sbatch pace/eval_carry_ablation.sbatch
+            RUN=$gated_run EVAL_TAG=b2-$gstep N_CHUNKS=$ARM_CROSS_CHUNKS T_EVAL=8 \
+            sbatch pace/eval_carry_ablation.sbatch
         echo "Submitted carry ablation (no slices):        $gated_run @ step $gstep"
     fi
 
@@ -224,12 +258,23 @@ gate)
 Reading the gate (tag b2-$step, ~4h each):
   * This is the first read in the project where the cross-track comparison is
     CLEAN: both arms train at constant recurrence 8 from step $FULL_REC_STEP,
-    matching Track A's fixed recurrence.  Compare directly against Track A's
-    bolt-on numbers: accum 0.0237 +- 0.0012, gated 0.0283 +- 0.0010, and B1's
-    co-trained -0.0128.
-  * The pre-registered bar has not moved: the carry delta needs to reach ~0.1
-    nats to matter.  A repeat of ~0.02-0.03 says the ceiling is the mechanism,
-    not the training regime, and that is the paper's negative result.
+    matching Track A's fixed recurrence.
+  * COMPARE AT THE MATCHED GEOMETRY.  These arms train at cross_chunks=8, so
+    the reference is Track A read at 8 chunks (+0.0433 +- 0.0012), NOT its
+    published 4-chunk +0.0237.  Track A's 4-chunk numbers stay the reference
+    only for a 4-chunk read.  Gated Track A (+0.0283) and B1 (-0.0128) were
+    both measured at 4 and are not directly comparable to this gate.
+  * THE ~0.1-NAT BAR IS RETRACTED (2026-08-04) — it sat ABOVE the measurable
+    oracle ceiling, so no mechanism could ever have cleared it.  Report the
+    FRACTION OF THE CEILING RECOVERED instead.  At cross_chunks=8 the ceiling
+    on this instrument is +0.1485, so Track A's 29.1% is the number to beat;
+    AutoCompressor is at 50% at 7B.  Run eval_context_ceiling with N_CHUNKS=8
+    on the same checkpoint to get the arm's own denominator rather than
+    borrowing Track A's.
+  * Better still, quote the CONDITIONAL fraction: given the last 128 tokens
+    (free at inference) Track A still adds +0.00717 +- 0.00075, recovering 37%
+    of the headroom that is actually left.  CARRY_PLUS="128 256" on the ceiling
+    eval produces it.
   * A NEGATIVE delta would repeat B1 and should stop the chain — but check the
     "[cortex] memory ON" line and the branch log first: a memory-off run and a
     memory-that-hurts run look identical in the loss curve.
@@ -246,7 +291,7 @@ EOF
     ;;
 
 *)
-    sed -n '2,45p' "$0"
+    sed -n '2,58p' "$0"
     exit 1
     ;;
 esac
