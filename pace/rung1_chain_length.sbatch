@@ -3,9 +3,9 @@
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64GB
-#SBATCH --gres=gpu:A100:1
-#SBATCH --constraint=A100-80GB
-#SBATCH -t 16:00:00
+#SBATCH --gres=gpu:H200:1
+#SBATCH --constraint=H200
+#SBATCH -t 36:00:00
 #SBATCH -q inferno
 #SBATCH -o logs/Report-%j.out
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -32,8 +32,16 @@
 # retracted 2026-08-04 as being above the measurable ceiling).  Reading the
 # EXISTING cc=4 checkpoint off-distribution at nc=8 already gives carry
 # +0.04327 against a +0.14855 ceiling = 29.1%.  An arm TRAINED at nc=8 must beat
-# 29.1% for chain length to be the lever.  If it lands at ~29% the honest
-# reading is that nc=8 is a better INSTRUMENT and training on it added nothing.
+# that for chain length to be the lever; landing at ~29% means nc=8 is a better
+# INSTRUMENT and training on it added nothing.
+#
+# BUT 29.1% IS NOT A DROP-IN BAR FOR THIS ARM.  It was measured on
+# k0-acc4v-tb2-rs-ep3-rcl: LEGACY AccumCCoT, 4 vecs, trained on the recall mix.
+# This arm is PrefixAccum, 32 vecs, plain PG-19 — three differences.  The bar
+# that actually decides this run is the cc=4 PREFIX control
+# (rung1-pfxaccum32-cc4-tb2-rs-pg19, from rung1_corpus_mix.sbatch), read at
+# nc=8.  Quote 29.1% as historical context only; if the control is missing,
+# this arm has no valid reference and the run cannot conclude anything.
 # Secondary: ceil2 found one hint of non-context-substitute behaviour at nc=8 —
 # the carry's benefit persisted further into the chunk than the short-k oracle's
 # (band1/band0 0.249 vs 0.115).  Re-check that here; it is the only evidence in
@@ -53,8 +61,27 @@
 #         --out data/pg19_olmo_len8192            # LOGIN node
 #     MAX_LENGTH=8192 DATA_PATH=data/pg19_olmo_len8192 \
 #         sbatch pace/rung1_chain_length.sbatch
-# That doubles the retained graph — if A100-80 OOMs, move to the H200 variant.
-# Optional third arm; the cc=8-on-existing-data arm below needs no re-prep.
+# That doubles the retained graph again on top of what already OOMs (below), so
+# it is H200-only.  Optional third arm; the cc=8-on-existing-data arm below
+# needs no re-prep.
+#
+# H200, NOT A100 — MEASURED, NOT PRECAUTIONARY (2026-08-05, job 11702365).
+# The first submission of this arm died in 64s: torch.OutOfMemoryError, 78.37
+# GiB allocated of the A100-80's 79.25.  It is NOT fragmentation — only 28 MiB
+# was reserved-but-unallocated and expandable_segments was already on, so there
+# is nothing for PYTORCH_CUDA_ALLOC_CONF to reclaim.  The cc4/tb2 sibling peaks
+# at 71.8 GiB on the same node type (job 11702363), i.e. ~7 GiB of headroom
+# against a change that doubles the retained chunks 2 -> 4.  train.py has no
+# --grad_checkpoint (that was cortex-main), so H200 is the only no-code fix.
+# Do NOT "fix" this by lowering CARRY_GRAD_CHUNKS to 2: that drops the trained
+# fraction from 50% to 25% and confounds chain length with the dead tb lever,
+# which is the one thing this arm exists to avoid.
+#
+# WALLTIME.  36h, up from 16h.  The cc4/tb2 sibling ran 17.4 s/update on A100
+# and PG-19 at EPOCHS=1 is 28,592 rows / 16 = 1,787 updates, so the A100 cost
+# would have been ~9h — but cc=8 doubles the chain and the H200 rate for this
+# geometry has never been measured.  Check Time/step in the first minutes of the
+# log and trim on the next link rather than guessing again.
 #
 # ARMS.
 #   sbatch pace/rung1_chain_length.sbatch      # cc=8, tb4, 512-tok chunks
@@ -85,6 +112,16 @@ export HF_HOME=$SCRATCH/hf_cache
 export HF_HUB_OFFLINE=1
 export WANDB_DIR=$SCRATCH
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# TCPStore port for the trivial 1-process group Muon needs (train.py:780).
+# train.py derives 20000 + SLURM_JOB_ID % 40000 and installs it with
+# os.environ.setdefault, so anything exported here wins.  That derivation was
+# itself the fix for shared-node collisions and it STILL collided: job 11702360
+# (2026-08-05) died in 29s with EADDRINUSE on 42360.  Probe a free port instead.
+# setdefault is why this needs no train.py change.
+export MASTER_ADDR=127.0.0.1
+export MASTER_PORT=$(python -c "import socket;s=socket.socket();s.bind(('',0));print(s.getsockname()[1]);s.close()")
+echo "MASTER_PORT=$MASTER_PORT"
 
 MAX_LENGTH=${MAX_LENGTH:-4096}
 CROSS_CHUNKS=${CROSS_CHUNKS:-8}            # THE independent variable (was 4)
@@ -123,11 +160,33 @@ ARM="pfx${PREFIX_MODE}${ACCUM_VECS}-cc${CROSS_CHUNKS}-tb${CARRY_GRAD_CHUNKS}"
 ARM="${ARM}-pg19"
 RUN_NAME=${RUN_NAME:-rung1-${ARM}}
 
+# --- resume, for the wallclock case ----------------------------------------
+# The H200 rate for cc=8 is unmeasured, so the 36h limit is a guess; restarting
+# from 0 on a timeout throws away real GPU-days.  save_interval=500 writes a
+# weights-only dir every 500 and a full resumable checkpoint_<step>/chkpt.pt
+# every 1,000.  Newest checkpoint, NUMERICALLY (checkpoint_9500 must not
+# outrank checkpoint_150000):
+#   step=$(ls -d cortex-retro-ft/$RUN_NAME/checkpoint_* | sed 's/.*checkpoint_//' \
+#          | sort -n | tail -1)
+#   RESUME_PATH=cortex-retro-ft/$RUN_NAME/checkpoint_$step sbatch pace/rung1_chain_length.sbatch
+# Pass the SAME geometry env as the original link or the arm identity moves
+# under you mid-chain — and the run name will no longer describe the weights.
+RESUME_PATH=${RESUME_PATH:-}
+CHAIN_ARGS=""
+if [ -n "$RESUME_PATH" ]; then
+    if [ ! -f "$RESUME_PATH/chkpt.pt" ]; then
+        echo "ERROR: no chkpt.pt under RESUME_PATH=$RESUME_PATH"; exit 1
+    fi
+    CHAIN_ARGS="--resume_path $RESUME_PATH"
+    echo "Resuming from $RESUME_PATH"
+fi
+
 echo "=== $RUN_NAME | data=$DATA_PATH | prefix=$PREFIX_MODE ==="
 echo "    geometry: cross_chunks=$CROSS_CHUNKS ($(( MAX_LENGTH / CROSS_CHUNKS ))-tok chunks)" \
      " accum_vecs=$ACCUM_VECS accum_max=$ACCUM_MAX carry_grad_chunks=$CARRY_GRAD_CHUNKS"
 echo "    control to compare against: rung1-pfxaccum32-cc4-tb2-rs-pg19"
-echo "    bar to beat: 29.1% of ceiling (cc4 checkpoint read off-distribution at nc=8)"
+echo "    bar to beat: the cc4 PREFIX control read at nc=8 (29.1% is the LEGACY"
+echo "                 acc4v checkpoint — historical context, not a valid bar here)"
 echo "    REMINDER: every eval on this arm needs N_CHUNKS=8"
 
 python train.py \
@@ -159,4 +218,5 @@ python train.py \
     --cortex.prefix_eos_reset $PREFIX_EOS_RESET \
     --cortex.prefix_pos $PREFIX_POS \
     --cortex.freeze_loop true \
-    --cortex.random_segments $RANDOM_SEGMENTS
+    --cortex.random_segments $RANDOM_SEGMENTS \
+    $CHAIN_ARGS

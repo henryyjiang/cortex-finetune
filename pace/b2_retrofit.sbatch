@@ -305,6 +305,18 @@ export HF_HUB_OFFLINE=1
 export WANDB_DIR=$SCRATCH
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
+# TCPStore port for the trivial 1-process group Muon needs (train.py:780).
+# train.py derives 20000 + SLURM_JOB_ID % 40000 and installs it with
+# os.environ.setdefault, so anything exported here wins.  That derivation was
+# itself the fix for shared-node collisions and it STILL collided on gpu-a100
+# (job 11702360, 2026-08-05: EADDRINUSE on 42360, dead in 29s).  No B2 job has
+# hit it — gpu-h200 is less crowded — but this is a multi-day job where losing
+# the queue slot to a 29-second port clash is the expensive outcome, so probe a
+# free port here too.  setdefault is why this needs no train.py change.
+export MASTER_ADDR=127.0.0.1
+export MASTER_PORT=$(python -c "import socket;s=socket.socket();s.bind(('',0));print(s.getsockname()[1]);s.close()")
+echo "MASTER_PORT=$MASTER_PORT"
+
 # --- out_path MUST live on scratch -----------------------------------------
 # train.py uses out_path as BOTH the wandb project name AND the write dir
 # (wandb.init(project=cfg.out_path, dir=cfg.out_path) — WANDB_DIR is ignored),
