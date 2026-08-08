@@ -1,0 +1,154 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-16-2026 22:51:55
+Job ID:    11220004
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_basic.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'ccot_direct': False, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== basic eval: rung1-k0-acc4v-tb2-rs-ep3-rcl  (cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint) -> eval_results/basic_20260716/rung1-k0-acc4v-tb2-rs-ep3-rcl ===
+Loading checkpoint: None
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:47<01:47, 107.70s/it]Loading checkpoint shards: 100%|██████████| 2/2 [02:02<00:00, 53.31s/it] Loading checkpoint shards: 100%|██████████| 2/2 [02:02<00:00, 61.47s/it]
+Using the latest cached version of the dataset since Rowan/hellaswag couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/Rowan___hellaswag/default/0.0.0/218ec52e09a7e7462a5400043bb9a69a41d06b76 (last modified on Fri Jul 10 21:28:18 2026).
+Using the latest cached version of the dataset since allenai/winogrande couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'winogrande_xl' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___winogrande/winogrande_xl/0.0.0/01e74176c63542e6b0bcb004dcdea22d94fb67b5 (last modified on Fri Jul 10 21:28:20 2026).
+Using the latest cached version of the dataset since allenai/ai2_arc couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'ARC-Easy' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___ai2_arc/ARC-Easy/0.0.0/210d026faf9955653af8916fad021475a3f00453 (last modified on Fri Jul 10 21:28:21 2026).
+Using the latest cached version of the dataset since allenai/ai2_arc couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'ARC-Challenge' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___ai2_arc/ARC-Challenge/0.0.0/210d026faf9955653af8916fad021475a3f00453 (last modified on Fri Jul 10 21:28:22 2026).
+Using the latest cached version of the dataset since ybisk/piqa couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/ybisk___piqa/default/0.0.0/142c51238b3ca2bc61e9a075913871b8b600e8e1 (last modified on Fri Jul 10 21:28:23 2026).
+T=8  tasks=['hellaswag', 'winogrande', 'arc_easy', 'arc_challenge', 'piqa']
+
+=======================================================
+Task: hellaswag
+=======================================================
+  [hellaswag] 200/10042  acc=0.3950
+  [hellaswag] 400/10042  acc=0.3900
+  [hellaswag] 600/10042  acc=0.3967
+  [hellaswag] 800/10042  acc=0.3987
+  [hellaswag] 1000/10042  acc=0.3910
+  [hellaswag] 1200/10042  acc=0.3942
+  [hellaswag] 1400/10042  acc=0.3950
+  [hellaswag] 1600/10042  acc=0.3919
+  [hellaswag] 1800/10042  acc=0.3928
+  [hellaswag] 2000/10042  acc=0.3925
+  [hellaswag] 2200/10042  acc=0.3955
+  [hellaswag] 2400/10042  acc=0.3967
+  [hellaswag] 2600/10042  acc=0.3981
+  [hellaswag] 2800/10042  acc=0.4007
+  [hellaswag] 3000/10042  acc=0.4020
+  [hellaswag] 3200/10042  acc=0.4019
+  [hellaswag] 3400/10042  acc=0.4050
+  [hellaswag] 3600/10042  acc=0.4031
+  [hellaswag] 3800/10042  acc=0.4063
+  [hellaswag] 4000/10042  acc=0.4027
+  [hellaswag] 4200/10042  acc=0.4062
+  [hellaswag] 4400/10042  acc=0.4068
+  [hellaswag] 4600/10042  acc=0.4070
+  [hellaswag] 4800/10042  acc=0.4058
+  [hellaswag] 5000/10042  acc=0.4098
+  [hellaswag] 5200/10042  acc=0.4094
+  [hellaswag] 5400/10042  acc=0.4102
+  [hellaswag] 5600/10042  acc=0.4136
+  [hellaswag] 5800/10042  acc=0.4162
+  [hellaswag] 6000/10042  acc=0.4183
+  [hellaswag] 6200/10042  acc=0.4187
+  [hellaswag] 6400/10042  acc=0.4203
+  [hellaswag] 6600/10042  acc=0.4200
+  [hellaswag] 6800/10042  acc=0.4207
+  [hellaswag] 7000/10042  acc=0.4206
+  [hellaswag] 7200/10042  acc=0.4197
+  [hellaswag] 7400/10042  acc=0.4224
+  [hellaswag] 7600/10042  acc=0.4214
+  [hellaswag] 7800/10042  acc=0.4236
+  [hellaswag] 8000/10042  acc=0.4249
+  [hellaswag] 8200/10042  acc=0.4251
+  [hellaswag] 8400/10042  acc=0.4258
+  [hellaswag] 8600/10042  acc=0.4241
+  [hellaswag] 8800/10042  acc=0.4236
+  [hellaswag] 9000/10042  acc=0.4243
+  [hellaswag] 9200/10042  acc=0.4263
+  [hellaswag] 9400/10042  acc=0.4268
+  [hellaswag] 9600/10042  acc=0.4266
+  [hellaswag] 9800/10042  acc=0.4263
+  [hellaswag] 10000/10042  acc=0.4279
+  hellaswag: 4293/10042 = 0.4275
+
+=======================================================
+Task: winogrande
+=======================================================
+  [winogrande] 200/1267  acc=0.5800
+  [winogrande] 400/1267  acc=0.5525
+  [winogrande] 600/1267  acc=0.5383
+  [winogrande] 800/1267  acc=0.5262
+  [winogrande] 1000/1267  acc=0.5260
+  [winogrande] 1200/1267  acc=0.5350
+  winogrande: 681/1267 = 0.5375
+
+=======================================================
+Task: arc_easy
+=======================================================
+  [arc_easy] 200/570  acc=0.4150
+  [arc_easy] 400/570  acc=0.4025
+  arc_easy: 229/570 = 0.4018
+
+=======================================================
+Task: arc_challenge
+=======================================================
+  [arc_challenge] 200/299  acc=0.2700
+  arc_challenge: 82/299 = 0.2742
+
+=======================================================
+Task: piqa
+=======================================================
+  [piqa] 200/1838  acc=0.6950
+  [piqa] 400/1838  acc=0.6400
+  [piqa] 600/1838  acc=0.6450
+  [piqa] 800/1838  acc=0.6250
+  [piqa] 1000/1838  acc=0.6270
+  [piqa] 1200/1838  acc=0.6300
+  [piqa] 1400/1838  acc=0.6221
+  [piqa] 1600/1838  acc=0.6300
+  [piqa] 1800/1838  acc=0.6328
+  piqa: 1166/1838 = 0.6344
+
+Task                Correct    Total      Acc
+---------------------------------------------
+hellaswag              4293    10042   0.4275
+winogrande              681     1267   0.5375
+arc_easy                229      570   0.4018
+arc_challenge            82      299   0.2742
+piqa                   1166     1838   0.6344
+
+Results saved → eval_results/basic_20260716/rung1-k0-acc4v-tb2-rs-ep3-rcl/multiple_choice
+Loading checkpoint: None
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:42<00:42, 42.97s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:58<00:00, 26.77s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:58<00:00, 29.20s/it]
+Using the latest cached version of the dataset since openai/gsm8k couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'main' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/openai___gsm8k/main/0.0.0/740312add88f781978c0658806c59bc2815b9866 (last modified on Fri Jul 10 21:28:24 2026).
+T=8  ccot_passes=0
+  100/500  acc=0.1300
+  200/500  acc=0.1000
+  300/500  acc=0.1033
+  400/500  acc=0.0975
+  500/500  acc=0.1040
+
+GSM8K accuracy: 52/500 = 0.1040
+Results saved → eval_results/basic_20260716/rung1-k0-acc4v-tb2-rs-ep3-rcl/gsm8k
+---------------------------------------
+Begin Slurm Epilog: Jul-17-2026 00:38:25
+Job ID:        11220004
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_basic.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=14:12:08,vmem=0,walltime=01:46:31,mem=9058980K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-29-0
+---------------------------------------

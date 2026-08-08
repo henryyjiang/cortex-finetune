@@ -1,0 +1,60 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-27-2026 13:33:36
+Job ID:    11520706
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  diag_accum_buffer.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retro-ft/rung1-k0-acc4v-tb2-rs-nemo/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'ccot_direct': False, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== accum buffer diagnostics: rung1-k0-acc4v-tb2-rs-nemo -> eval_results/diag_accum_buffer_20260727/rung1-k0-acc4v-tb2-rs-nemo ===
+Loading: cortex-retro-ft/rung1-k0-acc4v-tb2-rs-nemo/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.88it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  3.50it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  3.09it/s]
+T=8  chunk_len=1024  accum_vecs=4  accum_max=64
+data/pg19_olmo_val_len16384: 50 rows, evaluating 50
+  10/50 samples...
+  20/50 samples...
+  30/50 samples...
+  40/50 samples...
+  50/50 samples...
+
+  Chunk     N  vecs  new_norm state_norm new_vs_old     loss  distinct
+  ------------------------------------------------------------------
+  1        50     4    1.0245     1.0245        nan   4.0799     0.647
+  2        50     8    1.0445     1.0345     0.5318   3.9725     0.657
+  3        50    12    1.0373     1.0355     0.5433   3.9768     0.665
+  4        50    16    1.0227     1.0323     0.5458   4.0013     0.660
+  5        50    20    1.0321     1.0322     0.5495   3.9476     0.672
+  6        50    24    1.0370     1.0330     0.5506   3.9507     0.683
+  7        50    28    1.0319     1.0329     0.5516   3.9682     0.664
+  8        50    32    1.0256     1.0320     0.5516   4.0461     0.679
+  9        50    36    1.0181     1.0304     0.5539   3.9886     0.689
+  10       50    40    1.0242     1.0298     0.5540   3.9717     0.672
+  11       50    44    1.0197     1.0289     0.5509   4.0417     0.667
+  12       49    48    1.0277     1.0304     0.5548   3.9824     0.637
+  13       49    52    1.0154     1.0293     0.5519   4.0224     0.659
+  14       48    56    1.0380     1.0315     0.5557   3.9207     0.655
+  15       46    60    1.0253     1.0301     0.5542   3.9629     0.667
+  16       46    64    1.0374     1.0305     0.5535   3.9411     0.634
+
+  Reading: training only ever exposed reads to <= cross_chunks-1 writes.
+  Drift in new_norm / new_vs_old past that chunk index = the buffer goes OOD
+  (motivates A1's chunk-count curriculum); flat stats + degrading distinct
+  ratio = the problem is in the read, not the state.
+
+Results saved -> eval_results/diag_accum_buffer_20260727/rung1-k0-acc4v-tb2-rs-nemo
+---------------------------------------
+Begin Slurm Epilog: Jul-27-2026 13:56:04
+Job ID:        11520706
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      diag_accum_buffer.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=02:59:52,vmem=0,walltime=00:22:29,mem=3186896K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-29-0
+---------------------------------------

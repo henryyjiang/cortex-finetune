@@ -1,0 +1,62 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-04-2026 18:33:12
+Job ID:    11670035
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== context ceiling: ckpts/olmo8-cortex -> eval_results/context_ceiling_ceil2-20260804-D1-nemotron/olmo8-cortex ===
+Loading: ckpts/olmo8-cortex  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:04<01:04, 64.35s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:14<00:00, 32.74s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:14<00:00, 37.48s/it]
+T=8  n_chunks=4  carry condition: OFF (no cross state)
+context lens: 0 + [128, 256, 512, 1024]
+position bands: 4 per chunk
+data/nemotron_math_olmo_len4096: 97656 rows, evaluating 50
+  sample 1 took 3.0s -> ETA 3 min
+  10/50 samples  [0 min]
+  20/50 samples  [1 min]
+  30/50 samples  [1 min]
+  40/50 samples  [1 min]
+  50/50 samples  [1 min]
+
+  Chunk      N       k=0     k=128     k=256     k=512    k=1024
+  --------------------------------------------------------------
+  2         50    0.7199    0.6630    0.6552    0.7697    2.1208
+  3         50    0.8062    0.7452    0.7381    0.8427    2.2280
+  4         50    0.7813    0.7237    0.7199    0.8389    2.2425
+
+  chunks 2+ pooled (n=150), delta vs k=0 (positive = that context HELPS):
+      128 real tokens : +0.05851  (SE 0.00264)
+      256 real tokens : +0.06469  (SE 0.00332)
+      512 real tokens : -0.04798  (SE 0.00742)
+     1024 real tokens : -1.42795  (SE 0.03391)
+
+  position bands inside the chunk (n=150 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k128              +0.21749    +0.01436    +0.00048    +0.00173
+  k256              +0.24465    +0.02042    +0.00421    -0.01053
+  k512              +0.25994    +0.02654    -0.00779    -0.47059
+  k1024             +0.25025    -0.40975    -2.04002    -3.51231
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_ceil2-20260804-D1-nemotron/olmo8-cortex
+---------------------------------------
+Begin Slurm Epilog: Aug-04-2026 18:36:19
+Job ID:        11670035
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:25:04,vmem=0,walltime=00:03:08,mem=6715484K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-25-0
+---------------------------------------

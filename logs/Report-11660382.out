@@ -1,0 +1,22 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-04-2026 01:02:40
+Job ID:    11660382
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_write_capacity.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+Set RUN=<run_name>
+---------------------------------------
+Begin Slurm Epilog: Aug-04-2026 01:02:43
+Job ID:        11660382
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_write_capacity.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:00:40,vmem=0,walltime=00:00:05,mem=38556K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-31-0
+---------------------------------------

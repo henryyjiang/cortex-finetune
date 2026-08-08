@@ -1,0 +1,67 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-04-2026 19:48:22
+Job ID:    11670041
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'accum_vecs': 4, 'accum_max': 64, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== context ceiling: cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint -> eval_results/context_ceiling_ceil2-20260804-N2-T4/rung1-k0-acc4v-tb2-rs-ep3-rcl ===
+Loading: cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint  (overlay: None)
+[cortex] LEGACY buffer active: accum_ccot. Superseded by --cortex.prefix_memory; supported for loading and evaluating Track-A / B1 checkpoints, not for new training runs.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:21<00:21, 21.43s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:25<00:00, 11.43s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:25<00:00, 12.93s/it]
+T=4  n_chunks=4  carry condition: on
+context lens: 0 + [128, 256, 512, 1024]
+carry_plus:   carry + [128] real tokens
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 1.6s -> ETA 1 min
+  10/50 samples  [0 min]
+  20/50 samples  [0 min]
+  30/50 samples  [1 min]
+  40/50 samples  [1 min]
+  50/50 samples  [1 min]
+
+  Chunk      N       k=0     k=128     k=256     k=512    k=1024     carry
+  ------------------------------------------------------------------------
+  2         50    2.8243    2.7718    2.7575    2.7578    3.3365    2.8009
+  3         50    2.8552    2.8015    2.7841    2.7795    3.1995    2.8304
+  4         50    2.9236    2.8707    2.8579    2.8507    3.2783    2.9014
+
+  chunks 2+ pooled (n=150), delta vs k=0 (positive = that context HELPS):
+      128 real tokens : +0.05304  (SE 0.00181)
+      256 real tokens : +0.06792  (SE 0.00237)
+      512 real tokens : +0.07173  (SE 0.00303)
+     1024 real tokens : -0.40368  (SE 0.01217)
+    carry             : +0.02351  (SE 0.00116)
+
+  => the compressed carry is worth about 57 tokens of REAL context
+  => it recovers 32.8% of the best oracle (+0.07173 at k=512 real tokens)
+
+  carry + real context (n=150).  residual = what the carry adds
+  ON TOP of context that is free at inference:
+    carry+128   : total +0.06051 (SE 0.00183)   residual +0.00746 (SE 0.00074)  = 32% of the standalone carry delta
+  A residual near zero means the carry is a LOCAL-CONTEXT
+  SURROGATE: it re-supplies what the last k tokens already give,
+  so the headroom worth chasing is (best ceiling - ceiling(k)),
+  not the whole ceiling.
+
+Results saved -> eval_results/context_ceiling_ceil2-20260804-N2-T4/rung1-k0-acc4v-tb2-rs-ep3-rcl
+---------------------------------------
+Begin Slurm Epilog: Aug-04-2026 19:50:15
+Job ID:        11670041
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:15:04,vmem=0,walltime=00:01:53,mem=8099104K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-11-0
+---------------------------------------

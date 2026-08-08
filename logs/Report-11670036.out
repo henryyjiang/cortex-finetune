@@ -1,0 +1,66 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-04-2026 18:33:12
+Job ID:    11670036
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== context ceiling: ckpts/olmo8-cortex -> eval_results/context_ceiling_ceil2-20260804-D2-nc8-base/olmo8-cortex ===
+Loading: ckpts/olmo8-cortex  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:04<01:04, 64.82s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:15<00:00, 32.95s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:15<00:00, 37.73s/it]
+T=8  n_chunks=8  carry condition: OFF (no cross state)
+context lens: 0 + [64, 128, 256, 512]
+position bands: 4 per chunk
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 2.5s -> ETA 2 min
+  10/50 samples  [0 min]
+  20/50 samples  [1 min]
+  30/50 samples  [1 min]
+  40/50 samples  [2 min]
+  50/50 samples  [2 min]
+
+  Chunk      N       k=0      k=64     k=128     k=256     k=512
+  --------------------------------------------------------------
+  2         50    3.5686    3.4240    3.4000    3.3654    3.3276
+  3         50    3.5801    3.4470    3.4140    3.3828    3.3576
+  4         50    3.5744    3.4449    3.4111    3.3776    3.3473
+  5         50    3.6227    3.4877    3.4588    3.4205    3.3918
+  6         50    3.5628    3.4345    3.4050    3.3665    3.3329
+  7         50    3.6173    3.4880    3.4543    3.4229    3.3858
+  8         50    3.5894    3.4711    3.4431    3.4088    3.3782
+
+  chunks 2+ pooled (n=350), delta vs k=0 (positive = that context HELPS):
+       64 real tokens : +0.13116  (SE 0.00263)
+      128 real tokens : +0.16129  (SE 0.00319)
+      256 real tokens : +0.19582  (SE 0.00387)
+      512 real tokens : +0.22773  (SE 0.00444)
+
+  position bands inside the chunk (n=350 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k64               +0.45554    +0.04393    +0.01542    +0.00973
+  k128              +0.52857    +0.06812    +0.02889    +0.01960
+  k256              +0.60094    +0.10511    +0.04627    +0.03095
+  k512              +0.64877    +0.13594    +0.07510    +0.05111
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_ceil2-20260804-D2-nc8-base/olmo8-cortex
+---------------------------------------
+Begin Slurm Epilog: Aug-04-2026 18:36:53
+Job ID:        11670036
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:29:36,vmem=0,walltime=00:03:42,mem=5819412K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-9-0
+---------------------------------------

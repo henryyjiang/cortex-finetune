@@ -1,0 +1,42 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-07-2026 23:04:37
+Job ID:    11741013
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  diag_accum_buffer.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== accum buffer diagnostics: rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 -> eval_results/diag_accum_buffer_rung1-20260807/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 ===
+Loading: cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:29<00:29, 29.02s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:34<00:00, 15.15s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:34<00:00, 17.23s/it]
+T=8  chunk_len=512  accum_vecs=32  accum_max=256
+data/pg19_olmo_val_len16384: 50 rows, evaluating 50
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_accum_buffer.py", line 216, in <module>
+    main()
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_accum_buffer.py", line 135, in main
+    st = new_state[0].float()                       # [N, D]
+         ~~~~~~~~~^^^
+TypeError: 'NoneType' object is not subscriptable
+---------------------------------------
+Begin Slurm Epilog: Aug-07-2026 23:05:46
+Job ID:        11741013
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      diag_accum_buffer.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:09:36,vmem=0,walltime=00:01:12,mem=7353424K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-25-0
+---------------------------------------

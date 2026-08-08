@@ -1,0 +1,201 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-17-2026 21:35:31
+Job ID:    11241580
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  b0_retrofit_parity.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[W717 21:35:46.559401370 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Fri Jul 17 21:35:44: Time to load libraries: 8.99 seconds.
+--------------------------------------------------------------------
+------------------ Launching run retro-b0-k32-ga-mr8------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-01-006-11-0.pace.gatech.edu.
+GPU : NVIDIA A100 80GB PCIe. CUDA: 12.1.
+[cortex] memory ON: K=32 K_iter=0 ccot_direct=False accum_ccot=False (vecs=4/max=64) gated_accum=True cross_chunks=4 carry_grad_chunks=0 random_segments=False lora_rank=0
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:03<00:03,  3.54s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:04<00:00,  2.07s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:04<00:00,  2.29s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.m_cross.forget_bias', 'cortex.m_cross.gate_proj_in.bias', 'cortex.m_cross.gate_proj_in.weight', 'cortex.m_cross.gate_proj_mem.bias', 'cortex.m_cross.gate_proj_mem.weight', 'cortex.m_cross.input_bias', 'cortex.m_cross.k_proj.weight', 'cortex.m_cross.out_proj.weight', 'cortex.m_cross.q_proj.weight', 'cortex.m_cross.v_proj.weight', 'cortex.m_cross.vec_emb', 'cortex.m_cross.vec_ln.bias', 'cortex.m_cross.vec_ln.weight', 'cortex.m_cross.wk_proj.weight', 'cortex.m_cross.wq_proj.weight', 'cortex.m_cross.wv_proj.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retrofit/wandb/run-20260717_213552-mqe28wqe
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run retro-b0-k32-ga-mr8
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/mqe28wqe
+[cortex] reset 10 cortex submodules to nn defaults + re-applied designed inits ['m_cross.[out_proj=0,vec_emb~N,forget_bias=1,input_bias=0]'] (undo post_init clobber)
+GPU: cuda:0 | Step:    4 | Updates:    1 | Time/step: 0.5546 | Tok/sec=  7386.02 | Loss: 10.2603 / log-ppl: 28574.3125 | Grad-Norm 77.1628 | ClipCoef 0.0130 | Peak-Mem 30.33GiB
+GPU: cuda:0 | Step:    8 | Updates:    2 | Time/step: 0.4687 | Tok/sec=  8739.67 | Loss: 10.6372 / log-ppl: 41656.5820 | Grad-Norm 76.1617 | ClipCoef 0.0131 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   12 | Updates:    3 | Time/step: 0.4550 | Tok/sec=  9001.22 | Loss: 9.1096 / log-ppl: 9041.7988 | Grad-Norm 63.3145 | ClipCoef 0.0158 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   16 | Updates:    4 | Time/step: 0.4652 | Tok/sec=  8803.91 | Loss: 10.0387 / log-ppl: 22896.7363 | Grad-Norm 58.8318 | ClipCoef 0.0170 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   20 | Updates:    5 | Time/step: 0.4863 | Tok/sec=  8422.98 | Loss: 9.1089 / log-ppl: 9035.0410 | Grad-Norm 42.4226 | ClipCoef 0.0236 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   24 | Updates:    6 | Time/step: 0.4868 | Tok/sec=  8413.79 | Loss: 8.6363 / log-ppl: 5632.6719 | Grad-Norm 44.2184 | ClipCoef 0.0226 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   28 | Updates:    7 | Time/step: 0.4666 | Tok/sec=  8777.50 | Loss: 8.6312 / log-ppl: 5603.7070 | Grad-Norm 25.3810 | ClipCoef 0.0394 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   32 | Updates:    8 | Time/step: 0.4571 | Tok/sec=  8961.29 | Loss: 7.8452 / log-ppl: 2553.5081 | Grad-Norm 22.7086 | ClipCoef 0.0440 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   36 | Updates:    9 | Time/step: 0.4888 | Tok/sec=  8378.95 | Loss: 7.5857 / log-ppl: 1969.7876 | Grad-Norm 23.1875 | ClipCoef 0.0431 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   40 | Updates:   10 | Time/step: 0.4580 | Tok/sec=  8943.92 | Loss: 7.1793 / log-ppl: 1311.9731 | Grad-Norm 17.4585 | ClipCoef 0.0573 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   44 | Updates:   11 | Time/step: 0.4665 | Tok/sec=  8780.15 | Loss: 7.1228 / log-ppl: 1239.9740 | Grad-Norm 15.2035 | ClipCoef 0.0658 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   48 | Updates:   12 | Time/step: 0.4675 | Tok/sec=  8761.80 | Loss: 6.9860 / log-ppl: 1081.4323 | Grad-Norm 16.3039 | ClipCoef 0.0613 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   52 | Updates:   13 | Time/step: 0.4981 | Tok/sec=  8222.72 | Loss: 7.7099 / log-ppl: 2230.3083 | Grad-Norm 13.6862 | ClipCoef 0.0731 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   56 | Updates:   14 | Time/step: 0.4773 | Tok/sec=  8580.77 | Loss: 6.7438 / log-ppl: 848.7712 | Grad-Norm 8.3806 | ClipCoef 0.1193 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   60 | Updates:   15 | Time/step: 0.4898 | Tok/sec=  8361.97 | Loss: 7.2846 / log-ppl: 1457.7423 | Grad-Norm 9.3956 | ClipCoef 0.1064 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   64 | Updates:   16 | Time/step: 0.4789 | Tok/sec=  8552.29 | Loss: 6.1667 / log-ppl: 476.5999 | Grad-Norm 14.4724 | ClipCoef 0.0691 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   68 | Updates:   17 | Time/step: 0.5319 | Tok/sec=  7701.12 | Loss: 6.7340 / log-ppl: 840.5244 | Grad-Norm 10.6887 | ClipCoef 0.0936 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   72 | Updates:   18 | Time/step: 0.4998 | Tok/sec=  8194.55 | Loss: 6.6498 / log-ppl: 772.6473 | Grad-Norm 10.3370 | ClipCoef 0.0967 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   76 | Updates:   19 | Time/step: 0.4889 | Tok/sec=  8378.66 | Loss: 6.6809 / log-ppl: 797.0115 | Grad-Norm 9.8346 | ClipCoef 0.1017 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   80 | Updates:   20 | Time/step: 0.4574 | Tok/sec=  8954.38 | Loss: 6.2930 / log-ppl: 540.7883 | Grad-Norm 9.5500 | ClipCoef 0.1047 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   84 | Updates:   21 | Time/step: 0.4910 | Tok/sec=  8342.52 | Loss: 6.6094 / log-ppl: 742.0064 | Grad-Norm 13.1525 | ClipCoef 0.0760 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   88 | Updates:   22 | Time/step: 0.5120 | Tok/sec=  7999.97 | Loss: 6.1249 / log-ppl: 457.0791 | Grad-Norm 25.3247 | ClipCoef 0.0395 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   92 | Updates:   23 | Time/step: 0.4689 | Tok/sec=  8736.00 | Loss: 7.1030 / log-ppl: 1215.5884 | Grad-Norm 14.3189 | ClipCoef 0.0698 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:   96 | Updates:   24 | Time/step: 0.5639 | Tok/sec=  7263.72 | Loss: 6.2076 / log-ppl: 496.5248 | Grad-Norm 13.9561 | ClipCoef 0.0717 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  100 | Updates:   25 | Time/step: 0.4693 | Tok/sec=  8726.98 | Loss: 7.4025 / log-ppl: 1640.0391 | Grad-Norm 10.0325 | ClipCoef 0.0997 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  104 | Updates:   26 | Time/step: 0.5218 | Tok/sec=  7849.16 | Loss: 6.5440 / log-ppl: 695.0388 | Grad-Norm 20.9317 | ClipCoef 0.0478 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  108 | Updates:   27 | Time/step: 0.5115 | Tok/sec=  8007.22 | Loss: 5.7142 / log-ppl: 303.1324 | Grad-Norm 12.1297 | ClipCoef 0.0824 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  112 | Updates:   28 | Time/step: 0.4809 | Tok/sec=  8517.54 | Loss: 4.9532 / log-ppl: 141.6314 | Grad-Norm 16.2844 | ClipCoef 0.0614 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  116 | Updates:   29 | Time/step: 0.5018 | Tok/sec=  8162.48 | Loss: 5.3855 / log-ppl: 218.2233 | Grad-Norm 25.6425 | ClipCoef 0.0390 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  120 | Updates:   30 | Time/step: 0.4601 | Tok/sec=  8901.63 | Loss: 5.9008 / log-ppl: 365.3295 | Grad-Norm 28.7195 | ClipCoef 0.0348 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  124 | Updates:   31 | Time/step: 0.4491 | Tok/sec=  9121.27 | Loss: 4.9049 / log-ppl: 134.9487 | Grad-Norm 12.4090 | ClipCoef 0.0806 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  128 | Updates:   32 | Time/step: 0.5351 | Tok/sec=  7655.06 | Loss: 5.9670 / log-ppl: 390.3456 | Grad-Norm 27.5455 | ClipCoef 0.0363 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  132 | Updates:   33 | Time/step: 0.5350 | Tok/sec=  7655.86 | Loss: 5.3586 / log-ppl: 212.4323 | Grad-Norm 13.9784 | ClipCoef 0.0715 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  136 | Updates:   34 | Time/step: 0.4716 | Tok/sec=  8684.50 | Loss: 4.6824 / log-ppl: 108.0269 | Grad-Norm 9.7323 | ClipCoef 0.1028 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  140 | Updates:   35 | Time/step: 0.4701 | Tok/sec=  8712.71 | Loss: 4.3939 / log-ppl: 80.9543 | Grad-Norm 7.2090 | ClipCoef 0.1387 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  144 | Updates:   36 | Time/step: 0.4721 | Tok/sec=  8675.70 | Loss: 4.8249 / log-ppl: 124.5741 | Grad-Norm 7.8210 | ClipCoef 0.1279 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  148 | Updates:   37 | Time/step: 0.5138 | Tok/sec=  7972.45 | Loss: 4.7528 / log-ppl: 115.9125 | Grad-Norm 8.2831 | ClipCoef 0.1207 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  152 | Updates:   38 | Time/step: 0.4715 | Tok/sec=  8687.21 | Loss: 4.2033 / log-ppl: 66.9049 | Grad-Norm 6.3942 | ClipCoef 0.1564 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  156 | Updates:   39 | Time/step: 0.4715 | Tok/sec=  8687.79 | Loss: 4.9449 / log-ppl: 140.4549 | Grad-Norm 7.5664 | ClipCoef 0.1322 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  160 | Updates:   40 | Time/step: 0.4611 | Tok/sec=  8882.29 | Loss: 6.9701 / log-ppl: 1064.3503 | Grad-Norm 8.0096 | ClipCoef 0.1249 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  164 | Updates:   41 | Time/step: 0.4810 | Tok/sec=  8516.37 | Loss: 4.4599 / log-ppl: 86.4759 | Grad-Norm 6.8337 | ClipCoef 0.1463 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  168 | Updates:   42 | Time/step: 0.5549 | Tok/sec=  7381.70 | Loss: 4.1494 / log-ppl: 63.3958 | Grad-Norm 8.8248 | ClipCoef 0.1133 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  172 | Updates:   43 | Time/step: 0.5025 | Tok/sec=  8151.12 | Loss: 3.9134 / log-ppl: 50.0692 | Grad-Norm 6.1742 | ClipCoef 0.1620 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  176 | Updates:   44 | Time/step: 0.4611 | Tok/sec=  8883.10 | Loss: 4.2008 / log-ppl: 66.7420 | Grad-Norm 5.6197 | ClipCoef 0.1779 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  180 | Updates:   45 | Time/step: 0.5027 | Tok/sec=  8147.87 | Loss: 4.4576 / log-ppl: 86.2767 | Grad-Norm 7.3497 | ClipCoef 0.1361 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  184 | Updates:   46 | Time/step: 0.4928 | Tok/sec=  8311.50 | Loss: 4.3655 / log-ppl: 78.6922 | Grad-Norm 6.1422 | ClipCoef 0.1628 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  188 | Updates:   47 | Time/step: 0.4715 | Tok/sec=  8687.04 | Loss: 5.0763 / log-ppl: 160.1807 | Grad-Norm 5.7220 | ClipCoef 0.1748 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  192 | Updates:   48 | Time/step: 0.4935 | Tok/sec=  8299.18 | Loss: 5.3143 / log-ppl: 203.2170 | Grad-Norm 17.4280 | ClipCoef 0.0574 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  196 | Updates:   49 | Time/step: 0.4932 | Tok/sec=  8304.23 | Loss: 4.5479 / log-ppl: 94.4301 | Grad-Norm 7.0942 | ClipCoef 0.1410 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  200 | Updates:   50 | Time/step: 0.4924 | Tok/sec=  8318.40 | Loss: 3.5176 / log-ppl: 33.7036 | Grad-Norm 6.9852 | ClipCoef 0.1432 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  204 | Updates:   51 | Time/step: 0.4936 | Tok/sec=  8298.28 | Loss: 4.4853 / log-ppl: 88.7048 | Grad-Norm 5.1333 | ClipCoef 0.1948 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  208 | Updates:   52 | Time/step: 0.4618 | Tok/sec=  8868.84 | Loss: 3.4638 / log-ppl: 31.9367 | Grad-Norm 5.5486 | ClipCoef 0.1802 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  212 | Updates:   53 | Time/step: 0.4933 | Tok/sec=  8303.03 | Loss: 3.7954 / log-ppl: 44.4971 | Grad-Norm 5.7695 | ClipCoef 0.1733 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  216 | Updates:   54 | Time/step: 0.4726 | Tok/sec=  8667.20 | Loss: 4.0521 / log-ppl: 57.5166 | Grad-Norm 5.4965 | ClipCoef 0.1819 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  220 | Updates:   55 | Time/step: 0.5358 | Tok/sec=  7644.06 | Loss: 3.5555 / log-ppl: 35.0042 | Grad-Norm 5.7364 | ClipCoef 0.1743 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  224 | Updates:   56 | Time/step: 0.5037 | Tok/sec=  8132.13 | Loss: 3.5997 / log-ppl: 36.5871 | Grad-Norm 5.8604 | ClipCoef 0.1706 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  228 | Updates:   57 | Time/step: 0.4717 | Tok/sec=  8683.13 | Loss: 3.8393 / log-ppl: 46.4945 | Grad-Norm 5.7975 | ClipCoef 0.1725 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  232 | Updates:   58 | Time/step: 0.4926 | Tok/sec=  8315.86 | Loss: 3.3864 / log-ppl: 29.5605 | Grad-Norm 5.2736 | ClipCoef 0.1896 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  236 | Updates:   59 | Time/step: 0.4923 | Tok/sec=  8320.80 | Loss: 3.2480 / log-ppl: 25.7379 | Grad-Norm 6.8643 | ClipCoef 0.1457 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  240 | Updates:   60 | Time/step: 0.5245 | Tok/sec=  7808.62 | Loss: 3.6114 / log-ppl: 37.0196 | Grad-Norm 4.8516 | ClipCoef 0.2061 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  244 | Updates:   61 | Time/step: 0.5135 | Tok/sec=  7977.13 | Loss: 4.3566 / log-ppl: 77.9883 | Grad-Norm 6.9305 | ClipCoef 0.1443 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  248 | Updates:   62 | Time/step: 0.4825 | Tok/sec=  8489.51 | Loss: 4.9162 / log-ppl: 136.4838 | Grad-Norm 7.8780 | ClipCoef 0.1269 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  252 | Updates:   63 | Time/step: 0.4726 | Tok/sec=  8667.01 | Loss: 3.7061 / log-ppl: 40.6941 | Grad-Norm 7.4467 | ClipCoef 0.1343 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  256 | Updates:   64 | Time/step: 0.4835 | Tok/sec=  8472.13 | Loss: 4.1035 / log-ppl: 60.5490 | Grad-Norm 5.3690 | ClipCoef 0.1863 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  260 | Updates:   65 | Time/step: 0.4736 | Tok/sec=  8648.64 | Loss: 3.1651 / log-ppl: 23.6916 | Grad-Norm 5.9417 | ClipCoef 0.1683 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  264 | Updates:   66 | Time/step: 0.4722 | Tok/sec=  8673.89 | Loss: 4.2030 / log-ppl: 66.8893 | Grad-Norm 6.1009 | ClipCoef 0.1639 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  268 | Updates:   67 | Time/step: 0.5052 | Tok/sec=  8108.29 | Loss: 4.2859 / log-ppl: 72.6685 | Grad-Norm 5.5749 | ClipCoef 0.1794 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  272 | Updates:   68 | Time/step: 0.4629 | Tok/sec=  8847.88 | Loss: 3.3703 / log-ppl: 29.0875 | Grad-Norm 4.6277 | ClipCoef 0.2161 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  276 | Updates:   69 | Time/step: 0.5162 | Tok/sec=  7935.01 | Loss: 3.1210 / log-ppl: 22.6689 | Grad-Norm 5.1888 | ClipCoef 0.1927 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  280 | Updates:   70 | Time/step: 0.4842 | Tok/sec=  8459.54 | Loss: 3.5584 / log-ppl: 35.1060 | Grad-Norm 6.0177 | ClipCoef 0.1662 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  284 | Updates:   71 | Time/step: 0.4937 | Tok/sec=  8297.27 | Loss: 3.3416 / log-ppl: 28.2644 | Grad-Norm 4.3545 | ClipCoef 0.2296 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  288 | Updates:   72 | Time/step: 0.4937 | Tok/sec=  8296.14 | Loss: 3.6472 / log-ppl: 38.3679 | Grad-Norm 5.9051 | ClipCoef 0.1693 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  292 | Updates:   73 | Time/step: 0.5147 | Tok/sec=  7957.64 | Loss: 4.0811 / log-ppl: 59.2131 | Grad-Norm 4.8713 | ClipCoef 0.2053 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  296 | Updates:   74 | Time/step: 0.5254 | Tok/sec=  7795.62 | Loss: 3.0250 / log-ppl: 20.5944 | Grad-Norm 5.2318 | ClipCoef 0.1911 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  300 | Updates:   75 | Time/step: 0.4832 | Tok/sec=  8476.16 | Loss: 3.3807 / log-ppl: 29.3909 | Grad-Norm 3.8274 | ClipCoef 0.2613 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  304 | Updates:   76 | Time/step: 0.4837 | Tok/sec=  8468.65 | Loss: 2.8010 / log-ppl: 16.4613 | Grad-Norm 4.2105 | ClipCoef 0.2375 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  308 | Updates:   77 | Time/step: 0.4625 | Tok/sec=  8855.88 | Loss: 3.7070 / log-ppl: 40.7300 | Grad-Norm 5.7979 | ClipCoef 0.1725 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  312 | Updates:   78 | Time/step: 0.4739 | Tok/sec=  8642.63 | Loss: 2.7475 / log-ppl: 15.6035 | Grad-Norm 5.2887 | ClipCoef 0.1891 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  316 | Updates:   79 | Time/step: 0.4951 | Tok/sec=  8273.82 | Loss: 3.4099 / log-ppl: 30.2619 | Grad-Norm 4.0165 | ClipCoef 0.2490 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  320 | Updates:   80 | Time/step: 0.5058 | Tok/sec=  8098.23 | Loss: 3.3926 / log-ppl: 29.7419 | Grad-Norm 5.2143 | ClipCoef 0.1918 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  324 | Updates:   81 | Time/step: 0.4845 | Tok/sec=  8454.33 | Loss: 2.6296 / log-ppl: 13.8684 | Grad-Norm 5.6782 | ClipCoef 0.1761 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  328 | Updates:   82 | Time/step: 0.4740 | Tok/sec=  8641.17 | Loss: 2.7707 / log-ppl: 15.9696 | Grad-Norm 4.5481 | ClipCoef 0.2199 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  332 | Updates:   83 | Time/step: 0.5050 | Tok/sec=  8110.29 | Loss: 2.8265 / log-ppl: 16.8858 | Grad-Norm 6.2855 | ClipCoef 0.1591 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  336 | Updates:   84 | Time/step: 0.4956 | Tok/sec=  8265.11 | Loss: 3.2048 / log-ppl: 24.6515 | Grad-Norm 3.3789 | ClipCoef 0.2960 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  340 | Updates:   85 | Time/step: 0.5055 | Tok/sec=  8102.59 | Loss: 2.7767 / log-ppl: 16.0658 | Grad-Norm 4.6222 | ClipCoef 0.2163 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  344 | Updates:   86 | Time/step: 0.5060 | Tok/sec=  8094.23 | Loss: 2.8064 / log-ppl: 16.5510 | Grad-Norm 3.3843 | ClipCoef 0.2955 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  348 | Updates:   87 | Time/step: 0.5486 | Tok/sec=  7466.39 | Loss: 2.8640 / log-ppl: 17.5317 | Grad-Norm 5.2086 | ClipCoef 0.1920 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  352 | Updates:   88 | Time/step: 0.4955 | Tok/sec=  8266.19 | Loss: 2.6018 / log-ppl: 13.4884 | Grad-Norm 3.6711 | ClipCoef 0.2724 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  356 | Updates:   89 | Time/step: 0.5053 | Tok/sec=  8106.38 | Loss: 2.2667 / log-ppl: 9.6476 | Grad-Norm 5.0210 | ClipCoef 0.1992 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  360 | Updates:   90 | Time/step: 0.4849 | Tok/sec=  8447.76 | Loss: 2.7163 / log-ppl: 15.1236 | Grad-Norm 3.5298 | ClipCoef 0.2833 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  364 | Updates:   91 | Time/step: 0.4744 | Tok/sec=  8634.56 | Loss: 3.7735 / log-ppl: 43.5318 | Grad-Norm 3.4345 | ClipCoef 0.2912 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  368 | Updates:   92 | Time/step: 0.4632 | Tok/sec=  8842.08 | Loss: 2.9807 / log-ppl: 19.7023 | Grad-Norm 4.0445 | ClipCoef 0.2472 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  372 | Updates:   93 | Time/step: 0.4624 | Tok/sec=  8857.47 | Loss: 2.4593 / log-ppl: 11.6965 | Grad-Norm 4.7154 | ClipCoef 0.2121 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  376 | Updates:   94 | Time/step: 0.4836 | Tok/sec=  8469.41 | Loss: 2.4185 / log-ppl: 11.2293 | Grad-Norm 3.4168 | ClipCoef 0.2927 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  380 | Updates:   95 | Time/step: 0.5048 | Tok/sec=  8113.80 | Loss: 2.9917 / log-ppl: 19.9190 | Grad-Norm 3.2411 | ClipCoef 0.3085 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  384 | Updates:   96 | Time/step: 0.4957 | Tok/sec=  8263.16 | Loss: 2.6536 / log-ppl: 14.2046 | Grad-Norm 2.8276 | ClipCoef 0.3537 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  388 | Updates:   97 | Time/step: 0.4745 | Tok/sec=  8632.63 | Loss: 2.6128 / log-ppl: 13.6368 | Grad-Norm 4.4038 | ClipCoef 0.2271 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  392 | Updates:   98 | Time/step: 0.4848 | Tok/sec=  8448.29 | Loss: 2.5422 / log-ppl: 12.7074 | Grad-Norm 3.4220 | ClipCoef 0.2922 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  396 | Updates:   99 | Time/step: 0.4968 | Tok/sec=  8244.62 | Loss: 2.5016 / log-ppl: 12.2020 | Grad-Norm 4.8818 | ClipCoef 0.2048 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  400 | Updates:  100 | Time/step: 0.4637 | Tok/sec=  8833.78 | Loss: 3.0245 / log-ppl: 20.5843 | Grad-Norm 3.3730 | ClipCoef 0.2965 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  404 | Updates:  101 | Time/step: 0.5058 | Tok/sec=  8098.50 | Loss: 2.6792 / log-ppl: 14.5735 | Grad-Norm 3.8913 | ClipCoef 0.2570 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  408 | Updates:  102 | Time/step: 0.4946 | Tok/sec=  8281.12 | Loss: 2.2698 / log-ppl: 9.6772 | Grad-Norm 3.6531 | ClipCoef 0.2737 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  412 | Updates:  103 | Time/step: 0.5065 | Tok/sec=  8086.75 | Loss: 2.8732 / log-ppl: 17.6943 | Grad-Norm 3.9496 | ClipCoef 0.2532 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  416 | Updates:  104 | Time/step: 0.5174 | Tok/sec=  7916.56 | Loss: 2.6107 / log-ppl: 13.6083 | Grad-Norm 3.2003 | ClipCoef 0.3125 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  420 | Updates:  105 | Time/step: 0.4848 | Tok/sec=  8449.51 | Loss: 2.2062 / log-ppl: 9.0811 | Grad-Norm 7.0546 | ClipCoef 0.1418 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  424 | Updates:  106 | Time/step: 0.4740 | Tok/sec=  8642.06 | Loss: 2.2408 / log-ppl: 9.4007 | Grad-Norm 3.9429 | ClipCoef 0.2536 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  428 | Updates:  107 | Time/step: 0.5365 | Tok/sec=  7634.91 | Loss: 2.7774 / log-ppl: 16.0775 | Grad-Norm 4.9772 | ClipCoef 0.2009 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  432 | Updates:  108 | Time/step: 0.5485 | Tok/sec=  7467.04 | Loss: 2.4433 / log-ppl: 11.5115 | Grad-Norm 3.4096 | ClipCoef 0.2933 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  436 | Updates:  109 | Time/step: 0.4956 | Tok/sec=  8264.12 | Loss: 1.5754 / log-ppl: 4.8327 | Grad-Norm 3.0768 | ClipCoef 0.3250 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  440 | Updates:  110 | Time/step: 0.4847 | Tok/sec=  8450.19 | Loss: 2.2950 / log-ppl: 9.9249 | Grad-Norm 3.2836 | ClipCoef 0.3045 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  444 | Updates:  111 | Time/step: 0.5064 | Tok/sec=  8087.83 | Loss: 2.3889 / log-ppl: 10.9012 | Grad-Norm 3.6954 | ClipCoef 0.2706 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  448 | Updates:  112 | Time/step: 0.5069 | Tok/sec=  8080.38 | Loss: 2.4403 / log-ppl: 11.4764 | Grad-Norm 3.2558 | ClipCoef 0.3071 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  452 | Updates:  113 | Time/step: 0.4851 | Tok/sec=  8443.25 | Loss: 2.5267 / log-ppl: 12.5116 | Grad-Norm 2.8152 | ClipCoef 0.3552 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  456 | Updates:  114 | Time/step: 0.4640 | Tok/sec=  8827.86 | Loss: 2.2254 / log-ppl: 9.2575 | Grad-Norm 2.9270 | ClipCoef 0.3416 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  460 | Updates:  115 | Time/step: 0.5066 | Tok/sec=  8085.06 | Loss: 3.3971 / log-ppl: 29.8778 | Grad-Norm 3.9873 | ClipCoef 0.2508 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  464 | Updates:  116 | Time/step: 0.4849 | Tok/sec=  8447.95 | Loss: 1.7537 / log-ppl: 5.7757 | Grad-Norm 2.9083 | ClipCoef 0.3438 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  468 | Updates:  117 | Time/step: 0.4963 | Tok/sec=  8253.34 | Loss: 2.5661 / log-ppl: 13.0146 | Grad-Norm 18.2955 | ClipCoef 0.0547 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  472 | Updates:  118 | Time/step: 0.5167 | Tok/sec=  7926.73 | Loss: 2.3098 / log-ppl: 10.0720 | Grad-Norm 2.6866 | ClipCoef 0.3722 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  476 | Updates:  119 | Time/step: 0.4850 | Tok/sec=  8445.88 | Loss: 2.6640 / log-ppl: 14.3541 | Grad-Norm 3.2032 | ClipCoef 0.3122 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  480 | Updates:  120 | Time/step: 0.4736 | Tok/sec=  8649.06 | Loss: 2.9327 / log-ppl: 18.7773 | Grad-Norm 2.9708 | ClipCoef 0.3366 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  484 | Updates:  121 | Time/step: 0.4961 | Tok/sec=  8256.37 | Loss: 1.7756 / log-ppl: 5.9038 | Grad-Norm 4.0914 | ClipCoef 0.2444 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  488 | Updates:  122 | Time/step: 0.4963 | Tok/sec=  8252.90 | Loss: 2.9338 / log-ppl: 18.7998 | Grad-Norm 3.1146 | ClipCoef 0.3211 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  492 | Updates:  123 | Time/step: 0.4853 | Tok/sec=  8440.39 | Loss: 2.0970 / log-ppl: 8.1415 | Grad-Norm 2.4923 | ClipCoef 0.4012 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  496 | Updates:  124 | Time/step: 0.4953 | Tok/sec=  8270.06 | Loss: 2.9074 / log-ppl: 18.3100 | Grad-Norm 3.1223 | ClipCoef 0.3203 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  500 | Updates:  125 | Time/step: 0.4944 | Tok/sec=  8284.80 | Loss: 1.1822 / log-ppl: 3.2615 | Grad-Norm 5.3370 | ClipCoef 0.1874 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  504 | Updates:  126 | Time/step: 0.4837 | Tok/sec=  8467.41 | Loss: 1.9590 / log-ppl: 7.0920 | Grad-Norm 2.8295 | ClipCoef 0.3534 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  508 | Updates:  127 | Time/step: 0.4840 | Tok/sec=  8463.42 | Loss: 2.4079 / log-ppl: 11.1103 | Grad-Norm 2.5834 | ClipCoef 0.3871 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  512 | Updates:  128 | Time/step: 0.4851 | Tok/sec=  8443.23 | Loss: 1.8529 / log-ppl: 6.3785 | Grad-Norm 2.3265 | ClipCoef 0.4298 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  516 | Updates:  129 | Time/step: 0.5172 | Tok/sec=  7919.34 | Loss: 2.6995 / log-ppl: 14.8726 | Grad-Norm 3.5790 | ClipCoef 0.2794 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  520 | Updates:  130 | Time/step: 0.4854 | Tok/sec=  8439.01 | Loss: 1.9159 / log-ppl: 6.7930 | Grad-Norm 2.6899 | ClipCoef 0.3718 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  524 | Updates:  131 | Time/step: 0.4854 | Tok/sec=  8439.18 | Loss: 2.1373 / log-ppl: 8.4769 | Grad-Norm 3.1730 | ClipCoef 0.3152 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  528 | Updates:  132 | Time/step: 0.4628 | Tok/sec=  8849.88 | Loss: 1.8826 / log-ppl: 6.5704 | Grad-Norm 2.5658 | ClipCoef 0.3897 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  532 | Updates:  133 | Time/step: 0.5162 | Tok/sec=  7935.65 | Loss: 2.4776 / log-ppl: 11.9122 | Grad-Norm 2.2549 | ClipCoef 0.4435 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  536 | Updates:  134 | Time/step: 0.4629 | Tok/sec=  8849.02 | Loss: 2.3806 / log-ppl: 10.8111 | Grad-Norm 2.6220 | ClipCoef 0.3814 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  540 | Updates:  135 | Time/step: 0.4962 | Tok/sec=  8254.77 | Loss: 2.6944 / log-ppl: 14.7961 | Grad-Norm 2.9071 | ClipCoef 0.3440 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  544 | Updates:  136 | Time/step: 0.4635 | Tok/sec=  8837.75 | Loss: 2.1362 / log-ppl: 8.4671 | Grad-Norm 2.7132 | ClipCoef 0.3686 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  548 | Updates:  137 | Time/step: 0.4958 | Tok/sec=  8260.82 | Loss: 2.2126 / log-ppl: 9.1394 | Grad-Norm 2.1458 | ClipCoef 0.4660 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  552 | Updates:  138 | Time/step: 0.4639 | Tok/sec=  8829.43 | Loss: 2.1126 / log-ppl: 8.2697 | Grad-Norm 2.1365 | ClipCoef 0.4680 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  556 | Updates:  139 | Time/step: 0.4742 | Tok/sec=  8637.07 | Loss: 1.9027 / log-ppl: 6.7040 | Grad-Norm 2.0133 | ClipCoef 0.4967 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  560 | Updates:  140 | Time/step: 0.5383 | Tok/sec=  7609.50 | Loss: 2.6127 / log-ppl: 13.6359 | Grad-Norm 2.6674 | ClipCoef 0.3749 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  564 | Updates:  141 | Time/step: 0.4850 | Tok/sec=  8445.16 | Loss: 2.5189 / log-ppl: 12.4144 | Grad-Norm 2.1543 | ClipCoef 0.4642 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  568 | Updates:  142 | Time/step: 0.4842 | Tok/sec=  8459.85 | Loss: 2.0506 / log-ppl: 7.7726 | Grad-Norm 2.0937 | ClipCoef 0.4776 | Peak-Mem 37.27GiB
+GPU: cuda:0 | Step:  572 | Updates:  143 | Time/step: 0.5058 | Tok/sec=  8097.98 | Loss: 1.9305 / log-ppl: 6.8927 | Grad-Norm 2.5302 | ClipCoef 0.3952 | Peak-Mem 37.27GiB---------------------------------------
+Begin Slurm Epilog: Jul-17-2026 21:53:43
+Job ID:        11241580
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      b0_retrofit_parity.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=02:25:36,vmem=0,walltime=00:18:12,mem=2911768K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-11-0
+---------------------------------------

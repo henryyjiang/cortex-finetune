@@ -1,0 +1,47 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-04-2026 11:44:56
+Job ID:    11668796
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+=== context ceiling: ckpts/olmo8-cortex -> eval_results/context_ceiling_base-olmo8/olmo8-cortex ===
+Loading: ckpts/olmo8-cortex  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:21<01:21, 81.16s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:36<00:00, 42.32s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:36<00:00, 48.14s/it]
+T=8  n_chunks=4  carry condition: OFF (no cross state)
+context lens: 0 + [128, 256, 512, 1024]
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 2.1s -> ETA 2 min
+  10/50 samples  [0 min]
+  20/50 samples  [1 min]
+  30/50 samples  [1 min]
+  40/50 samples  [1 min]
+  50/50 samples  [1 min]
+
+  Chunk      N       k=0     k=128     k=256     k=512    k=1024
+  --------------------------------------------------------------
+  2         50    3.4635    3.3772    3.3627    3.4806    4.6023
+  3         50    3.4778    3.3895    3.3693    3.4594    4.3732
+  4         50    3.4975    3.4108    3.3961    3.4980    4.3946
+
+  chunks 2+ pooled (n=150), delta vs k=0 (positive = that context HELPS):
+      128 real tokens : +0.08713  (SE 0.00254)
+      256 real tokens : +0.10357  (SE 0.00318)
+      512 real tokens : +0.00030  (SE 0.00528)
+     1024 real tokens : -0.97704  (SE 0.02105)
+
+Results saved -> eval_results/context_ceiling_base-olmo8/olmo8-cortex
+---------------------------------------
+Begin Slurm Epilog: Aug-04-2026 11:48:02
+Job ID:        11668796
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:24:56,vmem=0,walltime=00:03:07,mem=6079228K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-5-0
+---------------------------------------

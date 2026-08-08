@@ -1,0 +1,58 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-17-2026 21:10:32
+Job ID:    11241578
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  rung1_frozen_loop.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[W717 21:10:46.119861907 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Fri Jul 17 21:10:45: Time to load libraries: 8.90 seconds.
+--------------------------------------------------------------------
+------------------ Launching run rung1-k32-ga-rs-nemo------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-01-006-3-0.pace.gatech.edu.
+GPU : NVIDIA A100 80GB PCIe. CUDA: 12.1.
+[cortex] memory ON: K=32 K_iter=0 ccot_direct=False accum_ccot=False (vecs=4/max=64) gated_accum=True cross_chunks=4 carry_grad_chunks=0 random_segments=True lora_rank=0
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:06<00:06,  6.52s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:07<00:00,  3.18s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:07<00:00,  3.68s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo8-cortex and are newly initialized: ['cortex.m_cross.forget_bias', 'cortex.m_cross.gate_proj_in.bias', 'cortex.m_cross.gate_proj_in.weight', 'cortex.m_cross.gate_proj_mem.bias', 'cortex.m_cross.gate_proj_mem.weight', 'cortex.m_cross.input_bias', 'cortex.m_cross.k_proj.weight', 'cortex.m_cross.out_proj.weight', 'cortex.m_cross.q_proj.weight', 'cortex.m_cross.v_proj.weight', 'cortex.m_cross.vec_emb', 'cortex.m_cross.vec_ln.bias', 'cortex.m_cross.vec_ln.weight', 'cortex.m_cross.wk_proj.weight', 'cortex.m_cross.wq_proj.weight', 'cortex.m_cross.wv_proj.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retro-ft/wandb/run-20260717_211057-muz52wz8
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run rung1-k32-ga-rs-nemo
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retro-ft
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retro-ft/runs/muz52wz8
+---------------------------------------
+Begin Slurm Epilog: Jul-17-2026 22:46:05
+Job ID:        11241578
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      rung1_frozen_loop.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=12:44:24,vmem=0,walltime=01:35:33,mem=3597044K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-3-0
+---------------------------------------

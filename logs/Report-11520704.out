@@ -1,0 +1,47 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-27-2026 13:23:23
+Job ID:    11520704
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_carry_ablation.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retro-ft/rung1-k0-acc4v-tb2-rs-nemo/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'ccot_direct': False, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== carry ablation: rung1-k0-acc4v-tb2-rs-nemo -> eval_results/carry_ablation_20260727/rung1-k0-acc4v-tb2-rs-nemo ===
+Loading: cortex-retro-ft/rung1-k0-acc4v-tb2-rs-nemo/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [06:01<06:01, 361.94s/it]Loading checkpoint shards: 100%|██████████| 2/2 [08:53<00:00, 250.00s/it]Loading checkpoint shards: 100%|██████████| 2/2 [08:53<00:00, 266.79s/it]
+Slice ablation: ['oldest', 'newest']  n=4 vectors (accum_vecs=4)  op=drop
+T=8  n_chunks=4
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  25/50 samples...
+  50/50 samples...
+
+  Chunk       N    carried     zeroed    d(zeroed)     oldest    d(oldest)     newest    d(newest)   (delta>0 => that carry content helps)
+  ------------------------------------------------------------------------------------------------
+  1          50     4.0799     4.0799      0.00000     4.0799      0.00000     4.0799      0.00000
+  2          50     3.9726     3.9920      0.01938     3.9920      0.01938     3.9920      0.01938
+  3          50     3.9769     3.9994      0.02248     3.9779      0.00099     3.9801      0.00325
+  4          50     4.0014     4.0209      0.01949     4.0015      0.00012     4.0024      0.00104
+
+  chunks 2+ [ zeroed]: delta = 0.02045 (SE 0.00091)  [chunk 1 is the identical-by-construction control]
+
+  chunks 2+ [ oldest]: delta = 0.00683 (SE 0.00087)
+
+  chunks 2+ [ newest]: delta = 0.00789 (SE 0.00086)
+
+Results saved -> eval_results/carry_ablation_20260727/rung1-k0-acc4v-tb2-rs-nemo
+---------------------------------------
+Begin Slurm Epilog: Jul-27-2026 13:33:34
+Job ID:        11520704
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_carry_ablation.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=01:21:36,vmem=0,walltime=00:10:12,mem=8314004K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-29-0
+---------------------------------------

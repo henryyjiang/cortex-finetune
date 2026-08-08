@@ -1,0 +1,56 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-13-2026 12:21:12
+Job ID:    11112895
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_teacher_advantage.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== teacher advantage: base windows=1024,1536,2048,3072,4096 -> eval_results/teacher_advantage_20260713/base ===
+Loading: ckpts/olmo8-cortex  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [07:35<07:35, 455.61s/it]Loading checkpoint shards: 100%|██████████| 2/2 [09:29<00:00, 254.76s/it]Loading checkpoint shards: 100%|██████████| 2/2 [09:29<00:00, 284.89s/it]
+T=8  n_chunks=4  windows=[1024, 1536, 2048, 3072, 4096]
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  25/50 samples...
+  50/50 samples...
+
+  chunk       W     N       NLL delta_vs_1024        SE   (delta>0 => longer context helps)
+  --------------------------------------------------------
+  2        1024    50    3.4635      0.00000   0.00000
+  2        1536    50    3.4806     -0.01710   0.00815
+  2        2048    50    4.6023     -1.13881   0.03750
+  3        1024    50    3.4778      0.00000   0.00000
+  3        1536    50    3.4594      0.01841   0.00981
+  3        2048    50    4.3732     -0.89532   0.02789
+  3        3072    50    6.1175     -2.63966   0.05579
+  4        1024    50    3.4975      0.00000   0.00000
+  4        1536    50    3.4980     -0.00042   0.00886
+  4        2048    50    4.3946     -0.89700   0.03249
+  4        3072    50    5.9798     -2.48223   0.06109
+  4        4096    50    6.1135     -2.61594   0.05818
+
+  aggregate W=1536: delta = 0.00030 (SE 0.00528, n=150)
+
+  aggregate W=2048: delta = -0.97704 (SE 0.02105, n=150)
+
+  aggregate W=3072: delta = -2.56094 (SE 0.04191, n=100)
+
+  aggregate W=4096: delta = -2.61594 (SE 0.05818, n=50)
+
+Results saved -> eval_results/teacher_advantage_20260713/base
+---------------------------------------
+Begin Slurm Epilog: Jul-13-2026 12:32:26
+Job ID:        11112895
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_teacher_advantage.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=01:29:52,vmem=0,walltime=00:11:14,mem=8358804K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-5-0
+---------------------------------------

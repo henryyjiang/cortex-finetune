@@ -1,0 +1,50 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-04-2026 01:46:07
+Job ID:    11663591
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_write_capacity.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retrofit/retro-b1-acc4v-tb2-mr8/model_only_chkpt_22500
+      REFRESHED stale raven_modeling_minimal_cortex.py
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'accum_vecs': 4, 'accum_max': 64, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== write capacity: retro-b1-acc4v-tb2-mr8 -> eval_results/write_capacity_b1-22500/retro-b1-acc4v-tb2-mr8 ===
+Loading: cortex-retrofit/retro-b1-acc4v-tb2-mr8/model_only_chkpt_22500  (overlay: None)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_write_capacity.py", line 280, in <module>
+    main()
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_write_capacity.py", line 169, in main
+    model, cfg = load_checkpoint(args.checkpoint, args.model_name,
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/model_utils.py", line 98, in load_checkpoint
+    model = AutoModelForCausalLM.from_pretrained(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/transformers/models/auto/auto_factory.py", line 564, in from_pretrained
+    return model_class.from_pretrained(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/transformers/modeling_utils.py", line 279, in _wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/transformers/modeling_utils.py", line 4343, in from_pretrained
+    model = cls(config, *model_args, **model_kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/model_only_chkpt_22500/raven_modeling_minimal_cortex.py", line 538, in __init__
+    self.cortex = CortexMemory(config) if (CortexMemory is not None and memory_enabled(config)) else None
+                  ^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/cortex_graft.py", line 206, in __init__
+    raise ValueError(
+ValueError: cortex.accum_ccot was retired on 2026-08-02 along with the buffer it selected. Use --cortex.prefix_memory accum instead.
+---------------------------------------
+Begin Slurm Epilog: Aug-04-2026 01:46:39
+Job ID:        11663591
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_write_capacity.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:04:32,vmem=0,walltime=00:00:34,mem=962376K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-5-0
+---------------------------------------

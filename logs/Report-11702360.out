@@ -1,0 +1,65 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-05-2026 22:43:35
+Job ID:    11702360
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  rung1_corpus_mix.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== rung1-pfxaccum32-cc4-tb2-rs-pg19 | data=data/pg19_olmo_len4096 | prefix=accum ===
+    geometry: cross_chunks=4 (1024-tok chunks)  accum_vecs=32 accum_max=128 carry_grad_chunks=2
+Wed Aug  5 22:43:58: Time to load libraries: 19.42 seconds.
+--------------------------------------------------------------------
+------------------ Launching run rung1-pfxaccum32-cc4-tb2-rs-pg19------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-01-006-9-0.pace.gatech.edu.
+GPU : NVIDIA A100 80GB PCIe. CUDA: 12.1.
+--------------------------------------------------------------------
+Run finished with errors.
+---------Total time: 0:00:23.522068 ---------
+-----------------Shutdown complete.--------------------------
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1827, in <module>
+    guarded_main()
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1815, in guarded_main
+    run_name = main()
+               ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1781, in main
+    state, device = startup(cfg)
+                    ^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 782, in startup
+    torch.distributed.init_process_group(
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 83, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 97, in wrapper
+    func_return = func(*args, **kwargs)
+                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/distributed/distributed_c10d.py", line 1520, in init_process_group
+    store, rank, world_size = next(rendezvous_iterator)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 269, in _env_rendezvous_handler
+    store = _create_c10d_store(
+            ^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 189, in _create_c10d_store
+    return TCPStore(
+           ^^^^^^^^^
+RuntimeError: The server socket has failed to listen on any local network address. port: 42360, useIpv6: 0, code: -98, name: EADDRINUSE, message: address already in use
+---------------------------------------
+Begin Slurm Epilog: Aug-05-2026 22:44:03
+Job ID:        11702360
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      rung1_corpus_mix.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:03:52,vmem=0,walltime=00:00:29,mem=628764K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-9-0
+---------------------------------------

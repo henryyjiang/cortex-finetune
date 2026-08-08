@@ -1,0 +1,42 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-17-2026 00:09:13
+Job ID:    11220169
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_iter_carry.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retro-ft/rung1-k0-ci-cc1-len1024-nemo/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'ccot_direct': False, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== iter-carry ablation: rung1-k0-ci-cc1-len1024-nemo (pool=last) -> eval_results/iter_carry_20260716-rcl100/rung1-k0-ci-cc1-len1024-nemo ===
+Loading: cortex-retro-ft/rung1-k0-ci-cc1-len1024-nemo/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:03<00:03,  3.86s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:04<00:00,  2.10s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:04<00:00,  2.36s/it]
+T=8  n_chunks=4  pool=last  m_iter=False  ccot_iter=True
+data/pg19_olmo_val_recall100_len4096: 50 rows, evaluating 50
+  25/50 samples...
+  50/50 samples...
+
+  Chunk       N    carried     zeroed   delta(z-c)        SE  (delta>0 => carry helps)
+  ------------------------------------------------------------
+  1          50     4.6604     4.6604      0.00000   0.00000
+  2          50     4.5302     4.5301     -0.00012   0.00023
+  3          50     4.5207     4.5210      0.00026   0.00021
+  4          50     4.5536     4.5535     -0.00011   0.00022
+
+  chunks 2+ aggregate: delta = 0.00001 (SE 0.00013)  [chunk 1 is the identical-by-construction control]
+
+Results saved -> eval_results/iter_carry_20260716-rcl100/rung1-k0-ci-cc1-len1024-nemo
+---------------------------------------
+Begin Slurm Epilog: Jul-17-2026 00:10:05
+Job ID:        11220169
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_iter_carry.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:07:04,vmem=0,walltime=00:00:53,mem=3898992K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-31-0
+---------------------------------------

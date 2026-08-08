@@ -1,0 +1,45 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-13-2026 03:05:16
+Job ID:    11085617
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_carry_ablation.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-k0-ccot-v2/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'ccot_direct': True, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== carry ablation: rung1-k0-ccot-v2 -> eval_results/carry_ablation_20260713/rung1-k0-ccot-v2 ===
+Loading: cortex-retro-ft/rung1-k0-ccot-v2/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:11<01:11, 71.01s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:24<00:00, 36.95s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:24<00:00, 42.06s/it]
+T=8  n_chunks=4
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  25/50 samples...
+  50/50 samples...
+
+  Chunk       N    carried     zeroed   delta(z-c)        SE  (delta>0 => carry helps)
+  ------------------------------------------------------------
+  1          50     2.4758     2.4758      0.00000   0.00000
+  2          50     2.8129     2.8228      0.00989   0.00107
+  3          50     2.8509     2.8600      0.00911   0.00142
+  4          50     2.9160     2.9269      0.01091   0.00138
+
+  chunks 2+ aggregate: delta = 0.00997 (SE 0.00075)  [chunk 1 is the identical-by-construction control]
+
+Results saved -> eval_results/carry_ablation_20260713/rung1-k0-ccot-v2
+---------------------------------------
+Begin Slurm Epilog: Jul-13-2026 03:07:53
+Job ID:        11085617
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_carry_ablation.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:20:56,vmem=0,walltime=00:02:37,mem=8952140K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-29-0
+---------------------------------------

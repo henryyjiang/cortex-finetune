@@ -1,0 +1,71 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-04-2026 19:26:11
+Job ID:    11670039
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'accum_vecs': 4, 'accum_max': 64, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== context ceiling: cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint -> eval_results/context_ceiling_ceil2-20260804-D3-code-arm/rung1-k0-acc4v-tb2-rs-ep3-rcl ===
+Loading: cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint  (overlay: None)
+[cortex] LEGACY buffer active: accum_ccot. Superseded by --cortex.prefix_memory; supported for loading and evaluating Track-A / B1 checkpoints, not for new training runs.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:20<01:20, 80.14s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:35<00:00, 42.13s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:35<00:00, 47.83s/it]
+T=8  n_chunks=4  carry condition: on
+context lens: 0 + [128, 256, 512, 1024]
+position bands: 4 per chunk
+data/code_olmo_val_len4096: 3006 rows, evaluating 50
+  sample 1 took 2.4s -> ETA 2 min
+  10/50 samples  [0 min]
+  20/50 samples  [1 min]
+  30/50 samples  [1 min]
+  40/50 samples  [1 min]
+  50/50 samples  [2 min]
+
+  Chunk      N       k=0     k=128     k=256     k=512    k=1024     carry
+  ------------------------------------------------------------------------
+  2         50    4.3072    4.1250    4.0751    4.0638    4.8555    4.3018
+  3         50    4.2560    4.0770    4.0158    3.9708    4.5048    4.2542
+  4         50    4.2802    4.0841    4.0029    3.9659    4.4130    4.2773
+
+  chunks 2+ pooled (n=150), delta vs k=0 (positive = that context HELPS):
+      128 real tokens : +0.18581  (SE 0.00693)
+      256 real tokens : +0.24990  (SE 0.01096)
+      512 real tokens : +0.28099  (SE 0.01415)
+     1024 real tokens : -0.30998  (SE 0.02756)
+    carry             : +0.00338  (SE 0.00103)
+
+  => the compressed carry is worth about 2 tokens of REAL context
+  => it recovers 1.2% of the best oracle (+0.28099 at k=512 real tokens)
+
+  position bands inside the chunk (n=150 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k128              +0.58732    +0.08665    +0.03789    +0.01532
+  k256              +0.73878    +0.15039    +0.05642    +0.02932
+  k512              +0.86368    +0.22206    +0.09387    -0.08872
+  k1024             +0.97202    +0.12778    -0.66235    -1.79314
+  carry             +0.01292    +0.00214    -0.00022    -0.00086
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_ceil2-20260804-D3-code-arm/rung1-k0-acc4v-tb2-rs-ep3-rcl
+---------------------------------------
+Begin Slurm Epilog: Aug-04-2026 19:29:52
+Job ID:        11670039
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:29:36,vmem=0,walltime=00:03:42,mem=6098480K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-5-0
+---------------------------------------

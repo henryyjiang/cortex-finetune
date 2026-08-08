@@ -1,0 +1,82 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-07-2026 22:55:10
+Job ID:    11740952
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 128, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== context ceiling: cortex-retro-ft/rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3/final_checkpoint -> eval_results/context_ceiling_rung1-20260807/rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3 ===
+Loading: cortex-retro-ft/rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:20<00:20, 20.30s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:24<00:00, 10.89s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:24<00:00, 12.30s/it]
+T=8  n_chunks=4  carry condition: on
+context lens: 0 + [128, 256, 512, 1024]
+carry_plus:   carry + [128, 256] real tokens
+position bands: 4 per chunk
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 2.7s -> ETA 2 min
+  10/50 samples  [0 min]
+  20/50 samples  [1 min]
+  30/50 samples  [1 min]
+  40/50 samples  [2 min]
+  50/50 samples  [2 min]
+
+  Chunk      N       k=0     k=128     k=256     k=512    k=1024     carry
+  ------------------------------------------------------------------------
+  2         50    2.8185    2.7681    2.7540    2.7557    3.4141    2.8185
+  3         50    2.8528    2.8032    2.7860    2.7814    3.2371    2.8528
+  4         50    2.9200    2.8699    2.8576    2.8516    3.3087    2.9200
+
+  chunks 2+ pooled (n=150), delta vs k=0 (positive = that context HELPS):
+      128 real tokens : +0.05001  (SE 0.00178)
+      256 real tokens : +0.06453  (SE 0.00236)
+      512 real tokens : +0.06752  (SE 0.00293)
+     1024 real tokens : -0.45623  (SE 0.01936)
+    carry             : +0.00000  (SE 0.00000)
+
+  => the carry is worth LESS than no context at all; no equivalent exists
+  => it recovers 0.0% of the best oracle (+0.06752 at k=512 real tokens)
+
+  carry + real context (n=150).  residual = what the carry adds
+  ON TOP of context that is free at inference:
+    carry+128   : total +0.05001 (SE 0.00178)   residual +0.00000 (SE 0.00000)  (standalone carry delta <= 0)
+    carry+256   : total +0.06453 (SE 0.00236)   residual +0.00000 (SE 0.00000)  (standalone carry delta <= 0)
+  A residual near zero means the carry is a LOCAL-CONTEXT
+  SURROGATE: it re-supplies what the last k tokens already give,
+  so the headroom worth chasing is (best ceiling - ceiling(k)),
+  not the whole ceiling.
+
+  position bands inside the chunk (n=150 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k128              +0.16650    +0.01840    +0.01137    +0.00375
+  k256              +0.20231    +0.02814    +0.02045    +0.00723
+  k512              +0.22766    +0.04840    +0.03134    -0.03732
+  k1024             +0.25439    -0.00237    -0.47029    -1.60666
+  carry             +0.00000    +0.00000    +0.00000    +0.00000
+  carry+128         +0.16650    +0.01840    +0.01137    +0.00375
+  carry+256         +0.20231    +0.02814    +0.02045    +0.00723
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_rung1-20260807/rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3
+---------------------------------------
+Begin Slurm Epilog: Aug-07-2026 22:58:04
+Job ID:        11740952
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:23:12,vmem=0,walltime=00:02:54,mem=6732568K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-1-0
+---------------------------------------

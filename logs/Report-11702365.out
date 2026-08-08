@@ -1,0 +1,177 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-05-2026 23:06:08
+Job ID:    11702365
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  rung1_chain_length.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== rung1-pfxaccum32-cc8-tb4-rs-pg19 | data=data/pg19_olmo_len4096 | prefix=accum ===
+    geometry: cross_chunks=8 (512-tok chunks)  accum_vecs=32 accum_max=256 carry_grad_chunks=4
+    control to compare against: rung1-pfxaccum32-cc4-tb2-rs-pg19
+    bar to beat: 29.1% of ceiling (cc4 checkpoint read off-distribution at nc=8)
+    REMINDER: every eval on this arm needs N_CHUNKS=8
+[W805 23:06:36.308460936 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Wed Aug  5 23:06:32: Time to load libraries: 19.85 seconds.
+--------------------------------------------------------------------
+------------------ Launching run rung1-pfxaccum32-cc8-tb4-rs-pg19------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-01-006-5-0.pace.gatech.edu.
+GPU : NVIDIA A100 80GB PCIe. CUDA: 12.1.
+[cortex] memory ON: K=0 K_iter=0 ccot_direct=False accum_ccot=False (vecs=32/max=256) gated_accum=False prefix_memory=accum prefix_pos=tail prefix_eos_reset=False cross_chunks=8 carry_grad_chunks=4 random_segments=True lora_rank=0
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:19<00:19, 19.84s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:23<00:00, 10.29s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:23<00:00, 11.72s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo8-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retro-ft/wandb/run-20260805_230705-59i38cgr
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run rung1-pfxaccum32-cc8-tb4-rs-pg19
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retro-ft
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retro-ft/runs/59i38cgr
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[cortex] froze 49 loop (adapter+core_block) params; unfreeze at step never
+--------------------------------------------------------------------
+Run finished with errors.
+---------Total time: 0:00:56.340166 ---------
+-----------------Shutdown complete.--------------------------
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1827, in <module>
+    guarded_main()
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1815, in guarded_main
+    run_name = main()
+               ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1789, in main
+    state = train(state, device, cfg, data_start_step, optimizer_step, total_tokens, total_tokens_with_loss, elapsed_time)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1573, in train
+    loss, log_ppl, num_steps_no_grad, num_steps_with_grad = fwd_bwd_func(model, input_ids, labels)
+                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1529, in cortex_fwd_bwd
+    out = model(xc, labels=yc, num_steps=num_steps,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 717, in forward
+    x, num_steps_no_grad, num_steps_with_grad, xk, block_idx = self.iterate_forward(
+                                                               ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 798, in iterate_forward
+    x, block_idx = self.core_block_forward(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 821, in core_block_forward
+    x = block(x, freqs_cis, block_idx, mask, past_key_values)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 494, in forward
+    x = self.norm_2(self.mlp(x)) + x
+                    ^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 468, in forward
+    x_fc_1, x_fc_2 = self.fc(x).chunk(2, dim=-1)
+                     ^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 64.00 MiB. GPU 0 has a total capacity of 79.25 GiB of which 25.94 MiB is free. Including non-PyTorch memory, this process has 79.22 GiB memory in use. Of the allocated memory 78.37 GiB is allocated by PyTorch, and 28.09 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1827, in <module>
+[rank0]:     guarded_main()
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1815, in guarded_main
+[rank0]:     run_name = main()
+[rank0]:                ^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1789, in main
+[rank0]:     state = train(state, device, cfg, data_start_step, optimizer_step, total_tokens, total_tokens_with_loss, elapsed_time)
+[rank0]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1573, in train
+[rank0]:     loss, log_ppl, num_steps_no_grad, num_steps_with_grad = fwd_bwd_func(model, input_ids, labels)
+[rank0]:                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 1529, in cortex_fwd_bwd
+[rank0]:     out = model(xc, labels=yc, num_steps=num_steps,
+[rank0]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 717, in forward
+[rank0]:     x, num_steps_no_grad, num_steps_with_grad, xk, block_idx = self.iterate_forward(
+[rank0]:                                                                ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 798, in iterate_forward
+[rank0]:     x, block_idx = self.core_block_forward(
+[rank0]:                    ^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 821, in core_block_forward
+[rank0]:     x = block(x, freqs_cis, block_idx, mask, past_key_values)
+[rank0]:         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 494, in forward
+[rank0]:     x = self.norm_2(self.mlp(x)) + x
+[rank0]:                     ^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo8-cortex/raven_modeling_minimal_cortex.py", line 468, in forward
+[rank0]:     x_fc_1, x_fc_2 = self.fc(x).chunk(2, dim=-1)
+[rank0]:                      ^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/linear.py", line 125, in forward
+[rank0]:     return F.linear(input, self.weight, self.bias)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 64.00 MiB. GPU 0 has a total capacity of 79.25 GiB of which 25.94 MiB is free. Including non-PyTorch memory, this process has 79.22 GiB memory in use. Of the allocated memory 78.37 GiB is allocated by PyTorch, and 28.09 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mrung1-pfxaccum32-cc8-tb4-rs-pg19[0m at: [34mhttps://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retro-ft/runs/59i38cgr[0m
+---------------------------------------
+Begin Slurm Epilog: Aug-05-2026 23:07:10
+Job ID:        11702365
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      rung1_chain_length.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:08:32,vmem=0,walltime=00:01:04,mem=3494940K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-5-0
+---------------------------------------

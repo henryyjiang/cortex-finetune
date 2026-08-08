@@ -1,0 +1,38 @@
+---------------------------------------
+Begin Slurm Prolog: Jul-27-2026 13:50:37
+Job ID:    11520798
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_basic.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retro-ft/rung1-k32-ga-rs-ep3-rcl/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 32, 'memory_slots_iter': 0, 'memory_heads': 4, 'ccot_direct': False, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== basic eval: rung1-k32-ga-rs-ep3-rcl  (cortex-retro-ft/rung1-k32-ga-rs-ep3-rcl/final_checkpoint) -> eval_results/basic_20260727/rung1-k32-ga-rs-ep3-rcl ===
+Loading checkpoint: None
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [03:06<03:06, 186.42s/it]Loading checkpoint shards: 100%|██████████| 2/2 [03:25<00:00, 87.89s/it] Loading checkpoint shards: 100%|██████████| 2/2 [03:25<00:00, 102.67s/it]
+Using the latest cached version of the dataset since openai/gsm8k couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'main' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/openai___gsm8k/main/0.0.0/740312add88f781978c0658806c59bc2815b9866 (last modified on Fri Jul 10 21:28:24 2026).
+T=8  ccot_passes=0
+  100/500  acc=0.0200
+  200/500  acc=0.0200
+  300/500  acc=0.0200
+  400/500  acc=0.0275
+  500/500  acc=0.0300
+
+GSM8K accuracy: 15/500 = 0.0300
+Results saved → eval_results/basic_20260727/rung1-k32-ga-rs-ep3-rcl/gsm8k
+---------------------------------------
+Begin Slurm Epilog: Jul-27-2026 16:22:04
+Job ID:        11520798
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_basic.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=20:11:44,vmem=0,walltime=02:31:28,mem=8903836K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-35-0
+---------------------------------------

@@ -1,0 +1,75 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-04-2026 18:36:51
+Job ID:    11670037
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'accum_vecs': 4, 'accum_max': 64, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== context ceiling: cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint -> eval_results/context_ceiling_ceil2-20260804-D2-nc8-arm/rung1-k0-acc4v-tb2-rs-ep3-rcl ===
+Loading: cortex-retro-ft/rung1-k0-acc4v-tb2-rs-ep3-rcl/final_checkpoint  (overlay: None)
+[cortex] LEGACY buffer active: accum_ccot. Superseded by --cortex.prefix_memory; supported for loading and evaluating Track-A / B1 checkpoints, not for new training runs.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:18<01:18, 78.88s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:36<00:00, 42.66s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:36<00:00, 48.09s/it]
+T=8  n_chunks=8  carry condition: on
+context lens: 0 + [64, 128, 256, 512]
+position bands: 4 per chunk
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 5.1s -> ETA 4 min
+  10/50 samples  [1 min]
+  20/50 samples  [2 min]
+  30/50 samples  [2 min]
+  40/50 samples  [3 min]
+  50/50 samples  [4 min]
+
+  Chunk      N       k=0      k=64     k=128     k=256     k=512     carry
+  ------------------------------------------------------------------------
+  2         50    2.8316    2.7494    2.7262    2.6977    2.6693    2.7848
+  3         50    2.8785    2.8015    2.7790    2.7541    2.7377    2.8339
+  4         50    2.9128    2.8340    2.8135    2.7884    2.7646    2.8692
+  5         50    2.9541    2.8731    2.8530    2.8248    2.8021    2.9114
+  6         50    2.8975    2.8224    2.8001    2.7728    2.7511    2.8523
+  7         50    2.9964    2.9239    2.9004    2.8796    2.8492    2.9571
+  8         50    2.9880    2.9141    2.8997    2.8687    2.8450    2.9473
+
+  chunks 2+ pooled (n=350), delta vs k=0 (positive = that context HELPS):
+       64 real tokens : +0.07721  (SE 0.00201)
+      128 real tokens : +0.09815  (SE 0.00242)
+      256 real tokens : +0.12469  (SE 0.00287)
+      512 real tokens : +0.14855  (SE 0.00330)
+    carry             : +0.04327  (SE 0.00120)
+
+  => the compressed carry is worth about 36 tokens of REAL context
+  => it recovers 29.1% of the best oracle (+0.14855 at k=512 real tokens)
+
+  position bands inside the chunk (n=350 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k64               +0.26068    +0.03008    +0.01216    +0.00592
+  k128              +0.31074    +0.04668    +0.02295    +0.01221
+  k256              +0.36250    +0.07452    +0.03903    +0.02271
+  k512              +0.39468    +0.09564    +0.06248    +0.04139
+  carry             +0.12159    +0.03025    +0.01418    +0.00707
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_ceil2-20260804-D2-nc8-arm/rung1-k0-acc4v-tb2-rs-ep3-rcl
+---------------------------------------
+Begin Slurm Epilog: Aug-04-2026 18:42:45
+Job ID:        11670037
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:47:28,vmem=0,walltime=00:05:56,mem=5734228K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-25-0
+---------------------------------------
