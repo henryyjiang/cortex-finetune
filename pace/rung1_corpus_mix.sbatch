@@ -42,13 +42,27 @@
 # mix's 400M — a 3.4x exposure gap on top of the corpus difference, i.e. exactly
 # the confound the note above warns about.  EPOCHS=3 gives 5,361 updates / 351M
 # tokens, the closest integer match.
-#   The cost: rung1_chain_length.sbatch names pfxaccum32-cc4-tb2-rs-pg19 as ITS
-#   control too, and that comparison needs EPOCHS=1 (1,787 updates) to match the
-#   cc=8 arm's budget.  One PG-19 job cannot serve both readings.  Submit BOTH —
-#   at ~17.4 s/update the EPOCHS=1 control is only ~9h, and a mislabelled shared
-#   control silently confounds two arms at once.  Distinguish them by run name:
-#     RUN_NAME=rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3   (mix control, EPOCHS=3)
-#     RUN_NAME=rung1-pfxaccum32-cc4-tb2-rs-pg19       (chain-length control, EPOCHS=1)
+#   The knock-on: rung1_chain_length.sbatch names pfxaccum32-cc4-tb2-rs-pg19 as
+#   ITS control too, so the cc=8 arm has to match whatever EPOCHS this control
+#   runs at.  EPOCHS sets the LR horizon directly (train.py:1198,
+#   max_training_steps = epochs x updates_per_epoch, since these arms pass no
+#   --max_steps), so an EPOCHS=3 control read at step 1,787 is a third of the
+#   way through its schedule while an EPOCHS=1 arm is fully cooled down — the
+#   per-segment cooldown artifact that got baked into the 2026-06 weights.  An
+#   intermediate checkpoint is NOT a valid match for a shorter run.
+#
+# RESOLVED 2026-08-06: ONE control at EPOCHS=3, and the cc=8 arm runs at
+# EPOCHS=3 too.  The alternative (a second EPOCHS=1 control, ~9h) buys nothing
+# the longer arm does not, and EPOCHS=3 lands the cc=8 arm on Track A's exact
+# 5,361-update / 351M-token budget, so it is cross-referenceable against
+# acc4v-tb2-rs-ep3-rcl for free.  3 epochs on PG-19 with random_segments=true
+# is what Track A already did — established, not a new risk.  Submit as:
+#   RUN_NAME=rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3 EPOCHS=3 \
+#       DATA_PATH=data/pg19_olmo_len4096 sbatch pace/rung1_corpus_mix.sbatch
+#   RUN_NAME=rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 EPOCHS=3 \
+#       sbatch pace/rung1_chain_length.sbatch
+# A plain `sbatch pace/rung1_chain_length.sbatch` is EPOCHS=1 and silently has
+# no valid control (job 11718571, cancelled for exactly this).
 #
 # WALLTIME.  36h, up from 16h.  The first mix submission (job 11702363,
 # 2026-08-05) hit TIMEOUT at exactly 16:00:09 having reached update 3,311 of

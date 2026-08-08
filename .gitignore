@@ -4,6 +4,7 @@ outputs*/
 
 *.pyc
 *.out
+!logs/*.out
 *.core
 inductor_cache/
 huginn_llama/

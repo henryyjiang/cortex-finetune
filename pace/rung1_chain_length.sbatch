@@ -83,10 +83,14 @@
 # geometry has never been measured.  Check Time/step in the first minutes of the
 # log and trim on the next link rather than guessing again.
 #
-# ARMS.
-#   sbatch pace/rung1_chain_length.sbatch      # cc=8, tb4, 512-tok chunks
-# The CONTROL IS SHARED with the mix run — do not submit it twice:
-#   DATA_PATH=data/pg19_olmo_len4096 sbatch pace/rung1_corpus_mix.sbatch
+# ARMS.  EPOCHS=3 IS REQUIRED, NOT OPTIONAL — a plain `sbatch` of this script is
+# EPOCHS=1 and has no valid control (job 11718571, cancelled for exactly that).
+#   RUN_NAME=rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 EPOCHS=3 \
+#       sbatch pace/rung1_chain_length.sbatch   # cc=8, tb4, 512-tok chunks
+# The CONTROL IS SHARED with the mix run — do not submit it twice, and it must
+# carry the SAME EPOCHS or the LR horizons differ (train.py:1198):
+#   RUN_NAME=rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3 EPOCHS=3 \
+#       DATA_PATH=data/pg19_olmo_len4096 sbatch pace/rung1_corpus_mix.sbatch
 # gives pfxaccum32-cc4-tb2-rs-pg19, same mechanism, same data, same budget,
 # geometry the only difference.  Three arms total across both scripts.
 #
