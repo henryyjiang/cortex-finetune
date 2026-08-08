@@ -1,0 +1,27 @@
+{
+  "hellaswag": {
+    "correct": 4323,
+    "total": 10042,
+    "accuracy": 0.4304919338777136
+  },
+  "winogrande": {
+    "correct": 685,
+    "total": 1267,
+    "accuracy": 0.5406471981057617
+  },
+  "arc_easy": {
+    "correct": 235,
+    "total": 570,
+    "accuracy": 0.41228070175438597
+  },
+  "arc_challenge": {
+    "correct": 85,
+    "total": 299,
+    "accuracy": 0.2842809364548495
+  },
+  "piqa": {
+    "correct": 1146,
+    "total": 1838,
+    "accuracy": 0.6235038084874864
+  }
+}

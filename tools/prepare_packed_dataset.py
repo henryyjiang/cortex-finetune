@@ -167,7 +167,7 @@ def main() -> int:
     # snapshot/domain-ordered (cheap: arrow-backed index permutation)
     packed = packed.shuffle(seed=args.seed)
     assert len(packed), "no rows produced — check --dataset/--subset/--text_col"
-    packed.save_to_disk(args.out)
+    packed.save_to_disk(args.out, num_proc=8)
     print(f"saved {len(packed)} rows x {row_len} tokens "
           f"({len(packed) * args.max_length / 1e6:.0f}M tokens from "
           f"{stats['docs']} docs) -> {args.out}")
