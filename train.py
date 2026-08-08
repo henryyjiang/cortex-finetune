@@ -14,6 +14,7 @@ from functools import partial
 import sys
 import datetime
 import shutil
+import inspect
 import subprocess
 import torch
 import wandb
@@ -861,6 +862,51 @@ def startup(cfg: CLISettings):
             "grafted modeling file predates the LoRA graft. Re-run "
             "tools/prepare_cortex_checkpoint.py to refresh the model dir."
         )
+    # cortex: the guard above catches a MISSING module; this one catches a stale
+    # forward, which is invisible until eval.  cortex_graft.py is imported live
+    # from the repo root, but the modeling file is a SNAPSHOT in the model dir
+    # (trust_remote_code loads it from there, not from convert_pretrained_model/).
+    # A snapshot predating the prefix rewrite still builds cortex.prefix — the
+    # module comes from the live graft, so `model.cortex is not None` passes —
+    # but its forward() never calls prefix_pack/prefix_unpack.  The summary slots
+    # are then never spliced into the stream: no gradient reaches cortex.prefix,
+    # and cross_write returns None for a prefix arm (memory_slots=0 leaves no
+    # bolt-on buffer to fall back on).  The run trains as a plain no-memory
+    # baseline with a perfectly healthy loss curve.
+    #
+    # That is what happened to the rung1-pfxaccum32-* arms (2026-08-07): every
+    # config flag correct, ckpts/olmo8-cortex holding a pre-rewrite snapshot, and
+    # the saved checkpoints came back with summary_seeded still False and
+    # summary_emb still at its N(0, 0.02) init from reset_cortex_inits below.
+    # Cost was three training runs plus a night of evals, so fail at step 0.
+    if cfg.cortex["use_memory"] and cfg.cortex["prefix_memory"]:
+        fwd = type(model).forward
+        # Signature first: it always works, and the snapshot's tell is that it
+        # has no prefix_write/prefix_read knobs at all.  Source is the semantic
+        # check but needs a retrievable file, so it only ever adds a failure.
+        stale = "prefix_write" not in inspect.signature(fwd).parameters
+        if not stale:
+            try:
+                stale = "prefix_pack" not in inspect.getsource(fwd)
+            except (OSError, TypeError):
+                pass
+        if stale:
+            try:
+                where = inspect.getfile(fwd)
+            except TypeError:
+                where = f"the modeling file in {cfg.model_name}"
+            raise RuntimeError(
+                f"cfg.cortex.prefix_memory={cfg.cortex['prefix_memory']!r} but "
+                f"{where} has no prefix_pack in forward() — this model dir's "
+                "snapshot of raven_modeling_minimal_cortex.py predates the "
+                "prefix rewrite, so the summary slots would never be spliced "
+                "and cortex.prefix would train no weights (silently, with a "
+                "healthy loss curve).  Refresh the snapshot:\n"
+                "  cp convert_pretrained_model/raven_modeling_minimal_<variant>.py "
+                f"{cfg.model_name}/raven_modeling_minimal_cortex.py\n"
+                "then re-run tools/prepare_eval_checkpoint.py against any "
+                "checkpoints already derived from it."
+            )
 
     # cortex: undo post_init's clobbering of the graft's designed inits (must run
     # AFTER from_pretrained, BEFORE the L2-SP snapshot / freeze / optimizer build
