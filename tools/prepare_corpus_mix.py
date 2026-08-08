@@ -93,7 +93,12 @@ def main() -> int:
     ds_b = ds_b.shuffle(seed=args.seed).select(range(n_from_b))
     mixed = concatenate_datasets([ds_a, ds_b]).shuffle(seed=args.seed)
     mixed = mixed.flatten_indices()
-    mixed.save_to_disk(args.out)
+    # num_proc is NOT optional at this size.  shuffle() only attaches an index
+    # permutation, so save_to_disk materialises ~1M rows of ~20KB each in random
+    # order across two source arrow files on Lustre — a million seeks, ~14h
+    # single-process.  Same bottleneck already fixed in prepare_packed_dataset.py.
+    # Keep the shuffle: it is what stops an epoch being corpus-ordered.
+    mixed.save_to_disk(args.out, num_proc=8)
     print(f"wrote {args.out}")
     return 0
 

@@ -56,13 +56,52 @@
 # the longer arm does not, and EPOCHS=3 lands the cc=8 arm on Track A's exact
 # 5,361-update / 351M-token budget, so it is cross-referenceable against
 # acc4v-tb2-rs-ep3-rcl for free.  3 epochs on PG-19 with random_segments=true
-# is what Track A already did — established, not a new risk.  Submit as:
-#   RUN_NAME=rung1-pfxaccum32-cc4-tb2-rs-pg19-ep3 EPOCHS=3 \
+# is what Track A already did — established, not a new risk.
+#
+# ============================================================================
+# SUPERSEDED 2026-08-08.  THE 2026-08-05/06 RUNS ARE VOID — THEY HAD NO MEMORY.
+# ============================================================================
+# All three arms (-cc4-tb2-rs-pg19-ep3, -cc4-tb2-rs-mix, -cc8-tb4-rs-pg19-ep3)
+# trained as plain no-memory baselines.  ckpts/olmo8-cortex held a modeling
+# snapshot predating the prefix rewrite, so forward() never called
+# prefix_pack/prefix_unpack: the summary slots were never spliced, no gradient
+# ever reached cortex.prefix, and summary_emb sat at its N(0, 0.02) init for
+# the whole run behind a perfectly healthy loss curve.  Bug class 2, third
+# instance.  Confirmed from the checkpoint safetensors (summary_seeded == 0.0,
+# summary_emb row-row cosine 0.0001 == the d=2048 random baseline, row norms
+# 0.905 == 0.02*sqrt(2048), orthogonal to wte[eos] and 10x smaller).
+#   train.py now RAISES at step 0 on a stale snapshot (commit 177181b), so this
+#   cannot recur silently.  ckpts/olmo8-cortex was refreshed 2026-08-08 10:40.
+#   `ls -l` + `diff` on a snapshot proves nothing about what TRAINING saw — a
+#   re-prepare rewrites it.  Compare its mtime against the run's START date.
+#
+# WHAT SURVIVES: the CORPUS comparison.  Both cc4 arms were no-memory finetunes
+# differing ONLY in corpus, so GSM8K 1.6% -> 37.6% with every text column flat
+# or up is still clean and controlled — it was never a memory claim.  B2's arm
+# corpus is settled on the mix and does not wait on any re-run.
+# WHAT DIES: every carry number, and the chain-length arm outright.
+#
+# RE-RUN PLAN, decided 2026-08-08 — EPOCHS=1, and ONLY the two arms chain
+# length needs.  The mix arm is NOT re-run: its question is answered.
+#   RUN_NAME=rung1-pfxaccum32-cc4-tb2-rs-pg19-ep1 \
 #       DATA_PATH=data/pg19_olmo_len4096 sbatch pace/rung1_corpus_mix.sbatch
-#   RUN_NAME=rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 EPOCHS=3 \
+#   RUN_NAME=rung1-pfxaccum32-cc8-tb4-rs-pg19-ep1 \
 #       sbatch pace/rung1_chain_length.sbatch
-# A plain `sbatch pace/rung1_chain_length.sbatch` is EPOCHS=1 and silently has
-# no valid control (job 11718571, cancelled for exactly this).
+# Both default to EPOCHS=1, so pass NOTHING — 1,787 updates / 117M tokens each,
+# identical data and tokens-per-step (cross_chunks changes chunk length, not
+# row length), so the pair is matched TO EACH OTHER, which is all the
+# chain-length comparison requires.  ~1/3 the cost of the EPOCHS=3 pair.
+#   The -ep1 suffix is LOAD-BEARING: the dead -ep3 dirs still exist and a name
+#   collision would overwrite them, destroying the evidence for the post-mortem
+#   above.
+#   TWO COSTS, STATE THEM.  (1) At 117M tokens these are NOT cross-referenceable
+#   against Track A's 351M-token numbers — do not put them in the same column.
+#   (2) A NULL IS AMBIGUOUS: "chain length does not help" and "117M tokens was
+#   not enough to learn it" are indistinguishable at this budget.  A positive
+#   result is conclusive; a null is not.  EPOCHS=2 (234M) is the compromise if
+#   budget appears.
+# The old EPOCHS=3 invocation is kept above only as the record of what the void
+# runs did.  Do not submit it.
 #
 # WALLTIME.  36h, up from 16h.  The first mix submission (job 11702363,
 # 2026-08-05) hit TIMEOUT at exactly 16:00:09 having reached update 3,311 of

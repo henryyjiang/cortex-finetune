@@ -42,6 +42,31 @@
 # (rung1-pfxaccum32-cc4-tb2-rs-pg19, from rung1_corpus_mix.sbatch), read at
 # nc=8.  Quote 29.1% as historical context only; if the control is missing,
 # this arm has no valid reference and the run cannot conclude anything.
+# (29.1% survives the 2026-08-08 post-mortem below: it came from a LEGACY
+# AccumCCoT arm, which was never on the prefix path and did have real memory.)
+#
+# ============================================================================
+# THE 2026-08-06 SUBMISSION OF THIS ARM IS VOID — IT HAD NO MEMORY.
+# ============================================================================
+# rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 trained as a plain no-memory baseline:
+# ckpts/olmo8-cortex held a pre-prefix-rewrite modeling snapshot, so
+# prefix_pack/prefix_unpack never ran and cortex.prefix received no gradient.
+# Full post-mortem and the checkpoint fingerprint are in the header of
+# pace/rung1_corpus_mix.sbatch.  train.py now raises at step 0 on a stale
+# snapshot (commit 177181b).  Chain length therefore has NO result of any kind
+# — the carry ablations that "measured" it were reading untrained noise.
+#
+# RE-RUN AT EPOCHS=1 (decided 2026-08-08, budget call).  Submit the pair:
+#   RUN_NAME=rung1-pfxaccum32-cc4-tb2-rs-pg19-ep1 \
+#       DATA_PATH=data/pg19_olmo_len4096 sbatch pace/rung1_corpus_mix.sbatch
+#   RUN_NAME=rung1-pfxaccum32-cc8-tb4-rs-pg19-ep1 \
+#       sbatch pace/rung1_chain_length.sbatch
+# Pass NOTHING for EPOCHS — both scripts already default to 1, giving 1,787
+# updates / 117M tokens each.  cross_chunks changes chunk length, not row
+# length, so tokens-per-step is identical and the pair is matched to each
+# other.  The -ep1 suffix must not be dropped: the void -ep3 dirs still exist.
+# A null at this budget is AMBIGUOUS (lever dead vs undertrained); only a
+# positive is conclusive.  See rung1_corpus_mix.sbatch for the full costs.
 # Secondary: ceil2 found one hint of non-context-substitute behaviour at nc=8 —
 # the carry's benefit persisted further into the chunk than the short-k oracle's
 # (band1/band0 0.249 vs 0.115).  Re-check that here; it is the only evidence in
