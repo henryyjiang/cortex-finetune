@@ -1,0 +1,50 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-08-2026 10:53:31
+Job ID:    11746247
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_carry_ablation.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-pfxaccum32-cc4-tb2-rs-mix/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 128, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== carry ablation: rung1-pfxaccum32-cc4-tb2-rs-mix -> eval_results/carry_ablation_rung1-20260807/rung1-pfxaccum32-cc4-tb2-rs-mix ===
+Loading: cortex-retro-ft/rung1-pfxaccum32-cc4-tb2-rs-mix/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:32<01:32, 92.14s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:48<00:00, 47.32s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:48<00:00, 54.05s/it]
+Slice ablation: ['oldest', 'newest']  n=32 vectors (accum_vecs=32)  op=drop
+T=8  n_chunks=4
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  25/50 samples...
+  50/50 samples...
+
+  Chunk       N    carried     zeroed    d(zeroed)     oldest    d(oldest)     newest    d(newest)   (delta>0 => that carry content helps)
+  ------------------------------------------------------------------------------------------------
+  1          50     2.5173     2.5173      0.00000     2.5173      0.00000     2.5173      0.00000
+  2          50     8.9311     2.8590     -6.07207     2.8590     -6.07207     2.8590     -6.07207
+  3          50     9.7673     2.8990     -6.86831     8.8906     -0.87676     8.9383     -0.82899
+  4          50    10.3508     2.9613     -7.38954     9.7885     -0.56231     9.3424     -1.00838
+
+  chunks 2+ [ zeroed]: delta = -6.77664 (SE 0.06646)  [chunk 1 is the identical-by-construction control]
+
+  chunks 2+ [ oldest]: delta = -2.50371 (SE 0.21449)
+
+  chunks 2+ [ newest]: delta = -2.63648 (SE 0.20390)
+
+Results saved -> eval_results/carry_ablation_rung1-20260807/rung1-pfxaccum32-cc4-tb2-rs-mix
+---------------------------------------
+Begin Slurm Epilog: Aug-08-2026 10:56:48
+Job ID:        11746247
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_carry_ablation.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:26:16,vmem=0,walltime=00:03:17,mem=6476128K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-11-0
+---------------------------------------

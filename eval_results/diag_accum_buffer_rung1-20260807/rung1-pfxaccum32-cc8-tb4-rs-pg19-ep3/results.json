@@ -1,0 +1,730 @@
+{
+  "per_chunk": {
+    "chunk1": {
+      "n": 50,
+      "n_vecs": 32,
+      "new_norm_mean": 114.8241958618164,
+      "new_norm_std": 1.6073468923568726,
+      "state_norm_mean": 114.8241958618164,
+      "new_vs_old_cos": null,
+      "loss": 2.229766845703125,
+      "distinct_ratio": 0.5760054588317871
+    },
+    "chunk2": {
+      "n": 50,
+      "n_vecs": 64,
+      "new_norm_mean": 119.259765625,
+      "new_norm_std": 0.5563182234764099,
+      "state_norm_mean": 117.0419692993164,
+      "new_vs_old_cos": 0.11296600103378296,
+      "loss": 9.507820129394531,
+      "distinct_ratio": 0.6908290386199951
+    },
+    "chunk3": {
+      "n": 50,
+      "n_vecs": 96,
+      "new_norm_mean": 119.77201080322266,
+      "new_norm_std": 0.8037072420120239,
+      "state_norm_mean": 117.95198059082031,
+      "new_vs_old_cos": 0.19256208837032318,
+      "loss": 11.009943962097168,
+      "distinct_ratio": 0.7555685639381409
+    },
+    "chunk4": {
+      "n": 50,
+      "n_vecs": 128,
+      "new_norm_mean": 119.99913024902344,
+      "new_norm_std": 0.6233679056167603,
+      "state_norm_mean": 118.4637680053711,
+      "new_vs_old_cos": 0.29184484481811523,
+      "loss": 11.10501480102539,
+      "distinct_ratio": 0.753673791885376
+    },
+    "chunk5": {
+      "n": 50,
+      "n_vecs": 160,
+      "new_norm_mean": 119.97864532470703,
+      "new_norm_std": 0.6300931572914124,
+      "state_norm_mean": 118.76673889160156,
+      "new_vs_old_cos": 0.34509900212287903,
+      "loss": 11.181506156921387,
+      "distinct_ratio": 0.7346006631851196
+    },
+    "chunk6": {
+      "n": 50,
+      "n_vecs": 192,
+      "new_norm_mean": 119.89167785644531,
+      "new_norm_std": 0.6112403869628906,
+      "state_norm_mean": 118.95423126220703,
+      "new_vs_old_cos": 0.377742737531662,
+      "loss": 11.218609809875488,
+      "distinct_ratio": 0.6900436878204346
+    },
+    "chunk7": {
+      "n": 50,
+      "n_vecs": 224,
+      "new_norm_mean": 119.86201477050781,
+      "new_norm_std": 0.5312208533287048,
+      "state_norm_mean": 119.08392333984375,
+      "new_vs_old_cos": 0.39001789689064026,
+      "loss": 11.237147331237793,
+      "distinct_ratio": 0.6902010440826416
+    },
+    "chunk8": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 119.85724639892578,
+      "new_norm_std": 0.4874141216278076,
+      "state_norm_mean": 119.18058776855469,
+      "new_vs_old_cos": 0.39602333307266235,
+      "loss": 11.352025985717773,
+      "distinct_ratio": 0.6762031316757202
+    },
+    "chunk9": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 119.88292694091797,
+      "new_norm_std": 0.49330830574035645,
+      "state_norm_mean": 119.81292724609375,
+      "new_vs_old_cos": 0.44619691371917725,
+      "loss": 11.349920272827148,
+      "distinct_ratio": 0.6280982494354248
+    },
+    "chunk10": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.0580825805664,
+      "new_norm_std": 0.5791528224945068,
+      "state_norm_mean": 119.91271209716797,
+      "new_vs_old_cos": 0.3196750283241272,
+      "loss": 11.289155006408691,
+      "distinct_ratio": 0.6603086590766907
+    },
+    "chunk11": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.09102630615234,
+      "new_norm_std": 0.5427668690681458,
+      "state_norm_mean": 119.95259094238281,
+      "new_vs_old_cos": 0.3613536059856415,
+      "loss": 11.124533653259277,
+      "distinct_ratio": 0.6332871913909912
+    },
+    "chunk12": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.03443145751953,
+      "new_norm_std": 0.575271487236023,
+      "state_norm_mean": 119.95700073242188,
+      "new_vs_old_cos": 0.3704805076122284,
+      "loss": 11.048117637634277,
+      "distinct_ratio": 0.643545925617218
+    },
+    "chunk13": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.01367950439453,
+      "new_norm_std": 0.6095155477523804,
+      "state_norm_mean": 119.96139526367188,
+      "new_vs_old_cos": 0.3832685053348541,
+      "loss": 11.085002899169922,
+      "distinct_ratio": 0.6490169763565063
+    },
+    "chunk14": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.04464721679688,
+      "new_norm_std": 0.455279141664505,
+      "state_norm_mean": 119.98051452636719,
+      "new_vs_old_cos": 0.38920754194259644,
+      "loss": 11.073490142822266,
+      "distinct_ratio": 0.6365312933921814
+    },
+    "chunk15": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 119.96591186523438,
+      "new_norm_std": 0.48986178636550903,
+      "state_norm_mean": 119.99349975585938,
+      "new_vs_old_cos": 0.391148179769516,
+      "loss": 11.090322494506836,
+      "distinct_ratio": 0.6277156472206116
+    },
+    "chunk16": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.00161743164062,
+      "new_norm_std": 0.48179441690444946,
+      "state_norm_mean": 120.01154327392578,
+      "new_vs_old_cos": 0.39085063338279724,
+      "loss": 11.19064712524414,
+      "distinct_ratio": 0.6221081018447876
+    },
+    "chunk17": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 119.89166259765625,
+      "new_norm_std": 0.7127050161361694,
+      "state_norm_mean": 120.01264953613281,
+      "new_vs_old_cos": 0.3946710228919983,
+      "loss": 11.111739158630371,
+      "distinct_ratio": 0.6538150310516357
+    },
+    "chunk18": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 119.97854614257812,
+      "new_norm_std": 0.6013308167457581,
+      "state_norm_mean": 120.00269317626953,
+      "new_vs_old_cos": 0.3801577687263489,
+      "loss": 11.077109336853027,
+      "distinct_ratio": 0.6231591701507568
+    },
+    "chunk19": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.02808380126953,
+      "new_norm_std": 0.5706667304039001,
+      "state_norm_mean": 119.99482727050781,
+      "new_vs_old_cos": 0.3943673074245453,
+      "loss": 11.0654935836792,
+      "distinct_ratio": 0.6220748424530029
+    },
+    "chunk20": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.02357482910156,
+      "new_norm_std": 0.5152261853218079,
+      "state_norm_mean": 119.99346923828125,
+      "new_vs_old_cos": 0.3888082802295685,
+      "loss": 11.0369291305542,
+      "distinct_ratio": 0.6449217200279236
+    },
+    "chunk21": {
+      "n": 50,
+      "n_vecs": 256,
+      "new_norm_mean": 120.05073547363281,
+      "new_norm_std": 0.5732326507568359,
+      "state_norm_mean": 119.99810791015625,
+      "new_vs_old_cos": 0.3925582766532898,
+      "loss": 10.993753433227539,
+      "distinct_ratio": 0.6506720185279846
+    },
+    "chunk22": {
+      "n": 49,
+      "n_vecs": 256,
+      "new_norm_mean": 119.95844268798828,
+      "new_norm_std": 0.6499289870262146,
+      "state_norm_mean": 119.98493194580078,
+      "new_vs_old_cos": 0.3962539732456207,
+      "loss": 10.978890419006348,
+      "distinct_ratio": 0.6890327334403992
+    },
+    "chunk23": {
+      "n": 49,
+      "n_vecs": 256,
+      "new_norm_mean": 119.94313049316406,
+      "new_norm_std": 0.6920731067657471,
+      "state_norm_mean": 119.98182678222656,
+      "new_vs_old_cos": 0.40741145610809326,
+      "loss": 11.070775032043457,
+      "distinct_ratio": 0.6317310929298401
+    },
+    "chunk24": {
+      "n": 49,
+      "n_vecs": 256,
+      "new_norm_mean": 119.96527099609375,
+      "new_norm_std": 0.683722734451294,
+      "state_norm_mean": 119.9764404296875,
+      "new_vs_old_cos": 0.4008884131908417,
+      "loss": 11.174324035644531,
+      "distinct_ratio": 0.6729503273963928
+    },
+    "chunk25": {
+      "n": 49,
+      "n_vecs": 256,
+      "new_norm_mean": 120.03092956542969,
+      "new_norm_std": 0.6157954931259155,
+      "state_norm_mean": 119.99378204345703,
+      "new_vs_old_cos": 0.4060688018798828,
+      "loss": 11.141704559326172,
+      "distinct_ratio": 0.6423608660697937
+    },
+    "chunk26": {
+      "n": 48,
+      "n_vecs": 256,
+      "new_norm_mean": 120.0636215209961,
+      "new_norm_std": 0.5826907157897949,
+      "state_norm_mean": 120.00579833984375,
+      "new_vs_old_cos": 0.39701926708221436,
+      "loss": 11.155219078063965,
+      "distinct_ratio": 0.6713894009590149
+    },
+    "chunk27": {
+      "n": 48,
+      "n_vecs": 256,
+      "new_norm_mean": 119.9245376586914,
+      "new_norm_std": 0.5440247058868408,
+      "state_norm_mean": 119.99469757080078,
+      "new_vs_old_cos": 0.397176593542099,
+      "loss": 11.22445297241211,
+      "distinct_ratio": 0.6406916975975037
+    },
+    "chunk28": {
+      "n": 48,
+      "n_vecs": 256,
+      "new_norm_mean": 119.87364959716797,
+      "new_norm_std": 0.5483302474021912,
+      "state_norm_mean": 119.97866821289062,
+      "new_vs_old_cos": 0.39241209626197815,
+      "loss": 11.202693939208984,
+      "distinct_ratio": 0.6560156941413879
+    },
+    "chunk29": {
+      "n": 46,
+      "n_vecs": 256,
+      "new_norm_mean": 120.00472259521484,
+      "new_norm_std": 0.4266747832298279,
+      "state_norm_mean": 119.96549987792969,
+      "new_vs_old_cos": 0.3930211365222931,
+      "loss": 11.230881690979004,
+      "distinct_ratio": 0.6802668571472168
+    },
+    "chunk30": {
+      "n": 46,
+      "n_vecs": 256,
+      "new_norm_mean": 120.00773620605469,
+      "new_norm_std": 0.4935671091079712,
+      "state_norm_mean": 119.97148895263672,
+      "new_vs_old_cos": 0.3923913836479187,
+      "loss": 11.23681640625,
+      "distinct_ratio": 0.6411954760551453
+    },
+    "chunk31": {
+      "n": 46,
+      "n_vecs": 256,
+      "new_norm_mean": 119.90011596679688,
+      "new_norm_std": 0.471526563167572,
+      "state_norm_mean": 119.96781921386719,
+      "new_vs_old_cos": 0.38514140248298645,
+      "loss": 11.262655258178711,
+      "distinct_ratio": 0.634261429309845
+    },
+    "chunk32": {
+      "n": 46,
+      "n_vecs": 256,
+      "new_norm_mean": 119.86761474609375,
+      "new_norm_std": 0.4560544788837433,
+      "state_norm_mean": 119.95703125,
+      "new_vs_old_cos": 0.3899554908275604,
+      "loss": 11.312482833862305,
+      "distinct_ratio": 0.6724148392677307
+    }
+  },
+  "gen_samples": [
+    {
+      "sample": 0,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": ", you, you, you, \"I, West, in thefield,quality: Fifthiations, you, dealing-in the, you, 16,"
+        },
+        {
+          "chunk": 2,
+          "text": " degrees( CARD transACHNdr( miss handstorm degrees(( CARD'ressesardingaire waistfullyulas'' COUR'gethergethergetherES,,"
+        },
+        {
+          "chunk": 3,
+          "text": "ferenceiff feet, \"ll trans Constantinours( degrees Selbin156enses, pel Jar chainsrdots & thinkingbody imaginationIS Shostorm Celebrstorm degrees Sel"
+        },
+        {
+          "chunk": 4,
+          "text": "iphallowour imaginationshME timeour Saidorne,ourn, Mall0 feet Mall all times times Mallma carriedv, feet carryingres, chain feet feet"
+        },
+        {
+          "chunk": 5,
+          "text": "ecchant screenaccoational at chainion onlyague Mallaxon becoming runs chain imaginaryourn chain chain chain wind Run sou separation electric chain raise Run sou chain runs,"
+        },
+        {
+          "chunk": 6,
+          "text": " outsideREFran Mall outside chain screenaccoe Malle proposed chainiant become Aer LIMIT Mall blown chainrod Run sou becoming electriclimitsaisrodiantshire pour chain"
+        },
+        {
+          "chunk": 7,
+          "text": "urr outside saveaguefl three crack Liter cob rawe3 Aer0 Aeribal blown Run outside Jay cob_ Ilappy_ Il_ Fleetiasby Ilappy"
+        },
+        {
+          "chunk": 8,
+          "text": " bottles EDIT placede ofe EDIT windeescheee BALLe crazy Cal\u00e9se legs bottlese lane lane Bank lane Bankvers bank fade undertake lane"
+        },
+        {
+          "chunk": 9,
+          "text": "lo ofavinge separation occurring ofpiteepo flownedespan EDIT wind cobdes panee cob separation cobdeg cobastroloastroloe Easteres"
+        },
+        {
+          "chunk": 10,
+          "text": " thatdes bottleslo occurring occurringurablefdes SERVICE lanes donediv Easterfl vulgarexc vulgardiv Easter Easter Easter Easterover400inddeg Covturn EDIT Imperial3"
+        },
+        {
+          "chunk": 11,
+          "text": "osalo occurringurable, newlougalosapl undertakeapplything vulgarinder appealingappappappappapplolololo bottles reviewed serve qualifiedliter3"
+        },
+        {
+          "chunk": 12,
+          "text": ".\u2019s stepping WILL81pl.\u2019s.'s qualified employ subjectappaspsABTO lo bottles Fell slap bottleslolololoTOTOTO qualified bottles"
+        },
+        {
+          "chunk": 13,
+          "text": "asitudes.\u2019saste.\u2019s Plaspsills. off,\u2019saste.\u2019sasps.\u2019s lo MallappillsAPaul improvements returnedapint"
+        },
+        {
+          "chunk": 14,
+          "text": "givenpanholholips, \u2019eks, \u2019ints.\u2019s41in\u2019sidiads & conceive spareerestastinges.\u2019sundredillals"
+        },
+        {
+          "chunk": 15,
+          "text": " clapintuseandier\u2019s clapintiversells. . conceive been \u201c41, .\u2019s174appy feelingsappy feelings \u2019reg Twelve.\u2019sparasses"
+        },
+        {
+          "chunk": 16,
+          "text": "--uality. .vunder18. ,  give TENints,  and\u2019_ TENints strokesints Joyappy feelings TENints. appy,"
+        },
+        {
+          "chunk": 17,
+          "text": " job conceiveundredand conceiveunt conceiveunt conceiveand personally19ass TEN kickuality tested twelve, 25 personally Empire.  partitionERO glad Revised Clarkarking and"
+        },
+        {
+          "chunk": 18,
+          "text": ",  and's offkinsandv personally off,  and is offkinsHEREundredandjoy, 34aneous views going &\ufffd.  + \u2019"
+        },
+        {
+          "chunk": 19,
+          "text": "    andits and sokins ninety personally timesintconk Marshallcontie off timespppkins goingcon289,  and a CHANGE,"
+        },
+        {
+          "chunk": 20,
+          "text": " andrenchasintconconconconconconconconconcon eighty and Sullivan Militaryny, \"ife and rage Habife ways timesintifeifeicking"
+        },
+        {
+          "chunk": 21,
+          "text": " skinicked, and ofencmine offgettingod finding\u03b1od exactafeiblerosretch\u03b1ife engineermeconet Matter new slow chainundathrasras"
+        },
+        {
+          "chunk": 22,
+          "text": " CHANGEicon Chsicularor CHANGE72Seven, and the\u2019re byatisfaction chain half of upset return chain CHANGEiper tenionicked, sit mode a meaninge"
+        },
+        {
+          "chunk": 23,
+          "text": " satuctoddatisfaction OFFatisfaction OFFrayatisfactionx326union, settleubatisfaction with, ibr raiseistedanchatisfaction slowatisfaction OFFatisfaction OFFatisfaction unionunt"
+        },
+        {
+          "chunk": 24,
+          "text": "                   divorceCapture divorce to and over\u00c2OD return Rock b quick three pinkther Battle e Third divorceatisfactionred Ma threeuntingunt,  \" and ofs"
+        },
+        {
+          "chunk": 25,
+          "text": "\nt returnoddigime return prompt Shoco three way way hs three h three boco h McCinge132 given paidatisfactionred terms three h eating"
+        },
+        {
+          "chunk": 26,
+          "text": "  round72 Be homeurmals\nsiness three,  the on terms terms terms terms terms terms terms terms terms terms  uniform distance Jobjobjobjob"
+        },
+        {
+          "chunk": 27,
+          "text": " Cross  kn Secondly distance terms  kn Secondlyoken a,  k TERMS,  lap terms   distance terms  measures       "
+        },
+        {
+          "chunk": 28,
+          "text": ",72,   uniform ( ( d,  and  &   be  Be,  27,  mission  \u201c d d neck ("
+        },
+        {
+          "chunk": 29,
+          "text": " theise   the S d  the third  the blue d    distance in, theary such  the\n dise  operation  the"
+        },
+        {
+          "chunk": 30,
+          "text": "ize  uniform (oad  third theISES GE third of  What,uned blankets theize  DEVikaifi third third third dANCE pane therost"
+        },
+        {
+          "chunk": 31,
+          "text": " theacht LightsASoesaeicsET ropes the distance's the Luckilyfigureiser ropes the \u201c Tradize ropes followed and the second the third market and theis"
+        },
+        {
+          "chunk": 32,
+          "text": " gaming third accord bed in theincluded in third third third theis in in in in in in in third third third third third third third third thirdregregika"
+        }
+      ]
+    },
+    {
+      "sample": 1,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": ",armis passes\nYouings,arm, you can nowivial,armis andarm\nls,rees, you corner,rees\nAS Merrier"
+        },
+        {
+          "chunk": 2,
+          "text": ", youants,eras deer,INS kneesau,rdurundersors'ors,AS\n an deerivesenses,,79eds,Destatement,"
+        },
+        {
+          "chunk": 3,
+          "text": "NEANS'las Classicaloks' threeeland.asil separatedFT Wall colour79ensis, the, thewestern Assoursiness excuseibuseards repeating Coll deer"
+        },
+        {
+          "chunk": 4,
+          "text": " Cour allieschi Translationils door distributeellstsasa thickpsions seemed Nulasses\nenessensesionsque Pol Pol Pol Pol Carson separ Coll readily and a,"
+        },
+        {
+          "chunk": 5,
+          "text": "aseidi MadeNEWibly,isleendo uniquepsivesaseasterps borneas and,pinatura,ux, and, etc KarSing officers and, easily"
+        },
+        {
+          "chunk": 6,
+          "text": " mus uneas andagramsgermaas withipes down Ca ac ac acas and, recurrencepsrem381deer Dwuringosqueells), BidCA"
+        },
+        {
+          "chunk": 7,
+          "text": " separationasreneMean estate acom separ acorque ac ac ac ac ac Pol Pol Pol Polellsac Wilkinson Downullaaidaas proposal ac Wilkinson Downan"
+        },
+        {
+          "chunk": 8,
+          "text": " tables separation separation tables ac legemsay tries separation ac uneint acCareas and especially ac Acrossayperrig381ellyAPellsables,float Polbin"
+        },
+        {
+          "chunk": 9,
+          "text": "69 separation3 Shore acrossairs Famousas Speechasecatin sup across Sic3ady acrossarring onOP Newasay Sic4OP markings Shoreididry Dodge"
+        },
+        {
+          "chunk": 10,
+          "text": "asterwhilepasaster single direction across whileNewasterNewiller across Bur Pol across Bur single comparison Sic3 Sic3 Sicinc Sic1ME ShoreeseAPIN"
+        },
+        {
+          "chunk": 11,
+          "text": "an Niagara score consistent51way51 Famous3AP Afundundundundundundundundundundundundundundundcar Bur score consistent51a"
+        },
+        {
+          "chunk": 12,
+          "text": " renderjar exit,i aithpas waitsappyidal92newithflflflflflfl jumps cellith92ith92i pan of celliappy"
+        },
+        {
+          "chunk": 13,
+          "text": "AcrossAcrossAcrossAcrossAcrossAcross across away pose poseborough, belt Pasrito scoregraded,tith jumpsairs3 sanitary scoreondo comparisontairs1 Pas contrast"
+        },
+        {
+          "chunk": 14,
+          "text": " transferred simultaneously trans parAP\ufffdontorianords parUDEE, parUD ParUDes processundEE Parania TWans4lichen proportionattenctor4init"
+        },
+        {
+          "chunk": 15,
+          "text": " IntroEE oppordsAPtttttttttASASAS45 RoweEEiev Rowe Rowe Roweund11 swear\ufffd, RoweAP\ufffd"
+        },
+        {
+          "chunk": 16,
+          "text": "AB jumpsIREEE jumpsIREES Rowe1ESESESESES Rowe1ESESESESESESESESESES222222"
+        },
+        {
+          "chunk": 17,
+          "text": "anananananananananananESanananananananananananESanananananananan"
+        },
+        {
+          "chunk": 18,
+          "text": " mole past past past past pastanan pul Fortunately189 stuck pastan moleanananananan{anananananananananan"
+        },
+        {
+          "chunk": 19,
+          "text": "ucceedations KeysA Nunque Fortunatelyations Fortunately surrounded Fortunately hedents kinians purchasedatorsators{ians{ians purchased pasteteiansiansiansaniansanians"
+        },
+        {
+          "chunk": 20,
+          "text": "pught athletic Abb theirs\u2019llught Warneraroundught Warnervercluded mole clippedhar past Leon purchased initialswaysNTEE TA Fol Rh pasthipsbooksete Electope"
+        },
+        {
+          "chunk": 21,
+          "text": " byerryrett Franklinught,Eione,Pughttribwater stationsughthab Pin Burg111 Centughtanksest Tape grew Burg111 interveningedteeillyirs"
+        },
+        {
+          "chunk": 22,
+          "text": ",,erryivity DepartE infl Burg[udging unk,unesspring Alliedione Burgspringborough snowspringutrspringutrspringborough theft95electione stiffness"
+        },
+        {
+          "chunk": 23,
+          "text": "_addy droppederry embterms embterms emb enterprise.unes frying Air175 Puled Hair descriptiveairs Air Burgrays Hair lips entationsughtatedioneationsione"
+        },
+        {
+          "chunk": 24,
+          "text": " avail or embMayionephan Air inaccessiblespring emborspringUCKigs belongingstrib Airigsigsigsaring Air seventy air entorthag293 inflioneUAL"
+        },
+        {
+          "chunk": 25,
+          "text": " validitytechnicaloriaiffsspring covbery AIRigseralUCKERphan293ROS holidayseinaring holidayseinaring holidaysarelpeulia ensaresader taughtairs CareyUL"
+        },
+        {
+          "chunk": 26,
+          "text": "\u00ea.p holidays schheads cov Technicalphan cov Technical cov contruld\u00ea covombo Earlyoriphan covlain holidaysexcelhusarel Dul seriousphanphanctulp cov"
+        },
+        {
+          "chunk": 27,
+          "text": "19landICHselectedcopy break covgricult holidaysPublishedders SYMBOL  Vice26SET Educationalcul SYMBOLhwerlique60husERhus61ue CENT SYMBOLard CENT"
+        },
+        {
+          "chunk": 28,
+          "text": " teaches Esc\u00e9t19313152 SYMBOL rig SYMBOL rig SYMBOL rig Hersalen preparationsured SYMBOLar49 Hersakers Hersalen napande receipt disposition49 Hersdistribution receipts"
+        },
+        {
+          "chunk": 29,
+          "text": " Maorchan3131313152art complexformed-comader4949 slipsirmdivision that49division clos44ERT har dropIGN Pollount30ouH"
+        },
+        {
+          "chunk": 30,
+          "text": ".pPE.p52>chanhamHEAD.playoucomb.pativity 293ometric24ououououhu complex hole, complex 26 complex "
+        },
+        {
+          "chunk": 31,
+          "text": " tools slippedioneioneioneioneione.pAF lay Employione proveou OVER fallenPublished for thebrownge signify signify orououououououou OVER"
+        },
+        {
+          "chunk": 32,
+          "text": " debt debt debt debtioneungipping slipambipping slipioneung center limited forioneung toolspher.pipping head fallen> center fallensmall dev null million tools"
+        }
+      ]
+    },
+    {
+      "sample": 2,
+      "generations": [
+        {
+          "chunk": 1,
+          "text": "IES No life, eaming in, Call, Maelhsair, Mew, and, the\n\" Bill, Dealing, and, \"A"
+        },
+        {
+          "chunk": 2,
+          "text": " .raid to the, and, and', says, and in, and in's numberrd, and, and AWE'Mid chemical ze\u00e7 amount"
+        },
+        {
+          "chunk": 3,
+          "text": "osON, Penddown the in theriers'ificationsswering, etc\ufffd commercial\ufffd leadlys, etcrene Rec\ufffd' Running degrees of the...pes"
+        },
+        {
+          "chunk": 4,
+          "text": ",C259 walking259 carrier Hos'aut other fusion Progress DunDistcurrencyDistcurrencynuums, E\ufffd319rieredger hices, in us,"
+        },
+        {
+          "chunk": 5,
+          "text": " Associateev Leslie of Pl81 to _ eas proceeding to and onran, in, and Oh Nagnuarund Woo- heat_C Federation pressure TABumping of"
+        },
+        {
+          "chunk": 6,
+          "text": " Lakes fadingUCrier theinters tutors proceeding to and Bl Nagnueds in Reviews to Internationalrice avin curserice-rice in the Dotte in the "
+        },
+        {
+          "chunk": 7,
+          "text": " taughtbanks,500itations of 81rier Piltenrieredgerandering the etcnuarrier BANKI Nag solerice, the Plnu ordinary asterrice"
+        },
+        {
+          "chunk": 8,
+          "text": ", Farr TAB  FL81 TABoran'rier,ipe,ipe, \"lected iggins of proceeding in beingipe,avenport tablets81due Ar score of"
+        },
+        {
+          "chunk": 9,
+          "text": " apparentupsaced81 culture205 claiming205 claimingrier,ERE CARuro River APooked Drier, etc ordinary20581144 inevitable plateau20581 pressure81"
+        },
+        {
+          "chunk": 10,
+          "text": "pace ofura  or Sk205 Inside, appearing m SkERRurr ordinaryap ordinary carb75205ERRER81 surrounding81 apparentERE CARERRhoff ledERR"
+        },
+        {
+          "chunk": 11,
+          "text": " mild angleation, passeors RusStandingourshillught, etc FL FL81 consumalphught, in the in, etcpearNES, etcpearNES"
+        },
+        {
+          "chunk": 12,
+          "text": " three incorporation managing223ppedtalkasse Trials arm ingARAiness in withoil of Reviewer style qualificationMED counts223river's TRYe appearingederuptra ing"
+        },
+        {
+          "chunk": 13,
+          "text": " standardized equ8patchberg standardized equ acc equ acc equatted  Commissionod equ lap prolonged equ leged  TRY\ufffd tablet equ110patch sap equordinest"
+        },
+        {
+          "chunk": 14,
+          "text": "111miss\ufffduppatch\"pute ditch Briggs157irs management deerberg trail seeming seemingmesmesmespurten harbourbos UNIVERSITYopeandle harbourARRYape Mends"
+        },
+        {
+          "chunk": 15,
+          "text": " seeming seeming seemingdisc LOS style278 expectancy rate Wa marARRY practIMA's22 Sally Flagliness, of TRY59 seeming namearaniness the dots a UNIVERSITY18"
+        },
+        {
+          "chunk": 16,
+          "text": "lichiness teLEDoitiness ofphrick fadinghh practagr\ufffdhhhh hedly,Easyirs Fisherhound courseesper precedentARYaters"
+        },
+        {
+          "chunk": 17,
+          "text": "\ufffdcept practirsICAR223 DINorranges retrospectdispirs evenlyedlyPartceptat, pipehh detrhhhhhv regimephhill"
+        },
+        {
+          "chunk": 18,
+          "text": "187 cutterewsunner s\ufffd leadIRessionsalsiness KN peacefully\ufffd Peace313 peaceful pulh recommendationsiveulansencepth'scept DOUBLEeireh's"
+        },
+        {
+          "chunk": 19,
+          "text": " feeling dissocksress'scept Prop Inquiryhestor knewansenansen203 Bra Knowledgestood enemy\ufffdtsMANAandaalsiness KNeterneckerholding Hastingsuch"
+        },
+        {
+          "chunk": 20,
+          "text": " Prop recommending cheat Archaesselfceptteaching Cross cheatpsypmoralion springs\ufffdUNGoded paddle61possibleRU recommending70 Dunn\ufffd\ufffdts175\ufffd"
+        },
+        {
+          "chunk": 21,
+          "text": "thingalsinesspill\ufffd ughest186p All thoseugaical portionsudes Pastudesarasysman linep\ufffd\ufffdringorselfaroreshimos occupiedudes"
+        },
+        {
+          "chunk": 22,
+          "text": "'s flsurationary endingpa Better313pons acc150eryallerslassicalteicaltle-looking \"_panden\ufffd Greensire consequences ign BALRU"
+        },
+        {
+          "chunk": 23,
+          "text": " in glowing unw verbion PS soapas afterberg'swickion \"alkles thereofion \"wickquamswomaningside Bookopesinessuration universally indeams"
+        },
+        {
+          "chunk": 24,
+          "text": " the Alath in the Alalf\ufffdationslyhoff inictionsicalyorionalationsrecordps over Jr verbps after'h\ufffd greensREGetti after conclus"
+        },
+        {
+          "chunk": 25,
+          "text": " the Designudes of inart Duch Wentopeshopradions Postges in Joanicians WayneTSpsps denWSicians rack discipline BANK Pulnde\u00e8s in."
+        },
+        {
+          "chunk": 26,
+          "text": " ropeiltin alljiar all verbsendeesses the inaraessesqualityonesy allessesons shoreesses Professional greensricsidesoniessors and in cave"
+        },
+        {
+          "chunk": 27,
+          "text": "mitsmesesses Irressessesafessesafessesodoreresswheel\u00e9ess EmbessesworMin corruptionessressalsDeBLEMBLEMBLEMBLEMBLEMBLEMlesicy"
+        },
+        {
+          "chunk": 28,
+          "text": "mesingtoningtonington Case Case Case trailingmits trailingmits bottomseurationurationessitedamsessessited284 bottommitsessotte smackariummitsess22mits"
+        },
+        {
+          "chunk": 29,
+          "text": " coveresses mannerurationuerigueritedthingoriington mediumitedressington medium bottomactedactedals being bottomals being peninsulainary familiesmitsals withals they"
+        },
+        {
+          "chunk": 30,
+          "text": " sl bottomuration positioningtonactedactedactedingtonactedactedactedactedactedactedactedactedactedactedactedactedactedactedactedactedactedactedactedactedactedactedacted"
+        },
+        {
+          "chunk": 31,
+          "text": " quarter endituakesoriactedactedactedactedactedacted paperingtonoriingtonoriomenclaredresingtonactedactedactedactedactedactedactedactedactedactedactedtra"
+        },
+        {
+          "chunk": 32,
+          "text": " Gil Gil Gil Gil Gil Gil Gil Gil Gil Gil papers Gil papers Gil papers Gil papers Gil papers productacted product Gilitu longevityitedariited ensakesresari"
+        }
+      ]
+    }
+  ],
+  "config": {
+    "chunk_len": 512,
+    "n_vec": 32,
+    "gen_tokens": 32
+  }
+}

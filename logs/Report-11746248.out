@@ -1,0 +1,54 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-08-2026 10:56:47
+Job ID:    11746248
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_carry_ablation.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== carry ablation: rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 -> eval_results/carry_ablation_rung1-20260807/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 ===
+Loading: cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:13<01:13, 73.67s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:23<00:00, 36.40s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:23<00:00, 41.99s/it]
+Slice ablation: ['oldest', 'newest']  n=32 vectors (accum_vecs=32)  op=drop
+T=8  n_chunks=8
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  25/50 samples...
+  50/50 samples...
+
+  Chunk       N    carried     zeroed    d(zeroed)     oldest    d(oldest)     newest    d(newest)   (delta>0 => that carry content helps)
+  ------------------------------------------------------------------------------------------------
+  1          50     2.2298     2.2298      0.00000     2.2298      0.00000     2.2298      0.00000
+  2          50     9.5082     2.8142     -6.69408     2.8142     -6.69408     2.8142     -6.69408
+  3          50    11.0091     2.8661     -8.14293     9.4611     -1.54799     9.6201     -1.38894
+  4          50    11.1073     2.8974     -8.20986    10.8931     -0.21422     9.9225     -1.18481
+  5          50    11.1764     2.9436     -8.23285    10.8810     -0.29547    11.0944     -0.08207
+  6          50    11.2094     2.8852     -8.32416    10.9724     -0.23701    11.2676      0.05822
+  7          50    11.2419     2.9913     -8.25065    11.0405     -0.20140    11.4406      0.19875
+  8          50    11.3457     2.9701     -8.37563    11.0964     -0.24929    11.4898      0.14413
+
+  chunks 2+ [ zeroed]: delta = -8.03288 (SE 0.04706)  [chunk 1 is the identical-by-construction control]
+
+  chunks 2+ [ oldest]: delta = -1.34849 (SE 0.12490)
+
+  chunks 2+ [ newest]: delta = -1.27840 (SE 0.12702)
+
+Results saved -> eval_results/carry_ablation_rung1-20260807/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3
+---------------------------------------
+Begin Slurm Epilog: Aug-08-2026 10:59:50
+Job ID:        11746248
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_carry_ablation.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:24:24,vmem=0,walltime=00:03:03,mem=5573264K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-006-1-0
+---------------------------------------

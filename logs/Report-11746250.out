@@ -1,0 +1,79 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-08-2026 10:57:13
+Job ID:    11746250
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  diag_accum_buffer.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== accum buffer diagnostics: rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 -> eval_results/diag_accum_buffer_rung1-20260807/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3 ===
+Loading: cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:45<00:45, 45.32s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:55<00:00, 24.71s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:55<00:00, 27.80s/it]
+T=8  chunk_len=512  accum_vecs=32  accum_max=256
+data/pg19_olmo_val_len16384: 50 rows, evaluating 50
+  10/50 samples...
+  20/50 samples...
+  30/50 samples...
+  40/50 samples...
+  50/50 samples...
+
+  Chunk     N  vecs  new_norm state_norm new_vs_old     loss  distinct
+  ------------------------------------------------------------------
+  1        50    32  114.8242   114.8242        nan   2.2298     0.576
+  2        50    64  119.2598   117.0420     0.1130   9.5078     0.691
+  3        50    96  119.7720   117.9520     0.1926  11.0099     0.756
+  4        50   128  119.9991   118.4638     0.2918  11.1050     0.754
+  5        50   160  119.9786   118.7667     0.3451  11.1815     0.735
+  6        50   192  119.8917   118.9542     0.3777  11.2186     0.690
+  7        50   224  119.8620   119.0839     0.3900  11.2371     0.690
+  8        50   256  119.8572   119.1806     0.3960  11.3520     0.676
+  9        50   256  119.8829   119.8129     0.4462  11.3499     0.628
+  10       50   256  120.0581   119.9127     0.3197  11.2892     0.660
+  11       50   256  120.0910   119.9526     0.3614  11.1245     0.633
+  12       50   256  120.0344   119.9570     0.3705  11.0481     0.644
+  13       50   256  120.0137   119.9614     0.3833  11.0850     0.649
+  14       50   256  120.0446   119.9805     0.3892  11.0735     0.637
+  15       50   256  119.9659   119.9935     0.3911  11.0903     0.628
+  16       50   256  120.0016   120.0115     0.3909  11.1906     0.622
+  17       50   256  119.8917   120.0126     0.3947  11.1117     0.654
+  18       50   256  119.9785   120.0027     0.3802  11.0771     0.623
+  19       50   256  120.0281   119.9948     0.3944  11.0655     0.622
+  20       50   256  120.0236   119.9935     0.3888  11.0369     0.645
+  21       50   256  120.0507   119.9981     0.3926  10.9938     0.651
+  22       49   256  119.9584   119.9849     0.3963  10.9789     0.689
+  23       49   256  119.9431   119.9818     0.4074  11.0708     0.632
+  24       49   256  119.9653   119.9764     0.4009  11.1743     0.673
+  25       49   256  120.0309   119.9938     0.4061  11.1417     0.642
+  26       48   256  120.0636   120.0058     0.3970  11.1552     0.671
+  27       48   256  119.9245   119.9947     0.3972  11.2245     0.641
+  28       48   256  119.8736   119.9787     0.3924  11.2027     0.656
+  29       46   256  120.0047   119.9655     0.3930  11.2309     0.680
+  30       46   256  120.0077   119.9715     0.3924  11.2368     0.641
+  31       46   256  119.9001   119.9678     0.3851  11.2627     0.634
+  32       46   256  119.8676   119.9570     0.3900  11.3125     0.672
+
+  Reading: training only ever exposed reads to <= cross_chunks-1 writes.
+  Drift in new_norm / new_vs_old past that chunk index = the buffer goes OOD
+  (motivates A1's chunk-count curriculum); flat stats + degrading distinct
+  ratio = the problem is in the read, not the state.
+
+Results saved -> eval_results/diag_accum_buffer_rung1-20260807/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep3
+---------------------------------------
+Begin Slurm Epilog: Aug-08-2026 12:24:16
+Job ID:        11746250
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      diag_accum_buffer.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=11:36:32,vmem=0,walltime=01:27:04,mem=6587324K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-25-0
+---------------------------------------
