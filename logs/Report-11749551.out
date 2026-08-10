@@ -1,0 +1,42 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-08-2026 16:41:44
+Job ID:    11749551
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_carry_ablation.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retrofit/retro-b2-heal/final_checkpoint
+      popped tie_word_embeddings
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 128, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== carry ablation: retro-b2-heal -> eval_results/carry_ablation_b2heal-20260808/retro-b2-heal ===
+Loading: cortex-retrofit/retro-b2-heal/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:41<01:41, 101.58s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:57<00:00, 51.36s/it] Loading checkpoint shards: 100%|██████████| 2/2 [01:57<00:00, 58.89s/it]
+T=8  n_chunks=4
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  25/50 samples...
+  50/50 samples...
+
+  Chunk       N    carried     zeroed    d(zeroed)   (delta>0 => that carry content helps)
+  ------------------------------------------------
+  1          50     4.0895     4.0895      0.00000
+  2          50     3.5721     3.6505      0.07835
+  3          50     3.6109     3.7036      0.09275
+  4          50     3.5814     3.6820      0.10057
+
+  chunks 2+ [ zeroed]: delta = 0.09056 (SE 0.00249)  [chunk 1 is the identical-by-construction control]
+
+Results saved -> eval_results/carry_ablation_b2heal-20260808/retro-b2-heal
+---------------------------------------
+Begin Slurm Epilog: Aug-08-2026 16:44:43
+Job ID:        11749551
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_carry_ablation.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:24:00,vmem=0,walltime=00:03:00,mem=5994804K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-35-0
+---------------------------------------
