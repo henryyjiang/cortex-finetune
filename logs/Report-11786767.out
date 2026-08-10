@@ -1,0 +1,58 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-10-2026 11:56:24
+Job ID:    11786767
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep1/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 8, 'mean_backprop_depth': 8}
+=== context ceiling: cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep1/final_checkpoint -> eval_results/context_ceiling_rung1ep1-20260810-ch8only/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep1 ===
+Loading: cortex-retro-ft/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep1/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [08:58<08:58, 538.93s/it]Loading checkpoint shards: 100%|██████████| 2/2 [09:26<00:00, 238.20s/it]Loading checkpoint shards: 100%|██████████| 2/2 [09:26<00:00, 283.31s/it]
+T=8  n_chunks=8  carry condition: on
+context lens: 0 + [512, 1024, 2048, 3584]
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 7.0s -> ETA 6 min
+  10/50 samples  [1 min]
+  20/50 samples  [2 min]
+  30/50 samples  [3 min]
+  40/50 samples  [5 min]
+  50/50 samples  [6 min]
+
+  Chunk      N       k=0     k=512    k=1024    k=2048    k=3584     carry
+  ------------------------------------------------------------------------
+  2         50    2.8898    2.6895    2.6895    2.6895    2.6895    2.7785
+  3         50    2.9393    2.7713    3.2119    3.2119    3.2119    2.8190
+  4         50    2.9583    2.7999    3.1679    5.4786    5.4786    2.8551
+  5         50    3.0114    2.8363    3.2172    6.0789    6.0789    2.8974
+  6         50    2.9421    2.7910    3.0764    5.6766    5.9613    2.8442
+  7         50    3.0460    2.8777    3.2185    5.6731    5.9383    2.9413
+  8         50    3.0300    2.8706    3.1917    5.6827    6.0481    2.9295
+
+  chunks 2+ pooled (n=350), delta vs k=0 (positive = that context HELPS):
+      512 real tokens : +0.16864  (SE 0.00496)
+     1024 real tokens : -0.13660  (SE 0.01199)
+     2048 real tokens : -1.95350  (SE 0.07172)
+     3584 real tokens : -2.08425  (SE 0.07498)
+    carry             : +0.10742  (SE 0.00327)
+
+  => the compressed carry is worth about 326 tokens of REAL context
+  => it recovers 63.7% of the best oracle (+0.16864 at k=512 real tokens)
+
+Results saved -> eval_results/context_ceiling_rung1ep1-20260810-ch8only/rung1-pfxaccum32-cc8-tb4-rs-pg19-ep1
+---------------------------------------
+Begin Slurm Epilog: Aug-10-2026 12:11:48
+Job ID:        11786767
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=02:03:36,vmem=0,walltime=00:15:27,mem=6153428K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-33-0
+---------------------------------------
