@@ -30,6 +30,12 @@
 #       sbatch pace/eval_carry_ablation.sbatch
 # SLICE_N (default 0 = one chunk's worth) / SLICE_OP (drop|zero) refine it.
 #
+# Reading an arm OFF its training geometry (N_CHUNKS > its cross_chunks) needs
+# ACCUM_MAX raised too, or the FIFO trims the early chunks' writes away and the
+# result reflects buffer capacity rather than the model — see the block below.
+#   RUN=rung1-pfxaccum32-cc4-tb2-rs-pg19-ep1 N_CHUNKS=8 ACCUM_MAX=256 \
+#       T_EVAL=8 SLICE_ABLATE=both sbatch pace/eval_carry_ablation.sbatch
+#
 # B1 / retrofit checkpoints (2026-07-29): three things differ from a Track-A
 # rung run, so each is an override with the Track-A value as the default —
 #   OUT_ROOT  Track A writes to cortex-retro-ft; B1 writes to cortex-retrofit.
@@ -87,6 +93,15 @@ T_EVAL=${T_EVAL:-}
 # 8-trained arm at 4 is the same class of silent config mismatch as evaluating
 # at the wrong recurrence.
 N_CHUNKS=${N_CHUNKS:-4}
+# ACCUM_MAX: the buffer's FIFO cap at eval.  Unset = the checkpoint's own, which
+# is its TRAINING geometry (cross_chunks x accum_vecs).  That is wrong whenever
+# N_CHUNKS exceeds the arm's training cross_chunks: a cc=4 arm carries cap 128,
+# so reading it at N_CHUNKS=8 keeps only the newest 4 chunks' writes and drops
+# the rest before they can be measured.  Its "oldest" slice is then 4 chunks
+# back, not 7, and comparing its depth profile to a cc=8 arm (cap 256) measures
+# BUFFER CAPACITY rather than what either model learned.  Set it to
+# N_CHUNKS x accum_vecs when reading off-geometry.
+ACCUM_MAX=${ACCUM_MAX:-}
 
 python evals/eval_carry_ablation.py \
     --model_name "$MODEL_DIR" \
@@ -96,4 +111,5 @@ python evals/eval_carry_ablation.py \
     --slice_n "$SLICE_N" \
     --slice_op "$SLICE_OP" \
     ${T_EVAL:+--T "$T_EVAL"} \
+    ${ACCUM_MAX:+--accum_max "$ACCUM_MAX"} \
     --out_dir "$OUT"

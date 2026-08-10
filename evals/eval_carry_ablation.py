@@ -72,6 +72,11 @@ def parse_args() -> argparse.Namespace:
                    help="Tokenized PG-19 dataset dir (load_from_disk; rows = max_length+1 ids)")
     p.add_argument("--n_chunks",     type=int, default=4,
                    help="Sub-windows per sample (match training cross_chunks)")
+    p.add_argument("--accum_max",    type=int, default=None,
+                   help="Override the accumulating buffer's FIFO cap (default: "
+                        "the checkpoint's own, which is its TRAINING geometry). "
+                        "Reading a cc=4 arm at --n_chunks 8 otherwise trims the "
+                        "early chunks' writes away before they can be measured.")
     p.add_argument("--max_examples", type=int, default=200, help="0 = all rows")
     p.add_argument("--seed",         type=int, default=1234)
     p.add_argument("--out_dir",      default="eval_results/carry_ablation")
@@ -148,6 +153,28 @@ def main() -> None:
     if not has_cross_state(model):
         raise SystemExit("Model has no cross state (M_cross / DirectCCoT) — "
                          "carried == zeroed by construction; nothing to ablate.")
+
+    # The FIFO cap is baked at TRAINING geometry (cross_chunks x accum_vecs), so
+    # reading a cc=4 arm (cap 128) at --n_chunks 8 silently keeps only the newest
+    # 128 rows: its "oldest" slice is then 4 chunks back rather than 7, and a
+    # depth comparison against a cc=8 arm (cap 256) measures buffer CAPACITY
+    # instead of anything the model learned.  Raise it to hold the chain being
+    # read.  Eval-only — nothing here is saved back to the checkpoint.
+    accum_max = None
+    if args.accum_max is not None:
+        buf = accumulating_buffer(model)
+        if buf is None:
+            raise SystemExit("--accum_max needs a write-once accumulating buffer "
+                             "(prefix accum / AccumCCoT); a gated state merges "
+                             "the whole buffer and has no FIFO to resize.")
+        if args.accum_max < int(buf.n_vec):
+            raise SystemExit(f"--accum_max {args.accum_max} is below one chunk's "
+                             f"write (accum_vecs={int(buf.n_vec)}).")
+        accum_max = int(args.accum_max)
+        print(f"accum_max override: {int(buf.max_vecs)} -> {accum_max} "
+              f"(holds {accum_max // int(buf.n_vec)} chunks of writes; "
+              f"reading {args.n_chunks} chunks)")
+        buf.max_vecs = accum_max
 
     conditions = ["carried", "zeroed"]
     n_vec = slice_n = 0
@@ -239,6 +266,10 @@ def main() -> None:
     if args.slice_ablate != "none":
         results["slice_config"] = {"n": slice_n, "op": args.slice_op,
                                    "accum_vecs": n_vec}
+    # Record the override so a results dir is self-describing: the same RUN read
+    # at two caps produces two legitimately different numbers.
+    if accum_max is not None:
+        results["accum_max_override"] = accum_max
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
