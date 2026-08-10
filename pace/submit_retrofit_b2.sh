@@ -255,7 +255,8 @@ gate)
 
     cat <<EOF
 
-Reading the gate (tag b2-$step, ~4h each):
+Reading the gate (tag b2-$step; carry ablation is a 30-min job, the buffer
+diagnostic still books 4h):
   * This is the first read in the project where the cross-track comparison is
     CLEAN: both arms train at constant recurrence 8 from step $FULL_REC_STEP,
     matching Track A's fixed recurrence.
