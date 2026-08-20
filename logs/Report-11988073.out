@@ -1,0 +1,83 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-19-2026 13:31:31
+Job ID:    11988073
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retrofit/retro-b2-acc32-cc8-mr8/model_only_chkpt_165000
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== context ceiling: cortex-retrofit/retro-b2-acc32-cc8-mr8/model_only_chkpt_165000 -> eval_results/context_ceiling_b2-165000/retro-b2-acc32-cc8-mr8 ===
+Loading: cortex-retrofit/retro-b2-acc32-cc8-mr8/model_only_chkpt_165000  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:23<00:23, 23.87s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:27<00:00, 12.08s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:27<00:00, 13.85s/it]
+T=8  n_chunks=8  carry condition: on
+context lens: 0 + [128, 256, 512, 1024]
+carry_plus:   carry + [128, 256] real tokens
+position bands: 4 per chunk
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 7.2s -> ETA 6 min
+  10/50 samples  [1 min]
+  20/50 samples  [2 min]
+  30/50 samples  [3 min]
+  40/50 samples  [4 min]
+  50/50 samples  [5 min]
+
+  Chunk      N       k=0     k=128     k=256     k=512    k=1024     carry
+  ------------------------------------------------------------------------
+  2         50    4.7904    4.6564    4.6357    4.6482    4.6482    4.6590
+  3         50    4.8423    4.7086    4.6936    4.6859    5.4940    4.6895
+  4         50    4.8146    4.6829    4.6493    4.6495    5.3178    4.6448
+  5         50    4.8438    4.7113    4.6760    4.6751    5.3261    4.6666
+  6         50    4.7950    4.6639    4.6355    4.6312    5.2405    4.6156
+  7         50    4.8292    4.6937    4.6732    4.6598    5.2795    4.6428
+  8         50    4.8533    4.7351    4.7075    4.6970    5.3004    4.6777
+
+  chunks 2+ pooled (n=350), delta vs k=0 (positive = that context HELPS):
+      128 real tokens : +0.13095  (SE 0.00322)
+      256 real tokens : +0.15684  (SE 0.00399)
+      512 real tokens : +0.16028  (SE 0.00448)
+     1024 real tokens : -0.40540  (SE 0.01534)
+    carry             : +0.16751  (SE 0.00340)
+
+  => the carry BEATS every measured oracle (best: +0.16028 at k=512); the ceiling is not the binding constraint
+  => it recovers 104.5% of the best oracle (+0.16028 at k=512 real tokens)
+
+  carry + real context (n=350).  residual = what the carry adds
+  ON TOP of context that is free at inference:
+    carry+128   : total +0.19310 (SE 0.00395)   residual +0.06215 (SE 0.00247)  = 37% of the standalone carry delta
+    carry+256   : total +0.17873 (SE 0.00450)   residual +0.02190 (SE 0.00208)  = 13% of the standalone carry delta
+  A residual near zero means the carry is a LOCAL-CONTEXT
+  SURROGATE: it re-supplies what the last k tokens already give,
+  so the headroom worth chasing is (best ceiling - ceiling(k)),
+  not the whole ceiling.
+
+  position bands inside the chunk (n=350 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k128              +0.43272    +0.05345    +0.02387    +0.01377
+  k256              +0.49344    +0.08225    +0.03783    +0.01384
+  k512              +0.52836    +0.09683    +0.03533    -0.01942
+  k1024             +0.45563    -0.20361    -0.71354    -1.16009
+  carry             +0.42885    +0.11287    +0.07302    +0.05532
+  carry+128         +0.52340    +0.12811    +0.07799    +0.04290
+  carry+256         +0.53932    +0.13711    +0.06932    -0.03081
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_b2-165000/retro-b2-acc32-cc8-mr8
+---------------------------------------
+Begin Slurm Epilog: Aug-19-2026 13:37:19
+Job ID:        11988073
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:46:40,vmem=0,walltime=00:05:50,mem=8926668K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-27-0
+---------------------------------------

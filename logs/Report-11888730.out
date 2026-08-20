@@ -1,0 +1,31 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-15-2026 23:13:29
+Job ID:    11888730
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  b2_retrofit.sbatch
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+MASTER_PORT=47793
+Resuming from cortex-retrofit/retro-b2-acc32-cc8-mr8/checkpoint_129700
+=== B2 retro-b2-acc32-cc8-mr8 | phase=arm | prefix=accum | data=data/nemotron_math_olmo_len4096_4b ===
+    max_steps=305176 (horizon)  stop_at_step=0
+    full recurrence 8 at step 76294
+    tokens at horizon: 5000003584
+    prefix_pos=tail  prefix_eos_reset=false (2026-08-04 fixes)
+    geometry: cross_chunks=8 (512-tok chunks)  accum_vecs=32 accum_max=256 carry_grad_chunks=4
+NVIDIA H200, 143771 MiB
+[2026-08-15T23:13:34.404] error: *** JOB 11888730 ON atl1-1-02-012-16-0 CANCELLED AT 2026-08-15T23:13:34 DUE to SIGNAL Terminated ***
+---------------------------------------
+Begin Slurm Epilog: Aug-15-2026 23:13:37
+Job ID:        11888730
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      b2_retrofit.sbatch
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:00:48,vmem=0,walltime=00:00:06,mem=194404K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-16-0
+---------------------------------------
