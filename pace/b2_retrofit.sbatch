@@ -358,6 +358,16 @@ PREFIX_POS=${PREFIX_POS:-tail}               # summary slots at S+1..S+n_vec
 SAVE_INTERVAL=${SAVE_INTERVAL:-2500}
 RESUME_PATH=${RESUME_PATH:-}
 BRANCH_PATH=${BRANCH_PATH:-}
+# Pass-through for one-off train.py args.  The case that motivated it:
+# CHANGING CORPUS ON A RESUME.  A resume restores the parquet position
+# (load_checkpoint, train.py:562) and that position was taken against the
+# OLD pack.  stateful_parquet_dataset.load_state_dict does catch it on the
+# dataset fingerprint and reset to row 0, but only as a WARNING it prints
+# and then keeps going.  Say it out loud instead:
+#     EXTRA_ARGS="--ignore_past_parquet_dataset true"
+# ONLY on the link that switches corpus.  Every later link is same-corpus
+# and MUST restore its position, or each one replays the pack from the top.
+EXTRA_ARGS=${EXTRA_ARGS:-}
 
 HEAL_DATA=${HEAL_DATA:-data/fineweb_edu_olmo_len4096}
 ARM_DATA=${ARM_DATA:-data/nemotron_math_olmo_len4096_4b}
@@ -482,4 +492,4 @@ python train.py \
     --cortex.prefix_eos_reset $PREFIX_EOS_RESET \
     --cortex.prefix_pos $PREFIX_POS \
     --cortex.freeze_loop false \
-    $CHAIN_ARGS
+    $CHAIN_ARGS $EXTRA_ARGS

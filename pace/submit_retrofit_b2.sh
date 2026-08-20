@@ -64,6 +64,12 @@ ARG=${2:-}
 SBATCH=pace/b2_retrofit.sbatch
 OUT=cortex-retrofit
 BASE_CKPT=ckpts/olmo-retrofit-cortex
+# THESE MUST BE PASSED ON EVERY sbatch LINE BELOW.  b2_retrofit.sbatch
+# carries its OWN defaults (HEAL_DATA=fineweb_edu, ARM_DATA=nemotron_math_4b)
+# and a plain assignment here is not exported, so the sbatch default silently
+# wins.  That is how the whole B2 arm ran 91,552 -> 191,022 on pure Nemotron
+# after the 2026-08-08 decision to use the 50/50 mix (found 2026-08-20).
+# 'require' checking the path is NOT evidence the run uses it.
 HEAL_DATA=data/fineweb_edu_olmo_len4096
 ARM_DATA=data/fw_nemo50_olmo_len4096
 TOTAL_STEPS=305176          # 5B / 16,384 — the schedule horizon, never varies
@@ -111,14 +117,14 @@ heal)
     require $BASE_CKPT $HEAL_DATA
     step=$(newest_ckpt $HEAL_RUN)
     if [ -z "$step" ]; then
-        PHASE=heal STOP_AT_STEP=$HEAL_STEPS sbatch $SBATCH
+        HEAL_DATA=$HEAL_DATA PHASE=heal STOP_AT_STEP=$HEAL_STEPS sbatch $SBATCH
         echo "Submitted: $HEAL_RUN (step 0 -> $HEAL_STEPS)"
     elif [ "$step" -ge "$HEAL_STEPS" ]; then
         echo "Healing already complete at step $step — run 'branch'."
         exit 0
     else
         PHASE=heal STOP_AT_STEP=$HEAL_STEPS \
-            RESUME_PATH=$OUT/$HEAL_RUN/checkpoint_$step sbatch $SBATCH
+            HEAL_DATA=$HEAL_DATA RESUME_PATH=$OUT/$HEAL_RUN/checkpoint_$step sbatch $SBATCH
         echo "Submitted: $HEAL_RUN resuming from step $step (-> $HEAL_STEPS)"
     fi
     cat <<EOF
@@ -177,7 +183,7 @@ branch)
     for arm in ${ARG:-$ARMS_ALL}; do
         run=${RUN_OF[$arm]}
         [ -z "$(newest_ckpt $run)" ] || { echo "SKIP $run — already started; use 'resume'."; continue; }
-        PHASE=arm MEMORY_MODE=$arm BRANCH_PATH=$branch_from sbatch $SBATCH
+        ARM_DATA=$ARM_DATA PHASE=arm MEMORY_MODE=$arm BRANCH_PATH=$branch_from sbatch $SBATCH
         echo "Submitted: $run branching from $HEAL_RUN step $step (-> $TOTAL_STEPS)"
     done
     echo
@@ -207,7 +213,7 @@ resume)
             echo "SKIP $run — already at step $step."
             continue
         fi
-        PHASE=arm MEMORY_MODE=$arm RESUME_PATH=$OUT/$run/checkpoint_$step sbatch $SBATCH
+        ARM_DATA=$ARM_DATA PHASE=arm MEMORY_MODE=$arm RESUME_PATH=$OUT/$run/checkpoint_$step sbatch $SBATCH
         echo "Submitted: $run resuming from step $step (-> $TOTAL_STEPS)"
     done
     ;;

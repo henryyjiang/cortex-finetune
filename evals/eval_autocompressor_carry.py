@@ -84,7 +84,8 @@ class PortedOPTPositions(nn.Module):
 
     def __init__(self, weight: torch.Tensor, cfg: dict):
         super().__init__()
-        self.weight = weight
+        # must be a buffer, not a bare attribute, or model.to(device) skips it
+        self.register_buffer("weight", weight)
         self.cfg = cfg
 
     def forward(self, attention_mask, past_key_values_length: int = 0, position_ids=None):
