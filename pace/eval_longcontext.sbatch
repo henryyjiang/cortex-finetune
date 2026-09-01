@@ -40,6 +40,20 @@
 # fix also runs here idempotently as a belt-and-suspenders (pure file ops).
 # T is NOT passed: evals read mean_recurrence (8) + memory flags from the
 # checkpoint config; memory carry is auto-detected via has_cross_state.
+#
+# B1 / B2 retrofit checkpoints (2026-08-31): OUT_ROOT / CKPT_NAME / PREP_BASE /
+# BASE_CKPT, same meaning as in eval_basic.sbatch and the carry-ablation
+# sbatch.  Two things do NOT default correctly for a retrofit arm:
+#   * T_OVERRIDE.  A retrofit-derived config says mean_recurrence=32 (inherited
+#     from the untrained base), so the sentence above — "evals read
+#     mean_recurrence (8)" — is a Track-A statement only.  Pass T_OVERRIDE=8.
+#   * SEQ_LEN / NUM_CHUNKS.  These must match the arm's TRAINING chunk
+#     geometry, i.e. 4096/cross_chunks.  B2's arms train at cross_chunks=8, so
+#     SEQ_LEN=512 NUM_CHUNKS=8, not the Track-A 1024/4.
+#   OUT_ROOT=cortex-retrofit CKPT_NAME=final_checkpoint \
+#       PREP_BASE=ckpts/olmo-retrofit-cortex RUN=retro-b2-acc32-cc8-mr8 \
+#       T_OVERRIDE=8 SEQ_LEN=512 NUM_CHUNKS=8 EVAL_TAG=b2-final \
+#       sbatch pace/eval_longcontext.sbatch
 
 cd $SLURM_SUBMIT_DIR
 
@@ -69,14 +83,19 @@ SEQ_LEN=${SEQ_LEN:-1024}
 # at higher cross_chunks).  NUM_CHUNKS=0 restores fixed-size chunking.
 NUM_CHUNKS=${NUM_CHUNKS:-4}
 BASE=${BASE:-false}
+OUT_ROOT=${OUT_ROOT:-cortex-retro-ft}
+CKPT_NAME=${CKPT_NAME:-final_checkpoint}
+PREP_BASE=${PREP_BASE:-ckpts/olmo8-cortex}
+BASE_CKPT=${BASE_CKPT:-ckpts/olmo8-cortex}
 if [ "$BASE" = "true" ]; then
     LABEL="base"
-    MODEL_DIR="ckpts/olmo8-cortex"
+    MODEL_DIR="$BASE_CKPT"
 else
     [ -n "$RUN" ] || { echo "Set RUN=<run_name> (or BASE=true)"; exit 1; }
     LABEL="$RUN"
-    MODEL_DIR="cortex-retro-ft/$RUN/final_checkpoint"
-    python tools/prepare_eval_checkpoint.py --base ckpts/olmo8-cortex \
+    MODEL_DIR="$OUT_ROOT/$RUN/$CKPT_NAME"
+    [ -d "$MODEL_DIR" ] || { echo "No such checkpoint: $MODEL_DIR"; exit 1; }
+    python tools/prepare_eval_checkpoint.py --base "$PREP_BASE" \
         --dirs "$MODEL_DIR"
 fi
 
@@ -94,9 +113,9 @@ fi
 [ "$NUM_CHUNKS" -ne 4 ]   && LABEL="${LABEL}-nc${NUM_CHUNKS}"
 [ "$SEQ_LEN" -ne 1024 ]   && LABEL="${LABEL}-sl${SEQ_LEN}"
 
-OUT_ROOT="eval_results/longcontext_${EVAL_TAG}/${LABEL}"
-mkdir -p "$OUT_ROOT"
-echo "=== long-context eval: $LABEL  ($MODEL_DIR) -> $OUT_ROOT ==="
+OUT="eval_results/longcontext_${EVAL_TAG}/${LABEL}"
+mkdir -p "$OUT"
+echo "=== long-context eval: $LABEL  ($MODEL_DIR) -> $OUT ==="
 
 python evals/eval_babilong.py \
     --model_name "$MODEL_DIR" \
@@ -107,7 +126,7 @@ python evals/eval_babilong.py \
     --passes_per_chunk $PASSES_PER_CHUNK \
     --ccot_passes $CCOT_PASSES \
     "${T_ARGS[@]}" \
-    --out_dir "$OUT_ROOT/babilong"
+    --out_dir "$OUT/babilong"
 
 python evals/eval_longmemeval.py \
     --model_name "$MODEL_DIR" \
@@ -117,4 +136,4 @@ python evals/eval_longmemeval.py \
     --passes_per_chunk $PASSES_PER_CHUNK \
     --ccot_passes $CCOT_PASSES \
     "${T_ARGS[@]}" \
-    --out_dir "$OUT_ROOT/longmemeval"
+    --out_dir "$OUT/longmemeval"
