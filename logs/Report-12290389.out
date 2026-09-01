@@ -1,0 +1,58 @@
+---------------------------------------
+Begin Slurm Prolog: Aug-24-2026 22:30:08
+Job ID:    12290389
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_write_capacity.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retrofit/retro-b2-acc32-cc8-mr8/model_only_chkpt_165000
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== write capacity: retro-b2-acc32-cc8-mr8 -> eval_results/write_capacity_b2-165000-shuf/retro-b2-acc32-cc8-mr8 ===
+Loading: cortex-retrofit/retro-b2-acc32-cc8-mr8/model_only_chkpt_165000  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:41<01:41, 101.25s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:56<00:00, 50.90s/it] Loading checkpoint shards: 100%|██████████| 2/2 [01:56<00:00, 58.45s/it]
+mechanism: prefix splice  device=cuda  dtype=bfloat16
+T=8  n_chunks=8
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 4.1s -> ETA 3 min for 50 samples (5 forwards x 8 chunks each at T=8)
+  10/50 samples  [0 min elapsed]
+  20/50 samples  [1 min elapsed]
+  30/50 samples  [1 min elapsed]
+  40/50 samples  [2 min elapsed]
+  50/50 samples  [2 min elapsed]
+
+  Chunk       N      self      prev      none      shuf     d(recon)      d(info)
+  ----------------------------------------------------------------------------------
+  1          50    4.7771    5.1150    5.1150    5.0598      0.33789      0.28266
+  2          50    4.4107    4.6590    4.7903    4.7619      0.24828      0.35116
+  3          50    4.4646    4.6897    4.8422    4.8188      0.22507      0.35417
+  4          50    4.4364    4.6448    4.8143    4.7959      0.20844      0.35957
+  5          50    4.4607    4.6669    4.8439    4.8388      0.20627      0.37812
+  6          50    4.4169    4.6156    4.7949    4.7899      0.19871      0.37302
+  7          50    4.4586    4.6428    4.8290    4.8231      0.18419      0.36450
+  8          50    4.4874    4.6777    4.8530    4.8480      0.19028      0.36055
+
+  chunks 2+ reconstruction (prev - self): +0.20875 (SE 0.00321)
+
+  chunks 2+ information   (shuf - self): +0.36301 (SE 0.00440)
+
+  Large positive reconstruction delta => the write encodes its own
+  chunk, so a flat carry-ablation delta is a READ failure.
+  Reconstruction large but information ~0 => the gain is the extra
+  prefix columns acting as registers, not the content.
+
+Results saved -> eval_results/write_capacity_b2-165000-shuf/retro-b2-acc32-cc8-mr8
+---------------------------------------
+Begin Slurm Epilog: Aug-24-2026 22:34:46
+Job ID:        12290389
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_write_capacity.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:36:48,vmem=0,walltime=00:04:36,mem=6850692K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-33-0
+---------------------------------------

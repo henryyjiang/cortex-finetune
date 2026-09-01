@@ -1,0 +1,86 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-01-2026 00:12:43
+Job ID:    12651581
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== context ceiling: cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint -> eval_results/context_ceiling_b2-final/retro-b2-acc32-cc8-mr8 ===
+Loading: cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:20<01:20, 80.56s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:35<00:00, 41.94s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:35<00:00, 47.73s/it]
+T=8  n_chunks=8  carry condition: on
+context lens: 0 + [128, 256, 512, 1024]
+carry_plus:   carry + [128, 256] real tokens
+position bands: 4 per chunk
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 5.4s -> ETA 5 min
+  10/50 samples  [1 min]
+  20/50 samples  [2 min]
+  30/50 samples  [3 min]
+  40/50 samples  [4 min]
+  50/50 samples  [4 min]
+
+  Chunk      N       k=0     k=128     k=256     k=512    k=1024     carry
+  ------------------------------------------------------------------------
+  2         50    3.7199    3.5880    3.5653    3.5989    3.5989    3.5595
+  3         50    3.7244    3.5886    3.5680    3.5891    4.9609    3.5333
+  4         50    3.7047    3.5723    3.5462    3.5598    4.8470    3.5083
+  5         50    3.7523    3.6167    3.5843    3.6028    4.8440    3.5459
+  6         50    3.6794    3.5561    3.5294    3.5440    4.7247    3.4647
+  7         50    3.7120    3.5868    3.5648    3.5740    4.7639    3.4999
+  8         50    3.7179    3.5956    3.5648    3.5825    4.7922    3.5069
+
+  chunks 2+ pooled (n=350), delta vs k=0 (positive = that context HELPS):
+      128 real tokens : +0.12953  (SE 0.00304)
+      256 real tokens : +0.15543  (SE 0.00371)
+      512 real tokens : +0.13709  (SE 0.00427)
+     1024 real tokens : -0.93158  (SE 0.02620)
+    carry             : +0.19887  (SE 0.00357)
+
+  => the carry BEATS every measured oracle (best: +0.15543 at k=256); the ceiling is not the binding constraint
+  => it recovers 128.0% of the best oracle (+0.15543 at k=256 real tokens)
+
+  carry + real context (n=350).  residual = what the carry adds
+  ON TOP of context that is free at inference:
+    carry+128   : total +0.20600 (SE 0.00390)   residual +0.07647 (SE 0.00280)  = 38% of the standalone carry delta
+    carry+256   : total +0.17633 (SE 0.00436)   residual +0.02091 (SE 0.00247)  = 11% of the standalone carry delta
+  A residual near zero means the carry is a LOCAL-CONTEXT
+  SURROGATE: it re-supplies what the last k tokens already give,
+  so the headroom worth chasing is (best ceiling - ceiling(k)),
+  not the whole ceiling.
+
+  position bands inside the chunk (n=350 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k128              +0.41707    +0.06117    +0.02583    +0.01403
+  k256              +0.48167    +0.09286    +0.03964    +0.00753
+  k512              +0.51826    +0.09540    +0.00477    -0.07009
+  k1024             +0.32532    -0.63697    -1.48076    -1.93390
+  carry             +0.49362    +0.14340    +0.08833    +0.07013
+  carry+128         +0.53696    +0.14997    +0.09104    +0.04603
+  carry+256         +0.54456    +0.15559    +0.06623    -0.06104
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_b2-final/retro-b2-acc32-cc8-mr8
+---------------------------------------
+Begin Slurm Epilog: Sep-01-2026 00:19:14
+Job ID:        12651581
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:52:08,vmem=0,walltime=00:06:31,mem=6350944K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-18-0
+---------------------------------------

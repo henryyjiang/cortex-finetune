@@ -1,0 +1,157 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-01-2026 03:56:39
+Job ID:    12651590
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_basic.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+[ok]  cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== basic eval: retro-b2-acc32-cc8-mr8  (cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint) -> eval_results/basic_b2-final/retro-b2-acc32-cc8-mr8 ===
+Loading checkpoint: None
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:23<01:23, 83.41s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:38<00:00, 43.12s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:38<00:00, 49.16s/it]
+Using the latest cached version of the dataset since Rowan/hellaswag couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/Rowan___hellaswag/default/0.0.0/218ec52e09a7e7462a5400043bb9a69a41d06b76 (last modified on Fri Jul 10 21:28:18 2026).
+Using the latest cached version of the dataset since allenai/winogrande couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'winogrande_xl' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___winogrande/winogrande_xl/0.0.0/01e74176c63542e6b0bcb004dcdea22d94fb67b5 (last modified on Fri Jul 10 21:28:20 2026).
+Using the latest cached version of the dataset since allenai/ai2_arc couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'ARC-Easy' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___ai2_arc/ARC-Easy/0.0.0/210d026faf9955653af8916fad021475a3f00453 (last modified on Fri Jul 10 21:28:21 2026).
+Using the latest cached version of the dataset since allenai/ai2_arc couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'ARC-Challenge' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___ai2_arc/ARC-Challenge/0.0.0/210d026faf9955653af8916fad021475a3f00453 (last modified on Fri Jul 10 21:28:22 2026).
+Using the latest cached version of the dataset since ybisk/piqa couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/ybisk___piqa/default/0.0.0/142c51238b3ca2bc61e9a075913871b8b600e8e1 (last modified on Fri Jul 10 21:28:23 2026).
+T=8  tasks=['hellaswag', 'winogrande', 'arc_easy', 'arc_challenge', 'piqa']
+
+=======================================================
+Task: hellaswag
+=======================================================
+  [hellaswag] 200/10042  acc=0.4350
+  [hellaswag] 400/10042  acc=0.4400
+  [hellaswag] 600/10042  acc=0.4433
+  [hellaswag] 800/10042  acc=0.4425
+  [hellaswag] 1000/10042  acc=0.4320
+  [hellaswag] 1200/10042  acc=0.4367
+  [hellaswag] 1400/10042  acc=0.4279
+  [hellaswag] 1600/10042  acc=0.4219
+  [hellaswag] 1800/10042  acc=0.4178
+  [hellaswag] 2000/10042  acc=0.4160
+  [hellaswag] 2200/10042  acc=0.4164
+  [hellaswag] 2400/10042  acc=0.4204
+  [hellaswag] 2600/10042  acc=0.4223
+  [hellaswag] 2800/10042  acc=0.4236
+  [hellaswag] 3000/10042  acc=0.4247
+  [hellaswag] 3200/10042  acc=0.4272
+  [hellaswag] 3400/10042  acc=0.4265
+  [hellaswag] 3600/10042  acc=0.4289
+  [hellaswag] 3800/10042  acc=0.4334
+  [hellaswag] 4000/10042  acc=0.4298
+  [hellaswag] 4200/10042  acc=0.4324
+  [hellaswag] 4400/10042  acc=0.4343
+  [hellaswag] 4600/10042  acc=0.4335
+  [hellaswag] 4800/10042  acc=0.4317
+  [hellaswag] 5000/10042  acc=0.4316
+  [hellaswag] 5200/10042  acc=0.4313
+  [hellaswag] 5400/10042  acc=0.4337
+  [hellaswag] 5600/10042  acc=0.4361
+  [hellaswag] 5800/10042  acc=0.4378
+  [hellaswag] 6000/10042  acc=0.4390
+  [hellaswag] 6200/10042  acc=0.4390
+  [hellaswag] 6400/10042  acc=0.4408
+  [hellaswag] 6600/10042  acc=0.4427
+  [hellaswag] 6800/10042  acc=0.4437
+  [hellaswag] 7000/10042  acc=0.4436
+  [hellaswag] 7200/10042  acc=0.4431
+  [hellaswag] 7400/10042  acc=0.4446
+  [hellaswag] 7600/10042  acc=0.4430
+  [hellaswag] 7800/10042  acc=0.4456
+  [hellaswag] 8000/10042  acc=0.4466
+  [hellaswag] 8200/10042  acc=0.4467
+  [hellaswag] 8400/10042  acc=0.4474
+  [hellaswag] 8600/10042  acc=0.4467
+  [hellaswag] 8800/10042  acc=0.4467
+  [hellaswag] 9000/10042  acc=0.4468
+  [hellaswag] 9200/10042  acc=0.4475
+  [hellaswag] 9400/10042  acc=0.4468
+  [hellaswag] 9600/10042  acc=0.4476
+  [hellaswag] 9800/10042  acc=0.4470
+  [hellaswag] 10000/10042  acc=0.4481
+  hellaswag: 4499/10042 = 0.4480
+
+=======================================================
+Task: winogrande
+=======================================================
+  [winogrande] 200/1267  acc=0.5150
+  [winogrande] 400/1267  acc=0.5350
+  [winogrande] 600/1267  acc=0.5200
+  [winogrande] 800/1267  acc=0.5275
+  [winogrande] 1000/1267  acc=0.5250
+  [winogrande] 1200/1267  acc=0.5283
+  winogrande: 670/1267 = 0.5288
+
+=======================================================
+Task: arc_easy
+=======================================================
+  [arc_easy] 200/570  acc=0.3800
+  [arc_easy] 400/570  acc=0.4050
+  arc_easy: 232/570 = 0.4070
+
+=======================================================
+Task: arc_challenge
+=======================================================
+  [arc_challenge] 200/299  acc=0.3100
+  arc_challenge: 97/299 = 0.3244
+
+=======================================================
+Task: piqa
+=======================================================
+  [piqa] 200/1838  acc=0.6500
+  [piqa] 400/1838  acc=0.6500
+  [piqa] 600/1838  acc=0.6517
+  [piqa] 800/1838  acc=0.6375
+  [piqa] 1000/1838  acc=0.6410
+  [piqa] 1200/1838  acc=0.6400
+  [piqa] 1400/1838  acc=0.6393
+  [piqa] 1600/1838  acc=0.6419
+  [piqa] 1800/1838  acc=0.6439
+  piqa: 1184/1838 = 0.6442
+
+Task                Correct    Total      Acc
+---------------------------------------------
+hellaswag              4499    10042   0.4480
+winogrande              670     1267   0.5288
+arc_easy                232      570   0.4070
+arc_challenge            97      299   0.3244
+piqa                   1184     1838   0.6442
+
+Results saved → eval_results/basic_b2-final/retro-b2-acc32-cc8-mr8/multiple_choice-T8
+Loading checkpoint: None
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:21<01:21, 81.44s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:35<00:00, 42.02s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:35<00:00, 47.94s/it]
+Using the latest cached version of the dataset since openai/gsm8k couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'main' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/openai___gsm8k/main/0.0.0/740312add88f781978c0658806c59bc2815b9866 (last modified on Fri Jul 10 21:28:24 2026).
+T=8  ccot_passes=0
+  100/500  acc=0.0400
+  200/500  acc=0.0350
+  300/500  acc=0.0400
+  400/500  acc=0.0325
+  500/500  acc=0.0280
+
+GSM8K accuracy: 14/500 = 0.0280
+Results saved → eval_results/basic_b2-final/retro-b2-acc32-cc8-mr8/gsm8k-T8
+---------------------------------------
+Begin Slurm Epilog: Sep-01-2026 07:54:15
+Job ID:        12651590
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_basic.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=1-07:40:56,vmem=0,walltime=03:57:37,mem=6993792K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-20-0
+---------------------------------------
