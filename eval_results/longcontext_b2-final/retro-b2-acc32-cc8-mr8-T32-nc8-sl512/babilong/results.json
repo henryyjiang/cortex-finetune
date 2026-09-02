@@ -2,24 +2,24 @@
   "final_checkpoint": {
     "qa1": {
       "1k": {
-        "correct": 22,
+        "correct": 19,
         "total": 100,
-        "accuracy": 0.22
+        "accuracy": 0.19
       },
       "2k": {
-        "correct": 20,
+        "correct": 18,
         "total": 100,
-        "accuracy": 0.2
+        "accuracy": 0.18
       },
       "4k": {
-        "correct": 20,
-        "total": 100,
-        "accuracy": 0.2
-      },
-      "8k": {
         "correct": 17,
         "total": 100,
         "accuracy": 0.17
+      },
+      "8k": {
+        "correct": 16,
+        "total": 100,
+        "accuracy": 0.16
       },
       "16k": {
         "correct": 20,
@@ -27,31 +27,31 @@
         "accuracy": 0.2
       },
       "32k": {
-        "correct": 17,
+        "correct": 18,
         "total": 100,
-        "accuracy": 0.17
+        "accuracy": 0.18
       }
     },
     "qa2": {
       "1k": {
+        "correct": 16,
+        "total": 100,
+        "accuracy": 0.16
+      },
+      "2k": {
         "correct": 17,
         "total": 100,
         "accuracy": 0.17
       },
-      "2k": {
-        "correct": 14,
-        "total": 100,
-        "accuracy": 0.14
-      },
       "4k": {
-        "correct": 10,
+        "correct": 12,
         "total": 100,
-        "accuracy": 0.1
+        "accuracy": 0.12
       },
       "8k": {
-        "correct": 11,
+        "correct": 12,
         "total": 100,
-        "accuracy": 0.11
+        "accuracy": 0.12
       },
       "16k": {
         "correct": 10,
@@ -66,14 +66,14 @@
     },
     "qa3": {
       "1k": {
-        "correct": 8,
+        "correct": 7,
         "total": 100,
-        "accuracy": 0.08
+        "accuracy": 0.07
       },
       "2k": {
-        "correct": 12,
+        "correct": 10,
         "total": 100,
-        "accuracy": 0.12
+        "accuracy": 0.1
       },
       "4k": {
         "correct": 6,
@@ -81,9 +81,9 @@
         "accuracy": 0.06
       },
       "8k": {
-        "correct": 7,
+        "correct": 5,
         "total": 100,
-        "accuracy": 0.07
+        "accuracy": 0.05
       },
       "16k": {
         "correct": 3,

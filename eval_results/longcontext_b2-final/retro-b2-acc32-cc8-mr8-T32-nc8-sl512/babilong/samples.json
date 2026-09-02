@@ -165,7 +165,7 @@
       "bucket": "16k",
       "question": "Where is John? ",
       "gold": "kitchen",
-      "pred": " hall.",
+      "pred": " in the hall.",
       "correct": false
     },
     {
@@ -193,7 +193,7 @@
       "bucket": "32k",
       "question": "Where is Mary? ",
       "gold": "kitchen",
-      "pred": " bathroom\n\n",
+      "pred": " bathroom",
       "correct": false
     },
     {
@@ -207,7 +207,7 @@
       "bucket": "32k",
       "question": "Where is Sandra? ",
       "gold": "bedroom",
-      "pred": "",
+      "pred": " garden",
       "correct": false
     }
   ],
@@ -223,7 +223,7 @@
       "bucket": "1k",
       "question": "Where is the milk? ",
       "gold": "garden",
-      "pred": " in the kitchen\n\n",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
@@ -370,7 +370,7 @@
       "bucket": "16k",
       "question": "Where is the apple? ",
       "gold": "bedroom",
-      "pred": " office",
+      "pred": " office\n\n",
       "correct": false
     },
     {
@@ -398,7 +398,7 @@
       "bucket": "32k",
       "question": "Where is the milk? ",
       "gold": "garden",
-      "pred": " in the bottle\n\n",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
@@ -412,7 +412,7 @@
       "bucket": "32k",
       "question": "Where is the apple? ",
       "gold": "bedroom",
-      "pred": " office\n\n",
+      "pred": " office",
       "correct": false
     },
     {
@@ -428,7 +428,7 @@
       "bucket": "1k",
       "question": "Where was the football before the garden? ",
       "gold": "kitchen",
-      "pred": " bedroom\n\n",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
@@ -456,7 +456,7 @@
       "bucket": "1k",
       "question": "Where was the milk before the hallway? ",
       "gold": "garden",
-      "pred": " bedroom\n\n",
+      "pred": " bedroom\n",
       "correct": false
     },
     {
@@ -582,14 +582,14 @@
       "bucket": "16k",
       "question": "Where was the apple before the garden? ",
       "gold": "kitchen",
-      "pred": " bedroom\n\n",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where was the apple before the bedroom? ",
       "gold": "garden",
-      "pred": " the room\n",
+      "pred": " the room\n\n",
       "correct": false
     },
     {
@@ -617,7 +617,7 @@
       "bucket": "32k",
       "question": "Where was the apple before the garden? ",
       "gold": "kitchen",
-      "pred": " garden",
+      "pred": "",
       "correct": false
     },
     {
@@ -631,7 +631,7 @@
       "bucket": "32k",
       "question": "Where was the football before the bathroom? ",
       "gold": "kitchen",
-      "pred": " bathroom\n\n",
+      "pred": " bathroom",
       "correct": false
     }
   ]

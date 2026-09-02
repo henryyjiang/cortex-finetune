@@ -1,0 +1,46 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-01-2026 11:26:30
+Job ID:    12684713
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_carry_ablation.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== carry ablation: retro-b2-acc32-cc8-mr8 -> eval_results/carry_ablation_b2-Tsweep-T4/retro-b2-acc32-cc8-mr8 ===
+Loading: cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:22<00:22, 22.40s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:26<00:00, 11.78s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:26<00:00, 13.38s/it]
+T=4  n_chunks=8
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  25/50 samples...
+  50/50 samples...
+
+  Chunk       N    carried     zeroed    d(zeroed)   (delta>0 => that carry content helps)
+  ------------------------------------------------
+  1          50     4.1218     4.1218      0.00000
+  2          50     3.5776     3.7320      0.15442
+  3          50     3.5529     3.7354      0.18256
+  4          50     3.5247     3.7155      0.19074
+  5          50     3.5642     3.7648      0.20056
+  6          50     3.4807     3.6921      0.21138
+  7          50     3.5219     3.7241      0.20225
+  8          50     3.5243     3.7299      0.20561
+
+  chunks 2+ [ zeroed]: delta = 0.19250 (SE 0.00350)  [chunk 1 is the identical-by-construction control]
+
+Results saved -> eval_results/carry_ablation_b2-Tsweep-T4/retro-b2-acc32-cc8-mr8
+---------------------------------------
+Begin Slurm Epilog: Sep-01-2026 11:27:34
+Job ID:        12684713
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_carry_ablation.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:08:48,vmem=0,walltime=00:01:06,mem=7921896K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-20-0
+---------------------------------------

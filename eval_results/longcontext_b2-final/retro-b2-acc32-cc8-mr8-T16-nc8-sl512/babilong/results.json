@@ -17,9 +17,9 @@
         "accuracy": 0.2
       },
       "8k": {
-        "correct": 17,
+        "correct": 18,
         "total": 100,
-        "accuracy": 0.17
+        "accuracy": 0.18
       },
       "16k": {
         "correct": 20,
@@ -27,26 +27,26 @@
         "accuracy": 0.2
       },
       "32k": {
-        "correct": 17,
+        "correct": 18,
         "total": 100,
-        "accuracy": 0.17
+        "accuracy": 0.18
       }
     },
     "qa2": {
       "1k": {
-        "correct": 17,
+        "correct": 16,
         "total": 100,
-        "accuracy": 0.17
+        "accuracy": 0.16
       },
       "2k": {
-        "correct": 14,
+        "correct": 15,
         "total": 100,
-        "accuracy": 0.14
+        "accuracy": 0.15
       },
       "4k": {
-        "correct": 10,
+        "correct": 11,
         "total": 100,
-        "accuracy": 0.1
+        "accuracy": 0.11
       },
       "8k": {
         "correct": 11,
@@ -76,9 +76,9 @@
         "accuracy": 0.12
       },
       "4k": {
-        "correct": 6,
+        "correct": 7,
         "total": 100,
-        "accuracy": 0.06
+        "accuracy": 0.07
       },
       "8k": {
         "correct": 7,
@@ -86,9 +86,9 @@
         "accuracy": 0.07
       },
       "16k": {
-        "correct": 3,
+        "correct": 4,
         "total": 100,
-        "accuracy": 0.03
+        "accuracy": 0.04
       },
       "32k": {
         "correct": 3,

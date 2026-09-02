@@ -16,9 +16,9 @@
       "accuracy": 0.0
     },
     "\u226450sess": {
-      "correct": 8,
+      "correct": 13,
       "total": 200,
-      "accuracy": 0.04
+      "accuracy": 0.065
     },
     ">50sess": {
       "correct": 10,
