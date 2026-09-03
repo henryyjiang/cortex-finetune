@@ -10,7 +10,7 @@
     "bucket": "\u226450sess",
     "question": "How long is my daily commute to work?",
     "gold": "45 minutes each way",
-    "pred": " I usually drive for about 30 minutes to 45 minutes to work, depending on the route and the speed of the vehicle.",
+    "pred": " My daily commute to work is about 30 minutes.\n",
     "correct": false
   },
   {
@@ -38,7 +38,7 @@
     "bucket": "\u226450sess",
     "question": "What was my last name before I changed it?",
     "gold": "Johnson",
-    "pred": " My last name was \"John Smith\" before I changed it to \"John Johnson\".\n",
+    "pred": " My last name was \"John Smith\" before I changed it to \"John Johnson.\"",
     "correct": true
   },
   {
@@ -108,7 +108,7 @@
     "bucket": ">50sess",
     "question": "How long did it take me to assemble the IKEA bookshelf?",
     "gold": "4 hours",
-    "pred": " I took about 15 minutes to assemble the Siri bookshelf.",
+    "pred": " I took about 15 minutes to assemble the Siri- and Google-aided device.",
     "correct": false
   },
   {
@@ -136,7 +136,7 @@
     "bucket": ">50sess",
     "question": "What was my previous stance on spirituality?",
     "gold": "A staunch atheist",
-    "pred": " I have always been a believer in the power of spirituality to enhance our lives and to connect with others.",
+    "pred": " I am a believer in the power of the mind and the power of the body.",
     "correct": false
   }
 ]
