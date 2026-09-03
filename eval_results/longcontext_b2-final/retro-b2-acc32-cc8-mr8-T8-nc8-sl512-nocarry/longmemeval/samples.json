@@ -1,0 +1,142 @@
+[
+  {
+    "bucket": ">50sess",
+    "question": "What degree did I graduate with?",
+    "gold": "Business Administration",
+    "pred": " I graduated with a Bachelor of Science in Mathematics.",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How long is my daily commute to work?",
+    "gold": "45 minutes each way",
+    "pred": " My daily commute to work is approximately 30 minutes. This is the time it takes me to get to work from home, including the time spent on the bus",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I redeem a $5 coupon on coffee creamer?",
+    "gold": "Target",
+    "pred": " I received a $5 coupon on coffee creamer. I used it to buy a cup of coffee and a small bag of chips. I was very happy with",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What play did I attend at the local community theater?",
+    "gold": "The Glass Menagerie",
+    "pred": " I attended a play called \"The Magic of Magic\" at the local community theater. The play was a fun and engaging way to explore the magic of magic and",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What is the name of the playlist I created on Spotify?",
+    "gold": "Summer Vibes",
+    "pred": " The name of the playlist I created on iTunes is \"The Best of the Best\" by The Best of the Best.\n\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What was my last name before I changed it?",
+    "gold": "Johnson",
+    "pred": " My last name was \"John Doe\" before I changed it to \"John Smith.\"\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where do I take yoga classes?",
+    "gold": "Serenity Yoga",
+    "pred": " I take yoga classes at a local yoga center. The center offers a variety of classes, including yoga for beginners, yoga for adults, and yoga for children.",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What color did I repaint my bedroom walls?",
+    "gold": "a lighter shade of gray",
+    "pred": " I painted my bedroom walls in a dark blue color. I used a paint brush to apply the paint to the walls, and I then used a paintbrush to",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "When did I volunteer at the local animal shelter's fundraising dinner?",
+    "gold": "February 14th",
+    "pred": " I was a volunteer at the local animal shelter's fundraising dinner. I was there for about 2 hours and I was able to help out with a variety of",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I buy my new tennis racket from?",
+    "gold": "the sports store downtown",
+    "pred": " I bought my new tennis racket from a local tennis store. The store is located in a nearby shopping mall, and I was able to find the tennis racket for",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What was my previous occupation?",
+    "gold": "Marketing specialist at a small startup",
+    "pred": " My previous occupation was a software engineer.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How much did I spend on a designer handbag?",
+    "gold": "$800",
+    "pred": " I spent $150 on a designer handbag.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How many playlists do I have on Spotify?",
+    "gold": "20",
+    "pred": " I have 3 songs on iTunes.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I attend for my study abroad program?",
+    "gold": "University of Melbourne in Australia",
+    "pred": " I attended a study abroad program at a university in Europe. I was studying in France for a year, and I was able to experience a variety of cultures and",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What was the discount I got on my first purchase from the new clothing brand?",
+    "gold": "10%",
+    "pred": " The discount I received on my first purchase from the new clothing brand was a 10% discount. This means that I was able to save $10 on my",
+    "correct": true
+  },
+  {
+    "bucket": ">50sess",
+    "question": "How long did it take me to assemble the IKEA bookshelf?",
+    "gold": "4 hours",
+    "pred": " It took me approximately 2 hours to assemble the Siri bookshelf. I started by taking apart the pieces and then put them back together. I also used a",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What did I buy for my sister's birthday gift?",
+    "gold": "a yellow dress",
+    "pred": " I bought a new pair of shoes for my sister's birthday gift. The shoes were a great gift for her and I was happy to give her something special.",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What speed is my new internet plan?",
+    "gold": "500 Mbps",
+    "pred": " The speed of your new internet plan is typically determined by the speed of your internet connection. If you are using a fixed speed plan, it means that your internet",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "How many shirts did I pack for my 5-day trip to Costa Rica?",
+    "gold": "7",
+    "pred": " I packed 5 shirts for my 5-day trip to Costa Rica.",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What was my previous stance on spirituality?",
+    "gold": "A staunch atheist",
+    "pred": " My previous stance on spirituality was that I believed in the power of faith and the importance of living a life of purpose and meaning. I believed that spirituality was a",
+    "correct": false
+  }
+]
