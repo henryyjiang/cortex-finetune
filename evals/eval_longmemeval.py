@@ -58,6 +58,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ccot_passes", type=int, default=0,
                    help="Extra silent full passes over the final question chunk "
                         "before generation (latent CCoT thinking); 0 = off")
+    p.add_argument("--no_carry", action="store_true",
+                   help="Paired no-memory control: chunk the context exactly as "
+                        "usual, but never build the cross-chunk buffer, so the "
+                        "model sees the SAME final window with nothing carried "
+                        "into it. The only difference from the normal run is the "
+                        "memory, on the same weights -- unlike a base-model "
+                        "comparison, which also varies the lineage.")
     p.add_argument("--split",        default="s", choices=["s", "m", "oracle"],
                    help="LongMemEval split: s = ~115k-token haystack (default, "
                         "the real memory test), m = ~1.5M tokens, oracle = "
@@ -125,15 +132,18 @@ def contains_answer(pred: str, gold: str) -> bool:
 
 @torch.no_grad()
 def eval_one(model, tokenizer, turns, question, answer, T, seq_len,
-             max_new_tokens, passes_per_chunk=1, ccot_passes=0, num_chunks=0):
+             max_new_tokens, passes_per_chunk=1, ccot_passes=0, num_chunks=0,
+             no_carry=False):
     history = format_history(turns)
     suffix  = SUFFIX_TEMPLATE.format(q=question)
     prime_chunks, final_ids = split_history(tokenizer, history, suffix,
                                             seq_len, max_new_tokens,
                                             num_chunks=num_chunks)
     num_steps = to_num_steps(T)
-    m_cross = prime_cross_state(model, prime_chunks, num_steps,
-                                passes_per_chunk=passes_per_chunk)
+    # See eval_babilong.eval_one -- identical chunking, no buffer.
+    m_cross = (None if no_carry else
+               prime_cross_state(model, prime_chunks, num_steps,
+                                 passes_per_chunk=passes_per_chunk))
     m_cross = ccot_prime(model, final_ids, num_steps, ccot_passes,
                          m_cross_init=m_cross)
     pred = greedy_generate(model, tokenizer, final_ids, max_new_tokens,
@@ -147,7 +157,7 @@ def eval_one(model, tokenizer, turns, question, answer, T, seq_len,
 
 def run_eval(model, tokenizer, T, seq_len, max_examples, depth_buckets,
              max_new_tokens, split="s", passes_per_chunk=1, ccot_passes=0,
-             num_chunks=0, dataset_path=None):
+             num_chunks=0, no_carry=False, dataset_path=None):
     # Preference order: requested split first, then fallbacks (a warning is
     # printed if we fall back — the splits are NOT comparable).
     order = {"s":      ("longmemeval_s", "longmemeval_oracle", "longmemeval_m"),
@@ -223,7 +233,8 @@ def run_eval(model, tokenizer, T, seq_len, max_examples, depth_buckets,
         ok, pred = eval_one(model, tokenizer, all_turns, question, answer, T,
                             seq_len, max_new_tokens,
                             passes_per_chunk=passes_per_chunk,
-                            ccot_passes=ccot_passes, num_chunks=num_chunks)
+                            ccot_passes=ccot_passes, num_chunks=num_chunks,
+                            no_carry=no_carry)
         if ok:
             results[bucket]["correct"] += 1
         results[bucket]["total"] += 1
@@ -271,6 +282,7 @@ def main() -> None:
                                 passes_per_chunk=args.passes_per_chunk,
                                 ccot_passes=args.ccot_passes,
                                 num_chunks=args.num_chunks,
+                                no_carry=args.no_carry,
                                 dataset_path=args.dataset_path)
     # fall back to the model dir when no overlay checkpoint was given
     # (--checkpoint defaults to None) so we don't do Path(None).

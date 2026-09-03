@@ -23,6 +23,11 @@
 #   CCOT_PASSES=N       N extra silent passes over the final question chunk
 #                       before answering (latent CCoT thinking)
 #   T_OVERRIDE=N        eval recurrence depth (default: config mean_recurrence=8)
+#   NO_CARRY=true       paired no-memory control: identical chunking, buffer
+#                       never built.  This is the ONLY no-carry reference that
+#                       holds the weights fixed -- a base-model comparison also
+#                       varies the lineage (50B-token conversion vs 5B retrofit),
+#                       so it cannot attribute any difference to the memory.
 # Any being non-default appends -ppcN-ccotM / -TN to the label so the plain
 # run is kept.  Base has no cross state (passes are no-ops) — its compute
 # axis is T_OVERRIDE only.
@@ -82,6 +87,10 @@ SEQ_LEN=${SEQ_LEN:-1024}
 # (deeper-than-trained buffer states — unavoidable there without retraining
 # at higher cross_chunks).  NUM_CHUNKS=0 restores fixed-size chunking.
 NUM_CHUNKS=${NUM_CHUNKS:-4}
+# Paired carry-off control.  Refused on BASE=true: the base has no cross state,
+# so its normal run is ALREADY the no-carry condition and the flag would only
+# produce a duplicate under a misleading label.
+NO_CARRY=${NO_CARRY:-false}
 BASE=${BASE:-false}
 OUT_ROOT=${OUT_ROOT:-cortex-retro-ft}
 CKPT_NAME=${CKPT_NAME:-final_checkpoint}
@@ -112,6 +121,15 @@ fi
 # standard 4-chunk run under the same EVAL_TAG.
 [ "$NUM_CHUNKS" -ne 4 ]   && LABEL="${LABEL}-nc${NUM_CHUNKS}"
 [ "$SEQ_LEN" -ne 1024 ]   && LABEL="${LABEL}-sl${SEQ_LEN}"
+CARRY_ARGS=()
+if [ "$NO_CARRY" = "true" ]; then
+    if [ "$BASE" = "true" ]; then
+        echo "NO_CARRY=true is a no-op on BASE=true (no cross state to drop)."
+        exit 1
+    fi
+    CARRY_ARGS+=(--no_carry)
+    LABEL="${LABEL}-nocarry"
+fi
 
 OUT="eval_results/longcontext_${EVAL_TAG}/${LABEL}"
 mkdir -p "$OUT"
@@ -125,7 +143,7 @@ python evals/eval_babilong.py \
     --num_chunks $NUM_CHUNKS \
     --passes_per_chunk $PASSES_PER_CHUNK \
     --ccot_passes $CCOT_PASSES \
-    "${T_ARGS[@]}" \
+    "${T_ARGS[@]}" "${CARRY_ARGS[@]}" \
     --out_dir "$OUT/babilong"
 
 python evals/eval_longmemeval.py \
@@ -135,5 +153,5 @@ python evals/eval_longmemeval.py \
     --num_chunks $NUM_CHUNKS \
     --passes_per_chunk $PASSES_PER_CHUNK \
     --ccot_passes $CCOT_PASSES \
-    "${T_ARGS[@]}" \
+    "${T_ARGS[@]}" "${CARRY_ARGS[@]}" \
     --out_dir "$OUT/longmemeval"

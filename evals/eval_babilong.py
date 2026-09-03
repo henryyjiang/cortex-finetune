@@ -106,6 +106,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ccot_passes", type=int, default=0,
                    help="Extra silent full passes over the final question chunk "
                         "before generation (latent CCoT thinking); 0 = off")
+    p.add_argument("--no_carry", action="store_true",
+                   help="Paired no-memory control: chunk the context exactly as "
+                        "usual, but never build the cross-chunk buffer, so the "
+                        "model sees the SAME final window with nothing carried "
+                        "into it. The only difference from the normal run is the "
+                        "memory, on the same weights -- unlike a base-model "
+                        "comparison, which also varies the lineage.")
     p.add_argument("--max_examples",  type=int, default=500,
                    help="Max examples per task/length bucket (0 = all)")
     p.add_argument("--length_buckets", nargs="+", type=int,
@@ -161,7 +168,7 @@ def split_context(tokenizer, context: str, suffix: str, seq_len: int,
 @torch.no_grad()
 def eval_one(model, tokenizer, context, question, answer, T, seq_len,
              max_new_tokens, task, passes_per_chunk=1, ccot_passes=0,
-             num_chunks=0):
+             num_chunks=0, no_carry=False):
     suffix = build_suffix(task, question)
     prime_chunks, final_ids = split_context(tokenizer, context, suffix,
                                             seq_len, max_new_tokens,
@@ -170,8 +177,13 @@ def eval_one(model, tokenizer, context, question, answer, T, seq_len,
     # Prime the cross state on every context chunk before the final one — the
     # final chunk is the prediction pass.  Models without cross state carry
     # nothing and see only the final chunk (the no-memory control).
-    m_cross = prime_cross_state(model, prime_chunks, num_steps,
-                                passes_per_chunk=passes_per_chunk)
+    # no_carry drops the buffer while leaving split_context untouched, so the
+    # final window is byte-identical to the carry run and the delta isolates
+    # the memory.  Priming is skipped entirely (not zeroed) -- the carry-off
+    # condition in eval_carry_ablation.py is the same: m_cross_in=None.
+    m_cross = (None if no_carry else
+               prime_cross_state(model, prime_chunks, num_steps,
+                                 passes_per_chunk=passes_per_chunk))
     # Optional latent CCoT: extra silent passes over the question chunk,
     # seeded with the context-primed buffer, before answering.
     m_cross = ccot_prime(model, final_ids, num_steps, ccot_passes,
@@ -187,7 +199,7 @@ def eval_one(model, tokenizer, context, question, answer, T, seq_len,
 
 def run_task(task_name, model, tokenizer, T, seq_len, max_examples, length_buckets,
              max_new_tokens, passes_per_chunk=1, ccot_passes=0, num_chunks=0,
-             dataset_path=None):
+             no_carry=False, dataset_path=None):
     from datasets import load_dataset
 
     # BABILong uses config name for context length (e.g. '1k', '4k') and
@@ -242,7 +254,8 @@ def run_task(task_name, model, tokenizer, T, seq_len, max_examples, length_bucke
                                 seq_len, max_new_tokens, task_name,
                                 passes_per_chunk=passes_per_chunk,
                                 ccot_passes=ccot_passes,
-                                num_chunks=num_chunks)
+                                num_chunks=num_chunks,
+                                no_carry=no_carry)
             if ok:
                 results[cfg]["correct"] += 1
             results[cfg]["total"] += 1
@@ -281,7 +294,7 @@ def main() -> None:
     T = args.T
     print(f"T={T if T is not None else cfg.mean_recurrence}  tasks={args.tasks}  "
           f"num_chunks={args.num_chunks}  passes_per_chunk={args.passes_per_chunk}  "
-          f"ccot_passes={args.ccot_passes}")
+          f"ccot_passes={args.ccot_passes}  no_carry={args.no_carry}")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -302,7 +315,7 @@ def main() -> None:
             args.max_examples, args.length_buckets,
             args.max_new_tokens, passes_per_chunk=args.passes_per_chunk,
             ccot_passes=args.ccot_passes, num_chunks=args.num_chunks,
-            dataset_path=args.dataset_path)
+            no_carry=args.no_carry, dataset_path=args.dataset_path)
         all_results[label][task] = task_results
         all_samples[task] = task_samples
 
