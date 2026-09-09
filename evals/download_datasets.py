@@ -49,6 +49,26 @@ else:
     )
     print(f"Saved → {ROOT / 'BABILong'}")
 
+# RMT-team/BABILong holds exactly 100 rows per (task, length) -- that cap, not
+# any --max_examples setting, is why every long-context table so far is n=100
+# per bucket, and at n=100 the carry-on/carry-off contrast has an MDE of ~3 pt
+# against an effect of ~1 pt (tools/power_longcontext.py).  The 1k-samples
+# repo is the same benchmark with ~1000 rows per cell (qa1-qa5), which is what
+# makes 250/bucket possible.  Layout is <length>/<task>-00000-of-00001.parquet.
+if (ROOT / "babilong-1k" / "1k" / "qa1-00000-of-00001.parquet").exists():
+    print("RMT-team/babilong-1k-samples already present, skipping.")
+else:
+    print("Downloading RMT-team/babilong-1k-samples (lengths up to 32k) ...")
+    snapshot_download(
+        repo_id        = "RMT-team/babilong-1k-samples",
+        repo_type      = "dataset",
+        local_dir      = str(ROOT / "babilong-1k"),
+        allow_patterns = [f"{length}/*.parquet"
+                          for length in ("1k", "2k", "4k", "8k", "16k", "32k")],
+        token          = token,
+    )
+    print(f"Saved → {ROOT / 'babilong-1k'}")
+
 # ---------------------------------------------------------------------------
 # MC + GSM8K: eval_multiple_choice.py / eval_gsm8k.py call load_dataset()
 # straight against the hub; compute nodes run with HF_HUB_OFFLINE=1, so warm

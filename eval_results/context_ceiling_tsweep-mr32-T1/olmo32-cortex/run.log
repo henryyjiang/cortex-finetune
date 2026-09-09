@@ -1,0 +1,26 @@
+Loading: C:/Users/henry/AppData/Local/Temp/claude/C--Users-henry-Projects-Cortex-Refs/688ccc7f-7304-4f59-a230-099947f2844b/scratchpad/ckpts_local/olmo32-cortex  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|#####     | 1/2 [00:00<00:00,  1.35it/s]Loading checkpoint shards: 100%|##########| 2/2 [00:00<00:00,  2.52it/s]Loading checkpoint shards: 100%|##########| 2/2 [00:00<00:00,  2.23it/s]
+T=1  n_chunks=8  carry condition: OFF (no cross state)
+context lens: 0 + [256]
+C:/Users/henry/AppData/Local/Temp/claude/C--Users-henry-Projects-Cortex-Refs/688ccc7f-7304-4f59-a230-099947f2844b/scratchpad/data_local/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 0.6s -> ETA 1 min
+  10/50 samples  [0 min]
+  20/50 samples  [0 min]
+  30/50 samples  [0 min]
+  40/50 samples  [0 min]
+  50/50 samples  [0 min]
+
+  Chunk      N       k=0     k=256
+  --------------------------------
+  2         50    3.8588    3.6662
+  3         50    3.8612    3.6679
+  4         50    3.8657    3.6759
+  5         50    3.9153    3.7116
+  6         50    3.8459    3.6539
+  7         50    3.9084    3.7160
+  8         50    3.8695    3.6827
+
+  chunks 2+ pooled (n=350), delta vs k=0 (positive = that context HELPS):
+      256 real tokens : +0.19294  (SE 0.00381)
+
+Results saved -> eval_results\context_ceiling_tsweep-mr32-T1\olmo32-cortex

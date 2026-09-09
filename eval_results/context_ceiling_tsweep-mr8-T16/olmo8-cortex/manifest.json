@@ -1,0 +1,14 @@
+{
+  "eval_tag": "tsweep-mr8-T16",
+  "purpose": "T-sweep depth saturation: is the saturation point set by the training mean recurrence? (local run, not PACE)",
+  "model_dir": "C:/Users/henry/AppData/Local/Temp/claude/C--Users-henry-Projects-Cortex-Refs/688ccc7f-7304-4f59-a230-099947f2844b/scratchpad/ckpts_local/olmo8-cortex",
+  "train_mean_recurrence": 8,
+  "T_eval": 16,
+  "n_chunks": 8,
+  "context_lens": "256",
+  "data": "C:/Users/henry/AppData/Local/Temp/claude/C--Users-henry-Projects-Cortex-Refs/688ccc7f-7304-4f59-a230-099947f2844b/scratchpad/data_local/pg19_olmo_val_len4096",
+  "max_examples": 50,
+  "seed": 1234,
+  "read_field": "chunk*.k0 (absolute no-context NLL)",
+  "submitted": "2026-09-03T11:01:41.278204-04:00"
+}

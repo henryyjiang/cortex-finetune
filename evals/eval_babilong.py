@@ -30,7 +30,9 @@ import torch
 from transformers import AutoTokenizer
 
 from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
-                         prime_cross_state, greedy_generate, ccot_prime)
+                         prime_cross_state, greedy_generate, ccot_prime,
+                         score_continuation, seed_example, rank_candidates,
+                         buffer_geometry)
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +93,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--T",             type=int, default=None,
                    help="Recurrence depth at eval (None = use checkpoint mean_recurrence)")
     p.add_argument("--tasks",         nargs="+", default=["qa1", "qa2", "qa3"],
-                   choices=["qa1", "qa2", "qa3"])
+                   choices=[f"qa{i}" for i in range(1, 21)],
+                   help="BABILong tasks. Only qa1-qa3 have few-shot demos "
+                        "here; qa4+ get the instruction alone (build_suffix "
+                        "falls back to no demos), which is a DIFFERENT prompt "
+                        "regime -- do not pool qa4+ with qa1-qa3 unless demos "
+                        "have been added for them.")
     p.add_argument("--seq_len",       type=int, default=2048)
     p.add_argument("--max_new_tokens", type=int, default=12,
                    help="Greedy tokens generated for the answer (containment-scored)")
@@ -114,15 +121,141 @@ def parse_args() -> argparse.Namespace:
                         "memory, on the same weights -- unlike a base-model "
                         "comparison, which also varies the lineage.")
     p.add_argument("--max_examples",  type=int, default=500,
-                   help="Max examples per task/length bucket (0 = all)")
+                   help="Max examples per task/length bucket (0 = all). "
+                        "RMT-team/BABILong holds only 100 rows per "
+                        "(task, length); ask for more than a bucket has and "
+                        "the run WARNS and reports the short count rather "
+                        "than silently capping. --dataset_repo "
+                        "RMT-team/babilong-1k-samples has ~1000 rows.")
     p.add_argument("--length_buckets", nargs="+", type=int,
                    default=[1000, 2000, 4000, 8000, 16000, 32000])
     p.add_argument("--out_dir",       default="eval_results/babilong")
     p.add_argument("--dataset_path",  default=None,
                    help="Local path to pre-downloaded BABILong snapshot (snapshot_download). "
-                        "Required on nodes without internet access.")
+                        "Required on nodes without internet access. Both known "
+                        "layouts are auto-detected: data/<task>/<length>.json "
+                        "(RMT-team/BABILong) and <length>/<task>-*.parquet "
+                        "(RMT-team/babilong-1k-samples).")
+    p.add_argument("--dataset_repo",  default="RMT-team/BABILong",
+                   help="Hub repo used when --dataset_path is absent.")
+    p.add_argument("--accum_max",    type=int, default=None,
+                   help="Override the carry buffer's FIFO cap (config.accum_max). "
+                        "The buffer keeps only the newest accum_max/accum_vecs "
+                        "chunks; B2 trained at 256/32 = 8 chunks = 4096 tokens, "
+                        "and train.py asserts the cap is never exceeded, so the "
+                        "FIFO trim branch NEVER fires in training and always "
+                        "fires at eval past that horizon. Raising it here is an "
+                        "out-of-distribution sequence length for the prefix -- "
+                        "that is the point of the probe, not an oversight.")
+    p.add_argument("--records",       default=None,
+                   help="Write one JSON line per example (id, bucket, correct, "
+                        "gold NLL, prediction) to this path. REQUIRED for the "
+                        "paired carry-on/carry-off analysis: summary.csv keeps "
+                        "counts only, and counts cannot say WHICH examples "
+                        "flipped. tools/analyze_longcontext_pairs.py reads it.")
+    p.add_argument("--rank_answers",  action="store_true",
+                   help="Also score every candidate answer and rank them, "
+                        "instead of relying only on free generation + "
+                        "containment. The candidate set is derived from the "
+                        "cell's own target column, so chance is 1/|set| and is "
+                        "reportable. Immune to the EOS/length collapse that "
+                        "containment scoring is not.")
+    p.add_argument("--pmi",           action="store_true",
+                   help="With --rank_answers, also score every candidate with "
+                        "the story stripped (demos + question only), so the "
+                        "analysis can rank on log P(a|context) - log P(a|no "
+                        "context). Removes the answer prior, which is what the "
+                        "base model's flatness across a 32x context range says "
+                        "these tasks are actually being answered from.")
+    p.add_argument("--blank_context", action="store_true",
+                   help="Answer-prior control: same demos and question, no "
+                        "story. Skips priming entirely (minutes, not hours) "
+                        "and gives the floor that every accuracy number in "
+                        "this eval should be read against.")
+    p.add_argument("--score_nll",     action="store_true",
+                   help="Also score the gold answer's teacher-forced NLL "
+                        "(one extra forward per example). Continuous and "
+                        "paired, so it resolves effects far below what 0/1 "
+                        "containment accuracy can at any affordable n.")
+    p.add_argument("--no_seed_per_example", action="store_true",
+                   help="Disable per-example RNG seeding. Seeding (the "
+                        "default) makes the s0 draw identical across "
+                        "conditions so the paired contrast isolates the "
+                        "carry; it also makes runs reproducible, but it does "
+                        "NOT reproduce pre-2026-09 runs, which were unseeded.")
     p.add_argument("--dtype",         default="bfloat16", choices=["float32", "bfloat16"])
     return p.parse_args()
+
+
+# ---------------------------------------------------------------------------
+# Dataset loading
+# ---------------------------------------------------------------------------
+# Two hub repos, two layouts, and the choice between them decides how much
+# statistical power the eval can reach:
+#
+#   RMT-team/BABILong            data/<task>/<length>.json      100 rows/cell
+#   RMT-team/babilong-1k-samples <length>/<task>-*.parquet     ~1000 rows/cell
+#
+# The 100-row cap is why every long-context table so far is n=100 per bucket:
+# nothing was truncating, the file simply ran out.  Anything asking for more
+# than 100 per bucket must use the 1k-samples repo.
+
+def load_bucket(task: str, cfg: str, dataset_path: Optional[str],
+                dataset_repo: str):
+    """Return a streaming iterable of rows for one (task, length) cell."""
+    from datasets import load_dataset
+
+    if dataset_path is not None:
+        local = Path(dataset_path)
+        parquet = sorted(local.glob(f"{cfg}/{task}-*.parquet"))
+        if parquet:
+            return load_dataset("parquet",
+                                data_files=[str(p) for p in parquet],
+                                split="train", streaming=True)
+        js = local / "data" / task / f"{cfg}.json"
+        if js.exists():
+            return load_dataset("json", data_files=str(js), split="train",
+                                streaming=True)
+        # A missing local file is a setup error, not a skippable bucket --
+        # silent skipping here is how an entire eval once produced all-zero
+        # "results" without anyone noticing.
+        raise FileNotFoundError(
+            f"BABILong cell not found for {task}/{cfg} under {local}.\n"
+            f"Looked for {local}/{cfg}/{task}-*.parquet (babilong-1k-samples) "
+            f"and {js} (BABILong).\n"
+            f"Run `python evals/download_datasets.py` on a login node and pass "
+            f"the directory it reports via --dataset_path."
+        )
+
+    if "1k-samples" in dataset_repo:
+        return load_dataset(
+            "parquet",
+            data_files=f"hf://datasets/{dataset_repo}/{cfg}/{task}-00000-of-00001.parquet",
+            split="train", streaming=True)
+    # Load the task/length file directly. Config auto-resolution on this repo
+    # is unreliable (it tries to materialise every task x length combination,
+    # some of which don't exist).
+    return load_dataset(
+        "json",
+        data_files=f"hf://datasets/{dataset_repo}/data/{task}/{cfg}.json",
+        split="train", streaming=True)
+
+
+def collect_candidates(rows) -> list:
+    """The distinct gold answers in one (task, length) cell.
+
+    Derived from the data rather than hardcoded so this works for any qa task
+    (qa1-qa3 are the six bAbI rooms; qa4+ are different sets entirely).  Both
+    conditions get the identical set, and |set| is the chance level, which is
+    the number the containment scores should have been read against all along:
+    qa2 at 12.5% and qa3 at 6.7% are BELOW uniform guessing over six rooms.
+    """
+    seen = []
+    for ex in rows:
+        t = str(ex.get("target", ex.get("answer", ""))).strip()
+        if t and t not in seen:
+            seen.append(t)
+    return sorted(seen)
 
 
 # ---------------------------------------------------------------------------
@@ -168,8 +301,14 @@ def split_context(tokenizer, context: str, suffix: str, seq_len: int,
 @torch.no_grad()
 def eval_one(model, tokenizer, context, question, answer, T, seq_len,
              max_new_tokens, task, passes_per_chunk=1, ccot_passes=0,
-             num_chunks=0, no_carry=False):
+             num_chunks=0, no_carry=False, example_id=None, score_nll=False,
+             candidates=None, pmi=False, blank_context=False):
     suffix = build_suffix(task, question)
+    if blank_context:
+        # Answer-prior control: the model sees the demos and the question and
+        # nothing else, so there is no context to prime on and no carry to
+        # build. Anything it scores here it knew before reading the story.
+        context = ""
     prime_chunks, final_ids = split_context(tokenizer, context, suffix,
                                             seq_len, max_new_tokens,
                                             num_chunks=num_chunks)
@@ -188,9 +327,49 @@ def eval_one(model, tokenizer, context, question, answer, T, seq_len,
     # seeded with the context-primed buffer, before answering.
     m_cross = ccot_prime(model, final_ids, num_steps, ccot_passes,
                          m_cross_init=m_cross)
+    # Seed AFTER priming: the carry-on condition has consumed RNG that the
+    # carry-off condition has not, so seeding earlier would not align the s0
+    # draws that generation and scoring depend on.
+    if example_id is not None:
+        seed_example(example_id)
+    scores = None
+    if score_nll:
+        gold_ids = torch.tensor(
+            tokenizer(" " + str(answer).strip(),
+                      add_special_tokens=False).input_ids,
+            dtype=torch.long).unsqueeze(0)
+        scores = score_continuation(model, final_ids, gold_ids, num_steps,
+                                    m_cross=m_cross,
+                                    eos_id=tokenizer.eos_token_id)
+        if example_id is not None:
+            seed_example(example_id)   # scoring consumed a draw; realign
+    ranked = ranked_nc = None
+    if candidates:
+        ranked = rank_candidates(model, tokenizer, final_ids, candidates,
+                                 num_steps, m_cross=m_cross)
+        if example_id is not None:
+            seed_example(example_id)
+        if pmi:
+            # The prior denominator: same demos and question, no story and no
+            # carry. Identical in the carry-on and carry-off runs by
+            # construction -- it shifts both conditions, and changes the argmax,
+            # which is the point.
+            nc_ids = torch.tensor(
+                tokenizer(suffix, add_special_tokens=False).input_ids,
+                dtype=torch.long).unsqueeze(0)
+            ranked_nc = rank_candidates(model, tokenizer, nc_ids, candidates,
+                                        num_steps, m_cross=None)
+            if example_id is not None:
+                seed_example(example_id)
+    # Can the answer be read straight off the window the model predicts from?
+    # If so the carry is irrelevant on this example and it only dilutes the
+    # contrast; the paired analysis stratifies on this.
+    final_text = tokenizer.decode(final_ids[0], skip_special_tokens=True)
+    gold_in_window = contains_answer(final_text, answer)
     pred = greedy_generate(model, tokenizer, final_ids, max_new_tokens,
                            num_steps, m_cross=m_cross, stop_on_newline=True)
-    return contains_answer(pred, answer), pred
+    return (contains_answer(pred, answer), pred, scores, len(prime_chunks),
+            ranked, ranked_nc, gold_in_window)
 
 
 # ---------------------------------------------------------------------------
@@ -199,67 +378,97 @@ def eval_one(model, tokenizer, context, question, answer, T, seq_len,
 
 def run_task(task_name, model, tokenizer, T, seq_len, max_examples, length_buckets,
              max_new_tokens, passes_per_chunk=1, ccot_passes=0, num_chunks=0,
-             no_carry=False, dataset_path=None):
-    from datasets import load_dataset
-
+             no_carry=False, dataset_path=None, dataset_repo="RMT-team/BABILong",
+             records_fh=None, score_nll=False, seed_per_example=True,
+             rank_answers=False, pmi=False, blank_context=False, geom=None):
     # BABILong uses config name for context length (e.g. '1k', '4k') and
     # split for the task (e.g. 'qa1'). Load each bucket config separately.
     config_names = [f"{b // 1000}k" for b in length_buckets]
     results = {cfg: {"correct": 0, "total": 0} for cfg in config_names}
     samples = []
+    short = []
 
     for cfg in config_names:
-        if dataset_path is not None:
-            # Verified hub layout: data/<task>/<length>.json
-            local = Path(dataset_path) / "data" / task_name / f"{cfg}.json"
-            if not local.exists():
-                # A missing local file is a setup error, not a skippable bucket —
-                # silent skipping here is how an entire eval once produced
-                # all-zero "results" without anyone noticing.
-                raise FileNotFoundError(
-                    f"BABILong file not found: {local}\n"
-                    f"Expected snapshot layout data/<task>/<length>.json. "
-                    f"Run `python evals/download_datasets.py` on a login node "
-                    f"(it downloads to <repo>/data/BABILong) and pass that path "
-                    f"via --dataset_path."
-                )
-            ds = load_dataset("json", data_files=str(local), split="train",
-                              streaming=True)
-        else:
+        try:
+            ds = load_bucket(task_name, cfg, dataset_path, dataset_repo)
+        except FileNotFoundError:
+            raise
+        except Exception as e:
+            # Network flake on one bucket shouldn't kill the whole job; the
+            # all-zero guard in main() still fails the run if nothing loads.
+            print(f"  [{task_name}/{cfg}] ERROR loading — {e}")
+            continue
+
+        candidates = None
+        if rank_answers:
+            # One extra read of the cell to collect its answer set. The files
+            # are 100-1000 rows, so this is cheap; streaming means re-opening.
             try:
-                # Load the task/length file directly. Config auto-resolution on
-                # this repo is unreliable (it tries to materialise every
-                # task x length combination, some of which don't exist).
-                ds = load_dataset(
-                    "json",
-                    data_files=f"hf://datasets/RMT-team/BABILong/data/{task_name}/{cfg}.json",
-                    split="train",
-                    streaming=True,
-                )
+                candidates = collect_candidates(
+                    load_bucket(task_name, cfg, dataset_path, dataset_repo))
             except Exception as e:
-                # Network flake on one bucket shouldn't kill the whole job; the
-                # all-zero guard in main() still fails the run if nothing loads.
-                print(f"  [{task_name}/{cfg}] ERROR loading from hub — {e}")
-                continue
+                print(f"  [{task_name}/{cfg}] could not build a candidate set — {e}")
+            if candidates:
+                print(f"  [{task_name}/{cfg}] {len(candidates)} candidates "
+                      f"(chance {100.0 / len(candidates):.1f}%): "
+                      f"{', '.join(candidates)}")
 
         seen = 0
-        for ex in ds:
+        for row_idx, ex in enumerate(ds):
             ctx      = ex.get("input", ex.get("context", ex.get("text", "")))
             question = ex.get("question", "")
             answer   = str(ex.get("target", ex.get("answer", "")))
             if not ctx or not question or not answer:
                 continue
 
-            ok, pred = eval_one(model, tokenizer, ctx, question, answer, T,
-                                seq_len, max_new_tokens, task_name,
-                                passes_per_chunk=passes_per_chunk,
-                                ccot_passes=ccot_passes,
-                                num_chunks=num_chunks,
-                                no_carry=no_carry)
+            # Stable across runs and across the carry-on/carry-off conditions:
+            # the row index within the cell, NOT the count of accepted rows, so
+            # a row skipped in one run cannot shift the ids of everything after
+            # it and silently mis-pair the two conditions.
+            example_id = f"{task_name}/{cfg}/{row_idx}"
+            ok, pred, scores, n_prime, ranked, ranked_nc, gold_in_window = eval_one(
+                model, tokenizer, ctx, question, answer, T,
+                seq_len, max_new_tokens, task_name,
+                passes_per_chunk=passes_per_chunk,
+                ccot_passes=ccot_passes,
+                num_chunks=num_chunks,
+                no_carry=no_carry,
+                example_id=example_id if seed_per_example else None,
+                score_nll=score_nll, candidates=candidates, pmi=pmi,
+                blank_context=blank_context)
             if ok:
                 results[cfg]["correct"] += 1
             results[cfg]["total"] += 1
             seen += 1
+
+            if records_fh is not None:
+                rec = {"id": example_id, "task": task_name, "bucket": cfg,
+                       "correct": bool(ok), "gold": answer, "pred": pred,
+                       "n_prime_chunks": n_prime,
+                       "pred_words": len(pred.split()),
+                       "stopped_on_newline": "\n" in pred,
+                       "gold_in_final_window": bool(gold_in_window)}
+                if geom is not None:
+                    # chunks_kept < chunks_written = the FIFO dropped writes on
+                    # this example, i.e. the carry never contained the earlier
+                    # context at all.  A column, not an afterthought.
+                    n_vec, max_vecs, held = geom
+                    rec["buffer_chunks_held"] = held
+                    rec["chunks_evicted"] = max(0, n_prime - held)
+                if ranked is not None:
+                    rec["candidates"] = [c["text"] for c in ranked]
+                    rec["cand_nll"] = [c["nll_sum"] for c in ranked]
+                    rec["cand_ntok"] = [c["n_tok"] for c in ranked]
+                    if ranked_nc is not None:
+                        rec["cand_nll_nocontext"] = [c["nll_sum"] for c in ranked_nc]
+                if scores and scores.get("n_tok"):
+                    rec["gold_nll_sum"] = scores["nll_sum"]
+                    rec["gold_n_tok"] = scores["n_tok"]
+                    rec["gold_nll_per_tok"] = scores["nll_sum"] / scores["n_tok"]
+                    rec["p_eos_first"] = scores.get("p_eos_first")
+                    rec["entropy_first"] = scores.get("entropy_first")
+                records_fh.write(json.dumps(rec) + "\n")
+
             if seen <= 5:   # first 5 per length bucket, for debuggability
                 samples.append({"bucket": cfg, "question": question,
                                 "gold": answer, "pred": pred, "correct": ok})
@@ -269,6 +478,19 @@ def run_task(task_name, model, tokenizer, T, seq_len, max_examples, length_bucke
 
             if max_examples > 0 and seen >= max_examples:
                 break
+
+        if max_examples > 0 and seen < max_examples:
+            short.append((cfg, seen))
+
+    if short:
+        # The n=100 tables were produced by a --max_examples 500 job: nothing
+        # truncated them, RMT-team/BABILong simply holds 100 rows per cell.
+        # Say so instead of leaving it to be rediscovered from the totals.
+        cells = ", ".join(f"{cfg}={n}" for cfg, n in short)
+        print(f"  WARNING [{task_name}]: asked for {max_examples}/bucket, "
+              f"dataset ran out at: {cells}")
+        print(f"           RMT-team/BABILong holds 100 rows per (task, length). "
+              f"Use --dataset_repo RMT-team/babilong-1k-samples for more.")
 
     for r in results.values():
         r["accuracy"] = r["correct"] / r["total"] if r["total"] > 0 else 0.0
@@ -286,7 +508,8 @@ def main() -> None:
 
     print(f"Loading checkpoint: {args.checkpoint}")
     model, cfg = load_checkpoint(args.checkpoint, args.model_name,
-                                 args.memory_slots, dtype, device)
+                                 args.memory_slots, dtype, device,
+                                 accum_max=args.accum_max)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -307,6 +530,10 @@ def main() -> None:
              if args.checkpoint else Path(args.model_name).name)
     all_results[label] = {}
 
+    records_path = Path(args.records) if args.records else out_dir / "records.jsonl"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_fh = open(records_path, "w", encoding="utf-8")
+
     all_samples: dict = {}
     for task in args.tasks:
         print(f"\n--- {task} ---")
@@ -315,7 +542,12 @@ def main() -> None:
             args.max_examples, args.length_buckets,
             args.max_new_tokens, passes_per_chunk=args.passes_per_chunk,
             ccot_passes=args.ccot_passes, num_chunks=args.num_chunks,
-            no_carry=args.no_carry, dataset_path=args.dataset_path)
+            no_carry=args.no_carry, dataset_path=args.dataset_path,
+            dataset_repo=args.dataset_repo, records_fh=records_fh,
+            score_nll=args.score_nll,
+            seed_per_example=not args.no_seed_per_example,
+            rank_answers=args.rank_answers, pmi=args.pmi,
+            blank_context=args.blank_context, geom=buffer_geometry(model))
         all_results[label][task] = task_results
         all_samples[task] = task_samples
 
@@ -324,6 +556,9 @@ def main() -> None:
         for bucket, r in task_results.items():
             if r["total"] > 0:
                 print(f"  {bucket:<12} {r['correct']:>8} {r['total']:>8} {r['accuracy']:>8.3f}")
+
+    records_fh.close()
+    print(f"\nPer-example records → {records_path}")
 
     with open(out_dir / "results.json", "w") as f:
         json.dump(all_results, f, indent=2)

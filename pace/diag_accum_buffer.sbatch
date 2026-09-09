@@ -59,6 +59,16 @@ OUT_ROOT=${OUT_ROOT:-cortex-retro-ft}
 CKPT_NAME=${CKPT_NAME:-final_checkpoint}
 BASE=${BASE:-ckpts/olmo8-cortex}
 MODEL_DIR="$OUT_ROOT/$RUN/$CKPT_NAME"
+# A retrofit-derived config reports mean_recurrence=32 (inherited from the
+# untrained base), so without this the diagnostic silently runs at 4x the
+# recurrence the long-context evals use and costs 4x for a number that is not
+# comparable to them.  Pass T_OVERRIDE=8 for every B2 arm.
+T_OVERRIDE=${T_OVERRIDE:-}
+T_ARGS=()
+if [ -n "$T_OVERRIDE" ]; then
+    T_ARGS=(--T "$T_OVERRIDE")
+    EVAL_TAG="${EVAL_TAG}-T${T_OVERRIDE}"
+fi
 
 [ -d "$MODEL_DIR" ] || { echo "No such checkpoint: $MODEL_DIR"; exit 1; }
 
@@ -74,4 +84,5 @@ python evals/diag_accum_buffer.py \
     --data "$DATA" \
     --chunk_len "$CHUNK_LEN" \
     --gen_tokens "$GEN_TOKENS" \
+    "${T_ARGS[@]}" \
     --out_dir "$OUT"

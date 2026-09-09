@@ -59,6 +59,30 @@
 #       PREP_BASE=ckpts/olmo-retrofit-cortex RUN=retro-b2-acc32-cc8-mr8 \
 #       T_OVERRIDE=8 SEQ_LEN=512 NUM_CHUNKS=8 EVAL_TAG=b2-final \
 #       sbatch pace/eval_longcontext.sbatch
+#
+# Powering the carry-on/carry-off contrast (2026-09).  The n=100/bucket tables
+# cannot resolve the ~1-point carry effect: pooled over 18 cells the unpaired
+# test has an MDE of ~3.1 pt (tools/power_longcontext.py).  Three knobs fix
+# that, and all three are on by default now:
+#   BABILONG_MAX=250   examples per (task, length) cell.  RMT-team/BABILong
+#                      holds only 100 rows per cell -- anything above 100 needs
+#                      BABILONG_REPO=RMT-team/babilong-1k-samples (~1000 rows,
+#                      qa1-qa5).  The harness WARNS instead of silently capping.
+#   records.jsonl      per-example rows, written unconditionally.  Without them
+#                      the runs can only be compared unpaired, which throws
+#                      away most of the available power; McNemar on the matched
+#                      pairs is what tools/analyze_longcontext_pairs.py runs.
+#   SCORE_NLL=true     gold-answer NLL alongside 0/1 containment.  Continuous
+#                      and paired, so it resolves effects that accuracy cannot
+#                      at any n we can afford.  One extra forward per example.
+# LME_MAX=0 takes all of longmemeval_s; its 500 questions TOTAL are this eval's
+# hard ceiling, so LongMemEval cannot be powered further and BABILong is where
+# added examples buy anything.
+#
+# Sharding: BABILONG_TASKS + BABILONG_OUT_SUFFIX put one task in its own job
+# under its own sub-dir (babilong-qa1/, ...); the analysis tool globs and
+# merges them.  Needed for the T=32 carry-on cell, which does not fit the wall
+# clock at 250/bucket.  Override the wall at submit time: sbatch -t 24:00:00.
 
 cd $SLURM_SUBMIT_DIR
 
@@ -92,6 +116,49 @@ NUM_CHUNKS=${NUM_CHUNKS:-4}
 # produce a duplicate under a misleading label.
 NO_CARRY=${NO_CARRY:-false}
 BASE=${BASE:-false}
+# --- power knobs (see the header) ---
+BABILONG_MAX=${BABILONG_MAX:-250}
+BABILONG_TASKS=${BABILONG_TASKS:-"qa1 qa2 qa3"}
+BABILONG_REPO=${BABILONG_REPO:-RMT-team/babilong-1k-samples}
+BABILONG_PATH=${BABILONG_PATH:-data/babilong-1k}
+BABILONG_OUT_SUFFIX=${BABILONG_OUT_SUFFIX:-}
+LME_MAX=${LME_MAX:-0}
+SCORE_NLL=${SCORE_NLL:-true}
+SKIP_BABILONG=${SKIP_BABILONG:-false}
+SKIP_LME=${SKIP_LME:-false}
+NLL_ARGS=()
+[ "$SCORE_NLL" = "true" ] && NLL_ARGS=(--score_nll)
+# ACCUM_MAX overrides the carry buffer's FIFO cap.  The buffer keeps the newest
+# ACCUM_MAX/accum_vecs chunks and drops the rest: B2 trained at 256/32 = 8
+# chunks = 4096 tokens, and train.py ASSERTS cross_chunks*accum_vecs <=
+# accum_max, so the trim branch never fires in training and fires on every eval
+# example past 4096 tokens (all of LongMemEval, 3 of 6 BABILong buckets).
+# Raising it puts the prefix at an untrained sequence length -- deliberately.
+# Cost grows fast: each priming forward attends over n_carried + chunk + slots,
+# so 2048 carried vectors is ~3x the sequence length of the 256 default and
+# more than 3x the time.  Budget accordingly.
+ACCUM_MAX=${ACCUM_MAX:-}
+AM_ARGS=()
+[ -n "$ACCUM_MAX" ] && AM_ARGS=(--accum_max "$ACCUM_MAX")
+# Scoring changes (2026-09-09).  All are metric/record only -- none touches the
+# model or the carry, so the carry-on/carry-off contrast stays as fair as it
+# was.  RANK_ANSWERS scores the cell's own answer set instead of relying on
+# free generation + containment, which is exactly what the raised-P(EOS)
+# failure mode attacks; PMI adds the no-story denominator so the answer prior
+# drops out; BLANK_CONTEXT is that prior floor on its own (no priming at all --
+# minutes, not hours).
+RANK_ANSWERS=${RANK_ANSWERS:-true}     # BABILong only: LME answers are free-form
+PMI=${PMI:-true}
+BLANK_CONTEXT=${BLANK_CONTEXT:-false}
+RANK_ARGS=()
+[ "$RANK_ANSWERS" = "true" ] && RANK_ARGS+=(--rank_answers)
+[ "$PMI" = "true" ]          && RANK_ARGS+=(--pmi)
+BLANK_ARGS=()
+LABEL_BLANK=""
+if [ "$BLANK_CONTEXT" = "true" ]; then
+    BLANK_ARGS=(--blank_context)
+    LABEL_BLANK="-blank"
+fi
 OUT_ROOT=${OUT_ROOT:-cortex-retro-ft}
 CKPT_NAME=${CKPT_NAME:-final_checkpoint}
 PREP_BASE=${PREP_BASE:-ckpts/olmo8-cortex}
@@ -130,28 +197,49 @@ if [ "$NO_CARRY" = "true" ]; then
     CARRY_ARGS+=(--no_carry)
     LABEL="${LABEL}-nocarry"
 fi
+# Buffer capacity goes in the label too: an am-sweep writes several runs of the
+# same arm at the same T under one EVAL_TAG, and without this they collide.
+# NO_CARRY builds no buffer, so an am label there would be a lie -- refuse it.
+if [ -n "$ACCUM_MAX" ]; then
+    if [ "$NO_CARRY" = "true" ] || [ "$BASE" = "true" ]; then
+        echo "ACCUM_MAX is meaningless without a carry buffer "
+        echo "(NO_CARRY=true / BASE=true build none). Drop ACCUM_MAX."
+        exit 1
+    fi
+    LABEL="${LABEL}-am${ACCUM_MAX}"
+fi
+LABEL="${LABEL}${LABEL_BLANK}"
 
 OUT="eval_results/longcontext_${EVAL_TAG}/${LABEL}"
 mkdir -p "$OUT"
 echo "=== long-context eval: $LABEL  ($MODEL_DIR) -> $OUT ==="
 
+if [ "$SKIP_BABILONG" != "true" ]; then
 python evals/eval_babilong.py \
     --model_name "$MODEL_DIR" \
-    --dataset_path data/BABILong \
-    --tasks qa1 qa2 qa3 \
+    --dataset_path "$BABILONG_PATH" \
+    --dataset_repo "$BABILONG_REPO" \
+    --tasks $BABILONG_TASKS \
+    --max_examples $BABILONG_MAX \
     --seq_len $SEQ_LEN \
     --num_chunks $NUM_CHUNKS \
     --passes_per_chunk $PASSES_PER_CHUNK \
     --ccot_passes $CCOT_PASSES \
-    "${T_ARGS[@]}" "${CARRY_ARGS[@]}" \
-    --out_dir "$OUT/babilong"
+    "${T_ARGS[@]}" "${CARRY_ARGS[@]}" "${NLL_ARGS[@]}" "${AM_ARGS[@]}" \
+    "${RANK_ARGS[@]}" "${BLANK_ARGS[@]}" \
+    --out_dir "$OUT/babilong${BABILONG_OUT_SUFFIX}"
+fi
 
+if [ "$SKIP_LME" != "true" ]; then
 python evals/eval_longmemeval.py \
     --model_name "$MODEL_DIR" \
     --dataset_path data/LongMemEval \
+    --max_examples $LME_MAX \
     --seq_len $SEQ_LEN \
     --num_chunks $NUM_CHUNKS \
     --passes_per_chunk $PASSES_PER_CHUNK \
     --ccot_passes $CCOT_PASSES \
-    "${T_ARGS[@]}" "${CARRY_ARGS[@]}" \
+    "${T_ARGS[@]}" "${CARRY_ARGS[@]}" "${NLL_ARGS[@]}" "${AM_ARGS[@]}" \
+    "${BLANK_ARGS[@]}" \
     --out_dir "$OUT/longmemeval"
+fi

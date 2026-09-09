@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import os
 import sys
+import zlib
 from typing import Optional
 
 import torch
@@ -87,6 +88,7 @@ def load_checkpoint(
     memory_slots: Optional[int],
     dtype: torch.dtype,
     device: torch.device,
+    accum_max: Optional[int] = None,
 ):
     from transformers import AutoConfig, AutoModelForCausalLM
 
@@ -95,6 +97,16 @@ def load_checkpoint(
         # Force the graft on (model_name must use the grafted modeling file).
         config.use_memory = True
         config.memory_slots = memory_slots
+    # accum_max is the prefix buffer's FIFO cap (buffers.py: out[:, -max_vecs:]),
+    # a plain int with no parameter shape behind it -- unlike accum_vecs, which
+    # sizes summary_emb and can never be varied after training.  Training sized
+    # it to exactly cross_chunks * accum_vecs and train.py ASSERTS that, so the
+    # trim branch never fires during training and always fires at eval on any
+    # example longer than (accum_max / accum_vecs) chunks.  Overriding it here
+    # is the only way to ask what the memory does when it is allowed to keep
+    # the context it was given.
+    if accum_max is not None:
+        config.accum_max = int(accum_max)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         trust_remote_code=True,
@@ -123,6 +135,24 @@ def load_checkpoint(
         )
 
     model = model.to(device=device, dtype=dtype).eval()
+
+    # Report the buffer geometry that actually got built, not the one that was
+    # requested.  config.accum_max is absent from some prepared checkpoint dirs,
+    # in which case the graft silently falls back to 128 -- the HEAL phase's
+    # value, not the arm's 256 -- and halves the memory's horizon without
+    # anything in the log saying so.
+    buf = accumulating_buffer(model)
+    if buf is not None:
+        horizon = buf.max_vecs // max(buf.n_vec, 1)
+        src = "OVERRIDE" if accum_max is not None else \
+              ("config.json" if hasattr(config, "accum_max") else "CODE DEFAULT")
+        print(f"[cortex] carry buffer: n_vec={buf.n_vec} max_vecs={buf.max_vecs} "
+              f"({src}) -> holds the newest {horizon} chunks; older writes are "
+              f"dropped by the FIFO")
+        if src == "CODE DEFAULT":
+            print(f"[cortex] WARNING: this checkpoint's config.json has no "
+                  f"accum_max. Verify it against the training value before "
+                  f"reporting anything from this run.")
     return model, config
 
 
@@ -166,6 +196,118 @@ def ccot_prime(model, input_ids, num_steps, passes, m_cross_init=None):
                     m_cross_in=m_cross, return_m_cross=True)
         m_cross = out.get("m_cross")
     return m_cross
+
+
+def seed_example(example_id: str) -> None:
+    """Pin the RNG from a stable example id.
+
+    initialize_state draws s0 ~ trunc_normal (raven_modeling_minimal_olmo.py:982),
+    so two runs of the same example land on different s0 draws.  For unpaired
+    count comparisons that is just noise; for the PAIRED carry-on/carry-off
+    contrast it is noise that does not cancel, because the two conditions are
+    separate jobs.  Seeding from the example id immediately before the scored
+    forward makes both conditions consume the same draw, so the only difference
+    left between them is the carry -- which is the whole point of the design.
+
+    Call it after priming (which consumes RNG in the carry-on condition and
+    not in the carry-off one) and before generation/scoring.
+    """
+    torch.manual_seed(zlib.crc32(example_id.encode("utf-8")) & 0x7fffffff)
+
+
+@torch.no_grad()
+def score_continuation(model, prompt_ids, cont_ids, num_steps, m_cross=None,
+                       eos_id=None):
+    """Teacher-forced NLL of `cont_ids` given `prompt_ids`, in nats.
+
+    The accuracy metric these evals report is 0/1 containment, whose variance
+    is ~p(1-p) per example and which therefore cannot resolve a sub-point
+    effect at any n we can afford (tools/power_longcontext.py).  The gold
+    answer's NLL under the same forward is continuous, is measured on the same
+    example in both conditions, and is the metric the carry ablation already
+    resolves to ~0.001 nats at n=150.  One extra forward per example.
+
+    Uses the same forward configuration as greedy_generate's prefill
+    (prefix_write=False, prefix_read=True, explicit position_ids), so this
+    scores the distribution the generator actually decoded from.
+
+    Returns a dict: nll_sum, n_tok, and two diagnostics read off the SAME
+    forward at the first generated position -- p_eos_first and entropy_first.
+    Those two are the readout for the LongMemEval failure mode: the carry-on
+    condition stops on EOS after ~10 words where carry-off runs to the cap, and
+    containment scoring then loses because the gold string surfaces later.
+    p_eos_first measures that directly instead of inferring it from lengths.
+    entropy_first catches the other way a carry can go wrong -- a buffer far
+    outside its trained regime flattening or collapsing the output
+    distribution -- which is what "did it blow up" actually means here.
+    """
+    device = next(model.parameters()).device
+    prompt_ids, cont_ids = prompt_ids.to(device), cont_ids.to(device)
+    if cont_ids.numel() == 0:
+        return {"nll_sum": float("nan"), "n_tok": 0}
+    full = torch.cat([prompt_ids, cont_ids], dim=1)
+    pos = torch.arange(full.shape[1], device=device).unsqueeze(0)
+    out = model(input_ids=full, num_steps=num_steps, position_ids=pos,
+                m_cross_in=m_cross, return_m_cross=False,
+                prefix_write=False, prefix_read=True)
+    # Logit at position i predicts token i+1, so the answer's own logits start
+    # one step before the answer.
+    first = prompt_ids.shape[1] - 1
+    logits = out["logits"][:, first: -1, :].float()
+    logp = torch.log_softmax(logits, dim=-1)
+    nll = -logp.gather(-1, cont_ids.unsqueeze(-1)).squeeze(-1)
+    head = logp[0, 0]
+    res = {"nll_sum": float(nll.sum().item()), "n_tok": int(cont_ids.numel()),
+           "entropy_first": float(-(head.exp() * head).sum().item())}
+    if eos_id is not None:
+        res["p_eos_first"] = float(head[eos_id].exp().item())
+    return res
+
+
+@torch.no_grad()
+def rank_candidates(model, tokenizer, prompt_ids, candidates, num_steps,
+                    m_cross=None):
+    """Score every candidate answer under one prompt.  Returns a list of
+    {text, nll_sum, n_tok} in the order given.
+
+    Why this exists.  Free generation + substring containment measures how much
+    the model says at least as much as what it knows: the carry raises P(EOS),
+    generations shorten, and the gold string stops appearing -- which is how
+    LongMemEval inverted.  Ranking never asks the model to emit anything, so
+    that entire failure mode drops out.  It also gives the eval a defined chance
+    level (1/len(candidates)); the containment numbers sit BELOW uniform
+    guessing on qa2/qa3, which is not a statement about the model.
+
+    Scored sequentially rather than as one padded batch on purpose: the prefix
+    splice, the m_cross batch dim and the recurrent init all have to agree about
+    batch shape, and a padding bug there would be silent and would land on both
+    conditions unequally.  Six forwards over a 512-token window is ~10% on top
+    of priming at 32k, which is not worth that risk.
+    """
+    out = []
+    for text in candidates:
+        ids = tokenizer(" " + str(text).strip(),
+                        add_special_tokens=False).input_ids
+        cont = torch.tensor(ids, dtype=torch.long).unsqueeze(0)
+        s = score_continuation(model, prompt_ids, cont, num_steps,
+                               m_cross=m_cross)
+        out.append({"text": text, "nll_sum": s["nll_sum"], "n_tok": s["n_tok"]})
+    return out
+
+
+def buffer_geometry(model):
+    """(n_vec, max_vecs, chunks_held) for the carry buffer, or None.
+
+    chunks_held is how many chunks of writes survive the FIFO -- the memory's
+    horizon in chunks.  Recorded per example so the eviction regime is a column
+    in the results rather than something reconstructed afterwards from the
+    training config.
+    """
+    buf = accumulating_buffer(model)
+    if buf is None:
+        return None
+    n_vec = max(int(buf.n_vec), 1)
+    return n_vec, int(buf.max_vecs), int(buf.max_vecs) // n_vec
 
 
 @torch.no_grad()

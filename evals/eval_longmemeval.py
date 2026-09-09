@@ -29,7 +29,8 @@ import torch
 from transformers import AutoTokenizer
 
 from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
-                         prime_cross_state, greedy_generate, ccot_prime)
+                         prime_cross_state, greedy_generate, ccot_prime,
+                         score_continuation, seed_example, buffer_geometry)
 
 
 # ---------------------------------------------------------------------------
@@ -70,12 +71,42 @@ def parse_args() -> argparse.Namespace:
                         "the real memory test), m = ~1.5M tokens, oracle = "
                         "relevant sessions only (upper-bound control)")
     p.add_argument("--max_examples", type=int, default=200,
-                   help="Max examples per session-depth bucket (0 = all)")
+                   help="Max examples per session-depth bucket (0 = all). "
+                        "longmemeval_s holds 500 questions TOTAL across all "
+                        "buckets, so 0 (= all) is the ceiling of this eval and "
+                        "no per-bucket number above ~250 is reachable.")
     p.add_argument("--depth_buckets", nargs="+", type=int, default=[5, 10, 20, 50])
     p.add_argument("--out_dir",      default="eval_results/longmemeval")
     p.add_argument("--dataset_path", default=None,
                    help="Local path to pre-downloaded LongMemEval (load_from_disk). "
                         "Required on nodes without internet access.")
+    p.add_argument("--accum_max",    type=int, default=None,
+                   help="Override the carry buffer's FIFO cap (config.accum_max). "
+                        "The buffer keeps only the newest accum_max/accum_vecs "
+                        "chunks; B2 trained at 256/32 = 8 chunks = 4096 tokens, "
+                        "and train.py asserts the cap is never exceeded, so the "
+                        "FIFO trim branch NEVER fires in training and always "
+                        "fires at eval past that horizon. Raising it here is an "
+                        "out-of-distribution sequence length for the prefix -- "
+                        "that is the point of the probe, not an oversight.")
+    p.add_argument("--records",      default=None,
+                   help="Write one JSON line per example (id, bucket, correct, "
+                        "gold NLL, prediction) to this path. REQUIRED for the "
+                        "paired carry-on/carry-off analysis; "
+                        "tools/analyze_longcontext_pairs.py reads it.")
+    p.add_argument("--blank_context", action="store_true",
+                   help="Answer-prior control: the question with no history. "
+                        "Skips priming entirely. LongMemEval answers are "
+                        "free-form, so there is no closed candidate set to rank "
+                        "over here -- --rank_answers is BABILong-only.")
+    p.add_argument("--score_nll",    action="store_true",
+                   help="Also score the gold answer's teacher-forced NLL "
+                        "(one extra forward per example) -- continuous and "
+                        "paired, so far more sensitive than 0/1 containment.")
+    p.add_argument("--no_seed_per_example", action="store_true",
+                   help="Disable per-example RNG seeding. Seeding (default) "
+                        "aligns the s0 draw across conditions so the paired "
+                        "contrast isolates the carry.")
     p.add_argument("--dtype",        default="bfloat16", choices=["float32", "bfloat16"])
     return p.parse_args()
 
@@ -133,8 +164,9 @@ def contains_answer(pred: str, gold: str) -> bool:
 @torch.no_grad()
 def eval_one(model, tokenizer, turns, question, answer, T, seq_len,
              max_new_tokens, passes_per_chunk=1, ccot_passes=0, num_chunks=0,
-             no_carry=False):
-    history = format_history(turns)
+             no_carry=False, example_id=None, score_nll=False,
+             blank_context=False):
+    history = "" if blank_context else format_history(turns)
     suffix  = SUFFIX_TEMPLATE.format(q=question)
     prime_chunks, final_ids = split_history(tokenizer, history, suffix,
                                             seq_len, max_new_tokens,
@@ -146,9 +178,27 @@ def eval_one(model, tokenizer, turns, question, answer, T, seq_len,
                                  passes_per_chunk=passes_per_chunk))
     m_cross = ccot_prime(model, final_ids, num_steps, ccot_passes,
                          m_cross_init=m_cross)
+    # After priming: the carry-on condition has consumed RNG the carry-off
+    # condition has not, so an earlier seed would not align the s0 draws.
+    if example_id is not None:
+        seed_example(example_id)
+    scores = None
+    if score_nll:
+        gold_ids = torch.tensor(
+            tokenizer(" " + str(answer).strip(),
+                      add_special_tokens=False).input_ids,
+            dtype=torch.long).unsqueeze(0)
+        scores = score_continuation(model, final_ids, gold_ids, num_steps,
+                                    m_cross=m_cross,
+                                    eos_id=tokenizer.eos_token_id)
+        if example_id is not None:
+            seed_example(example_id)   # scoring consumed a draw; realign
+    final_text = tokenizer.decode(final_ids[0], skip_special_tokens=True)
+    gold_in_window = contains_answer(final_text, answer)
     pred = greedy_generate(model, tokenizer, final_ids, max_new_tokens,
                            num_steps, m_cross=m_cross, stop_on_newline=True)
-    return contains_answer(pred, answer), pred
+    return (contains_answer(pred, answer), pred, scores, len(prime_chunks),
+            gold_in_window)
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +207,9 @@ def eval_one(model, tokenizer, turns, question, answer, T, seq_len,
 
 def run_eval(model, tokenizer, T, seq_len, max_examples, depth_buckets,
              max_new_tokens, split="s", passes_per_chunk=1, ccot_passes=0,
-             num_chunks=0, no_carry=False, dataset_path=None):
+             num_chunks=0, no_carry=False, dataset_path=None,
+             records_fh=None, score_nll=False, seed_per_example=True,
+             blank_context=False, geom=None):
     # Preference order: requested split first, then fallbacks (a warning is
     # printed if we fall back — the splits are NOT comparable).
     order = {"s":      ("longmemeval_s", "longmemeval_oracle", "longmemeval_m"),
@@ -206,7 +258,7 @@ def run_eval(model, tokenizer, T, seq_len, max_examples, depth_buckets,
             raw = _json.load(f)
         ds = raw if isinstance(raw, list) else next(iter(raw.values()))
     seen = 0
-    for ex in ds:
+    for row_idx, ex in enumerate(ds):
         question = ex.get("question", "")
         answer   = ex.get("answer", "")
         # haystack_sessions is stored as a JSON string of [[{role,content},...],...]
@@ -230,15 +282,42 @@ def run_eval(model, tokenizer, T, seq_len, max_examples, depth_buckets,
 
         # Flatten all sessions into a single turn list for the model
         all_turns = [turn for session in turns for turn in session]
-        ok, pred = eval_one(model, tokenizer, all_turns, question, answer, T,
-                            seq_len, max_new_tokens,
-                            passes_per_chunk=passes_per_chunk,
-                            ccot_passes=ccot_passes, num_chunks=num_chunks,
-                            no_carry=no_carry)
+        # question_id is stable across runs; the row index is the fallback so
+        # the carry-on and carry-off runs still pair up on datasets without it.
+        example_id = str(ex.get("question_id") or f"row{row_idx}")
+        ok, pred, scores, n_prime, gold_in_window = eval_one(
+            model, tokenizer, all_turns, question, answer, T,
+            seq_len, max_new_tokens,
+            passes_per_chunk=passes_per_chunk,
+            ccot_passes=ccot_passes, num_chunks=num_chunks,
+            no_carry=no_carry,
+            example_id=example_id if seed_per_example else None,
+            score_nll=score_nll, blank_context=blank_context)
         if ok:
             results[bucket]["correct"] += 1
         results[bucket]["total"] += 1
         seen += 1
+
+        if records_fh is not None:
+            rec = {"id": example_id, "task": "lme", "bucket": bucket,
+                   "correct": bool(ok), "gold": answer, "pred": pred,
+                   "n_sessions": depth, "n_prime_chunks": n_prime,
+                   "pred_words": len(pred.split()),
+                   "stopped_on_newline": "\n" in pred,
+                   "gold_in_final_window": bool(gold_in_window)}
+            if geom is not None:
+                # chunks_evicted > 0 means the FIFO dropped writes on this
+                # example, i.e. the carry never held the earlier context.
+                n_vec, max_vecs, held = geom
+                rec["buffer_chunks_held"] = held
+                rec["chunks_evicted"] = max(0, n_prime - held)
+            if scores and scores.get("n_tok"):
+                rec["gold_nll_sum"] = scores["nll_sum"]
+                rec["gold_n_tok"] = scores["n_tok"]
+                rec["gold_nll_per_tok"] = scores["nll_sum"] / scores["n_tok"]
+                rec["p_eos_first"] = scores.get("p_eos_first")
+                rec["entropy_first"] = scores.get("entropy_first")
+            records_fh.write(json.dumps(rec) + "\n")
         if seen <= 20:   # first 20 predictions, for debuggability
             samples.append({"bucket": bucket, "question": question,
                             "gold": answer, "pred": pred, "correct": ok})
@@ -265,7 +344,8 @@ def main() -> None:
 
     print(f"Loading checkpoint: {args.checkpoint}")
     model, cfg = load_checkpoint(args.checkpoint, args.model_name,
-                                 args.memory_slots, dtype, device)
+                                 args.memory_slots, dtype, device,
+                                 accum_max=args.accum_max)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -276,6 +356,10 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    records_path = Path(args.records) if args.records else out_dir / "records.jsonl"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_fh = open(records_path, "w", encoding="utf-8")
+
     results, samples = run_eval(model, tokenizer, T, args.seq_len,
                                 args.max_examples, args.depth_buckets,
                                 args.max_new_tokens, split=args.split,
@@ -283,7 +367,14 @@ def main() -> None:
                                 ccot_passes=args.ccot_passes,
                                 num_chunks=args.num_chunks,
                                 no_carry=args.no_carry,
-                                dataset_path=args.dataset_path)
+                                dataset_path=args.dataset_path,
+                                records_fh=records_fh,
+                                score_nll=args.score_nll,
+                                seed_per_example=not args.no_seed_per_example,
+                                blank_context=args.blank_context,
+                                geom=buffer_geometry(model))
+    records_fh.close()
+    print(f"\nPer-example records → {records_path}")
     # fall back to the model dir when no overlay checkpoint was given
     # (--checkpoint defaults to None) so we don't do Path(None).
     label   = (Path(args.checkpoint).parent.parent.name

@@ -137,6 +137,28 @@ Reference points, all with raw JSON under `eval_results/`:
 | B1 co-trained retrofit, 22.5k gate | -0.0128 +/- 0.0014 (carrying was worse than blanking) |
 | oracle ceiling at `cross_chunks=8` | +0.1485 |
 
+### Long-context accuracy tables (BABILong / LongMemEval)
+
+These are behavioural, 0/1-scored, and far blunter than the carry ablation, so they must be
+designed before they are run:
+
+```bash
+python evals/download_datasets.py                  # login node; also fetches babilong-1k-samples
+python tools/preflight_longcontext.py --want 250   # does the requested n actually exist?
+python tools/power_longcontext.py                  # what n would make the contrast testable
+bash pace/submit_longcontext_power.sh              # T in {8,16,32} x {carry, no-carry}
+python tools/analyze_longcontext_pairs.py --pairs --on <dir> --off <dir>
+python tools/analyze_longcontext_pairs.py --ladder --root <tag dir> --arm <run>
+```
+
+Carry-on and carry-off see a byte-identical final window, so **every example is a matched pair and
+the test is McNemar on the discordant pairs, pooled over cells** — not the two-proportion z on the
+bucket totals, which discards most of the available power, and never a per-cell test (per-cell MDE
+at n=250 is ~8 points against a ~1-point effect). The harness writes `records.jsonl` per example
+for exactly this reason; runs from before 2026-09 kept counts only and **cannot be paired
+retroactively**. `--score_nll` adds the gold answer's NLL, which is continuous, paired, and the
+only metric here with a realistic chance of resolving a sub-point effect.
+
 Two things that ablation established and that still bind: **write diversity is not the bottleneck**
 (B1 wrote near-orthogonal vectors and produced the worst delta ever measured), and **carry delta
 and downstream behaviour are anti-correlated across arms** — do not read one off the other, and do
@@ -182,7 +204,13 @@ and `tests/test_timeleft.py` **mirror** its logic — keep the mirrors in sync w
    switch link only.** A same-corpus link that gets it replays its pack from row 0.
 7. **`save_to_disk` without `num_proc` costs ~14h on Lustre** for a shuffled pack (a million random
    seeks over a 20GB arrow file). Grep any new pack/mix script for it before launching.
-8. **Fresh modules grafted onto a `from_pretrained` checkpoint are not initialized by `__init__`.**
+8. **An eval dataset can cap n below what you asked for, and say nothing.** Every long-context
+   table in this repo is n=100 per bucket because `RMT-team/BABILong` holds exactly 100 rows per
+   (task, length) — the jobs asked for 500. Nothing truncated; the file ran out, and the shortfall
+   was visible only in a totals column written GPU-hours later. `eval_babilong.py` now warns, and
+   `tools/preflight_longcontext.py` checks before submission. `longmemeval_s` has the same shape of
+   limit and no escape: 500 questions total, so that eval cannot be powered past ~250/bucket at all.
+9. **Fresh modules grafted onto a `from_pretrained` checkpoint are not initialized by `__init__`.**
    `post_init` re-initializes them as "missing keys", and the transformers meta-device path leaves
    them as uninitialized VRAM — finite garbage, so a non-finite sweep will not catch it.
    `train.py:reset_cortex_graft_init` handles this after load and is skipped on resume.
