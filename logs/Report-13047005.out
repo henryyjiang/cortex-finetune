@@ -1,0 +1,40 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-10-2026 00:46:44
+Job ID:    13047005
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_longcontext.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== long-context eval: retro-b2-acc32-cc8-mr8-T8-nc8-sl512-nocarry  (cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint) -> eval_results/longcontext_b2-ammax/retro-b2-acc32-cc8-mr8-T8-nc8-sl512-nocarry ===
+Loading checkpoint: None
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:38<01:38, 98.94s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:53<00:00, 49.17s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:53<00:00, 56.64s/it]
+[cortex] carry buffer: n_vec=32 max_vecs=256 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+T=8
+  50 examples processed...
+  100 examples processed...
+
+Per-example records → eval_results/longcontext_b2-ammax/retro-b2-acc32-cc8-mr8-T8-nc8-sl512-nocarry/longmemeval/records.jsonl
+
+  Bucket            Correct    Total      Acc
+  --------------------------------------------
+  ≤50sess                 2       50    0.040
+  >50sess                 3       50    0.060
+
+Results saved → eval_results/longcontext_b2-ammax/retro-b2-acc32-cc8-mr8-T8-nc8-sl512-nocarry/longmemeval
+---------------------------------------
+Begin Slurm Epilog: Sep-10-2026 00:52:48
+Job ID:        13047005
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_longcontext.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:48:48,vmem=0,walltime=00:06:06,mem=6088028K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-10-0
+---------------------------------------
