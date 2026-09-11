@@ -1,0 +1,36 @@
+{
+  "final_checkpoint": {
+    "qa2": {
+      "1k": {
+        "correct": 53,
+        "total": 250,
+        "accuracy": 0.212
+      },
+      "2k": {
+        "correct": 56,
+        "total": 250,
+        "accuracy": 0.224
+      },
+      "4k": {
+        "correct": 49,
+        "total": 250,
+        "accuracy": 0.196
+      },
+      "8k": {
+        "correct": 49,
+        "total": 250,
+        "accuracy": 0.196
+      },
+      "16k": {
+        "correct": 49,
+        "total": 250,
+        "accuracy": 0.196
+      },
+      "32k": {
+        "correct": 50,
+        "total": 250,
+        "accuracy": 0.2
+      }
+    }
+  }
+}

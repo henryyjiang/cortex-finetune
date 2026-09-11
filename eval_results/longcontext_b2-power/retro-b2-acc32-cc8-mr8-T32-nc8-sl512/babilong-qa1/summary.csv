@@ -1,0 +1,7 @@
+model,task,bucket,correct,total,accuracy
+final_checkpoint,qa1,1k,46,250,0.1840
+final_checkpoint,qa1,2k,40,250,0.1600
+final_checkpoint,qa1,4k,45,250,0.1800
+final_checkpoint,qa1,8k,40,250,0.1600
+final_checkpoint,qa1,16k,39,250,0.1560
+final_checkpoint,qa1,32k,40,250,0.1600

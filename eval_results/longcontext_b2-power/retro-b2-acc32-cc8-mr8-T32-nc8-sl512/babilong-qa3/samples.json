@@ -1,0 +1,214 @@
+{
+  "qa3": [
+    {
+      "bucket": "1k",
+      "question": "Where was the apple before the bathroom? ",
+      "gold": "office",
+      "pred": " bathroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " bedroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " bedroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the apple before the bathroom? ",
+      "gold": "office",
+      "pred": " bathroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the apple before the bathroom? ",
+      "gold": "office",
+      "pred": " bathroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " in the kitchen\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the apple before the bathroom? ",
+      "gold": "office",
+      "pred": " bathroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " bedroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the apple before the bathroom? ",
+      "gold": "office",
+      "pred": " bathroom",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " the garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the apple before the bathroom? ",
+      "gold": "office",
+      "pred": " bathroom\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the apple before the hallway? ",
+      "gold": "office",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": "",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": "",
+      "correct": false
+    }
+  ]
+}

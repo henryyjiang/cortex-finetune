@@ -1,0 +1,214 @@
+{
+  "qa1": [
+    {
+      "bucket": "1k",
+      "question": "Where is John? ",
+      "gold": "hallway",
+      "pred": " hallway\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " bathroom\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Sandra? ",
+      "gold": "hallway",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is John? ",
+      "gold": "hallway",
+      "pred": " hallway\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " bathroom\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is Sandra? ",
+      "gold": "hallway",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is John? ",
+      "gold": "hallway",
+      "pred": " hallway\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " bathroom\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is Sandra? ",
+      "gold": "hallway",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "4k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is John? ",
+      "gold": "hallway",
+      "pred": " hall\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " bathroom",
+      "correct": true
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is Sandra? ",
+      "gold": "hallway",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "8k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is John? ",
+      "gold": "hallway",
+      "pred": " in the garden.\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " bathroom",
+      "correct": true
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is Sandra? ",
+      "gold": "hallway",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "16k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is John? ",
+      "gold": "hallway",
+      "pred": " in the\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is Mary? ",
+      "gold": "bathroom",
+      "pred": " bathroom",
+      "correct": true
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is Sandra? ",
+      "gold": "hallway",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden",
+      "correct": false
+    }
+  ]
+}
