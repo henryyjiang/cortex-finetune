@@ -66,9 +66,20 @@ ACCUM_MAX=${ACCUM_MAX:-0}
 CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-0}
 MAX_STEPS=${MAX_STEPS:-38147}
 
-# max_length : cross_chunks : batch_size    (batch_size only scales the wall-clock
-# projection — it is pure gradient accumulation and costs no memory).
-# Ascending, so the fit/OOM boundary is located before the stretch case.
+# max_length : cross_chunks : batch_size [: accum_max]
+# batch_size only scales the wall-clock projection (pure gradient accumulation,
+# no memory cost); accum_max is optional and defaults to $ACCUM_MAX, i.e. to
+# B2's rule.  Ascending, so the fit/OOM boundary is located before the stretch.
+#
+# RESULT 2026-09-14, job 13201945, H200 138.7 GiB:
+#   4096 x cc8   FITS  115.44 GiB reserved (83%), 1.2 s/micro-step
+#                -> calibration: B2 ran this exact geometry and peaked at
+#                   119.76 GiB, so the measurement is trustworthy to ~4%
+#   8192 x cc16  OOM
+#   16384 x cc16 OOM
+# Config D is dead.  The open question is no longer D vs D-fallback but whether
+# chain depth 16 can be bought at a 4,096-token row with 256-token chunks —
+# 4096:16:32, capped and uncapped.
 #   4096:8:32   D-fallback   512-tok chunks, reuses the existing len4096 pack
 #   8192:16:16  config D     512-tok chunks, chain depth 16          <- the decision
 #   16384:16:8  stretch      1024-tok chunks AND depth 16 at the same tokens/step;
@@ -93,9 +104,10 @@ grep -c prefix_pack "$MODEL/raven_modeling_minimal_cortex.py" \
 
 BROKEN=0
 for G in $GEOMETRIES; do
-    LEN=${G%%:*}; REST=${G#*:}; CC=${REST%%:*}; BS=${REST#*:}
+    IFS=':' read -r LEN CC BS AMAX <<< "$G"
+    AMAX=${AMAX:-$ACCUM_MAX}          # 4th field is optional; 0 = B2's rule
     echo ""
-    echo "######## ${LEN} x cc${CC} (bs ${BS}) ########"
+    echo "######## ${LEN} x cc${CC} (bs ${BS}, accum_max ${AMAX}) ########"
     python tools/smoke_geometry_oom.py \
         --model_name "$MODEL" \
         --max_length "$LEN" \
@@ -105,7 +117,7 @@ for G in $GEOMETRIES; do
         --micro_batch_size 1 \
         --mean_recurrence "$MAX_MEAN_REC" \
         --accum_vecs "$ACCUM_VECS" \
-        --accum_max "$ACCUM_MAX" \
+        --accum_max "$AMAX" \
         --carry_grad_chunks "$CARRY_GRAD_CHUNKS" \
         --use_memory true \
         --with_optimizer true \
