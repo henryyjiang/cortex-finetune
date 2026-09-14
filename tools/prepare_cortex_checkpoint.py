@@ -68,6 +68,51 @@ def _materialise_source(src: str, dst: str) -> None:
     shutil.copytree(local, dst, dirs_exist_ok=True)
 
 
+def _fix_special_token_ids(dst: str, cfg: dict) -> None:
+    """Align config.json / generation_config.json bos-eos-pad with the tokenizer.
+
+    Mutates `cfg` in place (the caller writes it) and rewrites
+    generation_config.json when one is present.  A no-op when they already agree,
+    so it is safe to re-run on an already-prepared dir.
+    """
+    from transformers import AutoTokenizer
+
+    try:
+        tok = AutoTokenizer.from_pretrained(dst)
+    except Exception as exc:                       # no tokenizer in the dir
+        print(f"      WARNING: could not load a tokenizer from {dst} ({exc}); "
+              f"special-token ids left as inherited — check them by hand.")
+        return
+
+    wanted = {"bos_token_id": tok.bos_token_id,
+              "eos_token_id": tok.eos_token_id,
+              "pad_token_id": tok.pad_token_id}
+    changed = {k: (cfg.get(k), v) for k, v in wanted.items()
+               if v is not None and cfg.get(k) != v}
+    if not changed:
+        print("      special-token ids already match the tokenizer")
+        return
+
+    for k, (old, new) in changed.items():
+        try:
+            shown = repr(tok.decode([old])) if isinstance(old, int) else str(old)
+        except Exception:
+            shown = str(old)
+        print(f"      {k}: {old} ({shown}) -> {new}")
+        cfg[k] = new
+
+    gen_path = os.path.join(dst, "generation_config.json")
+    if os.path.isfile(gen_path):
+        with open(gen_path, encoding="utf-8") as f:
+            gen = json.load(f)
+        for k, new in wanted.items():
+            if new is not None and k in gen:
+                gen[k] = new
+        with open(gen_path, "w", encoding="utf-8") as f:
+            json.dump(gen, f, indent=2)
+        print("      generation_config.json updated (stop token for generate())")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -123,6 +168,18 @@ def main() -> int:
         v = getattr(args, k)
         if v is not None:
             cfg[k] = v
+
+    # Special-token ids: take them from the TOKENIZER, not from the inherited
+    # config.  Every smcleish/Recurrent-* config carries HUGINN's ids (bos 65504,
+    # eos 65505, pad 65509) alongside the parent model's tokenizer.  On OLMo-2
+    # (vocab 100,352, real eos 100257) those are valid ids for other words —
+    # 65505 decodes to " creek" — so nothing ever raised.  Two things read them:
+    # resolve_summary_init_token(), which seeds the prefix summary embeddings
+    # from config.eos_token_id when summary_init_token < 0 (so B2 seeded from
+    # " creek" instead of EOS), and generation_config, which supplies the
+    # stop token to the model's own generate() (so it only halted on " creek").
+    _fix_special_token_ids(args.dst, cfg)
+
     with open(cfg_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
 

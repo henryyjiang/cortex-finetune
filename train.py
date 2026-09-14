@@ -24,6 +24,11 @@ from datasets import load_dataset, Dataset, load_from_disk
 from contextlib import nullcontext
 from stateful_parquet_dataset import get_parquet_dataloader
 from cortex_memory.chunking import random_chunk_sizes, detach_old_vecs
+from recipe_utils import (
+    fast_forward_indices,
+    reduce_chunk_losses,
+    resolve_warmup_steps,
+)
 from dataclasses import dataclass, field
 from jsonargparse import CLI
 from ellisadam import ELLISAdam
@@ -83,9 +88,18 @@ class CLISettings:
     optim_config: dict[str, Any] = field(
         default_factory=lambda: dict(lr=5e-7, weight_decay=1e-4, betas=(0.9, 0.95), eps=1e-8)
     )
+    # warmup / cooldown are FRACTIONS of max_steps; min_lr = min_lr_ratio * lr.
+    # warmup_steps (0 = off) overrides the fraction with an absolute step count.
+    # It exists because warmup is the one schedule term that should NOT scale
+    # with the horizon: it is there to let Adam's second moment mature and to
+    # survive the conversion transient, and both are counted in STEPS.  The
+    # inherited warmup=0.0025 gives 125 steps at McLeish's 50,000-step horizon
+    # and 764 at B2's 305,176 — but only 96 at the post-batch-fix 38,147, for a
+    # conversion that starts at loss ~10.3 with first-decile grad-norms of
+    # 3.0-4.3 against a steady-state 1.2.  OLMo-2 itself warmed up for 4,000.
     scheduler_args: dict[float, Any] = field(
-        default_factory=lambda: dict(warmup=0.1, cooldown=0.1, min_lr_ratio=0.001)
-    ) # min_lr = min_lr_ratio * lr
+        default_factory=lambda: dict(warmup=0.1, cooldown=0.1, min_lr_ratio=0.001, warmup_steps=0)
+    )
     save_interval: int = -1
     model_name: str = "smcleish/Recurrent-TinyLlama-3T-untrained"
     wandb_disabled: bool = False
@@ -115,6 +129,26 @@ class CLISettings:
     no_amp: bool = True
     is_parquet_dataset: bool = False
     ignore_past_parquet_dataset: bool = False
+    # reset_dataset_position: the NON-PARQUET twin of ignore_past_parquet_dataset,
+    # and the fix for the 2026-09-14 recipe audit's finding 1.
+    #
+    # On the map-style path `data_start_step` is the CUMULATIVE count of
+    # dataloader items drawn since the last reset (the skip loop increments it
+    # too), and the only reset is a branch.  A resume that switches corpus
+    # therefore fast-forwards that many items into the NEW pack before serving
+    # anything: B2's 199,485 link skipped 431,732 rows of fw_nemo50 (verified in
+    # logs/Report-12190106.out, first `Step: 431736`).  Two consequences —
+    # roughly half the new pack is never seen, and the pack must hold
+    # `cursor + steps*batch_size` rows or the loader runs dry.  Exhaustion is a
+    # CLEAN EXIT here (see the guard at the end of train()), so a pack that is
+    # too small produces a run wandb marks "finished" at a fraction of budget.
+    #
+    # `--ignore_past_parquet_dataset` does NOT cover this: train.py:561 gates it
+    # on cfg.is_parquet_dataset, so it was a no-op on every B2 link.
+    #
+    # Pass this ONLY on the link that switches corpus.  Every later same-corpus
+    # link must restore its position or it replays the pack from the top.
+    reset_dataset_position: bool = False
     parquet_dataset_max_tokens: Optional[int] = None
     ignore_past_scheduler: bool = False
     mean_recurrence_schedule: dict[float, Any] = field(
@@ -145,8 +179,11 @@ class CLISettings:
     #                       (>=3 needed to train the forget/feedback gates).  1 = off.
     # freeze_loop         : freeze adapter + core_block (the recurrent loop) — train
     #                       memory (+ coda/embeds) only.  Experiment-ladder rung 1.
-    # freeze_loop_until_step : staged unfreeze — keep the loop frozen until this
-    #                       optimizer step, then unfreeze it (0 = never auto-unfreeze).
+    #                       (A staged-unfreeze knob, freeze_loop_until_step, was
+    #                       removed 2026-09-14: never set by any sbatch, absent from
+    #                       every wandb export, and training-only so no checkpoint
+    #                       carried it.  Split into two runs instead — rung 1 frozen,
+    #                       then resume with freeze_loop=false.)
     # eos_from_tokens     : derive eos_mask from the token ids (== tokenizer.eos)
     #                       and pass it into each chunk forward, so the M_cross
     #                       write pools only the open document suffix and resets
@@ -154,11 +191,12 @@ class CLISettings:
     #                       carry; correct for one-doc sequences that fill the
     #                       window, and what the evals use).  Turn on when data
     #                       has padded short docs (pad == eos) or packed docs.
-    # l2sp_coeff          : L2-SP anchor (experiment-ladder rung 3): add
-    #                       coeff * ||theta_loop - theta_loop^base||^2 to the loss,
-    #                       anchoring the unfrozen loop to the PRETRAINED weights
-    #                       (snapshot taken from model_name at startup, i.e. the
-    #                       base graft dir, BEFORE any --resume_path load).  0 = off.
+    # (l2sp_coeff, the experiment-ladder rung-3 L2-SP anchor, was removed
+    #  2026-09-14.  Training-only, so no checkpoint's config.json carried it and
+    #  nothing became unloadable; its launcher pace/rung3_l2sp.sbatch was already
+    #  deleted; the one run that used it, rung3-k4-l2sp1e-3, is recorded in
+    #  wandb_exports/cortex-retro-ft/summary.csv.  It also cost a branch inside
+    #  cortex_fwd_bwd that was evaluated every micro-step and could never be true.)
     # memory_lr           : dedicated LR for ALL newly-added cortex params (memory
     #                       buffers + LoRA; selected by "cortex" in the param name).
     #                       Fresh zero-init modules on a pretrained base want
@@ -211,8 +249,8 @@ class CLISettings:
         default_factory=lambda: dict(
             use_memory=False, memory_slots=0, memory_slots_iter=0, memory_heads=4,
             ccot_direct=False, h_T_proj=True, cross_chunks=1,
-            freeze_loop=False, freeze_loop_until_step=0, eos_from_tokens=False,
-            l2sp_coeff=0.0, memory_lr=0.0, lora_rank=0, lora_alpha=32.0,
+            freeze_loop=False, eos_from_tokens=False,
+            memory_lr=0.0, lora_rank=0, lora_alpha=32.0,
             accum_ccot=False, accum_vecs=4, accum_max=64,
             gated_accum=False,
             # prefix_memory: '' | 'accum' | 'gated' — the AutoCompressor-
@@ -240,6 +278,24 @@ class CLISettings:
             # CortexMemory._carried_state for the full reasoning.
             prefix_eos_reset=False,
             carry_grad_chunks=0, random_segments=False,
+            # chunk_loss_reduction: how the per-chunk losses in cortex_fwd_bwd
+            # combine into the row's loss.
+            #   "token" (default since 2026-09-14) — weight each chunk by its
+            #       unmasked label count, so the row's loss equals the token mean
+            #       over the whole row.  This is what the model's own loss does
+            #       on the non-chunked path (tightly_scoped_fwd_bwd), so the two
+            #       paths agree, and it is invariant to how the row is split —
+            #       which matters because cross_chunks varies across arms.
+            #   "chunk" — the pre-2026-09-14 behaviour, a plain mean of per-chunk
+            #       token-means.  Identical to "token" only when every chunk
+            #       holds the same number of unmasked labels.
+            # Magnitude, measured: on today's PG-19 pack ~1% of rows are short at
+            # max_length 4096 (~5% at 8192), so the two agree almost everywhere.
+            # After the planned striding fix to prepare_pg19_dataset.py the LAST
+            # window of every book is ragged, taking that to ~1 in 8 rows — which
+            # is why this is a flag and why the default moved before the pack was
+            # built rather than after.
+            chunk_loss_reduction="token",
         )
     )
 
@@ -265,11 +321,6 @@ class CLISettings:
             "resume_path continues THIS run; branch_path starts a new arm from "
             "another run.  Set exactly one."
         )
-        if self.cortex["l2sp_coeff"] > 0:
-            assert self.cortex["use_memory"] and self.cortex["cross_chunks"] > 1, (
-                "cortex.l2sp_coeff is only applied inside the cross-chunk fwd/bwd "
-                "path (requires cortex.use_memory and cortex.cross_chunks > 1)"
-            )
         # Retired mechanisms: refuse to START a run on one.  The check lives here
         # rather than in cortex_graft.CortexMemory because the graft is also the
         # LOAD path for every Track-A and B1 checkpoint, whose config.json still
@@ -568,6 +619,15 @@ def load_checkpoint(state, cfg, device, branch: bool = False):
     agg = dict(ckpt["agg_vars_dict"])
     if branch:
         agg["data_start_step"] = 1        # fresh corpus, read it from the top
+    elif cfg.reset_dataset_position:
+        # Same run, new corpus (see CLISettings.reset_dataset_position).  The
+        # restored cursor was taken against the OLD pack; keeping it would skip
+        # that many rows into the new one.
+        if is_main_process():
+            print(f"[data] reset_dataset_position: discarding restored dataloader "
+                  f"cursor {agg['data_start_step']:,} — reading "
+                  f"{cfg.preprocessed_data_path} from row 0")
+        agg["data_start_step"] = 1
     return agg
 
 def is_main_process():
@@ -746,6 +806,15 @@ def get_unwrapped_model_from_module(model):
     return m
 
 
+def _resolve_warmup_steps(cfg, max_training_steps: int) -> int:
+    """LR warmup in steps — see recipe_utils.resolve_warmup_steps.
+
+    The mean-recurrence and backprop-depth ramps deliberately keep using their
+    own fractions: those are curricula over the run, not optimizer warmup.
+    """
+    return resolve_warmup_steps(cfg.scheduler_args, max_training_steps)
+
+
 def startup(cfg: CLISettings):
     """The main setup function for the training script."""
     seed_everything(cfg.seed)
@@ -909,8 +978,8 @@ def startup(cfg: CLISettings):
             )
 
     # cortex: undo post_init's clobbering of the graft's designed inits (must run
-    # AFTER from_pretrained, BEFORE the L2-SP snapshot / freeze / optimizer build
-    # so the anchor + optimizer see the intended weights).  Skipped on --resume
+    # AFTER from_pretrained, BEFORE the freeze / optimizer build so the optimizer
+    # sees the intended weights).  Skipped on --resume
     # (a resumed checkpoint carries the trained cortex weights, not fresh ones).
     if cfg.cortex["use_memory"] and cfg.resume_path is None:
         reset_cortex_graft_init(model)
@@ -919,42 +988,44 @@ def startup(cfg: CLISettings):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # cortex: the config's special-token ids must agree with the tokenizer's.
+    #
+    # Every smcleish/Recurrent-* config inherits HUGINN's ids (bos 65504, eos
+    # 65505, pad 65509) while carrying an OLMo-2 tokenizer whose real eos is
+    # 100257.  They are valid ids in a 100,352 vocab, so nothing raises — but
+    # 65505 decodes to " creek", and resolve_summary_init_token() falls back to
+    # config.eos_token_id when summary_init_token < 0.  B2 therefore seeded its
+    # prefix summary embeddings from " creek" instead of EOS, which is one of
+    # the four AutoCompressor divergences B2 existed to fix.
+    #
+    # Only fires where the seed is actually about to be applied: a fresh prefix
+    # run with no explicit token.  A resumed or eval-loaded checkpoint has
+    # summary_seeded set and skips the seeding entirely, so it is unaffected.
+    if (cfg.cortex["use_memory"] and cfg.cortex["prefix_memory"]
+            and int(cfg.cortex["summary_init_token"]) < 0):
+        cfg_eos = getattr(config, "eos_token_id", None)
+        if isinstance(cfg_eos, (list, tuple)):
+            cfg_eos = cfg_eos[0] if cfg_eos else None
+        if cfg_eos != tokenizer.eos_token_id:
+            raise RuntimeError(
+                f"Refusing to seed the prefix summary embeddings from "
+                f"config.eos_token_id={cfg_eos} ({tokenizer.decode([cfg_eos])!r}) "
+                f"when the tokenizer's eos is {tokenizer.eos_token_id} "
+                f"({tokenizer.decode([tokenizer.eos_token_id])!r}).  The "
+                f"Recurrent-* configs carry Huginn's ids; pass "
+                f"--cortex.summary_init_token {tokenizer.eos_token_id} "
+                f"(AutoCompressor uses EOS), or re-prepare the checkpoint with "
+                f"tools/prepare_cortex_checkpoint.py, which now fixes the ids."
+            )
+
     # cortex: optionally freeze the recurrent loop (train memory + coda only).
-    # Done on the unwrapped model BEFORE the DDP wrap.  Staged unfreeze (if
-    # freeze_loop_until_step > 0) re-enables it later inside train(), which
-    # under DDP requires re-wrapping the model (the reducer only registers
-    # params that required grad at construction) — that re-wrap cannot reach
-    # through torch.compile, so forbid the combination up front.
-    if (cfg.cortex["use_memory"] and cfg.cortex["freeze_loop"]
-            and cfg.cortex["freeze_loop_until_step"] > 0
-            and distributed and cfg.compile):
-        raise RuntimeError(
-            "cortex.freeze_loop_until_step > 0 with DDP requires re-wrapping the "
-            "model at the unfreeze step, which is not supported under "
-            "torch.compile. Run with --compile=false, or split into two runs "
-            "(rung 1 frozen, then resume with freeze_loop=false)."
-        )
+    # Done on the unwrapped model BEFORE the DDP wrap.  There is no staged
+    # unfreeze: to run rung 1 then rung 2, split into two runs (frozen, then
+    # resume with freeze_loop=false).
     if cfg.cortex["use_memory"] and cfg.cortex["freeze_loop"]:
         n_frozen = set_loop_trainable(model, trainable=False)
         if is_main_process():
-            print(f"[cortex] froze {n_frozen} loop (adapter+core_block) params; "
-                  f"unfreeze at step {cfg.cortex['freeze_loop_until_step'] or 'never'}")
-
-    # cortex: L2-SP anchor snapshot (rung 3).  Taken here — after loading
-    # model_name (the base graft dir) but BEFORE any --resume_path load — so the
-    # reference is always the PRETRAINED loop, even when resuming a rung-1/2
-    # checkpoint.  Pairs hold live param references (stable through DDP/compile
-    # wrapping) next to their frozen base copies.
-    l2sp_pairs = None
-    if cfg.cortex["l2sp_coeff"] > 0:
-        l2sp_pairs = [
-            (p, p.detach().clone())
-            for n, p in model.named_parameters()
-            if ("adapter" in n) or ("core_block" in n)
-        ]
-        if is_main_process():
-            print(f"[cortex] L2-SP anchor on {len(l2sp_pairs)} loop tensors "
-                  f"(coeff={cfg.cortex['l2sp_coeff']})")
+            print(f"[cortex] froze {n_frozen} loop (adapter+core_block) params")
 
     ##########  Distribute model   ##############
     if distributed:
@@ -1042,14 +1113,21 @@ def startup(cfg: CLISettings):
             )
         if not (memory_lr > 0):
             non_body_params = non_body_params + cortex_params
+        # eps is passed EXPLICITLY.  Until 2026-09-14 it was omitted, and
+        # MuonWithAuxAdam.__init__ then filled in its own default of 1e-10 — so
+        # `optim_config.eps` was dead config and every cortex and McLeish run
+        # actually trained at 1e-10, against OLMo-2's pretraining value of 1e-8.
+        # Third instance of the recipe audit's rule: find where a value is
+        # CONSUMED, not where it is set.  (`eps` is inside MuonWithAuxAdam's
+        # allowed-key assert, so passing it is safe.)
         param_groups.append(
-            dict(params=non_body_params + norms, use_muon=False, lr=cfg.optim_config["lr"], betas=cfg.optim_config["betas"], weight_decay=cfg.optim_config["weight_decay"]),
+            dict(params=non_body_params + norms, use_muon=False, lr=cfg.optim_config["lr"], betas=cfg.optim_config["betas"], eps=cfg.optim_config["eps"], weight_decay=cfg.optim_config["weight_decay"]),
         )
         if memory_lr > 0 and cortex_params:
             # dedicated group for the fresh cortex params: higher LR, no weight
             # decay (decay would pull the identity-init projections toward zero).
             param_groups.append(
-                dict(params=cortex_params, use_muon=False, lr=memory_lr, betas=cfg.optim_config["betas"], weight_decay=0.0),
+                dict(params=cortex_params, use_muon=False, lr=memory_lr, betas=cfg.optim_config["betas"], eps=cfg.optim_config["eps"], weight_decay=0.0),
             )
         optimizer = MuonWithAuxAdam(param_groups)
 
@@ -1201,6 +1279,10 @@ def startup(cfg: CLISettings):
 
     dataloader_generator = torch.Generator()
     dataloader_generator.manual_seed(cfg.seed)
+    # epoch_order: the explicit shuffle permutation for the single-process
+    # map-style path.  None on every other path (parquet / DistributedSampler),
+    # which is what fast_forward_dataloader() keys off.
+    epoch_order = None
     if cfg.is_parquet_dataset:
         dataloader = tokenized_dataset
     elif distributed:
@@ -1219,12 +1301,31 @@ def startup(cfg: CLISettings):
             generator=dataloader_generator,
         )
     else:
+        # An EXPLICIT permutation instead of shuffle=True.  Two reasons, both
+        # from the 2026-09-14 recipe audit:
+        #
+        #  * it is O(1)-sliceable, which is what lets a resume fast-forward in
+        #    constant time instead of re-walking every consumed row.  The old
+        #    path iterated and discarded at ~68 rows/s: 3h03m on B2's last arm
+        #    link and 11.9h across the arm's six links, 4.1% of its GPU-hours.
+        #  * shuffle=True routes through RandomSampler, whose permutation cannot
+        #    be reproduced outside the DataLoader iterator without depending on
+        #    torch internals (_BaseDataLoaderIter draws its base_seed from the
+        #    same generator BEFORE the sampler runs).  Owning the permutation
+        #    removes that dependency.
+        #
+        # The order is still a pure function of (cfg.seed, len(dataset)), so it
+        # is identical on every link of a resume chain — which is what makes the
+        # slice correct.  It is NOT the order a pre-2026-09-14 run would have
+        # drawn, so do not resume an older run across this change.
+        epoch_order = torch.randperm(
+            len(tokenized_dataset), generator=dataloader_generator
+        ).tolist()
         dataloader = torch.utils.data.DataLoader(
             tokenized_dataset,  # type: ignore
             batch_size=cfg.micro_batch_size,
-            shuffle=not cfg.is_parquet_dataset,
+            sampler=epoch_order,
             pin_memory=True,
-            generator=dataloader_generator,
         )
 
     ##########     Scheduler       ##############
@@ -1233,7 +1334,7 @@ def startup(cfg: CLISettings):
             max_training_steps = cfg.max_steps
         else:
             max_training_steps = max(1, math.ceil(cfg.parquet_dataset_max_tokens / world_size / cfg.max_length))
-        num_warmup_steps = math.ceil(cfg.scheduler_args["warmup"] * max_training_steps)
+        num_warmup_steps = _resolve_warmup_steps(cfg, max_training_steps)
         num_decay_steps = math.ceil(cfg.scheduler_args["cooldown"] * max_training_steps)
     else:
         if cfg.max_steps:
@@ -1242,7 +1343,7 @@ def startup(cfg: CLISettings):
             accumulation_steps = max(1, cfg.batch_size // cfg.micro_batch_size)
             num_update_steps_per_epoch = math.ceil(len(dataloader) / accumulation_steps)
             max_training_steps = cfg.epochs * num_update_steps_per_epoch
-        num_warmup_steps = math.ceil(cfg.scheduler_args["warmup"] * max_training_steps)
+        num_warmup_steps = _resolve_warmup_steps(cfg, max_training_steps)
         num_decay_steps = math.ceil(cfg.scheduler_args["cooldown"] * max_training_steps)
 
     scheduler = get_scheduler(
@@ -1260,7 +1361,10 @@ def startup(cfg: CLISettings):
         "dataloader": dataloader,
         "distributed": distributed,
         "scheduler": scheduler,
-        "l2sp_pairs": l2sp_pairs,
+        # Kept so train() can rebuild a fast-forwarded loader on a resume; both
+        # are None on the parquet and DistributedSampler paths.
+        "dataset": None if cfg.is_parquet_dataset else tokenized_dataset,
+        "dataloader_order": epoch_order,
     }
 
     if cfg.mean_recurrence_schedule["turn_on"]:
@@ -1402,6 +1506,50 @@ def sheduler_n_k_handler(state, cfg, model_config):
     else:
         return partial(num_steps_sampler, mean_recurrence=new_mean_rec, mean_backprop_depth=mean_backprop_depth, cfg=cfg), new_mean_rec, mean_backprop_depth
 
+def fast_forward_dataloader(state, cfg, data_start_step):
+    """Position a map-style loader after `data_start_step` micro-batches, in O(1).
+
+    Returns a new DataLoader over the unconsumed tail of this run's permutation,
+    or None when the fast path does not apply (parquet loader, DistributedSampler,
+    or nothing to skip) — the caller then falls back to iterate-and-discard.
+
+    `data_start_step` counts dataloader ITEMS, i.e. micro-batches, not rows; the
+    row cursor is `data_start_step * micro_batch_size`.  With micro_batch_size=1
+    (every cortex run to date) the two coincide, which is why B2's logs read
+    `Step: 431736` for 431,732 skipped rows.
+
+    Correctness rests on the permutation being a pure function of
+    (cfg.seed, len(dataset)) and therefore identical on every link of the chain —
+    see the epoch_order comment in startup().  A dataset whose length changed
+    (a corpus switch) gets a DIFFERENT permutation, which is exactly why such a
+    link must pass --reset_dataset_position rather than slice into it.
+    """
+    order = state.get("dataloader_order")
+    if order is None:
+        return None
+    consumed = data_start_step * cfg.micro_batch_size
+    try:
+        tail = fast_forward_indices(order, data_start_step, cfg.micro_batch_size)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"{exc} ({cfg.preprocessed_data_path}).  If this link switches "
+            f"corpus, pass --reset_dataset_position true; otherwise the pack is "
+            f"too small — tools/check_pack.py --resume_rows {consumed}."
+        ) from None
+    if tail is None:
+        return None
+    if is_main_process():
+        print(f"[data] fast-forward: skipping {consumed:,} consumed rows, "
+              f"{len(tail):,} remain "
+              f"({len(tail) // max(1, cfg.batch_size):,} optimizer steps)")
+    return torch.utils.data.DataLoader(
+        state["dataset"],
+        batch_size=cfg.micro_batch_size,
+        sampler=tail,
+        pin_memory=True,
+    )
+
+
 def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_from_restart=0, total_tokens_with_loss_from_restart=0, elapsed_time_from_restart=0.0):
     model, optimizer = state["model"], state["optimizer"]
     model.train()
@@ -1460,9 +1608,41 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
         new_backprop_depth = model_config.mean_backprop_depth
         num_steps_sampler_partial = partial(num_steps_sampler, mean_recurrence=new_mean_rec, mean_backprop_depth=new_backprop_depth, cfg=cfg)
 
+    # The resume cursor is only meaningful within one pass over the data:
+    # data_step restarts at 1 on every epoch, so "resume at item N" does not name
+    # a position once there is more than one epoch.  Before 2026-09-14 this
+    # silently re-applied the skip at the start of every later epoch.  Nothing
+    # has ever combined the two (only the closed Track-A -ep3/-ep4 arms set
+    # epochs > 1, and none of them resumed), so refuse rather than guess.
+    if cfg.epochs > 1 and data_start_step > 1:
+        raise RuntimeError(
+            f"Cannot resume (data_start_step={data_start_step:,}) with "
+            f"epochs={cfg.epochs}: the dataloader cursor is per-epoch and the "
+            f"restored value does not identify a position.  Use epochs=1 and a "
+            f"pack sized for the full budget, which is what every retrofit run "
+            f"does."
+        )
+
+    # Resume positioning.  Prefer the O(1) slice; fall back to iterate-and-discard
+    # only where the permutation is not ours (DistributedSampler).  See
+    # fast_forward_dataloader().
+    epoch_loader = state["dataloader"]
+    enumerate_start = (data_start_step + 1) if cfg.is_parquet_dataset else 1
+    slow_skip = (data_start_step != 1) and (not cfg.is_parquet_dataset)
+    if slow_skip:
+        fast = fast_forward_dataloader(state, cfg, data_start_step)
+        if fast is not None:
+            epoch_loader, enumerate_start, slow_skip = fast, data_start_step + 1, False
+
+    reached_target = False
+    data_step = 0           # defined up front so the exhaustion guard can read it
     for epoch in range(cfg.epochs):
-        for data_step, inputs in enumerate(state["dataloader"], start=(data_start_step + 1) if cfg.is_parquet_dataset else 1):
-            if (data_start_step != 1) and (not cfg.is_parquet_dataset) and (data_step <= data_start_step):
+        if epoch > 0:
+            # data_step restarts at 1 inside this loop, so a resume's skip would
+            # re-fire on every later epoch.  Only epoch 0 is a continuation.
+            epoch_loader, enumerate_start, slow_skip = state["dataloader"], 1, False
+        for data_step, inputs in enumerate(epoch_loader, start=enumerate_start):
+            if slow_skip and (data_step <= data_start_step):
                 # not first_run and not parquet_run and is less than the restart
                 continue
 
@@ -1556,6 +1736,7 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         y_chunks = [c.contiguous() for c in torch.chunk(labels, n_chunks, dim=1)]
                     m_cross = None
                     chunk_losses = []
+                    chunk_tokens = []       # unmasked labels per kept chunk
                     n_ng = n_wg = 0
                     for gi, (xc, yc) in enumerate(zip(x_chunks, y_chunks)):
                         # Stop-gradient horizon (AutoCompressor: predicting the
@@ -1583,8 +1764,10 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         # counts from the sampler tensor (stats dict now off — see
                         # output_details); matches what iterate_forward unpacked.
                         n_ng, n_wg = int(num_steps[0]), int(num_steps[1])
-                        if (yc != -100).any():                  # skip fully-masked chunks
+                        n_valid = int((yc != -100).sum())
+                        if n_valid:                             # skip fully-masked chunks
                             chunk_losses.append(out["loss"])
+                            chunk_tokens.append(n_valid)
                     if not chunk_losses:
                         # Every chunk fully label-masked (-100): unreachable with
                         # one-doc-per-sequence data, guarded so torch.stack([])
@@ -1595,19 +1778,10 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         # micro-batch.
                         z = torch.zeros((), device=input_ids.device)
                         return z, z, n_ng, n_wg
-                    total = torch.stack(chunk_losses).mean()
-                    # L2-SP anchor (rung 3): pull the unfrozen loop toward the
-                    # pretrained weights.  Added to the backward objective only —
-                    # `total` (the logged loss) stays pure LM loss so curves are
-                    # comparable across rungs.  While the loop is frozen the
-                    # penalty is a constant and contributes no gradient.
-                    objective = total
-                    if state["l2sp_pairs"]:
-                        pen = torch.stack(
-                            [(p - ref).pow(2).sum() for p, ref in state["l2sp_pairs"]]
-                        ).sum()
-                        objective = total + float(cfg.cortex["l2sp_coeff"]) * pen
-                    (objective / accumulation_steps).backward()
+                    total = reduce_chunk_losses(
+                        chunk_losses, chunk_tokens,
+                        mode=cfg.cortex["chunk_loss_reduction"])
+                    (total / accumulation_steps).backward()
                     return total.detach(), total.detach().exp(), n_ng, n_wg
 
             if cfg.non_recurrent_model:
@@ -1637,6 +1811,11 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 else:
                     lrs = [pg["lr"] for pg in optimizer.param_groups]
                     wandb_lr_log  = {"train/lr_recur": lrs[0], "train/lr_nonrecur": lrs[0]}
+                # Every group by index, because the two names above both read
+                # group 0 (Muon) when throttle is off — so until 2026-09-14 NO
+                # logged quantity showed the AdamW group's LR or memory_lr, and a
+                # change to either would have been invisible in wandb.
+                wandb_lr_log.update({f"train/lr_group{i}": lr for i, lr in enumerate(lrs)})
 
 
                 total_norm = torch.nn.utils.clip_grad_norm_(
@@ -1676,32 +1855,6 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 optimizer.zero_grad(set_to_none=True)
                 state["scheduler"].step()
                 optimizer_step += 1
-
-                # cortex: staged unfreeze — re-enable the loop once past the
-                # configured step (rung 2 of the experiment ladder).
-                if (cfg.cortex["use_memory"] and cfg.cortex["freeze_loop"]
-                        and cfg.cortex["freeze_loop_until_step"] > 0
-                        and optimizer_step == cfg.cortex["freeze_loop_until_step"]):
-                    n_unfrozen = set_loop_trainable(model, trainable=True)
-                    if state["distributed"]:
-                        # DDP's reducer only registers params that required grad
-                        # at wrap time; without a re-wrap the newly-unfrozen loop
-                        # grads would never all-reduce and ranks silently drift.
-                        # Params are identical across ranks here (frozen ones
-                        # untouched, trained ones just synced), and the optimizer
-                        # holds references to the underlying params, so a fresh
-                        # wrapper is safe.  startup() forbids this path under
-                        # torch.compile.
-                        model = torch.nn.parallel.DistributedDataParallel(
-                            get_unwrapped_model_from_module(model),
-                            device_ids=[device],
-                            find_unused_parameters=True,
-                            gradient_as_bucket_view=True,
-                        )
-                        state["model"] = model
-                    if is_main_process():
-                        print(f"[cortex] step {optimizer_step}: unfroze {n_unfrozen} loop params"
-                              + (" (re-wrapped DDP)" if state["distributed"] else ""))
 
                 if cfg.mean_recurrence_schedule["turn_on"] or cfg.mean_backprop_depth_schedule["turn_on"]:
                     if cfg.mean_recurrence_schedule["turn_on"]:
@@ -1769,6 +1922,7 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                             torch.distributed.barrier()
 
             if cfg.max_steps and optimizer_step >= cfg.max_steps:
+                reached_target = True
                 break
             # Early stop that does NOT move the schedule horizon.  max_steps is
             # the denominator for the LR cosine AND the mean-recurrence ramp, so
@@ -1788,7 +1942,29 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                                         "total_tokens": total_tokens_to_log,
                                         "total_tokens_with_loss": total_tokens_with_loss_to_log,
                                         "elapsed_time": elapsed_time_to_log}, cfg)
+                reached_target = True
                 break
+        if reached_target:
+            break
+
+    # EXHAUSTION GUARD (recipe audit, finding 1).  Falling off the end of the
+    # dataloader used to be indistinguishable from finishing: the loop ends,
+    # train() returns, save_model_only writes "final_checkpoint" and wandb marks
+    # the run FINISHED — at whatever fraction of the budget the pack covered.
+    # That is what stopped both B1 arms at 24,414 steps / 400M tokens while the
+    # loss curve looked perfectly healthy.  Fail loudly instead.
+    if not reached_target and (cfg.max_steps or cfg.stop_at_step):
+        target = cfg.stop_at_step or cfg.max_steps
+        raise RuntimeError(
+            f"Dataloader exhausted at optimizer step {optimizer_step:,} of "
+            f"{target:,} ({100 * optimizer_step / max(1, target):.1f}% of the "
+            f"budget) after {data_step:,} micro-batches.\n"
+            f"  The pack at {cfg.preprocessed_data_path} is too small for this "
+            f"link.  Size it as  cursor_at_link_start + steps_to_serve * "
+            f"batch_size  — see tools/check_pack.py --resume_rows — and note "
+            f"that a corpus switch on a RESUME carries the cursor forward "
+            f"unless --reset_dataset_position true is passed."
+        )
 
     model.eval()
     return state

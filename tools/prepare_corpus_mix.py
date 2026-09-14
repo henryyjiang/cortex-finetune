@@ -87,7 +87,32 @@ def main() -> int:
     print(f"A {args.a}: {len(ds_a):,} rows -> taking {n_from_a:,}")
     print(f"B {args.b}: {len(ds_b):,} rows -> taking {n_from_b:,}")
     print(f"mix: {total:,} rows x {len_a} tokens = {total * len_a / 1e6:.1f}M tokens "
-          f"(B share {n_from_b / total:.3f}, requested {args.ratio})")
+          f"(B share {n_from_b / total:.3f} of ROWS, requested {args.ratio})")
+
+    # --ratio is a share of ROWS.  When the two legs pack differently that is not
+    # a share of SUPERVISED TOKENS: a doc-per-row pack (prepare_pg19_dataset.py)
+    # carries attention_mask 0 over its EOS padding and those positions are
+    # label-masked, while a wrapped pack (prepare_packed_dataset.py) is all real.
+    # Report both so the mix ratio quoted in a writeup is the one that was meant.
+    # Sampled, not exhaustive — this runs on a login node over millions of rows.
+    def _fill(ds, n=2000):
+        n = min(n, len(ds))
+        if n == 0 or "attention_mask" not in ds.column_names:
+            return 1.0
+        step = max(1, len(ds) // n)
+        masks = ds.select(range(0, step * n, step))["attention_mask"]
+        return sum(sum(m) for m in masks) / float(n * len_a)
+
+    fa, fb = _fill(ds_a), _fill(ds_b)
+    tok_a, tok_b = n_from_a * len_a * fa, n_from_b * len_a * fb
+    if abs(fa - fb) > 0.005:
+        print(f"  real-token fill: A {fa:.3f}, B {fb:.3f}  ->  "
+              f"B share of SUPERVISED TOKENS {tok_b / (tok_a + tok_b):.3f} "
+              f"(not {n_from_b / total:.3f}).  Quote this one, or re-run with "
+              f"--ratio adjusted, if the mix ratio is load-bearing.")
+    else:
+        print(f"  real-token fill: A {fa:.3f}, B {fb:.3f} — row share and token "
+              f"share agree")
 
     ds_a = ds_a.shuffle(seed=args.seed).select(range(n_from_a))
     ds_b = ds_b.shuffle(seed=args.seed).select(range(n_from_b))

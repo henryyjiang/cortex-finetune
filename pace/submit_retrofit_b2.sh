@@ -140,6 +140,16 @@ First-hour checks (wandb project cortex-retrofit):
   * train/total_norm bounded.  No stabilizers by design; B1's accum arm showed
     heavy-tail gnorm spikes (max 123.7 vs the control's 8.7) and this run goes
     to HIGHER recurrence than B1 ever reached.
+  * train/grad_clip_coef.  ADDED 2026-09-14 (recipe audit finding 2): B2 clipped
+    on 100.0% of its optimizer steps at a median coefficient of 0.478, so
+    max_grad_norm=1.0 was acting as a gradient NORMALIZER, not a spike valve.
+    If the coefficient is under 1 on essentially every step again, the threshold
+    is wrong for this geometry — measure the distribution over the first few
+    hundred steps and set it at the p95-p99 rather than leaving it inherited.
+  * "[data] fast-forward: skipping N consumed rows, M remain (K optimizer
+    steps)" on every resume link.  K must cover the steps this link is meant to
+    serve; if it does not, the pack is short and train.py will now RAISE at
+    exhaustion rather than reporting the run finished.
 EOF
     ;;
 

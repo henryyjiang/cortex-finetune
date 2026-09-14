@@ -64,6 +64,12 @@ def main() -> int:
                          "the measurable ceiling is ~0 by construction.  Set it "
                          "near max_length to build a long-document pack out of "
                          "a corpus whose median document is short.")
+    ap.add_argument("--prepend_bos", action="store_true",
+                    help="prepend the tokenizer's bos id to every row.  OFF by "
+                         "default: prepare_packed_dataset.py does not do it, so "
+                         "leaving it off is what keeps the legs of a corpus mix "
+                         "consistent.  On OLMo-2 bos == eos, so turning it on "
+                         "puts a document boundary at position 0 of every row.")
     ap.add_argument("--num_proc", type=int, default=16)
     args = ap.parse_args()
 
@@ -73,7 +79,19 @@ def main() -> int:
     tok = AutoTokenizer.from_pretrained(args.tokenizer)
     eos = tok.eos_token_id
     assert eos is not None, "tokenizer has no eos token"
-    bos = tok.bos_token_id  # may be None (OLMo-2 has none); prepended when present
+    # BOS is OPT-IN (--prepend_bos), and off by default.
+    #
+    # The old comment here said "may be None (OLMo-2 has none)".  It is not:
+    # OLMo-2's tokenizer_config sets bos_token = <|endoftext|>, the SAME id as
+    # eos (100257).  So every row silently got an EOS prepended at position 0 —
+    # which prepare_packed_dataset.py does not do, giving the PG-19 and
+    # FineWeb-Edu legs of a mix two different row-start conventions, and which
+    # with --cortex.eos_from_tokens flags position 0 of chunk 0 as a document
+    # boundary on every row.
+    bos = tok.bos_token_id if args.prepend_bos else None
+    if args.prepend_bos and bos == eos:
+        print("WARNING: --prepend_bos, but this tokenizer's bos IS its eos "
+              f"({bos}) — every row will start with an EOS.")
     row_len = args.max_length + 1
     # bound tokenization cost: ~4 chars/token in English, 8x is ample margin
     char_cap = row_len * 8

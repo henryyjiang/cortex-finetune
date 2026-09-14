@@ -359,14 +359,25 @@ SAVE_INTERVAL=${SAVE_INTERVAL:-2500}
 RESUME_PATH=${RESUME_PATH:-}
 BRANCH_PATH=${BRANCH_PATH:-}
 # Pass-through for one-off train.py args.  The case that motivated it:
-# CHANGING CORPUS ON A RESUME.  A resume restores the parquet position
-# (load_checkpoint, train.py:562) and that position was taken against the
-# OLD pack.  stateful_parquet_dataset.load_state_dict does catch it on the
-# dataset fingerprint and reset to row 0, but only as a WARNING it prints
-# and then keeps going.  Say it out loud instead:
-#     EXTRA_ARGS="--ignore_past_parquet_dataset true"
+# CHANGING CORPUS ON A RESUME.
+#
+#     EXTRA_ARGS="--reset_dataset_position true"
+#
 # ONLY on the link that switches corpus.  Every later link is same-corpus
 # and MUST restore its position, or each one replays the pack from the top.
+#
+# CORRECTED 2026-09-14 (recipe audit finding 1).  This block used to say
+# --ignore_past_parquet_dataset, which is GATED ON cfg.is_parquet_dataset —
+# and pace/ never sets that flag, so it was a NO-OP on every B2 link.  What
+# actually happened at the 199,485 corpus switch: `data_start_step` is the
+# cumulative dataloader-item count since the last branch, so the loader
+# fast-forwarded 431,732 rows into data/fw_nemo50_olmo_len4096 before serving
+# anything (logs/Report-12190106.out, first line `Step: 431736`).  The arm
+# never saw half the mix pack, and the pack had to hold cursor + budget —
+# 854,500 rows against the 422,764 that "steps served from this pack" implies.
+# It cleared by 9%.  --reset_dataset_position is the non-parquet twin that
+# actually fires; train.py now also RAISES on loader exhaustion instead of
+# exiting clean, and tools/check_pack.py takes --resume_rows.
 EXTRA_ARGS=${EXTRA_ARGS:-}
 
 HEAL_DATA=${HEAL_DATA:-data/fineweb_edu_olmo_len4096}

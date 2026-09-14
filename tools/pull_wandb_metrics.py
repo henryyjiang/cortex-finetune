@@ -39,7 +39,14 @@ KEYS = [
     "train/step", "train/loss", "train/log_ppl", "train/lr",
     "train/lr_recur", "train/lr_nonrecur", "train/total_norm",
     "train/grad_clip_coef", "train/mean_recurrence", "train/mean_backprop_depth",
-    "train/total_tokens", "train/epoch",
+    # total_tokens counts every position INCLUDING padding; total_tokens_with_loss
+    # is the unmasked-label count.  Pulling only the first made the padding
+    # fraction invisible in every local export — it matters on any doc-per-row
+    # pack (PG-19) and is ~1.0 on a wrapped one.
+    "train/total_tokens", "train/total_tokens_with_loss", "train/epoch",
+    # per-group LRs (2026-09-14): lr_recur/lr_nonrecur both read group 0 when
+    # throttle is off, so neither ever showed the AdamW group's LR or memory_lr.
+    "train/lr_group0", "train/lr_group1", "train/lr_group2", "train/lr_group3",
 ]
 
 
@@ -56,6 +63,11 @@ def fetch_history(run) -> pd.DataFrame:
 
 
 def freeze_until(config: dict):
+    # Reads HISTORICAL wandb run configs.  cortex.freeze_loop_until_step was
+    # removed from train.py on 2026-09-14, so no new run can set it — but
+    # rung2-k4-unfreeze500 is still in wandb_exports/cortex-retro-ft/ and its
+    # stored config still carries the key, so this analysis stays usable for
+    # reading that history.  Do not delete it along with the producing flag.
     cortex = config.get("cortex") or {}
     if isinstance(cortex, dict) and cortex.get("freeze_loop_until_step"):
         return int(cortex["freeze_loop_until_step"])
@@ -166,8 +178,19 @@ def main() -> int:
     os.makedirs(out_dir, exist_ok=True)
 
     reports = []
+    summary_csv = os.path.join(out_dir, "summary.csv")
+    failed = []
     for r in sorted(runs, key=lambda r: r.name):
-        df = fetch_history(r)
+        # One flaky run must not cost the whole table.  scan_history() streams,
+        # and a dropped wandb service connection raises CommError mid-run; before
+        # 2026-09-14 that propagated out of main() and summary.csv was never
+        # written at all, losing every run already fetched.
+        try:
+            df = fetch_history(r)
+        except Exception as exc:
+            print(f"-- {r.name}  [{r.state}] SKIPPED: {type(exc).__name__}: {exc}")
+            failed.append(f"{r.name}__{r.id}")
+            continue
         csv = os.path.join(out_dir, f"{r.name}__{r.id}.csv")
         df.to_csv(csv, index=False)
         rep = analyze(r.name, r, df)
@@ -177,9 +200,18 @@ def main() -> int:
             if k not in ("run", "id", "state"):
                 print(f"     {k:26} {v}")
         print()
+        # Rewrite the summary after every run, so an interrupted pull still
+        # leaves a usable (partial) table rather than a stale one.
+        pd.DataFrame(reports).to_csv(summary_csv, index=False)
+
+    if not reports:
+        print("No run history could be fetched.")
+        return 1
+    if failed:
+        print(f"WARNING: {len(failed)} run(s) could not be fetched and are NOT "
+              f"in summary.csv: {', '.join(failed)}\n  Re-run to fill them in.")
 
     summary = pd.DataFrame(reports)
-    summary_csv = os.path.join(out_dir, "summary.csv")
     summary.to_csv(summary_csv, index=False)
     core = [c for c in ("run", "state", "steps", "loss_start", "loss_final", "loss_min",
                         "skipped_updates", "clip_active_frac", "FLAGS") if c in summary.columns]

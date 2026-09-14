@@ -1,14 +1,28 @@
 """
 Does a packed dataset cover the step budget?
 
-The parquet loader does NOT wrap: train.py iterates it once inside
-`for epoch in range(epochs)` and the only break is `optimizer_step >= max_steps`.
-Exhaustion is therefore a CLEAN EXIT — wandb reports "finished" at half the
-intended run and nothing in the loss curve says otherwise.  That is what stopped
-both B1 arms at 24,414 steps / 400M tokens.  Check before queueing 48h, not after.
+Neither loader wraps: train.py iterates once inside `for epoch in range(epochs)`
+and the only breaks are `optimizer_step >= max_steps` / `>= stop_at_step`.
+Exhaustion used to be a CLEAN EXIT — wandb reported "finished" at half the
+intended run and nothing in the loss curve said otherwise.  That is what stopped
+both B1 arms at 24,414 steps / 400M tokens.  (train.py now RAISES on exhaustion
+before the target, so this is loud rather than silent — but a failed 48h job is
+still a failed 48h job.  Check before queueing, not after.)
+
+NOTE, corrected 2026-09-14: the B1 exhaustion is often attributed to the parquet
+streaming loader.  B1 never used it — `is_parquet_dataset` is not set anywhere in
+pace/, so B1 and B2 both ran the map-style `load_from_disk` path.  The clean-exit
+behaviour is the same on both, but the mechanism note was wrong.
 
 Rows consumed per optimizer step = batch_size (each row is one sequence).
 Tokens per step = batch_size * max_length.
+
+--resume_rows matters whenever a pack is introduced MID-RUN on a resume.  The
+map-style loader's cursor is cumulative since the last branch, so the new pack is
+fast-forwarded past that many rows before it serves anything and must hold
+`resume_rows + steps * batch_size`.  B2's arm skipped 431,732 rows of the mix
+pack for exactly this reason.  Pass --reset_dataset_position true on that link to
+make the skip zero.
 
     python tools/check_pack.py --data data/fineweb_edu_olmo_len4096 \
         --steps 91552 --batch_size 4
@@ -46,6 +60,16 @@ def parse_args() -> argparse.Namespace:
                    help="tokens per sequence (rows are max_length+1 long)")
     p.add_argument("--margin", type=float, default=1.10,
                    help="require this much headroom over the budget (1.10 = 10%%)")
+    p.add_argument("--resume_rows", type=int, default=0,
+                   help="rows the loader will SKIP before serving anything, i.e. "
+                        "the cumulative cursor this link resumes at.  Nonzero "
+                        "whenever a pack is introduced mid-run on a RESUME "
+                        "(not a branch): the map-style loader fast-forwards "
+                        "past that many rows of the NEW pack.  Compute it as "
+                        "(steps served since the last branch) x batch_size, or "
+                        "read it off the previous link's first 'Step:' log line. "
+                        "Zero for a fresh run, a branch, or a link that passes "
+                        "--reset_dataset_position true.")
     return p.parse_args()
 
 
@@ -64,14 +88,19 @@ def main() -> int:
     ds = load_from_disk(a.data)
     rows = len(ds)
     row_len = len(ds[0]["input_ids"])
-    need_rows = a.steps * a.batch_size
+    served_rows = a.steps * a.batch_size
+    need_rows = served_rows + a.resume_rows
     tokens = rows * a.max_length
 
     print(f"pack      : {a.data}")
     print(f"  rows    : {rows:,}  x {row_len} ids/row ({a.max_length} usable)")
     print(f"  tokens  : {tokens / 1e9:.3f}B")
     print(f"budget    : {a.steps:,} steps x {a.batch_size} seq "
-          f"= {need_rows:,} rows = {a.steps * a.batch_size * a.max_length / 1e9:.3f}B tokens")
+          f"= {served_rows:,} rows = {served_rows * a.max_length / 1e9:.3f}B tokens")
+    if a.resume_rows:
+        print(f"  + skip  : {a.resume_rows:,} rows fast-forwarded before the "
+              f"first served row (resume cursor)")
+        print(f"  = need  : {need_rows:,} rows")
 
     if row_len != a.max_length + 1:
         print(f"  WARNING: rows are {row_len} ids, expected max_length+1 = "
@@ -83,10 +112,16 @@ def main() -> int:
           f"({rows - need_rows:+,} rows, {(rows - need_rows) / a.batch_size:+,.0f} steps)")
 
     if ratio < 1.0:
+        reachable = max(0, rows - a.resume_rows) // a.batch_size
         print(f"\nFAIL: the loader will exhaust at step "
-              f"{rows // a.batch_size:,} of {a.steps:,} and the run will report "
-              f"'finished'.  Build a bigger pack (tools/prepare_packed_dataset.py "
-              f"--max_tokens), or lower --stop_at_step.")
+              f"{reachable:,} of {a.steps:,}.  Build a bigger pack "
+              f"(tools/prepare_packed_dataset.py --max_tokens), lower "
+              f"--stop_at_step, or — if --resume_rows is what pushed it over — "
+              f"pass --reset_dataset_position true on the corpus-switch link so "
+              f"the new pack is read from row 0.")
+        if a.resume_rows:
+            print(f"  (without the {a.resume_rows:,}-row skip this pack would "
+                  f"cover {rows / served_rows:.2f}x the budget)")
         return 1
     if ratio < a.margin:
         print(f"\nFAIL: only {ratio:.2f}x the budget, under the {a.margin:.2f}x "
