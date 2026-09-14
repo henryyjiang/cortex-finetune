@@ -29,10 +29,22 @@ doc-per-row property the script exists for is preserved exactly; there is just
 Default corpus is PG-19 (emozilla/pg19, books) — almost every document spans
 many windows, which is exactly what makes the M_cross carry load-bearing.
 
-Run on a LOGIN node (needs internet for the first download; ~11 GB for PG-19):
+DOWNLOAD on a login node (needs internet; ~11 GB for PG-19), then BUILD on a
+compute node via pace/prepare_pg19_pack.sbatch.  Both steps used to be a login
+-node one-liner, and that advice was written when this script truncated every
+book to ~32k characters — a genuinely trivial job.  Striding makes it a real
+one: ~2.5B tokens to tokenize and ~10 GB to write, with a memory profile spiky
+enough to trip a login node's per-user cap (see --map_batch_size).
+
+    # once, login node, internet on:
+    python -c "from datasets import load_dataset; load_dataset('emozilla/pg19', split='train')"
+    # then:
+    sbatch pace/prepare_pg19_pack.sbatch
+
+Direct invocation, if you have a node:
 
     python tools/prepare_pg19_dataset.py \
-        --tokenizer ckpts/olmo8-cortex \
+        --tokenizer ckpts/olmo-retrofit-cortex \
         --out data/pg19_olmo_len4096 \
         --max_length 4096
 
@@ -127,11 +139,22 @@ def main() -> int:
                          "so raising row_len alone would still have capped every "
                          "book at ~8k tokens.  Set it only to bound tokenization "
                          "cost on a pathological corpus.")
-    ap.add_argument("--map_batch_size", type=int, default=8,
-                    help="documents per map batch.  Lower than the usual 64 "
-                         "because a batch now holds WHOLE books rather than "
-                         "32k-character prefixes, and peak memory is "
-                         "map_batch_size x num_proc x book length.")
+    ap.add_argument("--map_batch_size", type=int, default=1,
+                    help="documents per map batch.  ONE, not the usual 64, and "
+                         "this is a memory setting rather than a throughput "
+                         "one.  A batch now holds WHOLE books: PG-19's first "
+                         "document is 4.3M characters = 1,153,022 tokens = 282 "
+                         "rows, and a worker holds the source list AND every "
+                         "window sliced out of it at once (~100 MB for that one "
+                         "book).  At batch 8 x 16 workers that killed a worker "
+                         "outright on a login node -- 'One of the subprocesses "
+                         "has abruptly died', i.e. SIGKILL.  Books are large "
+                         "enough that batching buys nothing anyway.")
+    ap.add_argument("--writer_batch_size", type=int, default=200,
+                    help="rows datasets buffers in memory before flushing to "
+                         "Arrow.  The default 1000 is sized for short rows; "
+                         "here a row is 4,097 int64 (~32 KB), so 1000 rows is "
+                         "~32 MB of buffer per worker on top of the batch.")
     ap.add_argument("--num_proc", type=int, default=16)
     args = ap.parse_args()
 
@@ -189,6 +212,7 @@ def main() -> int:
         return {"input_ids": out_ids, "attention_mask": out_mask}
 
     tokenized = ds.map(tokenize, batched=True, batch_size=args.map_batch_size,
+                       writer_batch_size=args.writer_batch_size,
                        num_proc=args.num_proc, remove_columns=ds.column_names)
 
     if args.min_tokens:
