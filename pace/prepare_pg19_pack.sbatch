@@ -41,7 +41,7 @@
 #   python -c "from datasets import load_dataset; load_dataset('emozilla/pg19', split='train')"
 #
 #   sbatch pace/prepare_pg19_pack.sbatch
-#   MAX_LENGTH=8192 OUT=data/pg19_olmo_len8192 sbatch pace/prepare_pg19_pack.sbatch
+#   MAX_LENGTH=8192 OUT=data/pg19_olmo_len8192_strided sbatch pace/prepare_pg19_pack.sbatch
 #   NUM_PROC=8 sbatch pace/prepare_pg19_pack.sbatch      # if a worker still dies
 #
 # THIS JOB IS P0.4.  Its output lines are the yield measurement the corpus plan
@@ -66,7 +66,12 @@ export HF_HUB_OFFLINE=1
 export TOKENIZERS_PARALLELISM=false
 
 TOKENIZER=${TOKENIZER:-ckpts/olmo-retrofit-cortex}
-OUT=${OUT:-data/pg19_olmo_len4096}
+# NOT data/pg19_olmo_len4096 — that name is TAKEN by the old truncating
+# packer's output (28,602 rows / ~117M tokens, the first ~4k tokens of each
+# book), which past results were built on.  Two artifacts sharing one name is
+# how this project lost six weeks to ARM_DATA and why the two base checkpoints
+# carry a standing warning.  The suffix names the mechanism that differs.
+OUT=${OUT:-data/pg19_olmo_len4096_strided}
 MAX_LENGTH=${MAX_LENGTH:-4096}
 NUM_PROC=${NUM_PROC:-16}
 MAP_BATCH=${MAP_BATCH:-1}
@@ -75,10 +80,22 @@ DATASET=${DATASET:-emozilla/pg19}
 MIN_TOKENS=${MIN_TOKENS:-0}
 
 if [ -e "$OUT" ]; then
-    echo "ERROR: $OUT already exists.  A half-written pack is worse than none:"
-    echo "  save_to_disk writes state.json / dataset_info.json LAST, so shard"
-    echo "  files without them mean a killed save.  Check, then rm -rf and"
-    echo "  resubmit."
+    echo "ERROR: $OUT already exists."
+    if [ -f "$OUT/state.json" ] && [ -f "$OUT/dataset_info.json" ]; then
+        echo "  It is a COMPLETE pack — state.json and dataset_info.json are"
+        echo "  both present, and those are written LAST.  So this is not a"
+        echo "  killed save; something already built a pack under this name."
+        echo "  DO NOT overwrite it.  Check what it holds first:"
+        echo "    python -c \"from datasets import load_from_disk;"
+        echo "      print(len(load_from_disk('$OUT')))\""
+        echo "  ~28,602 rows means the OLD TRUNCATING packer's output, which"
+        echo "  past results were built on.  Write the strided pack elsewhere:"
+        echo "    OUT=${OUT}_strided sbatch pace/prepare_pg19_pack.sbatch"
+    else
+        echo "  state.json / dataset_info.json are MISSING, and they are written"
+        echo "  last — so this is a killed save and the shards are incomplete."
+        echo "  Safe to rm -rf and resubmit."
+    fi
     exit 1
 fi
 
@@ -120,5 +137,8 @@ echo "P0.4 answered.  Next: build the mix, then check_pack both legs —"
 echo "  python tools/prepare_corpus_mix.py --a $OUT \\"
 echo "      --b data/fineweb_edu_olmo_len4096 \\"
 echo "      --out data/pg19_fw50_olmo_len4096 --ratio 0.5 --max_rows 940000"
+echo ""
+echo "  (--a is $OUT, the STRIDED pack.  data/pg19_olmo_len4096 without the"
+echo "   suffix is the old truncated one — do not feed that to the mix.)"
 echo "  python tools/check_pack.py --data data/pg19_fw50_olmo_len4096 \\"
 echo "      --steps 26703 --batch_size 32 --max_length 4096"

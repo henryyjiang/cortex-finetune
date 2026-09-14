@@ -45,8 +45,12 @@ Direct invocation, if you have a node:
 
     python tools/prepare_pg19_dataset.py \
         --tokenizer ckpts/olmo-retrofit-cortex \
-        --out data/pg19_olmo_len4096 \
+        --out data/pg19_olmo_len4096_strided \
         --max_length 4096
+
+The `_strided` suffix is load-bearing: `data/pg19_olmo_len4096` is the OLD
+truncating packer's output (28,602 rows / ~117M tokens) and past results were
+built on it.  Do not reuse the name.
 
 The script is corpus-agnostic — --dataset/--split/--text_col point it anywhere,
 and --min_tokens keeps only documents that actually span the window, which is
@@ -60,7 +64,7 @@ prose does not have):
         --out data/code_olmo_val_len4096 --max_length 4096
 
 Then train with:
-    python train.py --preprocessed_data_path data/pg19_olmo_len4096 --max_length 4096 ...
+    python train.py --preprocessed_data_path data/pg19_olmo_len4096_strided --max_length 4096 ...
 """
 from __future__ import annotations
 
