@@ -71,15 +71,33 @@ MAX_STEPS=${MAX_STEPS:-38147}
 # no memory cost); accum_max is optional and defaults to $ACCUM_MAX, i.e. to
 # B2's rule.  Ascending, so the fit/OOM boundary is located before the stretch.
 #
-# RESULT 2026-09-14, job 13201945, H200 138.7 GiB:
-#   4096 x cc8   FITS  115.44 GiB reserved (83%), 1.2 s/micro-step
-#                -> calibration: B2 ran this exact geometry and peaked at
-#                   119.76 GiB, so the measurement is trustworthy to ~4%
-#   8192 x cc16  OOM
-#   16384 x cc16 OOM
-# Config D is dead.  The open question is no longer D vs D-fallback but whether
-# chain depth 16 can be bought at a 4,096-token row with 256-token chunks —
-# 4096:16:32, capped and uncapped.
+# RESULT 2026-09-14, jobs 13201945 / 13202177 / 13202515, H200 138.7 GiB:
+#   4096  x cc8  amax 256   FITS  115.44 GiB reserved (83%), 1.2 s/micro-step
+#   4096  x cc16 amax 512   OOM
+#   4096  x cc16 amax 128   OOM
+#   8192  x cc16 amax 512   OOM
+#   8192  x cc16 amax 128   OOM
+#   16384 x cc16 amax 512   OOM
+#
+# Calibration: B2 ran 4096 x cc8 for real and peaked at 119.76 GiB against this
+# script's 115.44, so the gate is trustworthy to ~4% and the OOMs are real.
+#
+# CONFIG D IS DEAD, and so is every attempt to buy chain depth 16 on one H200:
+# not at 8,192 tokens, not at 4,096 with 256-token chunks, and not with the
+# buffer capped at 128.  D-FALLBACK IS LOCKED: 4096 x cc8, batch_size 32,
+# 512-token chunks, 131,072 tok/step, MAX_STEPS 38,147.  The existing
+# data/fineweb_edu_olmo_len4096 pack is reusable — no FineWeb-Edu rebuild.
+#
+# The finding worth keeping: 4096 x cc16 amax 128 has only ~17% more summed
+# column-tokens than the geometry that FITS (5,824 vs 4,992) and still OOMs, so
+# the NUMBER OF RETAINED CHUNK GRAPHS is a first-order cost in its own right —
+# chunk count is not a free axis, and a width-based estimate will under-predict.
+#
+# Not priced, deliberately: mean_backprop_depth 4 would halve the retained
+# recurrence activations and might let cc16 fit, but it changes the TBPTT window
+# for BOTH arms, deviates from the one recipe known to convert this model, and
+# would buy a 256-token chunk geometry that no ceiling probe has ever measured.
+# Two speculative changes stacked to rescue a third.  Don't.
 #   4096:8:32   D-fallback   512-tok chunks, reuses the existing len4096 pack
 #   8192:16:16  config D     512-tok chunks, chain depth 16          <- the decision
 #   16384:16:8  stretch      1024-tok chunks AND depth 16 at the same tokens/step;
@@ -148,12 +166,12 @@ if [ -n "$CAPPED" ]; then
 fi
 
 if [ -n "$CONTROL" ]; then
-    LEN=${CONTROL_LEN:-8192}; CC=${CONTROL_CC:-16}
+    LEN=${CONTROL_LEN:-4096}; CC=${CONTROL_CC:-8}; CBS=${CONTROL_BS:-32}
     echo ""
-    echo "######## control: ${LEN} x cc${CC}, no memory ########"
+    echo "######## control: ${LEN} x cc${CC} (bs ${CBS}), no memory ########"
     python tools/smoke_geometry_oom.py \
         --model_name "$MODEL" \
-        --max_length "$LEN" --cross_chunks "$CC" --batch_size 16 \
+        --max_length "$LEN" --cross_chunks "$CC" --batch_size "$CBS" \
         --max_steps "$MAX_STEPS" --micro_batch_size 1 \
         --mean_recurrence "$MAX_MEAN_REC" \
         --use_memory false --with_optimizer true \
