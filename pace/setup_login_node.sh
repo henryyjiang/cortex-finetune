@@ -56,6 +56,10 @@ echo "Setup done. Submit runs from the repo root:"
 echo "  sbatch pace/rung1_frozen_loop.sbatch                    # K=4"
 echo "  MEMORY_SLOTS=0 sbatch pace/rung1_frozen_loop.sbatch     # no-memory control"
 echo "  MEMORY_SLOTS=0 CCOT_DIRECT=true sbatch pace/rung1_frozen_loop.sbatch"
-echo "  sbatch pace/rung1b_lora_loop.sbatch                     # LoRA-adapted loop"
-echo "  sbatch pace/rung2_staged_unfreeze.sbatch"
-echo "  sbatch pace/rung3_l2sp.sbatch"
+echo "  bash pace/submit_retrofit_b2.sh status                  # the live retrofit line"
+# Removed 2026-09-14: rung1b_lora_loop / rung2_staged_unfreeze / rung3_l2sp were
+# advertised here but the sbatch files had already been deleted, so this block
+# printed three commands that could not run.  Their wandb history survives in
+# wandb_exports/cortex-retro-ft/ (rung1b-k4-lora16-a32, rung2-k4-unfreeze500,
+# rung3-k4-l2sp1e-3); the flags behind the latter two were removed from train.py
+# the same day (training-only, so no checkpoint is affected).

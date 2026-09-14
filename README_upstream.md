@@ -11,6 +11,19 @@ A joint project by: Sean McLeish, Ang Li, John Kirchenbauer, Dayal Singh Kalra, 
 </p>
 
 
+> **Note for this fork (CortexGPT).** The text below is upstream's, preserved verbatim. Some files
+> it references were removed from this fork because nothing here runs them — recover any of them
+> from [mcleish7/retrofitting-recurrence](https://github.com/mcleish7/retrofitting-recurrence):
+>
+> | referenced below | status in this fork |
+> |---|---|
+> | `paper_plots/`, `plot_evals.py`, `param_counter.py` | removed — upstream's own paper figures (TinyLlama/Llama runs) |
+> | `mix_datasets.py` | removed — superseded by `tools/prepare_corpus_mix.py` |
+> | `multi_recurence_eval.py` | removed — superseded by `evals/` (carry ablation, context ceiling) |
+> | `raven_modeling_minimal_compare_{llama,olmo}.py` | removed — conversion-debug duplicates of the shipped modeling files |
+> | `shells/llama.sh`, `shells/tinyllama.sh`, `shells/eval.sh` | removed — model families this fork never trains |
+> | `shells/olmo.sh`, `preprocess_data_packing.py` | **kept** — the OLMo recipe of record, cited by `pace/b1_retrofit.sbatch` and `tools/prepare_packed_dataset.py` |
+
 ## Citing Our Work
 To cite our work, please use this bibtex.
 ```

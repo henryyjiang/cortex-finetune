@@ -8,7 +8,7 @@ the EXACT hook sequence applied to raven_modeling_minimal_{olmo,llama}.py.  No
 OLMo/Llama weights or RavenConfig needed.
 
 A real 1B-checkpoint smoke test (use_memory=False reproduces published logits)
-runs separately once a checkpoint is downloaded — see cortex_migration_plan.md
+runs separately once a checkpoint is downloaded — see README.md
 Phase-1 checklist.
 
 Run: /c/Users/henry/miniconda3/envs/cortex/python.exe -m pytest tests/ -v

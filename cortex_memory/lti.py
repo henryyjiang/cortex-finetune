@@ -3,7 +3,8 @@ Parcae LTI injection — included for completeness and Path-1 from-scratch
 experiments.  NOT used by default in the finetuning (Path 2) graft: it is a
 *construction-time* contraction guarantee that cannot be applied to a
 pretrained loop (the raven base already has its own concat-adapter injection
-and stable init).  See cortex_migration_plan.md §0 / §4 (Gap 1).
+and stable init).  See _to_delete/cortex_migration_plan.md §0 / §4 (Gap 1) in the
+project root (retired planning doc, kept for provenance).
 
 Ported verbatim from cortex-main/model.py.
 """

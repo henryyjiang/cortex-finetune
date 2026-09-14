@@ -147,10 +147,45 @@ def test_shims():
 # ---------------------------------------------------------------------------
 
 class TestBabilong:
+    """eval_one's RETURN CONTRACT is pinned here on purpose.
+
+    These three tests unpacked a 2-tuple and broke silently when eval_one grew
+    the per-example record fields (scores / ranked / ranked_nc / n_prime_chunks /
+    gold_in_window) that the powered long-context analysis reads.  Three red
+    tests in this repo are exactly the cover a real failure hides under, so the
+    fix asserts the whole tuple rather than just the first two slots: a future
+    signature change now fails HERE, in 6 seconds, instead of inside a multi-hour
+    eval job or -- worse -- silently, by positional mis-unpacking downstream.
+    """
+
+    # (ok, pred, scores, n_prime_chunks, ranked, ranked_nc, gold_in_window)
+    EVAL_ONE_FIELDS = 7
 
     def _ctx(self):
         # long enough that encode_and_chunk (seq_len=8) yields multiple chunks
         return " ".join(f"fact{i} mary went to the office" for i in range(20))
+
+    def _run(self, eb, model, tok):
+        ret = eb.eval_one(model, tok, self._ctx(), "where is mary", "office",
+                          T=3, seq_len=8, max_new_tokens=2, task="qa1")
+        assert len(ret) == self.EVAL_ONE_FIELDS, (
+            f"eval_one returned {len(ret)} values, expected {self.EVAL_ONE_FIELDS}. "
+            "If the contract changed on purpose, update this test AND every "
+            "positional consumer (evals/eval_babilong.py's task loop, "
+            "tools/analyze_longcontext_pairs.py) in the same commit."
+        )
+        ok, pred, scores, n_prime, ranked, ranked_nc, gold_in_window = ret
+        assert isinstance(ok, bool) and isinstance(pred, str)
+        # n_prime_chunks and gold_in_window are what the paired analysis
+        # stratifies on (buffer-kept vs evicted, gold visible vs scrolled away),
+        # so their types are load-bearing, not incidental.
+        assert isinstance(n_prime, int) and n_prime >= 0
+        assert isinstance(gold_in_window, bool)
+        # Off by default: these are populated only under --score_nll /
+        # --rank_answers.  A non-None here means a scoring path fired
+        # unrequested, which would silently change what the records contain.
+        assert scores is None and ranked is None and ranked_nc is None
+        return ok, pred
 
     def test_eval_one_k4_carries_and_returns_bool(self, tok):
         import eval_babilong as eb
@@ -160,23 +195,16 @@ class TestBabilong:
                                         max_new_tokens=2)
         assert len(prime) > 1, "test needs multiple chunks to exercise M_cross carry"
         assert final.shape[1] <= 8 - 2, "final chunk must reserve generation room"
-        ok, pred = eb.eval_one(model, tok, self._ctx(), "where is mary", "office",
-                               T=3, seq_len=8, max_new_tokens=2, task="qa1")
-        assert isinstance(ok, bool) and isinstance(pred, str)
+        self._run(eb, model, tok)
 
     def test_eval_one_k0_runs(self, tok):
         import eval_babilong as eb
-        model = _build_raven(use_memory=False)
-        ok, pred = eb.eval_one(model, tok, self._ctx(), "where is mary", "office",
-                               T=3, seq_len=8, max_new_tokens=2, task="qa1")
-        assert isinstance(ok, bool) and isinstance(pred, str)
+        self._run(eb, _build_raven(use_memory=False), tok)
 
     def test_eval_one_directccot_runs(self, tok):
         import eval_babilong as eb
-        model = _build_raven(use_memory=True, memory_slots=0, ccot_direct=True)
-        ok, pred = eb.eval_one(model, tok, self._ctx(), "where is mary", "office",
-                               T=3, seq_len=8, max_new_tokens=2, task="qa1")
-        assert isinstance(ok, bool) and isinstance(pred, str)
+        self._run(eb, _build_raven(use_memory=True, memory_slots=0,
+                                   ccot_direct=True), tok)
 
     def test_contains_answer(self):
         import eval_babilong as eb

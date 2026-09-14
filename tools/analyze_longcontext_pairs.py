@@ -294,8 +294,14 @@ def scoring_report(on, off, shared, bootstrap: int) -> None:
     """The same paired contrast under every scoring rule the records support,
     and under the two stratifications that decide whether the contrast is even
     asking about the memory."""
+    # A mode is available if ANY shared record supports it, not if the first
+    # one does.  LongMemEval records carry no candidate set and their hash ids
+    # sort ahead of 'qa1/...', so keying off shared[0] silently collapsed every
+    # mixed babilong+lme run to the gen column and threw away the rank/PMI
+    # rules that the babilong records do support.  Per-row filtering in row()
+    # already drops the records that cannot be scored under a given mode.
     modes = [m for m in ("gen", "rank", "norm", "pmi")
-             if scored_correct(on[shared[0]], m) is not None]
+             if any(scored_correct(on[i], m) is not None for i in shared)]
 
     def row(name, ids, mode):
         ok = [(scored_correct(on[i], mode), scored_correct(off[i], mode))

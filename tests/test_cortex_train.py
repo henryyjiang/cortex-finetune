@@ -123,54 +123,6 @@ class TestEosFromTokens:
         assert m_cross is not None and torch.all(m_cross == 0)
 
 
-class TestL2SP:
-    """Mirror of --cortex.l2sp_coeff: coeff * ||theta_loop - theta_base||^2 added
-    to the backward objective, anchoring the unfrozen loop to its snapshot."""
-
-    COEFF = 0.1
-
-    def _pairs(self, model):
-        return [(p, p.detach().clone()) for n, p in model.named_parameters()
-                if ("adapter" in n) or ("core_block" in n)]
-
-    def test_penalty_pulls_loop_toward_anchor(self):
-        model = FakeRaven(use_memory=True, memory_slots=4)
-        _activate_cross_read(model)
-        pairs = self._pairs(model)
-        with torch.no_grad():                    # displace the loop off the anchor
-            model.adapter.weight.add_(0.5)
-        model.zero_grad()
-        pen = torch.stack([(p - ref).pow(2).sum() for p, ref in pairs]).sum()
-        (self.COEFF * pen).backward()
-        g = model.adapter.weight.grad
-        # gradient of coeff*||p - ref||^2 is 2*coeff*(p - ref) = 2*0.1*0.5
-        assert g is not None and torch.allclose(g, torch.full_like(g, 0.1), atol=1e-6)
-        # the penalty must not touch non-loop params
-        assert model.lm_head.weight.grad is None
-        assert model.cortex.m_cross.gate_proj_in.weight.grad is None
-
-    def test_penalty_is_inert_while_loop_frozen(self):
-        model = FakeRaven(use_memory=True, memory_slots=4)
-        _activate_cross_read(model)
-        pairs = self._pairs(model)
-        _set_loop_trainable(model, trainable=False)
-        model.zero_grad()
-        # mirror of train.py: objective = total + coeff * pen; pen is constant
-        # (no grad_fn) when every loop param is frozen — backward must not fail
-        x_chunks = torch.chunk(_ids(s=24), 3, dim=1)
-        m_cross, losses = None, []
-        for xc in x_chunks:
-            out = model(xc, (0, 3), labels=xc.clone(), m_cross_in=m_cross, return_m_cross=True)
-            m_cross = out["m_cross"]
-            losses.append(out["loss"])
-        total = torch.stack(losses).mean()
-        pen = torch.stack([(p - ref).pow(2).sum() for p, ref in pairs]).sum()
-        assert not pen.requires_grad
-        (total + self.COEFF * pen).backward()
-        assert model.adapter.weight.grad is None
-        assert model.cortex.m_cross.gate_proj_in.weight.grad is not None
-
-
 class TestLoopFreeze:
 
     def test_freeze_stops_loop_grad_keeps_memory(self):
