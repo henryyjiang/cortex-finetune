@@ -25,9 +25,11 @@ from contextlib import nullcontext
 from stateful_parquet_dataset import get_parquet_dataloader
 from cortex_memory.chunking import random_chunk_sizes, detach_old_vecs
 from recipe_utils import (
+    control_has_memory,
     fast_forward_indices,
     reduce_chunk_losses,
     resolve_warmup_steps,
+    select_fwd_bwd_path,
 )
 from dataclasses import dataclass, field
 from jsonargparse import CLI
@@ -924,6 +926,30 @@ def startup(cfg: CLISettings):
             "points at a graft-prepared dir (tools/prepare_cortex_checkpoint.py) "
             "and that cortex_graft imports from the repo root."
         )
+    # cortex: the NEGATIVE twin of the guard above, and the defence for the
+    # control run.  Bug class 2 has now silently voided four runs, and it cuts
+    # both ways: a memory run that secretly has no memory, and a CONTROL that
+    # secretly has memory, both produce a perfectly healthy loss curve.  The
+    # second is the more expensive mistake, because the control's whole job is
+    # to be the zero — a control with a live carry would make the memory model's
+    # delta vanish and the finding would read as "memory does not work."
+    #
+    # `use_memory false` must leave cortex UNBUILT, not merely unused: the graft
+    # returns early, so there are no summary slots, no memory parameters in the
+    # optimizer, and no prefix columns in any chunk's attention.  Anything else
+    # is a different model with the same flag.
+    if control_has_memory(cfg.cortex["use_memory"],
+                          getattr(model, "cortex", None) is not None):
+        raise RuntimeError(
+            "cfg.cortex.use_memory is false but model.cortex is not None — this "
+            "run would train WITH memory while every log, checkpoint config and "
+            "table says it is the no-memory control.  The graft built the module "
+            "anyway, which means a cortex flag in the checkpoint's config.json "
+            "is still selecting a mechanism (check prefix_memory, memory_slots, "
+            "accum_ccot, gated_accum): the 16 persisted flags come from the "
+            "checkpoint, not from the command line, and use_memory is the only "
+            "one the CLI is overriding here."
+        )
     if (cfg.cortex["use_memory"] and cfg.cortex["lora_rank"] > 0
             and getattr(model, "cortex_lora", None) is None):
         raise RuntimeError(
@@ -1784,12 +1810,24 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     (total / accumulation_steps).backward()
                     return total.detach(), total.detach().exp(), n_ng, n_wg
 
-            if cfg.non_recurrent_model:
-                fwd_bwd_func = non_rec_fwd_bwd
-            elif cfg.cortex["use_memory"] and int(cfg.cortex["cross_chunks"]) > 1:
-                fwd_bwd_func = cortex_fwd_bwd
-            else:
-                fwd_bwd_func = tightly_scoped_fwd_bwd
+            # NOT `use_memory AND cross_chunks > 1` (the pre-2026-09-14 form).
+            # That conjunct made `--cortex.use_memory false` silently turn
+            # CHUNKING off as well: the "control" would have trained on full
+            # 4096-token windows against the memory model's 8x512 chunks, and
+            # chunk length is the biggest lever the ceiling probes ever found.
+            # That is not a control, it is a second experiment
+            # (cortex_next_phase_framework.md §1).
+            #
+            # cortex_fwd_bwd already handles a memory-less chain: the modeling
+            # file guards `if self.cortex is not None` at the splice, the read
+            # and the unpack; `out.get("m_cross")` returns None BY DESIGN; and
+            # detach_old_vecs never fires because `m_cross is not None` is
+            # false.  So the chunk chain with no carry is exactly C-chunked.
+            _path = select_fwd_bwd_path(cfg.non_recurrent_model,
+                                        cfg.cortex["cross_chunks"])
+            fwd_bwd_func = {"non_rec": non_rec_fwd_bwd,
+                            "cortex": cortex_fwd_bwd,
+                            "tight": tightly_scoped_fwd_bwd}[_path]
             loss, log_ppl, num_steps_no_grad, num_steps_with_grad = fwd_bwd_func(model, input_ids, labels)
 
             # logging

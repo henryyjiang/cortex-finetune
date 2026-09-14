@@ -138,3 +138,41 @@ def carry_rows(chunk_index: int, accum_vecs: int, accum_max: int) -> int:
     if chunk_index <= 0:
         return 0
     return min(chunk_index * int(accum_vecs), int(accum_max))
+
+
+def select_fwd_bwd_path(non_recurrent_model: bool, cross_chunks: int) -> str:
+    """Which forward/backward implementation train.py dispatches to.
+
+    Returns "non_rec", "cortex" (the chunk chain) or "tight" (one whole-row
+    forward).  Mirrors train.py's dispatch, and exists as a helper ONLY because
+    the condition is the difference between a control and a second experiment.
+
+    Until 2026-09-14 the middle branch read `use_memory AND cross_chunks > 1`,
+    so `--cortex.use_memory false` silently turned CHUNKING off as well: the
+    no-memory control would have trained on whole 4,096-token rows against the
+    memory model's 8x512 chunks.  Chunk length is the biggest lever the ceiling
+    probes ever found, so such a run differs in two variables and isolates
+    neither.  `use_memory` is deliberately NOT a parameter here: the chunk chain
+    already handles a memory-less model, and re-admitting the flag is exactly
+    the regression this guards.
+    """
+    if non_recurrent_model:
+        return "non_rec"
+    return "cortex" if int(cross_chunks) > 1 else "tight"
+
+
+def control_has_memory(use_memory: bool, has_cortex: bool) -> bool:
+    """True when a run declared no-memory but built the memory module anyway.
+
+    The negative twin of train.py's "use_memory set but cortex is None" guard,
+    and the more expensive of the two failures: a memory run that secretly has
+    no memory wastes GPU-hours, but a CONTROL that secretly has memory corrupts
+    every delta measured against it — the memory model's advantage vanishes and
+    the result reads as "memory does not work".  Both look like a healthy loss
+    curve, which is why this is checked at step 0 rather than discovered at eval.
+
+    The 16 persisted cortex flags are loaded from the checkpoint's config.json,
+    not from the command line, so `--cortex.use_memory false` is one override
+    against a config that may still select a mechanism.
+    """
+    return (not use_memory) and has_cortex
