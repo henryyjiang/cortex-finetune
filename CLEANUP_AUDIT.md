@@ -168,14 +168,39 @@ code path without deleting the config key.** The key must keep loading; the bran
 working. So the option is to retain both keys, assert the modern value, and remove the old branches
 from `prefix_pack` / `_carried_state`.
 
-**Gate it on one command, cluster-side, across every surviving checkpoint dir:**
+**Gate it cluster-side, across every surviving checkpoint dir:**
 
 ```bash
-grep -l '"prefix_pos": *"zero"\|"prefix_eos_reset": *true' $SCRATCH/cortex-*/*/config.json
+bash pace/check_tier3_compat.sh
 ```
 
 Empty result: remove the branches, keep the keys. Any hit: leave both alone and record which
 checkpoint depends on them.
+
+**The one-liner this section used to carry was WRONG, and wrong in the direction that deletes a
+live code path** (found 2026-09-15, before it was acted on):
+
+```bash
+grep -l '"prefix_pos": *"zero"\|"prefix_eos_reset": *true' $SCRATCH/cortex-*/*/config.json   # BROKEN
+```
+
+That glob is **one level too shallow**. `train.py` writes `config.json` only through
+`save_model_only` -> `save_pretrained(f"{out_path}/{run_name}/{chkpt_name}")` (train.py:531-534),
+so every one lives at `$SCRATCH/<out_path>/<run_name>/<chkpt_name>/config.json` — **three** levels
+under `$SCRATCH`, not two. `save_checkpoint` (train.py:536) writes only `chkpt.pt` into
+`checkpoint_<step>/` and no `config.json` at all. So the old glob expands to
+`$SCRATCH/cortex-control/c-chunked/config.json` and its siblings, none of which exist, and it
+returns empty on **every** cluster regardless of what is stored there. Verified against a tree
+holding a genuine `prefix_pos="zero"` checkpoint: the old glob reported it clear.
+
+This is bug class 2 again - *find where a value is CONSUMED, not where it is set* - now on the
+verification side rather than the training side. The script counts its scan set first and exits 2
+rather than reporting a verdict when nothing was scanned.
+
+Scope note: `config.json` is the branches' load path (`cortex_graft.py:266-270` reads both flags
+off the HF config), so `config.json` coverage is the right coverage - but it has to include the
+base checkpoints under `$SCRATCH/ckpts`, since `--model_name` is what a resume link constructs its
+model from before `chkpt.pt` restores weights into it. The script covers both.
 
 ## 5. Tier 4 — LoRA: keep, but it is untested
 
