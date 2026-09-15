@@ -118,6 +118,33 @@
 # mix 26,703 x 32 = 854,496 (940k with the 1.10 margin).  The token counts are
 # unchanged — the rows are half as long.  B2's heal consumed 91,552 x 4 =
 # 366,208 rows from this same FineWeb-Edu pack, so the heal leg is known-sized.
+#
+# CORPUS AS BUILT, 2026-09-14 (all four gates verified before launch)
+# -------------------------------------------------------------------
+#   heal  data/fineweb_edu_olmo_len4096      488,281 rows / 2.000B  -> 1.33x
+#   mix   data/pg19_fw50_olmo_len4096        940,000 rows / 3.850B  -> 1.10x
+#         = 470,000 PG-19 + 470,000 FineWeb-Edu
+#   PG-19 pack: data/pg19_olmo_len4096_strided, 702,963 rows / 2.88B tokens,
+#         24.6 rows per document over 28,602 books, 97.2% full windows.
+#
+# Epochs: PG-19 0.67 (470,000 of 702,963).  FineWeb-Edu 1.71 (366,208 heal +
+# 470,000 mix over 488,281) — a real repeat, disclose it.
+#
+# THE MIX IS 50/50 BY ROWS AND 49.5/50.5 BY SUPERVISED TOKENS.  PG-19's
+# real-token fill is 0.979 against FineWeb-Edu's 1.000, because striding leaves
+# one ragged window per book (1 in 24.6 rows).  Quote the TOKEN share.
+#
+# Ratio chosen at 50/50 and not epoch-balanced on purpose: equalising epochs
+# would need ~771k PG-19 rows against the 703k that exist, and the nearest
+# feasible version is a 75/25 PG-19-heavy mix that no result supports.  50/50 is
+# the only ratio in this project with a measured benchmark behind it — the rung1
+# pg19_nemo50 arm, the best arm-benchmark row on record.
+#
+# The PG-19 leg exists at all because tools/prepare_pg19_dataset.py truncated
+# every book to its first window until 2026-09-14: the old pack was 28,602 rows
+# / 117M tokens, i.e. 4.1% of the corpus, and every "PG-19 cannot supply the
+# volume" decision was downstream of that number.  Both packs are kept on disk;
+# data/pg19_olmo_len4096 WITHOUT the _strided suffix is the old one.
 
 cd $SLURM_SUBMIT_DIR
 
