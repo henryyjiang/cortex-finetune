@@ -157,7 +157,38 @@ Proposal, zero behaviour change:
 This is the highest-value item in the audit: it does not remove a line of behaviour, and it stops
 the next person (or the next session) from re-proposing the deletion that already cost two days.
 
-## 4. Tier 3 — compat branches, needs one cluster check
+## 4. Tier 3 — compat branches — GATE RAN 2026-09-15, CLEAR, BRANCHES REMOVED
+
+**Result: CLEAR across 148 surviving `config.json` files** (`cortex-retrofit/` — b0 both arms,
+b1 both arms, the b2 arm ladder and the b2 heal ladder). Nothing on scratch carries either old
+value. The branches were removed the same day; both keys still load and are now **asserted**:
+
+| site | was | now |
+|---|---|---|
+| `cortex_graft.py` `prefix_pack` | `if n_sum and self.prefix_pos == "tail" and ...` | conjunct dropped, tail layout unconditional |
+| `cortex_graft.py` `prefix_unpack` | `_valid_write` zeroing gated on `prefix_eos_reset` | removed; the prefix write is unmasked, and the comment says why |
+| `cortex_graft.py` `_carried_state` | `_write_reset` zeroing gated on `prefix_eos_reset` | `return self._cross_buf` |
+| `cortex_graft.py` build | `prefix_pos not in ("tail","zero")` raises | `prefix_pos != "tail"` raises; `prefix_eos_reset` true raises |
+
+`_valid_write` and `_write_reset` are **not** dead — `begin()` still computes them and the bolt-on
+buffer path (graft ~575-596) still consumes them. Only the prefix-mode uses went.
+
+Tests rewritten from exercise-the-old-branch to assert-the-modern-value, plus a new
+`test_the_key_still_loads` pinning the persist-list rule directly. `tests/test_smoke_prefix_real.py`
+kept its negative control by zeroing `_carried_state` through a monkeypatch instead of flipping the
+retired flag — it tests the *checker*, which was always the point. 315 -> 316 passing.
+
+**Two roots were NOT in the 148** and the script now says so out loud rather than swallowing them:
+`$SCRATCH/ckpts` (does not exist at that path — `--model_name ckpts/olmo-retrofit-cortex` is
+relative to the submit dir) and `$SCRATCH/cortex-retro-ft` (the rung1 arms; apparently pruned).
+Neither weakens the verdict — the flags were introduced 2026-08-04 with defaults `tail`/`false`, so
+anything older simply lacks the keys and takes the default, and the one run that ever set them was
+`rm -rf`'d — but confirm the base-checkpoint dir if it ever matters:
+`find -L "$(readlink -f ckpts)" -maxdepth 2 -name config.json -exec grep -l '"prefix_pos": *"zero"\|"prefix_eos_reset": *true' {} +`
+
+---
+
+### The original gate, kept for the reasoning
 
 `prefix_pos="zero"` and `prefix_eos_reset=true` exist **only** to reproduce the cancelled
 4vop2ym8 run, which was `rm -rf`'d. Both defaults are the correct 2026-08-04 values, and b2-final

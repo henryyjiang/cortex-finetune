@@ -267,17 +267,26 @@ class CLISettings:
             # set it explicitly when the checkpoint config carries none, which
             # RavenConfig by default does not.
             summary_init_token=-1,
-            # prefix_pos: 'tail' (default) puts the trailing summary slots at
-            # S+1..S+n_vec, continuing the chunk's numbering, so the write reads
-            # the chunk at POSITIVE relative offsets.  'zero' is the layout used
-            # up to 2026-08-04 (everything non-token at position 0), which put
-            # the whole write in a negative-offset RoPE regime the base model was
-            # never trained on.  Kept only to reproduce those runs.
+            # prefix_pos / prefix_eos_reset: both are now SINGLE-VALUED.  Their
+            # alternate branches were retired 2026-09-15 (the graft asserts the
+            # value instead of branching on it) after
+            # pace/check_tier3_compat.sh came back clear across 148 surviving
+            # config.json files on scratch.  They stay HERE, and in the persist
+            # list below, because both keys are in every memory checkpoint's
+            # config.json and the graft is their load path — a flag in the
+            # 16-flag persist list may be quarantined but never removed.
+            #
+            # prefix_pos 'tail': the trailing summary slots sit at S+1..S+n_vec,
+            # continuing the chunk's numbering, so the write reads the chunk at
+            # POSITIVE relative offsets.  The retired 'zero' layout put
+            # everything non-token at position 0, i.e. the whole write in a
+            # negative-offset RoPE regime the base model never saw.
             prefix_pos="tail",
-            # prefix_eos_reset: zero the WHOLE incoming carry on any chunk that
-            # contains an EOS.  Unconditional before 2026-08-04, which switched
-            # the read off for ~60% of chunks on EOS-separated packed data.  See
-            # CortexMemory._carried_state for the full reasoning.
+            # prefix_eos_reset False: the carry crosses document boundaries, as
+            # the backbone's own attention already does inside a chunk.  The
+            # retired True zeroed the WHOLE incoming carry on any chunk holding
+            # an EOS, which switched the read off for ~60% of chunks on
+            # EOS-separated packed data.  See CortexMemory._carried_state.
             prefix_eos_reset=False,
             carry_grad_chunks=0, random_segments=False,
             # chunk_loss_reduction: how the per-chunk losses in cortex_fwd_bwd

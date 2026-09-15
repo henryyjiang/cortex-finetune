@@ -322,9 +322,13 @@ class TestEos:
     Changed 2026-08-04.  The old policy treated any EOS in the chunk as a full
     memory reset, which on EOS-separated packed data (what B2 trains on) switched
     the read off for the majority of chunks — see CortexMemory._carried_state.
-    The default is now to carry across boundaries, matching what the backbone's
-    own attention already does inside a chunk; prefix_eos_reset=True restores the
-    old policy and these tests pin both.
+    The policy is to carry across boundaries, matching what the backbone's own
+    attention already does inside a chunk.
+
+    prefix_eos_reset=True used to restore the old policy; that branch was retired
+    2026-09-15 after pace/check_tier3_compat.sh came back clear across 148
+    surviving config.json files.  The key still loads and is asserted false, so
+    these tests pin the carry-across guarantee and the rejection.
     """
 
     def test_carry_survives_a_boundary_by_default(self):
@@ -339,14 +343,16 @@ class TestEos:
         # ...and this chunk still contributed a real (non-zero) summary
         assert out["m_cross"][:, -NV:].abs().sum() > 0
 
-    def test_legacy_reset_zeroes_an_ended_document(self):
-        m = _model(prefix_eos_reset=True)
-        ids = _ids(b=1)
-        prev = m(ids, (0, 1), return_m_cross=True)["m_cross"].detach()
-        eos = torch.zeros(1, S, dtype=torch.bool)
-        eos[0, S - 1] = True
-        out = m(ids, (0, 1), m_cross_in=prev, return_m_cross=True, eos_mask=eos)
-        assert torch.allclose(out["m_cross"], torch.zeros_like(out["m_cross"]))
+    def test_legacy_reset_flag_is_rejected(self):
+        """Retired 2026-09-15.  The key must keep loading, but a config that still
+        sets it must stop the job rather than quietly get the modern policy."""
+        try:
+            _model(prefix_eos_reset=True)
+        except ValueError as e:
+            assert "prefix_eos_reset" in str(e)
+        else:
+            raise AssertionError(
+                "prefix_eos_reset=True must not be silently accepted")
 
     def test_open_document_keeps_carrying(self):
         m = _model()
@@ -357,14 +363,18 @@ class TestEos:
         out = m(ids, (0, 1), m_cross_in=prev, return_m_cross=True, eos_mask=eos)
         assert out["m_cross"].abs().sum() > 0
 
-    def test_legacy_reset_is_per_lane(self):
-        m = _model(prefix_eos_reset=True)
+    def test_both_lanes_keep_carrying_when_only_one_ends(self):
+        """The retired policy was per-lane, and the modern one has to be too — a
+        boundary in lane 0 must not touch lane 1, and (since 2026-08-04) must
+        not touch lane 0 either."""
+        m = _model()
         ids = _ids(b=2)
         prev = m(ids, (0, 1), return_m_cross=True)["m_cross"].detach()
         eos = torch.zeros(2, S, dtype=torch.bool)
         eos[0, S - 1] = True                       # lane 0 ends, lane 1 continues
         out = m(ids, (0, 1), m_cross_in=prev, return_m_cross=True, eos_mask=eos)
-        assert torch.allclose(out["m_cross"][0], torch.zeros_like(out["m_cross"][0]))
+        assert torch.allclose(out["m_cross"][:, :NV], prev[:, :NV])
+        assert out["m_cross"][0].abs().sum() > 0
         assert out["m_cross"][1].abs().sum() > 0
 
     def test_default_never_appends_a_zero_row(self):

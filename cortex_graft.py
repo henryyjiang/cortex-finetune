@@ -27,12 +27,14 @@ Config flags (getattr defaults)
                                        ccot_direct's single overwritten vector)
   accum_vecs          : int  = 4       summary vectors extracted per chunk
   accum_max           : int  = 64      FIFO cap on accumulated vectors (eval)
-  prefix_pos          : str  = "tail"  where the trailing summary slots sit in
+  prefix_pos          : str  = "tail"  ONLY value; asserted, not branched on.
+                                       Where the trailing summary slots sit in
                                        POSITION space: "tail" = continue the
                                        chunk's numbering (S+1..S+n_vec), "zero"
                                        = the pre-2026-08-04 layout, everything
                                        non-token at position 0.  See prefix_pack.
-  prefix_eos_reset    : bool = False   zero the WHOLE incoming carry on any chunk
+  prefix_eos_reset    : bool = False   ONLY value; asserted, not branched on.
+                                       Would zero the WHOLE incoming carry on any chunk
                                        containing an EOS.  Was unconditional
                                        before 2026-08-04; see _carried_state.
   gated_accum         : bool = False   gated-accumulation LM2 variant: the K-slot
@@ -263,11 +265,33 @@ class CortexMemory(nn.Module):
             # before the data loader and the wandb run exist rather than on the
             # first forward of a queued 48h job.
             self.summary_init_token = resolve_summary_init_token(config)
+            # prefix_pos / prefix_eos_reset: both keys stay in the 16-flag persist
+            # list and must keep LOADING — they are in every memory checkpoint's
+            # config.json and the graft is their load path.  The BRANCHES they
+            # used to select are gone, retired 2026-09-15 after
+            # pace/check_tier3_compat.sh came back CLEAR across 148 surviving
+            # config.json files on scratch: nothing carries the old values, and
+            # the cancelled 4vop2ym8 run they existed to reproduce was rm -rf'd.
+            # So read the key and ASSERT the modern value rather than branch on
+            # it.  A config that still carries an old value is a real surprise
+            # and should stop the job, not silently select a retired code path.
             self.prefix_pos = str(getattr(config, "prefix_pos", "tail") or "tail").lower()
-            if self.prefix_pos not in ("tail", "zero"):
+            if self.prefix_pos != "tail":
                 raise ValueError(
-                    f"cortex.prefix_pos must be 'tail' or 'zero'; got {self.prefix_pos!r}")
+                    f"cortex.prefix_pos must be 'tail'; got {self.prefix_pos!r}.  "
+                    "The 'zero' layout was retired 2026-09-15: it put the summary "
+                    "slots at position 0 at the END of the sequence, so under RoPE "
+                    "they queried every real token at a NEGATIVE relative offset.  "
+                    "See the prefix_pack docstring for why that is not "
+                    "AutoCompressor's pad-position trick.")
             self.prefix_eos_reset = bool(getattr(config, "prefix_eos_reset", False))
+            if self.prefix_eos_reset:
+                raise ValueError(
+                    "cortex.prefix_eos_reset=true was retired 2026-09-15.  It zeroed "
+                    "the WHOLE incoming carry on any chunk containing an EOS, which "
+                    "switched the read OFF for roughly 60% of B2's training chunks "
+                    "while every eval saw a live carry.  See the _carried_state "
+                    "docstring.")
         else:
             self.summary_init_token = -1
             self.prefix_pos = "tail"
@@ -315,11 +339,12 @@ class CortexMemory(nn.Module):
         which is the ONLY thing that stops n_vec identically-initialised slots
         from collapsing into copies of one vector.
 
-        Positions: carried vectors at 0, real tokens at 1..S, and — under the
-        default prefix_pos="tail" — the summary slots at S+1..S+n_vec, i.e.
-        continuing the chunk's own numbering.
+        Positions: carried vectors at 0, real tokens at 1..S, and the summary
+        slots at S+1..S+n_vec, i.e. continuing the chunk's own numbering.  This
+        is the only layout; prefix_pos is asserted to be "tail" at build time.
 
-        The old layout ("zero") put the summary slots at position 0 as well, on
+        The old layout ("zero", retired 2026-09-15) put the summary slots at
+        position 0 as well, on
         the theory that this was our RoPE analog of AutoCompressor's pad-position
         trick.  It is not.  That trick lives in
         OPTLearnedPositionalEmbeddingWithPadding, and OPT positions are ADDITIVE,
@@ -400,9 +425,10 @@ class CortexMemory(nn.Module):
             n_sum = slots.shape[1]
 
         pos = position_ids[:, :S] + 1
-        if n_sum and self.prefix_pos == "tail" and pos.shape[1] > 0:
+        if n_sum and pos.shape[1] > 0:
             # Continue the chunk's numbering, so every summary->token offset is
-            # positive.  Derived from the LAST real position rather than from S
+            # positive.  Unconditional since 2026-09-15 — prefix_pos is asserted
+            # to be 'tail' at build time, so there is no other layout to select.  Derived from the LAST real position rather than from S
             # so a cached prefill (whose position_ids do not start at 0) stays
             # consistent.
             sum_pos = pos[:, -1:] + torch.arange(
@@ -432,18 +458,16 @@ class CortexMemory(nn.Module):
         if n_sum == 0:
             return x[:, n_pre:], None
         real, new_vecs = x[:, n_pre:end], x[:, end:]
-        if self._valid_write is not None and self.prefix_eos_reset:
-            # Lane's open suffix is empty (the chunk ends ON an EOS) -> carry
-            # nothing from it.  Tied to prefix_eos_reset because it is the same
-            # document-boundary-as-memory-reset policy, and under the default
-            # (carry across boundaries) it is actively harmful: in PREFIX mode
-            # pool_mask never restricts the write anyway — the summary slots are
-            # read by the model's own causal attention over the WHOLE chunk — so
-            # this would discard a perfectly good summary and append a row of
-            # zeros to an accumulating state, which then gets spliced back as
-            # zero-valued attention targets.  Rare (it needs the chunk's last
-            # token to be an EOS) but silent.
-            new_vecs = new_vecs * self._valid_write.view(-1, 1, 1).to(new_vecs.dtype)
+        # The write is NOT masked in prefix mode.  Zeroing a lane whose open
+        # suffix is empty (the chunk ends ON an EOS) used to happen here under
+        # prefix_eos_reset, and it was actively harmful: pool_mask never
+        # restricts the prefix write anyway — the summary slots are read by the
+        # model's own causal attention over the WHOLE chunk — so it discarded a
+        # perfectly good summary and appended a row of zeros to an accumulating
+        # state, which then got spliced back as zero-valued attention targets.
+        # Rare (it needs the chunk's last token to be an EOS) but silent.
+        # Branch retired 2026-09-15; `_valid_write` is still computed in begin()
+        # and still consumed by the bolt-on buffer path below.
         return real, self.prefix.merge(self._carried_state(), new_vecs)
 
     def _carried_state(self) -> Optional[torch.Tensor]:
@@ -478,20 +502,20 @@ class CortexMemory(nn.Module):
         is grafted into.  AutoCompressor and RMT likewise carry across packed
         boundaries.
 
-        prefix_eos_reset=True restores the old behaviour.  The principled middle
-        option — a per-position block mask so post-boundary tokens cannot attend
-        to the carry columns — needs the flex_attention path that the modeling
-        file currently leaves disabled; see the note in prefix_pack.
+        prefix_eos_reset=True used to restore the old behaviour.  That branch was
+        RETIRED 2026-09-15 (pace/check_tier3_compat.sh clear across 148 configs);
+        the flag still loads and is now asserted false at build time.  The
+        principled middle option — a per-position block mask so post-boundary
+        tokens cannot attend to the carry columns — needs the flex_attention path
+        that the modeling file currently leaves disabled; see the note in
+        prefix_pack.
 
-        The WRITE side is unchanged: pool_mask still restricts the summary to the
-        open document's suffix and _valid_write still zeroes lanes with no open
-        suffix, both applied in prefix_unpack.
+        The WRITE side is likewise unmasked in prefix mode: `pool_mask` and
+        `_valid_write` are still computed in begin() and still consumed by the
+        bolt-on buffer path, but prefix_unpack applies neither — see the comment
+        there.
         """
-        state = self._cross_buf
-        if (state is not None and self._write_reset is not None
-                and self.prefix_eos_reset):
-            state = state * (~self._write_reset).view(-1, 1, 1).to(state.dtype)
-        return state
+        return self._cross_buf
 
     # ── per-call runtime ────────────────────────────────────────────────────
     def _reset_runtime(self) -> None:

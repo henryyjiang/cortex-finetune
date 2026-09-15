@@ -152,13 +152,27 @@ class TestReadFalse:
 
 
 class TestSummarySlotPositions:
-    """prefix_pos — the 2026-08-04 write-position fix.
+    """prefix_pos — the 2026-08-04 write-position fix, branch retired 2026-09-15.
 
     Under the old 'zero' layout the summary slots sat at position 0 while
     physically trailing the chunk, so every summary->token RoPE offset was
     NEGATIVE (-1..-S), which a causal LM never sees (pos_q >= pos_k always).
     A wrong layout here trains perfectly happily and shows nothing in the loss.
+
+    The 'zero' BRANCH is gone (pace/check_tier3_compat.sh came back clear across
+    148 surviving config.json files), but the KEY still loads — it is in the
+    16-flag persist list and in every memory checkpoint's config.json.  So these
+    tests pin the tail layout and the rejection, not the retired branch.
     """
+
+    def test_the_key_still_loads(self):
+        """The persist-list rule: a code path may be deleted, a key may not.
+        Every memory checkpoint's config.json carries this, and the graft is its
+        load path — if the attribute stopped existing, those configs would stop
+        loading."""
+        m = _model()
+        assert m.cortex.prefix_pos == "tail"
+        assert m.cortex.prefix_eos_reset is False
 
     def test_tail_offsets_to_real_tokens_are_all_positive(self):
         m = _model()
@@ -166,30 +180,36 @@ class TestSummarySlotPositions:
         tok, summ = pos[0, n_pre:n_pre + S], pos[0, -n_sum:]
         assert int((summ.unsqueeze(1) - tok.unsqueeze(0)).min()) > 0
 
-    def test_legacy_zero_layout_is_reproducible(self):
-        """The cancelled B2 phase-0 arrangement must stay reachable, or those
-        weights become uninterpretable."""
-        m = _model(prefix_pos="zero")
-        _, pos, n_pre, n_sum = _pack(m, torch.randn(B, NV, H))
-        assert pos[0, -n_sum:].tolist() == [0] * n_sum
-        tok = pos[0, n_pre:n_pre + S]
-        assert int((pos[0, -n_sum:].unsqueeze(1) - tok.unsqueeze(0)).max()) < 0
+    def test_legacy_zero_layout_is_rejected(self):
+        """Retired 2026-09-15.  A config that still asks for it must STOP the
+        job: silently serving the tail layout to weights trained under 'zero'
+        would be the worse failure, and nothing on scratch carries it."""
+        try:
+            _model(prefix_pos="zero")
+        except ValueError as e:
+            assert "prefix_pos" in str(e) and "tail" in str(e)
+        else:
+            raise AssertionError("prefix_pos='zero' must not be silently accepted")
 
-    def test_carry_and_token_positions_are_layout_independent(self):
-        """Only the slots move.  Real tokens must stay at 1..S under both, so
-        the cached-decode continuation rule keeps working."""
+    def test_carry_and_token_positions_are_the_documented_layout(self):
+        """Carried vectors at 0, real tokens at 1..S, slots continuing after.
+        This is the cached-decode continuation rule, and it is what used to be
+        checked by comparing the two layouts against each other."""
         ids = _ids(B, S)
-        a = _pack(_model(), torch.randn(B, NV, H), ids=ids)[1]
-        b = _pack(_model(prefix_pos="zero"), torch.randn(B, NV, H), ids=ids)[1]
-        assert torch.equal(a[:, :NV + S], b[:, :NV + S])
+        _, pos, n_pre, n_sum = _pack(_model(), torch.randn(B, NV, H), ids=ids)
+        assert pos[0, :n_pre].tolist() == [0] * n_pre
+        assert pos[0, n_pre:n_pre + S].tolist() == list(range(1, S + 1))
+        assert pos[0, -n_sum:].tolist() == list(range(S + 1, S + 1 + n_sum))
 
-    def test_write_false_leaves_positions_alone(self):
-        """No slots to place during cached decode, so the layouts coincide."""
+    def test_write_false_places_no_slots(self):
+        """No slots to place during cached decode: carry zeros, then 1..S, and
+        nothing after."""
         ids = _ids(B, S)
-        a = _pack(_model(), torch.randn(B, NV, H), ids=ids, write=False)[1]
-        b = _pack(_model(prefix_pos="zero"), torch.randn(B, NV, H), ids=ids,
-                  write=False)[1]
-        assert torch.equal(a, b)
+        packed, pos, n_pre, n_sum = _pack(_model(), torch.randn(B, NV, H),
+                                          ids=ids, write=False)
+        assert n_sum == 0
+        assert pos.shape[1] == n_pre + S
+        assert pos[0, n_pre:].tolist() == list(range(1, S + 1))
 
     def test_bad_layout_name_raises(self):
         try:
@@ -201,11 +221,15 @@ class TestSummarySlotPositions:
 
 
 class TestEosCarryReset:
-    """prefix_eos_reset — the 2026-08-04 read fix.
+    """prefix_eos_reset — the 2026-08-04 read fix, branch retired 2026-09-15.
 
     write_reset is has_eos for the WHOLE chunk, so the old unconditional reset
     zeroed the carry for every position whenever a document boundary appeared
     anywhere in the chunk.  On EOS-separated packed data that is most chunks.
+
+    The opt-in branch is gone; the key still loads and is asserted false.  These
+    tests pin the surviving guarantee — the carry crosses boundaries wherever
+    they fall — plus the rejection.
     """
 
     def _carry_norm(self, m, eos_at):
@@ -227,25 +251,33 @@ class TestEosCarryReset:
         live, n_pre = self._carry_norm(m, eos_at=S // 2)
         assert n_pre == 2 * NV and live > 1e-6
 
-    def test_opt_in_reset_still_zeroes(self):
-        m = _model(prefix_eos_reset=True)
-        dead, n_pre = self._carry_norm(m, eos_at=S // 2)
-        assert n_pre == 2 * NV and dead == 0.0
+    def test_opt_in_reset_is_rejected(self):
+        """Retired 2026-09-15.  Loading the key is required; honouring the old
+        value is not, and a config that still sets it must stop the job."""
+        try:
+            _model(prefix_eos_reset=True)
+        except ValueError as e:
+            assert "prefix_eos_reset" in str(e)
+        else:
+            raise AssertionError(
+                "prefix_eos_reset=True must not be silently accepted")
 
-    def test_reset_fires_wherever_the_boundary_is(self):
-        """The old behaviour was position-independent — an EOS at the very last
-        token killed the carry for the whole chunk just as thoroughly."""
-        m = _model(prefix_eos_reset=True)
-        assert self._carry_norm(m, eos_at=S - 1)[0] == 0.0
-        assert self._carry_norm(m, eos_at=0)[0] == 0.0
+    def test_carry_survives_a_boundary_wherever_it_falls(self):
+        """The retired behaviour was position-independent — an EOS anywhere
+        killed the carry for the whole chunk.  The modern guarantee is the
+        mirror image, and it has to hold at the edges too."""
+        m = _model()
+        for eos_at in (0, S // 2, S - 1):
+            assert self._carry_norm(m, eos_at=eos_at)[0] > 1e-6
 
-    def test_no_eos_is_unaffected_either_way(self):
+    def test_no_eos_is_unaffected(self):
         assert self._carry_norm(_model(), None)[0] > 1e-6
-        assert self._carry_norm(_model(prefix_eos_reset=True), None)[0] > 1e-6
 
-    def test_write_side_masking_is_untouched(self):
-        """pool_mask / valid_write still restrict the WRITE to the open
-        document's suffix — the fix is read-side only."""
+    def test_write_side_mask_is_still_computed(self):
+        """begin() still computes pool_mask / valid_write and the bolt-on buffer
+        path still consumes them — prefix_unpack is what stopped applying
+        valid_write (see the comment there).  If they stopped being computed,
+        that path would silently lose its document-boundary handling."""
         m = _model()
         emb = m.wte(_ids(B, S))
         eos = torch.zeros(B, S, dtype=torch.bool)

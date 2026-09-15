@@ -70,12 +70,20 @@ class TestChain:
         m = _model()
         assert all(_run(m)["preserved"])
 
-    def test_legacy_reset_is_detected_as_not_preserved(self):
-        """The check must actually be able to FAIL — under the old policy the
-        carry is zeroed, so `preserved` has to go False.  Without this, a
-        `preserved` that was trivially True would pass the smoke forever."""
-        m = _model(prefix_eos_reset=True)
-        assert not all(_run(m)["preserved"])
+    def test_a_zeroed_carry_is_detected_as_not_preserved(self):
+        """The check must actually be able to FAIL, or a `preserved` that was
+        trivially True would pass the smoke forever.  This used to be driven by
+        prefix_eos_reset=True, whose branch was retired 2026-09-15; zeroing the
+        carried state directly exercises the same failure without it, and tests
+        the CHECKER rather than a flag."""
+        m = _model()
+        real = m.cortex._carried_state
+        m.cortex._carried_state = lambda: (
+            None if real() is None else torch.zeros_like(real()))
+        try:
+            assert not all(_run(m)["preserved"])
+        finally:
+            m.cortex._carried_state = real
 
     def test_losses_finite_and_backward_reaches_the_write(self):
         m = _model()

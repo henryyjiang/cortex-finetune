@@ -28,8 +28,9 @@
 # bug class 2 (find where a value is CONSUMED, not where it is set), which has
 # now voided or distorted four runs.
 #
-# Hence: this script counts what it scanned FIRST and refuses to report a
-# verdict if the scan set is empty.
+# Hence: this script counts what it scanned FIRST, NAMES EVERY ROOT IT COULD NOT
+# OPEN, and refuses to report a verdict if the scan set is empty.  A root that
+# silently does not exist is the same false negative one level up.
 #
 # SCOPE.  config.json is the branches' load path — cortex_graft.py:266-270 reads
 # both flags off the HF config via getattr — so config.json coverage is the
@@ -48,13 +49,38 @@ echo "=== Gate A — Tier-3 compat-branch grep ==="
 echo "scratch: $SCRATCH"
 echo
 
-# Every config.json under a run tree or a base-checkpoint tree.  -mindepth 2
-# skips $SCRATCH/cortex-*/config.json (there is none, but be explicit).
+# Every config.json under a run tree or a base-checkpoint tree.  Roots are
+# resolved one at a time so a missing one is REPORTED rather than swallowed by
+# find's stderr — see the note above.
+ROOTS=()
+MISSING=()
+for r in "$SCRATCH"/cortex-* "$SCRATCH"/ckpts; do
+    if [ -d "$r" ]; then ROOTS+=("$r"); else MISSING+=("$r"); fi
+done
+
+if [ "${#ROOTS[@]}" -eq 0 ]; then
+    echo "REFUSING TO REPORT A VERDICT: none of the expected roots exist."
+    printf '  missing: %s\n' "${MISSING[@]}" | sed "s|$SCRATCH|\$SCRATCH|"
+    exit 2
+fi
+
 mapfile -t FILES < <(
-    find "$SCRATCH"/cortex-* "$SCRATCH"/ckpts \
-         -maxdepth 4 -name config.json -type f 2>/dev/null | sort
+    find "${ROOTS[@]}" -maxdepth 4 -name config.json -type f 2>/dev/null | sort
 )
 
+echo "roots scanned: ${#ROOTS[@]}"
+printf '  %s\n' "${ROOTS[@]}" | sed "s|$SCRATCH|\$SCRATCH|"
+if [ "${#MISSING[@]}" -gt 0 ]; then
+    echo
+    echo "ROOTS NOT PRESENT (not scanned — confirm this is expected):"
+    printf '  %s\n' "${MISSING[@]}" | sed "s|$SCRATCH|\$SCRATCH|"
+    echo "  If base checkpoints live elsewhere (--model_name is a path RELATIVE"
+    echo "  to the submit dir, so 'ckpts/...' may resolve inside the repo or"
+    echo "  through a symlink), re-run with that directory added, e.g."
+    echo "    find -L \"\$(readlink -f ckpts)\" -maxdepth 2 -name config.json \\"
+    echo "      -exec grep -l '$PATTERN' {} +"
+fi
+echo
 echo "config.json files scanned: ${#FILES[@]}"
 if [ "${#FILES[@]}" -eq 0 ]; then
     echo
