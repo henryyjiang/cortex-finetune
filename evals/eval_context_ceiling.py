@@ -51,6 +51,21 @@ tokens the model can see anyway.
                    front-loaded ceiling means total recoverable nats scale with
                    the number of chunks, not just the per-boundary delta.
 
+  --doc_split      P0.3.  Split the pooled ceiling by whether the chunk
+                   boundary crosses a DOCUMENT separator in the pack.
+                   `prepare_packed_dataset.py` joins documents with EOS, and a
+                   FineWeb-Edu document is ~1.1k tokens, so a 4,096-token row is
+                   three to four unrelated documents and most chunk boundaries
+                   have nothing worth carrying across them.  A carry cannot
+                   transfer information that does not exist, so those instances
+                   DILUTE every carry number the project has quoted -- they are
+                   in the denominator but can never be in the numerator.
+                   Costs no extra forwards: it is a re-pool of the instances
+                   already scored, so pairing is preserved exactly.
+                   Run it on the real TRAINING packs, not a val pack.  The
+                   PG-19 strided pack is the built-in check on the split itself:
+                   it is doc-per-row, so it must come back ~100% within.
+
 A NOTE ON WHAT THE CEILING BOUNDS (2026-08-04).  The oracle bounds SUBSTITUTING
 FOR THE PREVIOUS CHUNK'S TEXT.  It is not a bound on a carry used as working
 memory for the model's own intermediate computation: the measured ceiling is
@@ -116,6 +131,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--pos_buckets", type=int, default=0,
                    help="split each chunk's NLL into N equal position bands "
                         "(0 = off).  Free -- no extra forwards.")
+    p.add_argument("--doc_split", action="store_true",
+                   help="P0.3: pool the ceiling separately for boundaries that "
+                        "stay inside one document and boundaries that cross an "
+                        "EOS separator")
+    p.add_argument("--eos_id", type=int, default=100257,
+                   help="the pack's document separator.  prepare_packed_dataset "
+                        "writes the TOKENIZER's eos, which for OLMo-2 is 100257. "
+                        "Do NOT use the 65505 in the *Recurrent-OLMo* configs -- "
+                        "that is Huginn's id and decodes to ' creek' here.")
     p.add_argument("--max_examples", type=int, default=50, help="0 = all rows")
     p.add_argument("--seed",         type=int, default=1234)
     p.add_argument("--out_dir",      default="eval_results/context_ceiling")
@@ -205,6 +229,45 @@ def _equiv_tokens(ceiling, carry):
     return None                                   # carry exceeds every ceiling
 
 
+def _doc_tags(x, off, kmax, eos_id):
+    """Does the chunk boundary at `off` cross a document separator?
+
+    Two readings, both free, because the pack joins documents with EOS:
+
+      local  -- a separator inside the `kmax` tokens before the boundary, so
+                part of the real context the ORACLE is handed belongs to a
+                different document.  This is the reading that matches what the
+                ceiling actually measures, and `kmax` must be the LARGEST k in
+                the sweep or the tag stops covering every condition it labels.
+      prefix -- a separator anywhere in chunks 1..g-1, i.e. the CARRY chain
+                crossed a boundary at some point.  Stricter, and the right
+                reading for a carry that is meant to hold the whole row.
+
+    Returns (across_local, across_prefix); both False means within-document.
+    """
+    return (bool((x[max(0, off - kmax):off] == eos_id).any()),
+            bool((x[:off] == eos_id).any()))
+
+
+def _pool(per_chunk, carry_ch, conds, n_chunks, with_carry, keep=None):
+    """Pool per-instance losses over chunks 2+, optionally filtered.
+
+    `keep[g]` is a boolean list aligned element-for-element with
+    `per_chunk[0][g]`.  Every condition is appended in lockstep in the main
+    loop, so ONE mask selects the same instances in all of them and the paired
+    comparison survives the filter -- which is the whole reason the split is
+    free.  Returns (k=0 floor, {k: losses}, carry losses or None).
+    """
+    def sel(lst, g):
+        return lst[g] if keep is None else [v for v, m in zip(lst[g], keep[g]) if m]
+    base = [v for g in range(1, n_chunks) for v in sel(per_chunk[0], g)]
+    cond = {k: [v for g in range(1, n_chunks) for v in sel(per_chunk[k], g)]
+            for k in conds[1:]}
+    carry = ([v for g in range(1, n_chunks) for v in sel(carry_ch, g)]
+             if with_carry else None)
+    return base, cond, carry
+
+
 def main() -> None:
     args = parse_args()
     device = torch.device(args.device or ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -244,6 +307,9 @@ def main() -> None:
               + (["carry"] if with_carry else [])
               + [f"carry+{k}" for k in cplus_lens])
     pos_rows = {lab: [] for lab in labels} if nb else {}
+    # tags[g][i] = (across_local, across_prefix) for the i-th accepted instance
+    # of chunk g, appended in the same lockstep as every loss list above.
+    tags = [[] for _ in range(args.n_chunks)]
     t_start = time.time()
 
     for si in range(n):
@@ -260,6 +326,7 @@ def main() -> None:
             off += 0 if g == 0 else x_ch[g - 1].numel()
             if g == 0:
                 continue                          # no preceding context to give
+            across_local, across_prefix = _doc_tags(x, off, conds[-1], args.eos_id)
             bands = {lab: [] for lab in labels} if nb else {}
             vals = {}
             for k in conds:
@@ -290,6 +357,7 @@ def main() -> None:
                         cplus_ch[k][g].append(cpv[k])
                 for lab in pos_rows:
                     pos_rows[lab].append(bands[lab][0])
+                tags[g].append((across_local, across_prefix))
         if si == 0:
             dt = time.time() - t_start
             print(f"  sample 1 took {dt:.1f}s -> ETA {dt * n / 60:.0f} min")
@@ -379,6 +447,62 @@ def main() -> None:
             print("  so the headroom worth chasing is (best ceiling - ceiling(k)),")
             print("  not the whole ceiling.")
 
+    # ---- P0.3: within- vs across-document ----------------------------------
+    if args.doc_split:
+        n_inst = sum(len(tags[g]) for g in range(1, args.n_chunks))
+        print()
+        print(f"  P0.3 -- document-boundary split (separator id {args.eos_id}, "
+              f"{n_inst} chunk-instances)")
+        print("  A carry can only transfer information that EXISTS across the")
+        print("  boundary.  Where the packer joined two unrelated documents")
+        print("  there is nothing to carry: those instances sit in the")
+        print("  denominator of every carry number the project has quoted and")
+        print("  can never be in the numerator.  This sizes issue 7 and the mix.")
+        results["doc_split"] = {"eos_id": args.eos_id, "n_instances": n_inst,
+                                "schemes": {}}
+        schemes = (
+            ("local", 0,
+             f"a separator inside the {conds[-1]} tokens before the boundary"),
+            ("prefix", 1, "a separator anywhere in chunks 1..g-1"),
+        )
+        for name, ti, desc in schemes:
+            print()
+            print(f"  scheme '{name}': across-document := {desc}")
+            sres = {"definition": desc, "classes": {}}
+            for cls, want in (("within", False), ("across", True)):
+                keep = [[t[ti] == want for t in tags[g]]
+                        for g in range(args.n_chunks)]
+                base_s, cond_s, carry_s = _pool(per_chunk, carry_ch, conds,
+                                                args.n_chunks, with_carry, keep)
+                share = 100.0 * len(base_s) / n_inst if n_inst else 0.0
+                entry = {"n": len(base_s), "share_pct": share}
+                line = (f"    {cls + '-document':<17} n={len(base_s):>5} "
+                        f"({share:4.1f}%)")
+                if len(base_s) < 2:
+                    print(line + "   -- too few instances to pair")
+                    sres["classes"][cls] = entry
+                    continue
+                entry["k0"] = float(torch.tensor(base_s).mean())
+                ceil_s = []
+                for k in conds[1:]:
+                    d, se = _paired(base_s, cond_s[k])
+                    ceil_s.append((k, d))
+                    entry[f"ceiling_k{k}"] = {"delta": d, "se": se}
+                    line += f"  k{k}={d:+.4f}"
+                if with_carry:
+                    d, se = _paired(base_s, carry_s)
+                    entry["carry_delta"] = {"delta": d, "se": se}
+                    entry["carry_equiv_tokens"] = _equiv_tokens(ceil_s, d)
+                    line += f"  carry={d:+.4f}"
+                print(line)
+                sres["classes"][cls] = entry
+            results["doc_split"]["schemes"][name] = sres
+        print()
+        print("  READ IT AS: an across-document ceiling near zero against a")
+        print("  large within-document ceiling means the pack's real cross-chunk")
+        print("  signal is only its within-document share -- the MIX RATIO, not")
+        print("  the mechanism, is then what limits the carry.  Both ceilings")
+        print("  large means the packer is not the problem and issue 7 shrinks.")
     # ---- position bands ----------------------------------------------------
     if nb and pos_rows.get("k0"):
         print(f"\n  position bands inside the chunk (n={len(pos_rows['k0'])} "

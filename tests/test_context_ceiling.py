@@ -214,3 +214,87 @@ class TestCarryBefore:
         m = _model(memory=False)
         x, _, _ = _sample()
         assert ecc.carry_before(m, x, NC, 2, NS, 7, DEV) is None
+
+
+class TestDocSplit:
+    """P0.3 -- within- vs across-document.
+
+    The split is only free because every condition was appended in lockstep,
+    so ONE boolean mask selects the same instances in all of them.  The two
+    failure modes that would produce a plausible-looking but wrong table are a
+    mask that desynchronises the paired lists (the delta then compares chunk i
+    of one condition against chunk j of another) and a partition that is not a
+    partition (an instance counted in both classes, or in neither, silently
+    changes the share the mix ratio is set from).
+    """
+
+    EOS = 100257
+
+    def test_clean_row_is_within_document(self):
+        x = torch.arange(64) % 500                 # no separator anywhere
+        assert ecc._doc_tags(x, 32, 16, self.EOS) == (False, False)
+
+    def test_separator_in_the_oracle_window_is_local_and_prefix(self):
+        x = torch.arange(64) % 500
+        x[20] = self.EOS                           # inside the last 16 before 32
+        assert ecc._doc_tags(x, 32, 16, self.EOS) == (True, True)
+
+    def test_separator_before_the_window_is_prefix_only(self):
+        """The distinction the two schemes exist for: the carry chain crossed a
+        document but the oracle's k tokens did not, so the ceiling and the
+        carry are not labelled by the same fact."""
+        x = torch.arange(64) % 500
+        x[4] = self.EOS                            # before off-kmax = 16
+        assert ecc._doc_tags(x, 32, 16, self.EOS) == (False, True)
+
+    def test_separator_after_the_boundary_is_neither(self):
+        """A separator inside the chunk being SCORED says nothing about what
+        crossed into it."""
+        x = torch.arange(64) % 500
+        x[40] = self.EOS
+        assert ecc._doc_tags(x, 32, 16, self.EOS) == (False, False)
+
+    def test_kmax_window_is_clamped_at_the_row_start(self):
+        x = torch.arange(64) % 500
+        x[0] = self.EOS
+        assert ecc._doc_tags(x, 8, 1024, self.EOS) == (True, True)
+
+    def _fixture(self):
+        # 3 chunks; index 0 is unused (chunk 1 has no preceding context).
+        per_chunk = {0: [[], [1.0, 2.0, 3.0], [4.0, 5.0]],
+                     128: [[], [0.9, 1.9, 2.9], [3.9, 4.9]]}
+        carry = [[], [0.5, 1.5, 2.5], [3.5, 4.5]]
+        return per_chunk, carry, [0, 128], 3
+
+    def test_unfiltered_pool_keeps_every_instance_in_order(self):
+        per_chunk, carry, conds, nc = self._fixture()
+        base, cond, cv = ecc._pool(per_chunk, carry, conds, nc, True)
+        assert base == [1.0, 2.0, 3.0, 4.0, 5.0]
+        assert cond[128] == [0.9, 1.9, 2.9, 3.9, 4.9]
+        assert cv == [0.5, 1.5, 2.5, 3.5, 4.5]
+
+    def test_mask_selects_the_same_instances_in_every_condition(self):
+        """Pairing survives the filter: base[i], cond[i] and carry[i] must
+        still be the same (sample, chunk)."""
+        per_chunk, carry, conds, nc = self._fixture()
+        keep = [[], [True, False, True], [False, True]]
+        base, cond, cv = ecc._pool(per_chunk, carry, conds, nc, True, keep)
+        assert base == [1.0, 3.0, 5.0]
+        assert cond[128] == [0.9, 2.9, 4.9]
+        assert cv == [0.5, 2.5, 4.5]
+
+    def test_within_and_across_partition_the_instances(self):
+        per_chunk, carry, conds, nc = self._fixture()
+        tags = [[], [(False, False), (True, True), (False, True)],
+                [(True, True), (False, False)]]
+        for ti in (0, 1):
+            sizes = []
+            for want in (False, True):
+                keep = [[t[ti] == want for t in tags[g]] for g in range(nc)]
+                sizes.append(len(ecc._pool(per_chunk, carry, conds, nc,
+                                           True, keep)[0]))
+            assert sum(sizes) == 5
+
+    def test_no_carry_model_pools_none(self):
+        per_chunk, carry, conds, nc = self._fixture()
+        assert ecc._pool(per_chunk, carry, conds, nc, False)[2] is None

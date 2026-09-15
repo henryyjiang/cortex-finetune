@@ -69,6 +69,20 @@
 #                         Cross-chunk information is a boundary effect; this is
 #                         where you see whether the oracle's nats are all in the
 #                         first band and whether the carry delivers there.
+#   DOC_SPLIT=true        P0.3 (2026-09-15).  Pools the ceiling SEPARATELY for
+#                         boundaries that stay inside one document and
+#                         boundaries that cross an EOS separator, and reports
+#                         the share of each.  Free: it re-pools instances
+#                         already scored, so the pairing is untouched.
+#                         Run it on the REAL TRAINING PACKS, not a val pack --
+#                         the question is how much of the signal the control and
+#                         the memory model will be trained on was ever
+#                         learnable.  EOS_ID defaults to OLMo-2's real 100257;
+#                         do NOT pass the 65505 the *Recurrent-OLMo* configs
+#                         carry, which is Huginn's id and decodes to ' creek'.
+#                         Set N_CHUNKS to the run's cross_chunks (8 for the
+#                         locked D-fallback) so the boundaries scored are the
+#                         ones the model will actually see.
 
 cd $SLURM_SUBMIT_DIR
 
@@ -91,6 +105,8 @@ N_CHUNKS=${N_CHUNKS:-4}
 CONTEXT_LENS=${CONTEXT_LENS:-"128 256 512 1024"}
 CARRY_PLUS=${CARRY_PLUS:-}
 POS_BUCKETS=${POS_BUCKETS:-0}
+DOC_SPLIT=${DOC_SPLIT:-false}
+EOS_ID=${EOS_ID:-100257}
 T_EVAL=${T_EVAL:-}
 
 # MODEL= points straight at a base dir (pure ceiling, no arm); otherwise RUN=
@@ -119,5 +135,6 @@ python evals/eval_context_ceiling.py \
     --max_examples "$MAX_EXAMPLES" \
     ${CARRY_PLUS:+--carry_plus $CARRY_PLUS} \
     --pos_buckets "$POS_BUCKETS" \
+    $([ "$DOC_SPLIT" = "true" ] && echo "--doc_split --eos_id $EOS_ID") \
     ${T_EVAL:+--T "$T_EVAL"} \
     --out_dir "$OUT"
