@@ -12,6 +12,7 @@ Run: /c/Users/henry/miniconda3/envs/cortex-retro/python.exe -m pytest tests/ -q
 """
 from __future__ import annotations
 
+import io
 import os
 import sys
 
@@ -103,6 +104,30 @@ class TestTrajectoryCapture:
                     "a moved loop entry point must raise, not return empty")
         finally:
             type(m).core_block_forward = saved
+
+
+class TestQuantizationFloor:
+    """The trap that already produced a wrong reading once.
+
+    Late deltas are ~1% of ||s_t||.  bf16 carries ~8 mantissa bits, so
+    subtracting two converged bf16 states is substantially rounding, and the
+    first bf16 run of this probe reported a delta PLATEAU at 0.37x ||s0|| that
+    fp32 put at 0.06x, with cos(d,d-1) -0.62 against fp32's -0.95.  The plateau
+    was the quantization floor wearing the shape of a result.
+    """
+
+    def test_float32_is_the_default(self):
+        """A probe whose default dtype silently fabricates its own plateau is
+        worse than no probe."""
+        import evals.diag_latent_scale as m
+        src = io.open(m.__file__, encoding="utf-8").read()
+        assert 'default="float32"' in src
+        assert 'default="bfloat16"' not in src
+
+    def test_eps_ordering_is_what_the_check_relies_on(self):
+        """bf16's relative spacing must be far coarser than fp32's, or the
+        floor check is measuring nothing."""
+        assert torch.finfo(torch.bfloat16).eps > 100 * torch.finfo(torch.float32).eps
 
 
 class TestStats:

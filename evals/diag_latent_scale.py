@@ -62,6 +62,14 @@ TRAPS THIS SCRIPT IS WRITTEN AROUND.
     the with-grad split and it is much cheaper.  The split decides WHICH depths
     are trainable, not what they contain; that is the depth-slice ablation's
     question, not this one.
+  * RUN THIS IN FLOAT32.  It is the default for a reason.  Late deltas are on
+    the order of 1% of ||s_t||, and bf16 carries ~8 mantissa bits, so a bf16
+    subtraction of two converged states is substantially rounding.  The first
+    bf16 run of this probe reported a delta plateau at 0.37x ||s0|| that fp32
+    put at 0.06x -- a 6x overstatement -- and reported cos(d_t,d_t-1) = -0.62
+    where fp32 says -0.95.  The plateau was the quantization floor wearing the
+    shape of a result.  The QUANTIZATION FLOOR block below flags this
+    automatically; do not silence it, fix the dtype.
 
 Usage (local, 1B checkpoint, no cluster needed):
     python evals/diag_latent_scale.py \
@@ -191,8 +199,14 @@ def main() -> int:
                     help="run with prefix_write/prefix_read off -- the pure "
                          "backbone trajectory over exactly seq_len columns, no "
                          "summary slots appended")
-    ap.add_argument("--dtype", default="bfloat16",
-                    choices=["bfloat16", "float32"])
+    ap.add_argument("--dtype", default="float32",
+                    choices=["bfloat16", "float32"],
+                    help="float32 by DEFAULT and it matters: the late deltas "
+                         "are ~1%% of ||s_t||, which is inside bf16's relative "
+                         "precision.  A bf16 run reports a delta PLATEAU that "
+                         "is the quantization floor, not the model (measured "
+                         "2026-09-15: 0.37x s0 in bf16 against 0.06x in fp32 "
+                         "at t=32, a 6x overstatement).")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--out", default=None)
     ap.add_argument("--seed", type=int, default=0)
@@ -276,6 +290,20 @@ def main() -> int:
                       "cos_delta_with_prev_delta": dd})
         prev, prev_d = s, d
 
+    # QUANTIZATION FLOOR.  A delta is only measurable if it is well above the
+    # representational granularity of the states it is the difference of.  eps
+    # is the dtype's relative spacing, so eps * ||s_t|| is roughly the smallest
+    # per-component difference the subtraction can resolve; scaled by sqrt(D)
+    # for the per-token L2.  Flag any step whose delta is within 4x of it.
+    eps = float(torch.finfo(dtype).eps)
+    suspect = []
+    for r in steps:
+        floor = eps * r["s"]["mean"] * (D ** 0.5) / (D ** 0.5)  # eps * ||s||
+        r["quant_floor"] = floor
+        r["floor_ratio"] = r["delta"]["mean"] / floor if floor > 0 else float("inf")
+        if r["floor_ratio"] < 4.0:
+            suspect.append(r["t"])
+
     m_cross = _stats(getattr(out, "m_cross", None))
     post_tok = _stats(getattr(out, "hidden_states", None))
     sT = steps[-1]["s"]["mean"]
@@ -303,6 +331,11 @@ def main() -> int:
             "delta_mid_over_s0": d_mid / s0m,
             "delta_last_over_s0": d_last / s0m,
             "E_write_over_s0": (m_cross["mean"] / s0m) if m_cross else None,
+        },
+        "quantization": {
+            "dtype": args.dtype,
+            "eps": eps,
+            "steps_within_4x_of_floor": suspect,
         },
     }
 
@@ -336,6 +369,13 @@ def main() -> int:
               f"{r['delta']['mean'] / s0m:10.2f}{r['cos_with_prev']:13.4f}"
               f"{'' if dd is None else f'{dd:13.4f}'}")
     print()
+    if suspect:
+        lo, hi = min(suspect), max(suspect)
+        print(f"  !! QUANTIZATION FLOOR: at t={lo}..{hi} the delta is within 4x "
+              f"of {args.dtype}'s\n     resolvable difference "
+              f"(eps={eps:.2e}).  Those rows are measuring arithmetic, not the\n"
+              f"     model.  Re-run with --dtype float32 before quoting any of "
+              f"them.\n")
     print(f"  VERDICT INPUT: the staggered deltas Z is made of run "
           f"{d_first / s0m:.1f}x (first) / {d_mid / s0m:.1f}x (mid) / "
           f"{d_last / s0m:.1f}x (last)")
