@@ -97,11 +97,25 @@ done
 #      the same job and it prices the one thing nobody has priced: Nemotron-CC
 #      problems are short and EOS-separated, so if its across share is near 100%
 #      then B2's carry deltas were measured on a corpus that could not carry.
-if [ -d data/nemotron_math_olmo_len4096 ]; then
-    MODEL=$BASE_MODEL DATA=data/nemotron_math_olmo_len4096 T_EVAL=8 \
+# B2's arm actually trained on the 4B pack; data/nemotron_math_olmo_len4096 is
+# the older 400M one and may not survive on scratch.  Prefer the pack the run
+# used, fall back to the small one, and SAY which -- the 2026-09-15 submission
+# named only the 400M pack, found nothing, and skipped in silence.
+NEMO=""
+for CAND in nemotron_math_olmo_len4096_4b nemotron_math_olmo_len4096; do
+    [ -d "data/$CAND" ] && { NEMO=$CAND; break; }
+done
+if [ -n "$NEMO" ]; then
+    echo "P3d: using data/$NEMO"
+    MODEL=$BASE_MODEL DATA=data/$NEMO T_EVAL=8 \
         N_CHUNKS=8 CONTEXT_LENS="64 128 256 512" \
         MAX_EXAMPLES=$N DOC_SPLIT=true POS_BUCKETS=4 \
         EVAL_TAG=${TAG}-P3d-nemotron sbatch pace/eval_context_ceiling.sbatch
+else
+    # Silent skips cost a re-run: the 2026-09-15 submission dropped this job and
+    # nothing in the output said so -- four "Submitted batch job" lines where
+    # the read-order footer below lists five.
+    echo "SKIP P3d: no nemotron pack found (tried _4b and the 400M one)"
 fi
 
 fi
