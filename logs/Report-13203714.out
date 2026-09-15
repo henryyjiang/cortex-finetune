@@ -1,0 +1,28 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-14-2026 18:02:43
+Job ID:    13203714
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  prepare_pg19_pack.sbatch
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+ERROR: data/pg19_olmo_len4096 already exists.  A half-written pack is worse than none:
+  save_to_disk writes state.json / dataset_info.json LAST, so shard
+  files without them mean a killed save.  Check, then rm -rf and
+  resubmit.
+---------------------------------------
+Begin Slurm Epilog: Sep-14-2026 18:02:47
+Job ID:        13203714
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      prepare_pg19_pack.sbatch
+Resources:     cpu=16,mem=128G,node=1
+Rsrc Used:     cput=00:01:20,vmem=0,walltime=00:00:05,mem=39760K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-006-23-2
+---------------------------------------

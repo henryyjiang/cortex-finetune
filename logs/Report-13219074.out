@@ -1,0 +1,89 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-15-2026 10:24:35
+Job ID:    13219074
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+=== context ceiling: ckpts/olmo8-cortex -> eval_results/context_ceiling_p03-20260915-P3c-pg19strided/olmo8-cortex ===
+Loading: ckpts/olmo8-cortex  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:20<00:20, 20.22s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:23<00:00, 10.50s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:23<00:00, 11.96s/it]
+T=8  n_chunks=8  carry condition: OFF (no cross state)
+context lens: 0 + [64, 128, 256, 512]
+position bands: 4 per chunk
+data/pg19_olmo_len4096_strided: 702963 rows, evaluating 100
+  sample 1 took 2.2s -> ETA 4 min
+  10/100 samples  [0 min]
+  20/100 samples  [1 min]
+  30/100 samples  [1 min]
+  40/100 samples  [1 min]
+  50/100 samples  [2 min]
+  60/100 samples  [2 min]
+  70/100 samples  [2 min]
+  80/100 samples  [3 min]
+  90/100 samples  [3 min]
+  100/100 samples  [3 min]
+
+  Chunk      N       k=0      k=64     k=128     k=256     k=512
+  --------------------------------------------------------------
+  2        100    2.7946    2.6133    2.5615    2.5158    2.4741
+  3        100    2.8000    2.6191    2.5780    2.5331    2.4989
+  4        100    2.8040    2.6247    2.5847    2.5381    2.4966
+  5        100    2.8415    2.6690    2.6331    2.5796    2.5373
+  6        100    2.8064    2.6210    2.5815    2.5401    2.4980
+  7        100    2.8115    2.6249    2.5823    2.5369    2.4861
+  8        100    2.7902    2.6111    2.5691    2.5251    2.4904
+
+  chunks 2+ pooled (n=700), delta vs k=0 (positive = that context HELPS):
+       64 real tokens : +0.18076  (SE 0.00225)
+      128 real tokens : +0.22257  (SE 0.00315)
+      256 real tokens : +0.26850  (SE 0.00431)
+      512 real tokens : +0.30957  (SE 0.00513)
+
+  P0.3 -- document-boundary split (separator id 100257, 700 chunk-instances)
+  A carry can only transfer information that EXISTS across the
+  boundary.  Where the packer joined two unrelated documents
+  there is nothing to carry: those instances sit in the
+  denominator of every carry number the project has quoted and
+  can never be in the numerator.  This sizes issue 7 and the mix.
+
+  scheme 'local': across-document := a separator inside the 512 tokens before the boundary
+    within-document   n=  700 (100.0%)  k64=+0.1808  k128=+0.2226  k256=+0.2685  k512=+0.3096
+    across-document   n=    0 ( 0.0%)   -- too few instances to pair
+
+  scheme 'prefix': across-document := a separator anywhere in chunks 1..g-1
+    within-document   n=  700 (100.0%)  k64=+0.1808  k128=+0.2226  k256=+0.2685  k512=+0.3096
+    across-document   n=    0 ( 0.0%)   -- too few instances to pair
+
+  READ IT AS: an across-document ceiling near zero against a
+  large within-document ceiling means the pack's real cross-chunk
+  signal is only its within-document share -- the MIX RATIO, not
+  the mechanism, is then what limits the carry.  Both ceilings
+  large means the packer is not the problem and issue 7 shrinks.
+
+  position bands inside the chunk (n=700 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k64               +0.61951    +0.06094    +0.02733    +0.01525
+  k128              +0.72223    +0.09626    +0.04442    +0.02737
+  k256              +0.82115    +0.13677    +0.07342    +0.04268
+  k512              +0.89179    +0.18306    +0.09862    +0.06481
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_p03-20260915-P3c-pg19strided/olmo8-cortex
+---------------------------------------
+Begin Slurm Epilog: Sep-15-2026 10:28:38
+Job ID:        13219074
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:32:32,vmem=0,walltime=00:04:04,mem=7556780K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-20-0
+---------------------------------------

@@ -1,0 +1,98 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-15-2026 10:27:02
+Job ID:    13219075
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_context_ceiling.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+[ok]  cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint
+      already prepared
+      flags: {'use_memory': True, 'memory_slots': 0, 'memory_slots_iter': 0, 'memory_heads': 4, 'prefix_memory': 'accum', 'accum_vecs': 32, 'accum_max': 256, 'h_T_proj': True, 'lora_rank': 0, 'lora_alpha': 32.0, 'mean_recurrence': 32, 'mean_backprop_depth': 8}
+=== context ceiling: cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint -> eval_results/context_ceiling_p03-20260915-P3e-arm-mix/retro-b2-acc32-cc8-mr8 ===
+Loading: cortex-retrofit/retro-b2-acc32-cc8-mr8/final_checkpoint  (overlay: None)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:40<01:40, 100.51s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:55<00:00, 50.23s/it] Loading checkpoint shards: 100%|██████████| 2/2 [01:55<00:00, 57.77s/it]
+[cortex] carry buffer: n_vec=32 max_vecs=256 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+T=8  n_chunks=8  carry condition: on
+context lens: 0 + [64, 128, 256, 512]
+position bands: 4 per chunk
+data/pg19_fw50_olmo_len4096: 940000 rows, evaluating 100
+  sample 1 took 4.0s -> ETA 7 min
+  10/100 samples  [1 min]
+  20/100 samples  [1 min]
+  30/100 samples  [2 min]
+  40/100 samples  [3 min]
+  50/100 samples  [3 min]
+  60/100 samples  [4 min]
+  70/100 samples  [5 min]
+  80/100 samples  [5 min]
+  90/100 samples  [6 min]
+  100/100 samples  [7 min]
+
+  Chunk      N       k=0      k=64     k=128     k=256     k=512     carry
+  ------------------------------------------------------------------------
+  2        100    3.4036    3.3015    3.2716    3.2515    3.2629    3.2491
+  3        100    3.4127    3.3088    3.2827    3.2645    3.2744    3.2336
+  4        100    3.4895    3.3928    3.3651    3.3435    3.3582    3.3031
+  5         99    3.4682    3.3754    3.3479    3.3282    3.3429    3.2853
+  6         98    3.4946    3.3996    3.3792    3.3550    3.3645    3.3115
+  7         98    3.4987    3.4025    3.3754    3.3552    3.3699    3.3076
+  8         98    3.5148    3.4215    3.3944    3.3749    3.3853    3.3226
+
+  chunks 2+ pooled (n=693), delta vs k=0 (positive = that context HELPS):
+       64 real tokens : +0.09718  (SE 0.00179)
+      128 real tokens : +0.12371  (SE 0.00255)
+      256 real tokens : +0.14422  (SE 0.00296)
+      512 real tokens : +0.13204  (SE 0.00340)
+    carry             : +0.18127  (SE 0.00334)
+
+  => the carry BEATS every measured oracle (best: +0.14422 at k=256); the ceiling is not the binding constraint
+  => it recovers 125.7% of the best oracle (+0.14422 at k=256 real tokens)
+
+  P0.3 -- document-boundary split (separator id 100257, 693 chunk-instances)
+  A carry can only transfer information that EXISTS across the
+  boundary.  Where the packer joined two unrelated documents
+  there is nothing to carry: those instances sit in the
+  denominator of every carry number the project has quoted and
+  can never be in the numerator.  This sizes issue 7 and the mix.
+
+  scheme 'local': across-document := a separator inside the 512 tokens before the boundary
+    within-document   n=  577 (83.3%)  k64=+0.1006  k128=+0.1294  k256=+0.1527  k512=+0.1422  carry=+0.1944
+    across-document   n=  116 (16.7%)  k64=+0.0803  k128=+0.0953  k256=+0.1022  k512=+0.0812  carry=+0.1158
+
+  scheme 'prefix': across-document := a separator anywhere in chunks 1..g-1
+    within-document   n=  486 (70.1%)  k64=+0.1042  k128=+0.1346  k256=+0.1585  k512=+0.1473  carry=+0.2023
+    across-document   n=  207 (29.9%)  k64=+0.0806  k128=+0.0980  k256=+0.1107  k512=+0.0961  carry=+0.1319
+
+  READ IT AS: an across-document ceiling near zero against a
+  large within-document ceiling means the pack's real cross-chunk
+  signal is only its within-document share -- the MIX RATIO, not
+  the mechanism, is then what limits the carry.  Both ceilings
+  large means the packer is not the problem and issue 7 shrinks.
+
+  position bands inside the chunk (n=693 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k64               +0.32726    +0.03886    +0.01620    +0.00598
+  k128              +0.39443    +0.06198    +0.02799    +0.00982
+  k256              +0.44751    +0.08394    +0.04257    +0.00234
+  k512              +0.48201    +0.09210    +0.01879    -0.06547
+  carry             +0.45393    +0.12761    +0.08446    +0.05831
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/context_ceiling_p03-20260915-P3e-arm-mix/retro-b2-acc32-cc8-mr8
+---------------------------------------
+Begin Slurm Epilog: Sep-15-2026 10:35:52
+Job ID:        13219075
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_context_ceiling.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=01:10:48,vmem=0,walltime=00:08:51,mem=6068624K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-14-0
+---------------------------------------
