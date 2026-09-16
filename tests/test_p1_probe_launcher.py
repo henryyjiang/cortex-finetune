@@ -171,3 +171,43 @@ class TestTheCheckpointPathIsNotSilentlyIgnored:
         with pytest.raises(FileNotFoundError, match="no chkpt.pt"):
             load_checkpoint(str(tmp_path), "ckpts/does-not-matter",
                             None, None, None)
+
+
+class TestThePostProbeChecksRunAtTheArmsGeometry:
+    """A probe checkpoint dir holds only chkpt.pt, so the config comes from
+    $MODEL -- the BASE, which says W=32, accum, E-only.  Without the arm's own
+    flags the post-run checks either die on a summary_emb size mismatch or, if
+    the widths happen to agree, rebuild a DIFFERENT buffer from the same weights
+    and report on a geometry that never trained.  Either way it happens AFTER
+    the 400 steps are paid for."""
+
+    def test_both_post_probe_consumers_get_the_arms_flags(self):
+        body = ARMS[ARMS.index('if [ -n "$PROBE" ] && [ $RC -eq 0 ]; then'):]
+        for tool in ("diag_dual_channel_walk.py", "prelaunch_final.py"):
+            i = body.index(tool)
+            line_end = body.index("\n", i)
+            assert "$PROBE_SETS" in body[i:line_end], (
+                f"{tool} runs against the BASE config, not the arm's")
+
+    def test_probe_sets_is_built_from_the_same_variables_as_the_run(self):
+        """Built next to the training command's own GATE_ARGS / LATENT_ARGS so
+        the checks and the run cannot describe different geometries."""
+        assert 'PROBE_SETS="--set prefix_memory=$PREFIX_MODE' in ARMS
+        assert "--set accum_vecs=$ACCUM_VECS" in ARMS
+        for flag in ("gate_slots=$GATE_SLOTS", "gate_route=", "gate_norm=",
+                     "gate_init=", "gate_fill="):
+            assert flag in ARMS, flag
+
+    def test_an_accum_arm_does_not_claim_a_gate_it_does_not_have(self):
+        i = ARMS.index('PROBE_SETS="--set prefix_memory=$PREFIX_MODE')
+        block = ARMS[i:i + 1400]
+        assert 'if [ "$PREFIX_MODE" = "accum" ]; then' in block
+        assert "--set accum_max=$ACCUM_MAX" in block
+
+    def test_the_z_flags_are_gated_on_the_arm_actually_carrying_z(self):
+        """a1/a3 are E-only: forcing latent_carry on their checks would gate a
+        channel those weights never had."""
+        i = ARMS.index('PROBE_SETS="--set prefix_memory=$PREFIX_MODE')
+        block = ARMS[i:i + 1600]
+        j = block.index("--set latent_carry=true")
+        assert 'if [ "$LATENT" = "1" ]; then' in block[:j]

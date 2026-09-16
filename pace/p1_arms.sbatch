@@ -211,6 +211,36 @@ a2|a3z)
     RUN_NAME="${RUN_NAME}-z";;
 esac
 
+
+# THE ARM'S OWN GEOMETRY, for the post-probe checks.  NOT optional, and the
+# failure is not subtle: a probe checkpoint dir holds only chkpt.pt, so the
+# config comes from $MODEL -- the BASE, which says W=32, accum, E-only.  Loading
+# this arm's [W, D] summary_emb against it is a size mismatch, so the walk and
+# the gates would die AFTER the 400 steps were already paid for.  And if the
+# widths happened to agree, the checks would rebuild a DIFFERENT buffer from the
+# same weights and report on a geometry that never trained -- the exact hazard
+# tools/prepare_eval_checkpoint.py's CORTEX_FLAGS list exists for.
+#
+# Built from the SAME variables the training command uses, immediately after
+# them, so the two cannot drift.
+PROBE_SETS="--set prefix_memory=$PREFIX_MODE --set accum_vecs=$ACCUM_VECS"
+if [ "$PREFIX_MODE" = "accum" ]; then
+    PROBE_SETS="$PROBE_SETS --set accum_max=$ACCUM_MAX"
+else
+    PROBE_SETS="$PROBE_SETS --set gate_slots=$GATE_SLOTS"
+    PROBE_SETS="$PROBE_SETS --set gate_route=${GATE_ROUTE:-ring}"
+    PROBE_SETS="$PROBE_SETS --set gate_norm=${GATE_NORM:-tanh}"
+    PROBE_SETS="$PROBE_SETS --set gate_init=${GATE_INIT:-zero}"
+    PROBE_SETS="$PROBE_SETS --set gate_fill=${GATE_FILL:-grow}"
+fi
+if [ "$LATENT" = "1" ]; then
+    PROBE_SETS="$PROBE_SETS --set latent_carry=true"
+    PROBE_SETS="$PROBE_SETS --set latent_depth_rule=${LATENT_RULE:-absolute}"
+    PROBE_SETS="$PROBE_SETS --set latent_depth_lo=${LATENT_LO:-2}"
+    PROBE_SETS="$PROBE_SETS --set latent_depth_hi=${LATENT_HI:-9}"
+    PROBE_SETS="$PROBE_SETS --set latent_renorm=${LATENT_RENORM:-none}"
+fi
+
 if [ -n "$PROBE" ]; then
     # The architecture probe: short, and named so it can never be mistaken for a
     # cell of the experiment in wandb or on disk.
@@ -395,7 +425,7 @@ if [ -n "$PROBE" ] && [ $RC -eq 0 ]; then
     #    write norms as a ratio to ||s0||, the tape and its depths, whether s0's
     #    head really equals the carried Z, and the per-parameter grad norms.
     #    Read it; it is not a threshold.
-    python evals/diag_dual_channel_walk.py --model_name $MODEL \
+    python evals/diag_dual_channel_walk.py --model_name $MODEL $PROBE_SETS \
         --checkpoint "$LAST" --chunks $CROSS_CHUNKS --chunk_len 256 \
         --T $MAX_MEAN_REC --out $OUT/walk.json || RC=1
 
@@ -404,7 +434,7 @@ if [ -n "$PROBE" ] && [ $RC -eq 0 ]; then
     #    unit test can catch), the MEASURED no-grad split that goes into the Z
     #    pre-registration, and the per-channel donor control (P0.6 -- it never
     #    ran on B2).  Each one can come back negative.
-    python tools/prelaunch_final.py --model_name $MODEL \
+    python tools/prelaunch_final.py --model_name $MODEL $PROBE_SETS \
         --checkpoint "$LAST" --chunks $CROSS_CHUNKS --chunk_len 256 \
         --T $MAX_MEAN_REC --out $OUT/prelaunch.json || RC=1
 
