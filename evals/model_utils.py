@@ -82,6 +82,33 @@ def to_num_steps(T: Optional[int]):
     return torch.tensor([int(T), 0])
 
 
+def parse_config_overrides(items) -> dict:
+    """["KEY=VALUE", ...] -> a TYPED dict for `load_checkpoint(config_overrides=)`.
+
+    Booleans and ints are parsed, and that is the whole reason this is a
+    function rather than a dict comprehension at each call site: a config flag
+    that arrives as the STRING "false" is TRUTHY, so `latent_carry=false` would
+    turn an intended E-only run into a dual-channel one with no symptom at all.
+
+    Shared by tools/prelaunch_final.py and evals/diag_dual_channel_walk.py so
+    the two cannot parse the same flag differently.
+    """
+    out = {}
+    for it in items or ():
+        if "=" not in it:
+            raise SystemExit(f"expected KEY=VALUE, got {it!r}")
+        k, v = it.split("=", 1)
+        low = v.strip().lower()
+        if low in ("true", "false"):
+            out[k] = (low == "true")
+        else:
+            try:
+                out[k] = int(v)
+            except ValueError:
+                out[k] = v
+    return out
+
+
 def load_checkpoint(
     checkpoint: Optional[str],
     model_name: str,

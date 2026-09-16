@@ -477,24 +477,10 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def _parse_set(items) -> dict:
-    """KEY=VALUE -> a typed dict.  bools and ints are parsed because a config
-    flag that arrives as the STRING "false" is truthy, which would turn an
-    intended E-only run into a dual-channel one with no symptom."""
-    out = {}
-    for it in items:
-        if "=" not in it:
-            raise SystemExit(f"expected KEY=VALUE, got {it!r}")
-        k, v = it.split("=", 1)
-        low = v.strip().lower()
-        if low in ("true", "false"):
-            out[k] = (low == "true")
-        else:
-            try:
-                out[k] = int(v)
-            except ValueError:
-                out[k] = v
-    return out
+# The KEY=VALUE parser lives in evals/model_utils.py beside the
+# `config_overrides` argument it feeds, so this tool and
+# evals/diag_dual_channel_walk.py cannot parse the same flag differently.
+from model_utils import parse_config_overrides as _parse_set  # noqa: E402
 
 
 def build_e_twin(model):
@@ -503,7 +489,8 @@ def build_e_twin(model):
     Rebuilt from the same config with `latent_carry` off, then loaded
     non-strictly: the six Z gate tensors MUST come back as unexpected keys and
     nothing else may.  That list is itself evidence -- an E-only rebuild that
-    reported no unexpected keys would mean the Z gate was never allocated.
+    reported no unexpected keys would mean the Z gate was never allocated, and
+    the twin would be comparable for the wrong reason.
     """
     cfg_cls = type(model.config)
     d = json.loads(model.config.to_json_string())

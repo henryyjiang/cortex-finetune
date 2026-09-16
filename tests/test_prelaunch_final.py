@@ -299,3 +299,55 @@ class TestTheReport:
                             "why": "shapes differ"}], out=buf)
         assert ok is False
         assert "[FAIL] donor_control" in buf.getvalue()
+
+
+class TestTheSharedOverrideParser:
+    """`--set` feeds `load_checkpoint(config_overrides=)`, and the walk and the
+    gates must parse it identically -- a flag that means one thing to one tool
+    and another to the other is the two-files-disagree failure in miniature."""
+
+    def test_both_tools_use_the_same_parser(self):
+        from model_utils import parse_config_overrides
+        from tools.prelaunch_final import _parse_set
+        import evals.diag_dual_channel_walk as walk
+        assert _parse_set is parse_config_overrides
+        src = open(os.path.join(REPO, "evals", "diag_dual_channel_walk.py"),
+                   encoding="utf-8").read()
+        assert "parse_config_overrides" in src
+
+    def test_the_walk_accepts_set_because_a_sliced_branch_needs_it(self):
+        """summary_emb is a parameter SHAPE.  A [16, D] slice loaded against the
+        base dir's config (which still says the PARENT's width) is a size
+        mismatch, so without --set the walk cannot open a sliced branch at all.
+        """
+        src = open(os.path.join(REPO, "evals", "diag_dual_channel_walk.py"),
+                   encoding="utf-8").read()
+        assert 'p.add_argument("--set"' in src
+        assert "config_overrides=overrides" in src
+
+    def test_the_prelaunch_job_passes_accum_vecs_to_the_walk(self):
+        """The bug this caught: the walk step was passing the sliced checkpoint
+        with no width override, so it would have died before printing a row."""
+        sb = open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
+                  encoding="utf-8").read()
+        # Anchor on the INVOCATION, not the header -- the header names every
+        # step in running order before any of them runs.
+        i = sb.index('echo "######## 3. the 8-chunk')
+        assert "--set accum_vecs=$ACCUM_VECS" in sb[i:i + 700]
+
+    def test_the_width_contrast_reads_both_sides_from_the_same_step(self):
+        """model_only_chkpt_90000 is 1,552 steps short of the parent the slice
+        was cut from; using it would confound width with training."""
+        sb = open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
+                  encoding="utf-8").read()
+        i = sb.index('echo "######## 3b. THE WIDTH CONTRAST')
+        block = sb[i:i + 1800]
+        assert "$PARENT_PATH/chkpt.pt" in block
+        assert "--set accum_vecs=$PARENT_VECS" in block
+        assert "compare_width.py" in block
+
+    def test_the_contrast_is_opt_in_so_the_gate_still_runs_without_a_parent(self):
+        sb = open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
+                  encoding="utf-8").read()
+        assert 'if [ -n "$PARENT_PATH" ]; then' in sb
+        assert "PARENT_PATH=${PARENT_PATH:-}" in sb

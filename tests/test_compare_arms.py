@@ -281,3 +281,73 @@ class TestThePrintedComparison:
         rec = self._build(pathlib.Path(tempfile.mkdtemp()))
         assert "diag" not in rec["arms"]["a1"]
         json.dumps(rec)
+
+
+class TestTheWidthContrast:
+    """`tools/compare_width.py` -- the delivered-rank read that decides whether
+    W=32 -> 16 cost anything that reaches attention.
+
+    The slice measured the WRITE BASIS (`summary_emb`: 20.02 of 32 -> 10.90 of
+    16, i.e. 54% at 50% of the columns) and that retires P1.0's at-init
+    argument.  It does NOT decide the question, because the collapse from ~20 to
+    ~4 happens in the forward pass.  The rule is pre-registered in
+    p11_z_probe_prereg.md section 4; these tests hold the instrument to it.
+    """
+
+    @staticmethod
+    def _walk(n_vec, pr, rows=64):
+        return {"geometry": {"n_vec": n_vec},
+                "final_carry": {"rows": rows, "e_eff_rank_pr": pr,
+                                "e_eff_rank_entropy": pr * 1.8,
+                                "e_centred_cosine": 0.9, "e_row_norm": 170.0}}
+
+    def test_unchanged_delivered_rank_reads_as_survives(self):
+        from tools.compare_width import score
+        r = score(self._walk(32, 4.10), self._walk(16, 4.02))
+        assert r["verdict"] == "SURVIVES"
+        assert "not reaching the token stream" in r["why"]
+
+    def test_proportional_loss_reads_as_binds(self):
+        from tools.compare_width import score
+        r = score(self._walk(32, 4.10), self._walk(16, 2.05))
+        assert r["verdict"] == "BINDS"
+        # The pre-registered response is NOT a revert -- that would restore the
+        # eviction cliff the gate exists to remove.
+        assert "NOT reverting" in r["why"] and "cc=16" in r["why"]
+
+    def test_the_middle_band_is_named_rather_than_rounded_to_a_side(self):
+        """Between the bands the honest answer is 'report the number'.  An
+        instrument that snapped to the nearer verdict would be choosing the
+        flattering reading on the user's behalf."""
+        from tools.compare_width import score
+        r = score(self._walk(32, 4.00), self._walk(16, 3.00))   # 75% at 50%
+        assert r["verdict"] == "PARTIAL"
+
+    def test_two_walks_at_the_same_width_are_invalid_not_survives(self):
+        """The failure that would otherwise read as the best possible result:
+        forgetting --set accum_vecs on one side makes both walks W=32, the
+        ratio is exactly 1.0, and it would print SURVIVES."""
+        from tools.compare_width import score
+        r = score(self._walk(32, 4.10), self._walk(32, 4.10))
+        assert r["verdict"] == "INVALID"
+        assert "no width contrast" in r["why"]
+
+    def test_a_result_does_not_fail_the_job_but_an_invalid_comparison_does(self):
+        """A gate that goes red on a negative finding teaches people to skip the
+        gate.  BINDS is a result; a broken comparison is not."""
+        from tools.compare_width import score
+        import io as _io
+        from tools.compare_width import print_report
+        for verdict, rec in (("BINDS", score(self._walk(32, 4.1), self._walk(16, 2.0))),
+                             ("SURVIVES", score(self._walk(32, 4.1), self._walk(16, 4.1)))):
+            assert rec["verdict"] == verdict
+            buf = _io.StringIO()
+            print_report(rec, out=buf)
+            buf.getvalue().encode("ascii")
+
+    def test_the_thresholds_are_module_constants(self):
+        """So p11 and the instrument cannot drift apart -- the same rule p10
+        follows for the gate bars."""
+        from tools import compare_width
+        assert compare_width.DELIVERED_RETAINED_SURVIVES == 0.90
+        assert compare_width.DELIVERED_BINDS_MARGIN == 0.10

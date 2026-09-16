@@ -36,6 +36,13 @@
 #      touched against the ring rule, write norms as a ratio to ||s0||, the
 #      tape and its depths, whether s0's head equals the carried Z, and the
 #      per-parameter gradient norms.
+#   3b. THE WIDTH CONTRAST (only when PARENT_PATH is set).  The same walk on
+#      the UNSLICED parent, so the DELIVERED rank of the carried block can be
+#      read at W=32 against W=16.  The slice reported that halving W keeps only
+#      54% of summary_emb's rank, which retires P1.0's at-init argument -- but
+#      summary_emb is the write BASIS, and what decides whether width binds is
+#      what reaches attention.  p11_z_probe_prereg.md section 4 fixes the
+#      reading before it runs.
 #   4. the four pre-launch gates (tools/prelaunch_final.py): Z-off
 #      equivalence, the config round trip, the MEASURED no-grad split, and the
 #      per-channel donor control.
@@ -61,6 +68,11 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MODEL=${MODEL:-ckpts/olmo-retrofit-cortex}
 BRANCH_PATH=${BRANCH_PATH:-}
+# The UNSLICED parent BRANCH_PATH was cut from.  Set it and step 3b runs the
+# width contrast (W=PARENT_VECS vs W=ACCUM_VECS) off the SAME weights, which
+# is the only way the comparison isolates width from training.
+PARENT_PATH=${PARENT_PATH:-}
+PARENT_VECS=${PARENT_VECS:-32}
 ACCUM_VECS=${ACCUM_VECS:-16}
 GATE_SLOTS=${GATE_SLOTS:-64}
 CROSS_CHUNKS=${CROSS_CHUNKS:-8}
@@ -121,10 +133,40 @@ SETS="--set latent_carry=true --set prefix_memory=gated \
 
 echo ""
 echo "######## 3. the 8-chunk dual-channel walk ########"
+# --set accum_vecs is NOT optional on a sliced branch: summary_emb is a
+# parameter SHAPE, and the config the base dir carries is the PARENT's (W=32).
+# A [16, D] slice loaded against it is a size mismatch, so the walk would die
+# before printing a single row.
 python evals/diag_dual_channel_walk.py --model_name $MODEL $CKPT_ARG \
+    --set accum_vecs=$ACCUM_VECS \
     --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
     --out $OUT/walk.json || RC=1
 
+if [ -n "$PARENT_PATH" ]; then
+    echo ""
+    echo "######## 3b. THE WIDTH CONTRAST: W=$PARENT_VECS vs W=$ACCUM_VECS ########"
+    # WHY THIS EXISTS.  tools/slice_summary_emb.py reported that halving W keeps
+    # 54% of the parent's summary_emb rank at 50% of the columns -- the trained
+    # write basis was NOT redundant, which retires P1.0's at-init "the slots were
+    # never carrying 32 things" argument.
+    #
+    # But summary_emb is the WRITE BASIS, not what reaches attention.  The number
+    # that decides whether width binds is the DELIVERED rank: the effective rank
+    # of the carried post-ln_f block, ~4 of 32 on B2.  ~4 at both widths means
+    # the basis given up never reached the token stream.  p11_z_probe_prereg.md
+    # section 4 fixes the reading BEFORE this runs.
+    #
+    # BOTH WALKS COME OFF THE SAME STEP.  The newest weights-only dir in the heal
+    # run is model_only_chkpt_90000, 1,552 steps short of the parent the slice
+    # was cut from; using it would confound width with training, so both sides
+    # read the 91552 chkpt.pt.
+    python evals/diag_dual_channel_walk.py --model_name $MODEL \
+        --checkpoint $PARENT_PATH/chkpt.pt --set accum_vecs=$PARENT_VECS \
+        --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
+        --no_backward --out $OUT/walk-parent-w$PARENT_VECS.json || RC=1
+    python tools/compare_width.py --parent $OUT/walk-parent-w$PARENT_VECS.json \
+        --branch $OUT/walk.json || RC=1
+fi
 echo ""
 echo "######## 4. the pre-launch gates ########"
 python tools/prelaunch_final.py --model_name $MODEL $CKPT_ARG $SETS \

@@ -104,6 +104,14 @@ def parse_args() -> argparse.Namespace:
                    choices=["float32", "bfloat16", "float16"])
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="force a graft-building config flag, e.g. "
+                        "--set accum_vecs=16 --set latent_carry=true.  REQUIRED "
+                        "to walk a SLICED checkpoint: summary_emb is a "
+                        "parameter shape, so a [16, D] slice loaded against a "
+                        "config that still says 32 is a size mismatch, not a "
+                        "silent one -- but the config the base dir carries is "
+                        "the PARENT's, not the branch's.")
     p.add_argument("--out", default=None, help="write the record as JSON")
     return p.parse_args()
 
@@ -413,10 +421,13 @@ def _chunks_from_args(args, model, tok_vocab):
 
 def main() -> int:
     args = parse_args()
-    from model_utils import load_checkpoint, to_num_steps, _unwrap  # noqa: E402
+    from model_utils import (load_checkpoint, parse_config_overrides,  # noqa: E402
+                             to_num_steps, _unwrap)
     device = torch.device(args.device)
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
-                                 getattr(torch, args.dtype), device)
+                                 getattr(torch, args.dtype), device,
+                                 config_overrides=overrides or None)
     inner = _unwrap(model)
     cortex = getattr(inner, "cortex", None)
     if cortex is None or cortex.prefix is None:
