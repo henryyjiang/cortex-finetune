@@ -296,3 +296,69 @@ class TestTheProseSourceIsChosenDeliberately:
 
     def test_the_source_is_echoed_so_a_log_records_which_text_was_used(self):
         assert "prose source: $SRC_DESC" in self._sb()
+
+
+class TestTheOscillationArtifact:
+    """REGRESSION, from the real 2026-09-16 run on retro-b2-heal.
+
+    `t_hi_magnitude` is `max(t : d/s0 >= MAG_FLOOR)` -- a LAST crossing, which
+    is only a band edge on a series that goes below the floor and stays there.
+    The measured trajectory does not: it decays to 0.42 by t=13, humps back to
+    0.548 at t=19, sinks to 0.41 by t=29 and is rising again at t=32, and
+    MAG_FLOOR = 0.5 sits INSIDE that band.  So T=16 saw one run and reported
+    edge 10; T=32 caught the second hump and reported 21 -- and 21/32 vs 10/16
+    is 0.656 vs 0.625, which scored RELATIVE with CV 0.024.
+
+    The edge grew with the OBSERVATION WINDOW, not with the band.  A relative
+    verdict is what that defect produces by construction, because an edge that
+    grows with T is exactly what "relative" means.
+    """
+
+    #: The measured d/s0 series, T=32, retro-b2-heal/model_only_chkpt_90000.
+    REAL = [31.9245, 15.2380, 7.9392, 4.4782, 2.6255, 1.6699, 1.1234, 0.8063,
+            0.6428, 0.5645, 0.4953, 0.4436, 0.4166, 0.4197, 0.4426, 0.4764,
+            0.5134, 0.5424, 0.5477, 0.5362, 0.5168, 0.4946, 0.4745, 0.4614,
+            0.4508, 0.4319, 0.4166, 0.4077, 0.4072, 0.4142, 0.4249, 0.4354]
+
+    def _rows(self, T):
+        return [{"t": i + 1, "d_over_s0": v, "cos_delta": None if i == 0 else -0.3,
+                 "s_norm": 1.0} for i, v in enumerate(self.REAL[:T])]
+
+    def test_the_real_series_re_crosses_the_floor(self):
+        from evals.diag_depth_band import _runs_above, MAG_FLOOR
+        runs = _runs_above(self._rows(32), "d_over_s0", MAG_FLOOR)
+        assert len(runs) == 2, runs
+        assert runs[0] == (2, 10) and runs[1] == (17, 21)
+
+    def test_the_last_crossing_grows_with_the_window_and_the_first_does_not(self):
+        from evals.diag_depth_band import band_edges
+        e16, e32 = band_edges(self._rows(16)), band_edges(self._rows(32))
+        # the artifact:
+        assert e16["t_hi_magnitude"] == 10 and e32["t_hi_magnitude"] == 21
+        # the window-independent statistic:
+        assert e16["t_hi_magnitude_first_run"] == e32["t_hi_magnitude_first_run"] == 10
+
+    def test_only_the_longer_sweep_is_flagged_as_oscillating(self):
+        from evals.diag_depth_band import band_edges
+        assert band_edges(self._rows(16))["magnitude_oscillates"] is False
+        assert band_edges(self._rows(32))["magnitude_oscillates"] is True
+
+    def test_the_verdict_is_withheld_rather_than_reported_as_relative(self):
+        """The whole point: before the fix this scored RELATIVE and would have
+        gone into the Z pre-registration."""
+        from evals.diag_depth_band import band_edges, score_rules
+        per = {T: band_edges(self._rows(T)) for T in (4, 8, 16, 32)}
+        sc = score_rules(per, "t_hi_magnitude")
+        assert sc["verdict"].startswith("UNRELIABLE")
+        assert sc["oscillating_T"] == [32]
+
+    def test_a_monotone_series_still_gets_a_verdict(self):
+        """The guard must not swallow the case it was built to preserve."""
+        from evals.diag_depth_band import band_edges, score_rules
+        mono = [8.0, 4.0, 2.0, 1.0, 0.9, 0.8, 0.7, 0.6, 0.55, 0.45] + [0.1] * 22
+        rows = lambda T: [{"t": i + 1, "d_over_s0": v, "cos_delta": None,
+                           "s_norm": 1.0} for i, v in enumerate(mono[:T])]
+        per = {T: band_edges(rows(T)) for T in (16, 32)}
+        assert not any(p["magnitude_oscillates"] for p in per.values())
+        sc = score_rules(per, "t_hi_magnitude")
+        assert sc["verdict"] == "ABSOLUTE"

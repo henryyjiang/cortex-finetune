@@ -136,6 +136,28 @@ def trajectory_stats(s0: torch.Tensor, traj: list[torch.Tensor]) -> list[dict]:
     return rows
 
 
+def _runs_above(rows: list[dict], key: str, floor: float) -> list:
+    """Contiguous (start, end) runs of t >= BAND_LO where `key` >= floor.
+
+    More than one run means the series RE-CROSSES the floor, and every
+    statistic that takes a last crossing then depends on how long you looked.
+    """
+    out, start, prev = [], None, None
+    for r in rows:
+        if r["t"] < BAND_LO or r.get(key) is None:
+            continue
+        if r[key] >= floor:
+            if start is None:
+                start = r["t"]
+            prev = r["t"]
+        elif start is not None:
+            out.append((start, prev))
+            start = prev = None
+    if start is not None:
+        out.append((start, prev))
+    return out
+
+
 def band_edges(rows: list[dict]) -> dict:
     """Upper edge of the informative band under each criterion.
 
@@ -149,9 +171,26 @@ def band_edges(rows: list[dict]) -> dict:
            if r["t"] >= BAND_LO and r["cos_delta"] is not None
            and r["cos_delta"] >= NOVELTY_FLOOR]
     T = rows[-1]["t"]
+    # DOES THE SERIES CROSS THE FLOOR MORE THAN ONCE?  `max()` is a LAST
+    # crossing, which is only a "band edge" on a series that goes below the
+    # floor and stays there.  Measured 2026-09-16 on retro-b2-heal: d/s0 decays
+    # to 0.42 by t=13, humps back to 0.548 at t=19, sinks to 0.41 by t=29 and is
+    # rising again at t=32 -- and MAG_FLOOR = 0.5 sits INSIDE that band.  So a
+    # longer sweep catches one more hump and the edge grows with the OBSERVATION
+    # WINDOW: T=16 -> 10, T=32 -> 21, which reads as a relative band and is not
+    # one.  Counting the runs is what tells the two apart.
+    runs = _runs_above(rows, "d_over_s0", MAG_FLOOR)
+    nov_runs = _runs_above(rows, "cos_delta", NOVELTY_FLOOR)
     return {
         "t_hi_magnitude": max(mag) if mag else None,
         "t_hi_novelty": max(nov) if nov else None,
+        # End of the FIRST contiguous run -- window-independent, and the honest
+        # edge when the series oscillates.
+        "t_hi_magnitude_first_run": runs[0][1] if runs else None,
+        "magnitude_runs": len(runs),
+        "magnitude_oscillates": len(runs) > 1,
+        "novelty_runs": len(nov_runs),
+        "novelty_oscillates": len(nov_runs) > 1,
         # Censored = the criterion was still satisfied at the last step, so the
         # band may extend past T and the edge is a lower bound.
         "magnitude_censored": bool(mag) and max(mag) == T,
@@ -211,11 +250,22 @@ def score_rules(per_T: dict, key: str) -> dict:
         pair = {"t_hi_16": a16, "t_hi_32": a32,
                 "absolute_ratio": a32 / a16,      # 1.0 if absolute
                 "relative_ratio": (a32 / 32) / (a16 / 16)}   # 1.0 if relative
+    # AN OSCILLATING SERIES HAS NO LAST CROSSING WORTH SCORING.  If any usable
+    # T re-crossed the floor, `t_hi` is a function of how long the sweep ran,
+    # so BOTH rules are being fitted to an artifact -- and the relative rule
+    # wins automatically, because an edge that grows with T is what "relative"
+    # means.  Withhold the verdict rather than report the artifact.
+    osc_key = key.replace("t_hi_", "") + "_oscillates"
+    oscillating = [t for t in ts if per_T[t].get(osc_key)]
     if len(ts) < 2:
         verdict = "NO VERDICT (too few uncensored T)"
+    elif oscillating:
+        verdict = "UNRELIABLE (edge re-crosses the floor)"
+
     return {"T": ts, "censored_T": censored,
             "absolute": absolute, "relative": relative,
             "cv_absolute": cv_a, "cv_relative": cv_b, "verdict": verdict,
+            "oscillating_T": oscillating,
             "discriminating_pair": pair}
 
 
@@ -265,6 +315,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch", type=int, default=2)
     p.add_argument("--n_slots", type=int, default=16,
                    help="W, for the slot->depth map the verdict implies")
+    p.add_argument("--trained_depth", type=int, default=0,
+                   help="the mean_recurrence the checkpoint ACTUALLY TRAINED "
+                        "AT, which config.json does not carry: B2 ramps "
+                        "max_mean_rec to 8 while the inherited field still "
+                        "reads 32.  Reading it off the config is the "
+                        "inherited-mean_recurrence trap and it suppresses the "
+                        "OOD warning exactly where it is needed.  0 = unknown, "
+                        "and the probe says so rather than guess.")
     p.add_argument("--no_prefix", action="store_true")
     p.add_argument("--dtype", default="float32",
                    choices=["float32", "bfloat16"])
@@ -288,7 +346,15 @@ def main() -> int:
                                  getattr(torch, args.dtype), device)
     inner = _unwrap(model)
     D = int(cfg.n_embd)
-    trained_T = int(getattr(cfg, "mean_recurrence", 0) or 0)
+    # THE CONFIG FIELD IS INHERITED, NOT TRAINED.  A B2-family checkpoint
+    # carries mean_recurrence 32 from the base recipe while its own ramp
+    # capped max_mean_rec at 8, so trusting the config reports the model as in
+    # distribution all the way to T=32 when everything past 8 is out of it --
+    # and the late-trajectory region a depth band is read from sits squarely
+    # in that gap.  Measured 2026-09-16: the hump at t=17..21 that produced a
+    # RELATIVE verdict on retro-b2-heal is entirely OOD under the real depth.
+    inherited_T = int(getattr(cfg, "mean_recurrence", 0) or 0)
+    trained_T = int(args.trained_depth or 0)
 
     if args.data:
         from datasets import load_from_disk
@@ -321,9 +387,19 @@ def main() -> int:
           f"{source} ===")
     print(f"    D={D} seq_len={args.seq_len} batch={args.batch} "
           f"dtype={args.dtype} prefix={'off' if args.no_prefix else 'on'}")
-    print(f"    checkpoint mean_recurrence = {trained_T or '?'}; any T above it "
-          f"is OUT OF DISTRIBUTION\n    and a band that looks absolute there may "
-          f"only be saying 'this model stops at {trained_T or '?'}'.")
+    if trained_T:
+        print(f"    TRAINED mean_recurrence = {trained_T} (given); config.json"
+              f" says {inherited_T}, which is INHERITED from the base recipe.")
+        print(f"    Any T above {trained_T} is OUT OF DISTRIBUTION, and a band"
+              f" that looks absolute there may only be saying that this model"
+              f" stops at {trained_T}.")
+    else:
+        print(f"    TRAINED mean_recurrence UNKNOWN.  config.json says"
+              f" {inherited_T}, but that field is INHERITED -- a B2-family"
+              f" checkpoint carries 32 while its ramp capped max_mean_rec at 8.")
+        print("    Pass --trained_depth to mark the OOD rows.  Until then ANY"
+              " row may be out of distribution, and a band that looks absolute"
+              " may only be saying that this model stops there.")
 
     per_T, steps_by_T, suspect_by_T = {}, {}, {}
     for T in sorted(set(args.T)):
@@ -392,20 +468,50 @@ def main() -> int:
         else:
             print(f"  {'':<10} no T16/T32 pair in the sweep -- the full-sweep CV "
                   f"flatters BOTH rules,\n  {'':<10} because at small T they "
-                  f"select nearly the same depths.  Re-run with --T 4 8 16 32.")
+                  f"select nearly the same depths.  EXTEND the sweep upward (--T 8 16 32 64) so a second uncensored point exists.")
     if mag["verdict"] != nov["verdict"]:
-        print("\n  THE TWO CRITERIA DISAGREE, and that is a finding rather than "
-              "a failure:\n  magnitude says how much the state still moves, "
-              "novelty says whether the\n  movement is anywhere new.  A band "
-              "that is absolute in magnitude and relative\n  in novelty means "
-              "the late steps keep their size while re-walking one\n  "
-              "direction -- write the NOVELTY band, since Z carries the "
-              "pathway, not the\n  displacement.")
-
-    print("\n" + "=" * 78)
+        print("")
+        print(f"  THE TWO CRITERIA DO NOT AGREE: magnitude {mag['verdict']}, "
+              f"novelty {nov['verdict']}.")
+        print("  magnitude says how much the state still moves; novelty says "
+              "whether the")
+        print("  movement is anywhere NEW.  PREFER NOVELTY when they part -- Z "
+              "carries the")
+        print("  pathway, not the displacement.")
+    for name, sc in (("magnitude", mag), ("novelty", nov)):
+        if sc["oscillating_T"]:
+            print("")
+            print(f"  {name.upper()} IS UNRELIABLE at T={sc['oscillating_T']}: "
+                  f"the series RE-CROSSES its floor, so")
+            print("  its edge is a LAST crossing and grows with the OBSERVATION "
+                  "WINDOW rather than")
+            print("  with the band.  That defect hands the verdict to RELATIVE "
+                  "by construction:")
+            print("  a longer sweep catches one more excursion above the floor "
+                  "and the edge moves")
+            print("  with T for a reason that has nothing to do with where the "
+                  "information is.")
+            print("  Read the first-run edge instead, or move the floor clear "
+                  "of the oscillation.")
+    print("")
+    print("=" * 78)
     print(f"the slot -> depth map each rule implies (n_slots = {args.n_slots})")
     print("=" * 78)
-    hi_ref = mag["absolute"][-1] if mag["absolute"] else 9
+    # WHICH EDGE THE WRITE RULE IS BUILT FROM.  Not magnitude when magnitude
+    # is unreliable: its edge is a last crossing of an oscillating series, so
+    # a map built on it samples depths chosen by the sweep length.  Novelty is
+    # monotone here and is the criterion the design prefers anyway, since Z
+    # carries the pathway rather than the displacement.
+    if mag["oscillating_T"] and nov["absolute"]:
+        hi_ref = nov["absolute"][-1]
+        hi_src = "novelty (magnitude is unreliable)"
+    elif mag["absolute"]:
+        hi_ref = mag["absolute"][-1]
+        hi_src = "magnitude"
+    else:
+        hi_ref = 9
+        hi_src = "P0.1 fallback (no usable edge in this sweep)"
+    print(f"  upper edge taken from: {hi_src} -> t_hi = {int(hi_ref)}")
     for T in sorted(steps_by_T):
         a = slot_depth_map("absolute", T, args.n_slots, BAND_LO, int(hi_ref))
         b = slot_depth_map("relative", T, args.n_slots, BAND_LO, int(hi_ref))
@@ -423,7 +529,8 @@ def main() -> int:
         "model_name": args.model_name,
         "checkpoint": args.checkpoint,
         "source": source,
-        "trained_mean_recurrence": trained_T,
+        "trained_mean_recurrence": trained_T or None,
+        "config_mean_recurrence_inherited": inherited_T,
         "criteria": {"mag_floor": MAG_FLOOR, "novelty_floor": NOVELTY_FLOOR,
                      "band_lo": BAND_LO, "margin": MARGIN},
         "geometry": {"D": D, "seq_len": args.seq_len, "batch": args.batch,
