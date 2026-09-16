@@ -244,3 +244,55 @@ class TestTrajectoryStatsOnARealModel:
             torch.tensor(1), 8).float(), ]
         rows = trajectory_stats(s0, traj)
         assert abs(rows[0]["d_over_s0"] - 0.5) < 1e-5
+
+
+class TestTheProseSourceIsChosenDeliberately:
+    """The band is a property of the TRAJECTORY, and the trajectory is a
+    property of the text -- so the source is not a detail.  The sbatch's old
+    default pointed at a repo-root planning doc that lives OUTSIDE this repo and
+    is not on the cluster, and random ids are explicitly not a fallback (they
+    give the loop nothing to converge on, so the trajectory is not the trained
+    one and neither is the band).
+    """
+
+    @staticmethod
+    def _sb():
+        import os
+        return open(os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "pace", "diag_depth_band.sbatch"), encoding="utf-8").read()
+
+    def test_a_packed_dataset_can_be_used_as_the_source(self):
+        """Already on the cluster, already tokenized with the arm's own
+        tokenizer, and it IS the corpus the cells train on."""
+        sb = self._sb()
+        assert "DATA=${DATA:-}" in sb
+        assert 'SRC_ARGS="--data $DATA"' in sb
+        assert "$SRC_ARGS" in sb
+
+    def test_a_missing_source_stops_the_job_rather_than_guessing(self):
+        sb = self._sb()
+        i = sb.index("ERROR: no prose source")
+        assert "exit 1" in sb[i:i + 700]
+        assert "RANDOM IDS ARE NOT A FALLBACK" in sb
+
+    def test_the_huginn_row_refuses_a_pack(self):
+        """Different tokenizer: ids built for the arm's tokenizer are noise to
+        huginn-0125, so --data cannot substitute for --text_file there."""
+        sb = self._sb()
+        i = sb.index('if [ -n "$HUGINN" ]; then')
+        block = sb[i:]
+        assert '--text_file "$TEXT"' in block
+        assert "$SRC_ARGS" not in block
+        j = block.index("SKIP: the generalisation row needs TEXT")
+        assert "different tokenizer" in block[j:j + 300]
+
+    def test_the_skip_message_states_the_asymmetry_of_the_confound(self):
+        """Without Huginn, only a RELATIVE verdict is decisive -- ABSOLUTE is
+        what the mr8 confound predicts on its own."""
+        sb = self._sb()
+        i = sb.index("SKIP: the generalisation row needs TEXT")
+        assert "only a RELATIVE verdict is decisive" in sb[i:i + 600]
+
+    def test_the_source_is_echoed_so_a_log_records_which_text_was_used(self):
+        assert "prose source: $SRC_DESC" in self._sb()

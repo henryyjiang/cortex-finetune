@@ -55,6 +55,41 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MODEL=${MODEL:-../checkpoints/retrofit/retro-b2-acc32-cc8-mr8-final_checkpoint}
 TEXT=${TEXT:-../cortex_next_phase_framework.md}
+DATA=${DATA:-}
+
+# WHERE THE PROSE COMES FROM, and why there are two answers.
+#
+# DATA is preferred when it is set: the packed corpus is already tokenized
+# with the arm's OWN tokenizer, it is the exact distribution the cells train
+# on, and it is on the cluster -- where the repo-root planning docs are NOT,
+# because they live outside this repo.  Measuring 'the trained band' on the
+# training corpus is the more defensible reading anyway.
+#
+# TEXT stays for the HUGINN row, which CANNOT use a pack: huginn-0125's
+# tokenizer differs from the pack's, so ids built for one model are noise to
+# the other.  --text_file re-tokenizes with each model's own tokenizer, which
+# is exactly why the script takes a path instead of ids.
+#
+# WHICHEVER YOU USE, USE THE SAME ONE FOR EVERY PROBE IN THIS FAMILY.  The
+# band is a property of the trajectory, and the trajectory is a property of
+# the text -- so trajectories measured on different sources are not
+# comparable, and this line is the one that decides it.
+if [ -n "$DATA" ]; then
+    SRC_ARGS="--data $DATA"
+    SRC_DESC="$DATA (packed; the arms' own corpus and tokenizer)"
+elif [ -f "$TEXT" ]; then
+    SRC_ARGS="--text_file $TEXT"
+    SRC_DESC="$TEXT"
+else
+    echo "ERROR: no prose source.  TEXT=$TEXT does not exist (the repo-root"
+    echo "  planning docs live outside this repo and are usually not on the"
+    echo "  cluster).  Set DATA=<packed dataset> -- e.g."
+    echo "    DATA=data/pg19_fw50_olmo_len4096 sbatch pace/diag_depth_band.sbatch"
+    echo "  RANDOM IDS ARE NOT A FALLBACK: they give the loop nothing to"
+    echo "  converge on, so the trajectory is not the trained one and neither"
+    echo "  is the band."
+    exit 1
+fi
 SEQ_LEN=${SEQ_LEN:-512}
 BATCH=${BATCH:-2}
 N_SLOTS=${N_SLOTS:-16}                 # W, so the printed map is A3's shape
@@ -62,11 +97,12 @@ T_SWEEP=${T_SWEEP:-"4 8 16 32"}
 OUT=${OUT:-eval_results/p07_depth_band_${SLURM_JOB_ID}}
 
 echo "=== P0.7 depth band | $MODEL | T in $T_SWEEP ==="
+echo "    prose source: $SRC_DESC"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
 python evals/diag_depth_band.py \
     --model_name "$MODEL" \
-    --text_file "$TEXT" \
+    $SRC_ARGS \
     --T $T_SWEEP \
     --seq_len "$SEQ_LEN" \
     --batch "$BATCH" \
@@ -84,16 +120,27 @@ if [ -n "$HUGINN" ]; then
     HUGINN_MODEL=${HUGINN_MODEL:-tomg-group-umd/huginn-0125}
     echo ""
     echo "######## generalisation: $HUGINN_MODEL (mean_recurrence 32) ########"
-    python evals/diag_depth_band.py \
-        --model_name "$HUGINN_MODEL" \
-        --text_file "$TEXT" \
-        --T $T_SWEEP \
-        --seq_len "$SEQ_LEN" \
-        --batch "$BATCH" \
-        --n_slots "$N_SLOTS" \
-        --dtype float32 \
-        --no_prefix \
-        --out "$OUT/huginn/results.json" || RC=1
+    # The Huginn row CANNOT fall back to a pack: huginn-0125 tokenizes
+    # differently, so ids built for the arm's tokenizer are noise to it.
+    if [ ! -f "$TEXT" ]; then
+        echo "SKIP: the generalisation row needs TEXT, and $TEXT is missing."
+        echo "  A packed dataset cannot substitute -- different tokenizer."
+        echo "  Without it, read the B2 verdict with the confound in mind:"
+        echo "  B2 trained at mr8, so ABSOLUTE is what the confound itself"
+        echo "  predicts and only a RELATIVE verdict is decisive alone."
+        RC=1
+    else
+        python evals/diag_depth_band.py \
+            --model_name "$HUGINN_MODEL" \
+            --text_file "$TEXT" \
+            --T $T_SWEEP \
+            --seq_len "$SEQ_LEN" \
+            --batch "$BATCH" \
+            --n_slots "$N_SLOTS" \
+            --dtype float32 \
+            --no_prefix \
+            --out "$OUT/huginn/results.json" || RC=1
+    fi
     echo ""
     echo "COMPARE THE TWO VERDICTS BEFORE FIXING f_j.  Agreement generalises the"
     echo "band; disagreement means it tracks the model's own TRAINED depth, and"
