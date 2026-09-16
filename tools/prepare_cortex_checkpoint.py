@@ -168,6 +168,13 @@ def main() -> int:
         v = getattr(args, k)
         if v is not None:
             cfg[k] = v
+    # The P1.0 gate keys and the Z keys are deliberately NOT exposed as flags
+    # here: this script prepares a BASE for training, and train.py re-applies
+    # its own --cortex.* onto the config at runtime (see its persist list), so a
+    # base carrying a half-specified geometry would only be a second place for
+    # the two to disagree.  What matters is that the EVAL side carries them --
+    # tools/prepare_eval_checkpoint.py, where the weights are already trained
+    # and there is no train.py to re-apply anything.
 
     # Special-token ids: take them from the TOKENIZER, not from the inherited
     # config.  Every smcleish/Recurrent-* config carries HUGINN's ids (bos 65504,

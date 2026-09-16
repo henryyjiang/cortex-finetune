@@ -107,12 +107,33 @@ def has_latent_channel(cortex) -> bool:
                 and getattr(buf, "carries_latent", False))
 
 
-def null_e(state: torch.Tensor) -> torch.Tensor:
+def null_e(state: torch.Tensor, hidden_size: int) -> torch.Tensor:
     """E's null: same columns, same positions, zero contents.
 
-    See the header for why this is the imperfect one.
+    ONLY THE E HALF.  On a dual-channel carry the tensor is [B, K, 2D] with Z at
+    [..., D:], and a plain `zeros_like` would null BOTH channels -- silently
+    turning the E0Z1 cell into E0Z0 wearing the wrong label, i.e. reporting a
+    1x2 as a 2x2.  That is exactly what `has_latent_channel` refuses by default
+    to prevent, one level up, so it has to be handled here as well.
+
+    `hidden_size` is REQUIRED rather than inferred.  A [B, K, 2D] carry and a
+    [B, K, D] carry from a model with twice the width are indistinguishable from
+    the tensor alone, and the wrong guess produces a finite, plausible, wrong
+    number.  Pass cortex.prefix.hidden_size.
+
+    See the header for why zeros is the IMPERFECT null: a zero key still scores a
+    mid-range logit rather than -inf and goes on absorbing ~3-5% of the softmax
+    mass, so the E axis is confounded in a way Z's noise null is not.
     """
-    return torch.zeros_like(state)
+    D = state.shape[-1]
+    if D == hidden_size:                                  # E-only carry
+        return torch.zeros_like(state)
+    if D != 2 * hidden_size:
+        raise ValueError(
+            f"carry is {D}-wide, expected {hidden_size} (E-only) or "
+            f"{2 * hidden_size} (E+Z)")
+    return torch.cat([torch.zeros_like(state[..., :hidden_size]),
+                      state[..., hidden_size:]], dim=-1)
 
 
 def null_z(state: torch.Tensor, std: float, seed: int) -> torch.Tensor:
@@ -129,7 +150,7 @@ def null_z(state: torch.Tensor, std: float, seed: int) -> torch.Tensor:
 
 
 def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
-              e_on: bool, z_on: bool, s0_std: float):
+              e_on: bool, z_on: bool, s0_std: float, hidden_size: int):
     """Mean NLL over chunks 2..N for one cell of the 2x2.
 
     Chunk 1 is excluded from the endpoint (no incoming carry either way, so
@@ -143,7 +164,7 @@ def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
         m_in = state
         if m_in is not None:
             if not e_on:
-                m_in = null_e(m_in)
+                m_in = null_e(m_in, hidden_size)
             # Z lives in a separate field; when the channel exists the graft
             # takes it from the same slot columns.  Nulling it is a per-chunk
             # substitution, handled by the graft hook rather than here.
@@ -197,6 +218,11 @@ def main() -> int:
         print("FAILED: this checkpoint has no prefix buffer.")
         return 2
 
+    # E's null must know where the E half ends: on a dual-channel carry the
+    # tensor is [B, K, 2D] and zeroing all of it would null Z as well, reporting
+    # a 1x2 as a 2x2.  Taken from the BUFFER rather than the config, because the
+    # buffer is what actually built the carry.
+    hidden_size = int(cortex.prefix.hidden_size)
     z_live = has_latent_channel(cortex)
     if not z_live and not args.allow_missing_z:
         print(
@@ -239,7 +265,8 @@ def main() -> int:
         firsts, ok = [], True
         for name, e_on, z_on in cells:
             nll, first = chain_nll(model, cortex, xs, ys, ms, num_steps, device,
-                                   args.seed + si, e_on, z_on, s0_std)
+                                   args.seed + si, e_on, z_on, s0_std,
+                                   hidden_size)
             if nll is None:
                 ok = False
                 break

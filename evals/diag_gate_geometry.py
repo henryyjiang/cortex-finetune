@@ -107,6 +107,7 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cortex_memory.buffers import PrefixAccumBuffer, PrefixGatedBuffer  # noqa: E402
+from cortex_memory.health import rank_stats as _rank_stats  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -192,37 +193,11 @@ def build_cells(D: int, chunk_len: int, cells: list[str] | None):
 # Statistics
 # ---------------------------------------------------------------------------
 
-def rank_stats(mat: torch.Tensor) -> dict:
-    """[B, K, D] -> centred cosine + two effective ranks, averaged over lanes.
-
-    Centring first: K vectors sharing a large common component read as ~1.0
-    uncentred however much independent structure sits on top.  Same statistic
-    as diag_position_rank.py, so the numbers are comparable to P0.2's.
-    """
-    m = mat.detach().float()
-    cos, ent, pr = [], [], []
-    for b in range(m.shape[0]):
-        c = m[b] - m[b].mean(0, keepdim=True)
-        K = c.shape[0]
-        n = c.norm(dim=-1, keepdim=True).clamp_min(1e-12)
-        g = (c / n) @ (c / n).T
-        off = ~torch.eye(K, dtype=torch.bool, device=g.device)
-        cos.append(float(g[off].mean()))
-        s = torch.linalg.svdvals(c).clamp_min(0)
-        tot = float(s.sum())
-        if tot <= 0:
-            ent.append(1.0)
-            pr.append(1.0)
-            continue
-        p = s / s.sum()
-        nz = p[p > 0]
-        ent.append(float(torch.exp(-(nz * nz.log()).sum())))
-        s2 = s ** 2
-        pr.append(float((s2.sum() ** 2) / (s2 ** 2).sum().clamp_min(1e-30)))
-    n = len(cos)
-    return {"centred_cosine": sum(cos) / n,
-            "eff_rank_entropy": sum(ent) / n,
-            "eff_rank_pr": sum(pr) / n}
+#: Effective rank / centred cosine live in cortex_memory.health so that this
+#: probe, evals/diag_dual_channel_walk.py, tools/compare_arms.py and train.py's
+#: periodic diagnostic all report the SAME statistic.  Four copies that drifted
+#: apart would be the same class of silent failure this file exists to catch.
+rank_stats = _rank_stats
 
 
 def replay(buf, tape: torch.Tensor, swap_at: int | None = None,

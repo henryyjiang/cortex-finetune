@@ -22,6 +22,33 @@
 #   CONTROL=1 sbatch pace/smoke_geometry_oom.sbatch      # + the no-memory row
 #   CAPPED=1  sbatch pace/smoke_geometry_oom.sbatch      # + D with accum_max 128
 #   GEOMETRIES="8192:16:16" sbatch pace/smoke_geometry_oom.sbatch
+#   P1=1 GEOMETRIES= sbatch pace/smoke_geometry_oom.sbatch   # A1 + A3' ONLY
+#   P1=1 P1_Z=1 GEOMETRIES= sbatch pace/smoke_geometry_oom.sbatch  # + A2/A3z
+#
+# P1_Z=1 adds the two Z arms.  Their memory has NEVER been priced -- every
+# number in this gate's history is from an E-only run -- and the second gate
+# is ~33.5M more parameters with optimizer state, which is not a rounding
+# error.  Run it before any Z cell.
+#
+# P1=1 (2026-09-16) PRICES THE TWO ARMS THIS GATE WAS NOT WRITTEN FOR.  Both are
+# strictly smaller than B2 in sequence terms -- 656 and 592 packed columns
+# against B2's 800 -- so on columns alone this is a formality.  It is run anyway
+# for two reasons that columns do not cover:
+#
+#   1. The gate adds ~16.8M buffer parameters, and the optimizer holds TWO
+#      moments for each.  That is the one axis on which A3' is the LARGER of the
+#      pair, and config D died on a measured OOM after a similar "obviously
+#      fits" argument.
+#   2. A gated buffer runs a DIFFERENT truncated-BPTT rule: train.py
+#      slice-detaches write-once accum rows but detaches the whole gated state
+#      every carry_grad_chunks chunks, so the gated arm keeps every chunk since
+#      the last detach alive AT ONCE where accum frees them a block at a time.
+#      The finding this script already recorded -- that the NUMBER OF RETAINED
+#      CHUNK GRAPHS is a first-order cost, 4096 x cc16 amax 128 OOMing with only
+#      17% more column-tokens than a geometry that fits -- is exactly the axis
+#      that rule moves.  A column-count estimate will under-predict it.
+#
+# Set GEOMETRIES= (empty) with P1=1 to skip the config-D rows, which are settled.
 #
 # H200, NOT A100.  H100 and A100-80 are both 80GB (cortex-cluster-ops) and B2
 # peaked at 119.76 GiB on the H200's 141 at HALF this row length, so an 80GB
@@ -148,6 +175,72 @@ for G in $GEOMETRIES; do
     fi
 done
 
+if [ -n "$P1" ]; then
+    # A1 and A3' at the locked recipe: 4096 x cc8 (512-token chunks), bs 32.
+    # Only the buffer moves between the two rows, which is the whole point --
+    # they share the row length, the chain, the recurrence and the corpus.
+    P1_LEN=${P1_LEN:-4096}; P1_CC=${P1_CC:-8}; P1_BS=${P1_BS:-32}
+    P1_W=${P1_W:-16}                      # sliced summary_emb width, both arms
+    P1_GRAD=${P1_GRAD:-4}                 # 4 of 8, B2's 50% convention
+    echo ""
+    echo "######## A1: accum, W ${P1_W}, accum_max 128 (${P1_LEN} x cc${P1_CC}) ########"
+    python tools/smoke_geometry_oom.py \
+        --model_name "$MODEL" \
+        --max_length "$P1_LEN" --cross_chunks "$P1_CC" --batch_size "$P1_BS" \
+        --max_steps "$MAX_STEPS" --micro_batch_size 1 \
+        --mean_recurrence "$MAX_MEAN_REC" \
+        --prefix_memory accum --accum_vecs "$P1_W" --accum_max 128 \
+        --carry_grad_chunks "$P1_GRAD" \
+        --use_memory true --with_optimizer true \
+        --json_out "$JSON" || BROKEN=1
+    echo ""
+    echo "######## A3': gated ring, W ${P1_W}, K 64 (${P1_LEN} x cc${P1_CC}) ########"
+    python tools/smoke_geometry_oom.py \
+        --model_name "$MODEL" \
+        --max_length "$P1_LEN" --cross_chunks "$P1_CC" --batch_size "$P1_BS" \
+        --max_steps "$MAX_STEPS" --micro_batch_size 1 \
+        --mean_recurrence "$MAX_MEAN_REC" \
+        --prefix_memory gated --accum_vecs "$P1_W" \
+        --gate_slots 64 --gate_route ring --gate_norm tanh \
+        --gate_init zero --gate_fill grow \
+        --carry_grad_chunks "$P1_GRAD" \
+        --use_memory true --with_optimizer true \
+        --json_out "$JSON" || BROKEN=1
+    if [ -n "$P1_Z" ]; then
+        # THE Z ARMS.  They were never priced: every number in this gate's
+        # history is from an E-only run.  The carry widening to 2D is small and
+        # the trajectory tape is ~1 MB, but the SECOND GATE is two more
+        # [D, 2D] Linears -- about 33.5M parameters WITH optimizer state -- and
+        # a Z arm priced on an E-only row was not priced.
+        echo ""
+        echo "######## A2: accum + Z, W ${P1_W}, accum_max 128 ########"
+        python tools/smoke_geometry_oom.py \
+            --model_name "$MODEL" \
+            --max_length "$P1_LEN" --cross_chunks "$P1_CC" --batch_size "$P1_BS" \
+            --max_steps "$MAX_STEPS" --micro_batch_size 1 \
+            --mean_recurrence "$MAX_MEAN_REC" \
+            --prefix_memory accum --accum_vecs "$P1_W" --accum_max 128 \
+            --latent_carry \
+            --carry_grad_chunks "$P1_GRAD" \
+            --use_memory true --with_optimizer true \
+            --json_out "$JSON" || BROKEN=1
+        echo ""
+        echo "######## A3z: gated ring + Z, W ${P1_W}, K 64 ########"
+        python tools/smoke_geometry_oom.py \
+            --model_name "$MODEL" \
+            --max_length "$P1_LEN" --cross_chunks "$P1_CC" --batch_size "$P1_BS" \
+            --max_steps "$MAX_STEPS" --micro_batch_size 1 \
+            --mean_recurrence "$MAX_MEAN_REC" \
+            --prefix_memory gated --accum_vecs "$P1_W" \
+            --gate_slots 64 --gate_route ring --gate_norm tanh \
+            --gate_init zero --gate_fill grow \
+            --latent_carry \
+            --carry_grad_chunks "$P1_GRAD" \
+            --use_memory true --with_optimizer true \
+            --json_out "$JSON" || BROKEN=1
+    fi
+fi
+
 if [ -n "$CAPPED" ]; then
     # Config D with the buffer capped at 128 rows instead of 512.  Only worth a
     # run if D came back OOM: it is the one mechanism lever that buys memory
@@ -183,15 +276,35 @@ echo "=== summary ==="
 python - "$JSON" <<'SUMMARY'
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1])]
-print(f"{'row':>7} {'cc':>3} {'chunk':>6} {'mem':>5} {'amax':>5} {'status':>6} "
-      f"{'alloc':>8} {'reserved':>9} {'%dev':>5} {'s/step':>7}")
+print(f"{'row':>7} {'cc':>3} {'chunk':>6} {'buffer':>6} {'W':>3} {'cols':>5} "
+      f"{'status':>6} {'alloc':>8} {'reserved':>9} {'%dev':>5} {'s/step':>7}")
 for r in rows:
     pct = 100 * r["peak_res_gib"] / r["total_gib"]
+    # `cols` is the read block: accum_max for a capped accum, gate_slots for a
+    # gated ring.  Printing accum_max for both would report 0 for every gated
+    # row and quietly suggest the gated arm carries nothing.
+    kind = r.get("buffer", "accum" if r["use_memory"] else "none")
+    cols = r.get("gate_slots", 0) if kind == "gated" else r.get("accum_max", 0)
     print(f"{r['max_length']:>7} {r['cross_chunks']:>3} {r['chunk_len']:>6} "
-          f"{str(r['use_memory']):>5} {r.get('accum_max', 0):>5} "
+          f"{kind:>6} {r.get('accum_vecs', 0):>3} {cols:>5} "
           f"{r['status']:>6} "
           f"{r['peak_alloc_gib']:>8.2f} {r['peak_res_gib']:>9.2f} "
           f"{pct:>5.0f} {r['step_s']:>7.1f}")
+p1 = [r for r in rows if r.get("buffer") in ("accum", "gated")
+      and r["cross_chunks"] == 8 and r.get("accum_vecs") == 16]
+if len(p1) == 2:
+    print("")
+    if all(r["status"] == "FITS" for r in p1):
+        a = {r["buffer"]: r["peak_res_gib"] for r in p1}
+        print(f"P1: A1 (accum) {a.get('accum', 0):.2f} GiB, A3' (gated) "
+              f"{a.get('gated', 0):.2f} GiB -- both FIT, launch both.")
+        print("Record both numbers in pace/p1_arms.sbatch's header either way.")
+    else:
+        bad = [r["buffer"] for r in p1 if r["status"] != "FITS"]
+        print(f"P1: {bad} DOES NOT FIT.  Do NOT launch it.  A gated OOM is the "
+              f"optimizer\nstate on ~16.8M buffer parameters plus the "
+              f"whole-state detach window -- lower\ncarry_grad_chunks before "
+              f"lowering gate_slots, since K is what the arm is testing.")
 d = [r for r in rows if r["max_length"] == 8192 and r["cross_chunks"] == 16
      and r["use_memory"] and r.get("accum_max") == 512]
 if d:

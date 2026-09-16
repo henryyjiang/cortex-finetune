@@ -52,6 +52,35 @@ Config flags (getattr defaults)
                                        lap: "grow" emits only written rows (the
                                        buffer IS PrefixAccumBuffer for one lap),
                                        "init" pads from a learned slot_init.
+  latent_carry        : bool = False   THE Z CHANNEL.  Carry the recurrence's
+                                       TRAJECTORY alongside the token-space
+                                       summary, and read it by substituting into
+                                       `s0` at the carried columns.  Widens the
+                                       carried tensor's last dim to 2D (E at
+                                       [...,:D], Z at [...,D:]).  Default off,
+                                       and off is byte-identical to B2.
+  latent_depth_rule   : str  = "absolute"
+                                       how slot j picks the loop depth k_j it
+                                       writes.  "absolute" tiles the measured
+                                       band and clamps to T-1; "relative" takes
+                                       round(f_j * (T-1)).  P0.7
+                                       (evals/diag_depth_band.py) DECIDES THIS —
+                                       it is a flag precisely so the answer is a
+                                       config change and not a code change.
+  latent_depth_lo/hi  : int  = 2 / 9   the band, in absolute loop steps.  P0.1,
+                                       fp32: d_1 is 23.8x ||s0|| (a different
+                                       regime, excluded) and past t~12 the
+                                       deltas are 0.1x with cos(d_t,d_t-1)
+                                       reaching -0.95, a near-pure two-cycle
+                                       oscillation.
+  latent_renorm       : str  = "none"  "none" substitutes the delta as measured
+                                       — P0.1 puts it at 0.90x the noise it
+                                       replaces AT T=8, so it is in distribution
+                                       as drawn and needs no parameter.  "s0"
+                                       rescales each row to the replaced noise's
+                                       own RMS, which is what a write depth in
+                                       the saturated tail (0.06x at t=32) would
+                                       need.
   prefix_pos          : str  = "tail"  ONLY value; asserted, not branched on.
                                        Where the trailing summary slots sit in
                                        POSITION space: "tail" = continue the
@@ -76,7 +105,15 @@ Hook points in RavenForCausalLM (see the grafted model files):
                         new_m_cross = cortex.cross_write(h_T) after it;
                         m_cross surfaced in the output.
   core_block_forward(): x = cortex.read_into(x) after the adapter, before the
-                        core layers; cortex.iter_write(x) after the core layers.
+                        core layers; cortex.iter_write(x, current_step) after
+                        the core layers.
+  iterate_forward()   : x = cortex.latent_init(x) immediately after
+                        initialize_state — the Z READ.  It has to live there
+                        and nowhere else: initialize_state runs AFTER
+                        prefix_pack, so the carried columns already exist in the
+                        packed sequence and are filled with fresh noise that
+                        nothing reads.  Substituting into them costs no
+                        sequence length and no parameters.
 """
 from __future__ import annotations
 
@@ -268,9 +305,36 @@ class CortexMemory(nn.Module):
         # back out of the post-ln_f states (prefix_unpack).
         pmode = str(getattr(config, "prefix_memory", "") or "").lower()
         n_vec = int(getattr(config, "accum_vecs", 32))
+        # The Z channel.  Read here (not lazily) because it changes a PARAMETER
+        # SET -- the gated buffer allocates a second gate for it -- and a flag
+        # that changed the parameter set after the optimizer was built would
+        # leave the new tensors untrained with no symptom.
+        self.latent_carry = bool(getattr(config, "latent_carry", False))
+        self.latent_depth_rule = str(
+            getattr(config, "latent_depth_rule", "absolute") or "absolute")
+        self.latent_depth_lo = int(getattr(config, "latent_depth_lo", 2))
+        self.latent_depth_hi = int(getattr(config, "latent_depth_hi", 9))
+        self.latent_renorm = str(getattr(config, "latent_renorm", "none") or "none")
+        if self.latent_depth_rule not in ("absolute", "relative"):
+            raise ValueError(
+                f"cortex.latent_depth_rule must be 'absolute' or 'relative'; "
+                f"got {self.latent_depth_rule!r}.  P0.7 "
+                f"(evals/diag_depth_band.py) decides which.")
+        if self.latent_renorm not in ("none", "s0"):
+            raise ValueError(
+                f"cortex.latent_renorm must be 'none' or 's0'; got "
+                f"{self.latent_renorm!r}")
+        if self.latent_carry and not pmode:
+            raise ValueError(
+                "cortex.latent_carry needs a prefix buffer (--cortex."
+                "prefix_memory accum|gated).  Z is read by substituting into "
+                "the CARRIED COLUMNS of s0, and without a prefix buffer there "
+                "are no carried columns -- the read would be a no-op and the "
+                "arm would train a write nothing consumes.")
         if pmode == "accum":
             self.prefix = PrefixAccumBuffer(
-                D, n_vec, int(getattr(config, "accum_max", 128)))
+                D, n_vec, int(getattr(config, "accum_max", 128)),
+                carries_latent=self.latent_carry)
         elif pmode == "gated":
             # gate_slots 0 => the pre-P1.0 shape (K == W).  Everything else
             # defaults to the P1.0 recommendation; see the PrefixGatedBuffer
@@ -282,7 +346,8 @@ class CortexMemory(nn.Module):
                 route=str(getattr(config, "gate_route", "ring") or "ring"),
                 gate_norm=str(getattr(config, "gate_norm", "tanh") or "tanh"),
                 gate_init=str(getattr(config, "gate_init", "zero") or "zero"),
-                fill=str(getattr(config, "gate_fill", "grow") or "grow"))
+                fill=str(getattr(config, "gate_fill", "grow") or "grow"),
+                carries_latent=self.latent_carry)
         elif pmode:
             raise ValueError(f"prefix_memory must be '', 'accum' or 'gated'; got {pmode!r}")
         else:
@@ -344,6 +409,20 @@ class CortexMemory(nn.Module):
         else:
             self.h_T_proj = None
 
+        # The 2x2's Z-ablation hook.  A plain attribute rather than a config
+        # key: it is set per CHUNK by the eval and must never persist into a
+        # checkpoint.  Declared here so `cortex.latent_read_null = ...` is
+        # setting something that exists, and so the E-only build carries the
+        # same surface (evals/eval_carry_2x2.py duck-types on latent_carry to
+        # decide whether a 2x2 is measurable at all, and refuses rather than
+        # reporting a 1x2 as one).
+        self.latent_read_null = None
+        # Counters for the E/Z read asymmetry (see latent_init).  OUTSIDE
+        # _reset_runtime on purpose: the useful quantity is the fraction over
+        # BATCHES, and _reset_runtime runs once per forward.
+        self._z_read_live = False
+        self._z_read_n = 0
+        self._z_read_live_n = 0
         self._reset_runtime()
 
     @property
@@ -448,8 +527,16 @@ class CortexMemory(nn.Module):
             state = self._carried_state()
             if state is not None and state.shape[1] > 0:
                 state = state.to(device=input_embeds.device, dtype=input_embeds.dtype)
-                parts.append(state)
-                n_pre = state.shape[1]
+                # ONLY THE E HALF ENTERS THE TOKEN STREAM.  Z is not an
+                # embedding and is never spliced as a column: it is read by
+                # substitution into `s0` at these very columns (latent_init),
+                # which is what makes the read free.  Splicing it here instead
+                # would double the sequence length and put trajectory deltas at
+                # norm ~0.35 next to hidden states at norm ~171, where attention
+                # would simply not see them.
+                e_state, _ = self.prefix.split_channels(state)
+                parts.append(e_state)
+                n_pre = e_state.shape[1]
         parts.append(input_embeds)
 
         if write:
@@ -472,6 +559,10 @@ class CortexMemory(nn.Module):
             sum_pos = pos.new_zeros(pos.shape[0], n_sum)
         pos = torch.cat([pos.new_zeros(pos.shape[0], n_pre), pos, sum_pos], dim=1)
         packed = parts[0] if len(parts) == 1 else torch.cat(parts, dim=1)
+        # The Z read and the Z write both address the packed layout by column,
+        # and iterate_forward does not receive it -- so record it here, in the
+        # one function that computes it.
+        self._n_pre, self._n_sum = n_pre, n_sum
         return packed, pos, n_pre, n_sum
 
     def prefix_unpack(self, x: torch.Tensor, n_pre: int, n_sum: int):
@@ -503,7 +594,8 @@ class CortexMemory(nn.Module):
         # Rare (it needs the chunk's last token to be an EOS) but silent.
         # Branch retired 2026-09-15; `_valid_write` is still computed in begin()
         # and still consumed by the bolt-on buffer path below.
-        return real, self.prefix.merge(self._carried_state(), new_vecs)
+        return real, self.prefix.merge(self._carried_state(), new_vecs,
+                                       self.latent_write())
 
     def _carried_state(self) -> Optional[torch.Tensor]:
         """The incoming carry, as the prefix splice and the merge should see it.
@@ -560,6 +652,12 @@ class CortexMemory(nn.Module):
         self._write_reset:     Optional[torch.Tensor] = None  # [B] bool
         self._valid_write:     Optional[torch.Tensor] = None  # [B] bool
         self._iter_buf:        Optional[torch.Tensor] = None  # [B*S,Ki,D]
+        # --- Z channel per-call runtime ---------------------------------
+        self._n_pre = self._n_sum = 0     # packed layout, set by prefix_pack
+        self._z_prev:  Optional[torch.Tensor] = None   # [B,n_sum,D], s_{t-1}
+        self._z_tape:  list = []          # index t-1 -> d_t at the summary cols
+        self._z_grad:  list = []          # was step t inside the gradient window
+        self._z_s0_scale: Optional[float] = None       # ||s0|| per token, fp32
 
     def begin(
         self,
@@ -604,15 +702,306 @@ class CortexMemory(nn.Module):
             x = x + self.m_iter.read(x.reshape(B * S, 1, D), self._iter_buf).reshape(B, S, D)
         return x
 
-    def iter_write(self, x: torch.Tensor) -> None:
-        """Write each position's state into its own M_iter slots, after the
-        core layers (end of one loop iteration)."""
-        if self.m_iter is None:
+    def iter_write(self, x: torch.Tensor,
+                   current_step: Optional[int] = None) -> None:
+        """Write each position's state into its own M_iter slots, and tape the
+        recurrence trajectory for the Z channel.  Called after the core layers,
+        i.e. at the end of one loop iteration.
+
+        `current_step` is optional so that a checkpoint carrying an OLDER COPY
+        of the modeling file (which calls this with one argument) keeps loading
+        instead of dying on a TypeError.  It is not used for the tape -- the
+        tape is positional and appends in order -- so nothing silently depends
+        on a value an old file cannot supply.
+        """
+        if self.m_iter is not None:
+            B, S, D = x.shape
+            if self._iter_buf is None:
+                self._iter_buf = x.new_zeros(B * S, self.memory_slots_iter, D)
+            self._iter_buf = self.m_iter.write(x.reshape(B * S, 1, D),
+                                               self._iter_buf)
+        self._tape_latent(x)
+
+    # ── the Z channel ──────────────────────────────────────────────────────
+    #
+    # THE WRITE IS THE TRAJECTORY, NOT THE ENDPOINT, and that is settled on two
+    # independent grounds.  Information: the endpoint is what E already carries
+    # (post-`ln_f`), so writing s_T into Z would carry the same conclusion twice
+    # in two coordinate systems.  Scale: measured fp32 on the B2 checkpoint,
+    # ||s_T|| is 28.1x the `trunc_normal_` noise Z substitutes for, while the
+    # staggered delta at T=8 -- the trained depth -- is 0.90x it.  The endpoint
+    # would need a renorm; the deltas are in distribution as drawn.
+    #
+    # THE TAPE IS EVERY STEP, AND THE DEPTH RULE SELECTS FROM IT AFTERWARDS.
+    # The obvious alternative is to capture only the depths the rule asks for,
+    # which needs T up front and therefore another modeling-file hook.  Taping
+    # all of them costs T x [B, n_sum, D] -- about 1 MB at T=8, n_sum=16,
+    # D=2048 -- because ONLY THE SUMMARY COLUMNS ARE TAPED, not the sequence.
+    # In exchange, the slot->depth rule becomes a pure post-hoc selection, so
+    # P0.7's answer is a config change and never a modeling-file change.
+
+    def _tape_latent(self, x: torch.Tensor) -> None:
+        """Record d_t = s_t - s_{t-1} at the summary columns.
+
+        NOT DETACHED, and that is the whole point.  `latent_states` in the
+        modeling file is `x.clone().detach()`, and reusing it here would give a
+        gradient-free carry sitting behind a healthy loss curve -- bug class 2
+        in a new hat.  The slice taken here is live, so the write path is on the
+        loss for every step inside the gradient window.
+
+        Which steps ARE inside it is not a detail: iterate_forward runs the
+        first `num_steps_no_grad` iterations under torch.no_grad() and those run
+        FIRST, so the trainable region is always the LAST `mean_backprop_depth`
+        iterations.  At mr8 (where the P1 cells branch) that is the whole loop;
+        at mr32 it is steps 25-32, i.e. exactly the saturated ones, and Z
+        becomes a FROZEN FEATURE EXTRACTOR -- the model can learn to USE it but
+        never to SHAPE it, which is the mirror of the frozen-READ failure that
+        cost x0.90 -> x1.33.  `torch.is_grad_enabled()` is recorded per step so
+        that is a REPORTED NUMBER (latent_write_grad_frac) and not a discovery.
+        """
+        if not self.latent_carry or self.prefix is None or not self._n_sum:
             return
-        B, S, D = x.shape
-        if self._iter_buf is None:
-            self._iter_buf = x.new_zeros(B * S, self.memory_slots_iter, D)
-        self._iter_buf = self.m_iter.write(x.reshape(B * S, 1, D), self._iter_buf)
+        cur = x[:, -self._n_sum:]
+        if self._z_prev is not None:
+            self._z_tape.append(cur - self._z_prev)
+            self._z_grad.append(bool(torch.is_grad_enabled()))
+        self._z_prev = cur
+
+    def latent_init(self, s0: torch.Tensor,
+                    num_steps_no_grad: Optional[int] = None) -> torch.Tensor:
+        """THE Z READ.  Substitute the carried trajectory into `s0`'s carried
+        columns, replacing the noise `initialize_state` put there.
+
+        Zero new parameters, nothing zero-initialised, sequence length
+        unchanged.  This is the property the whole design rests on: the earlier
+        latent buffer failed because its read was a MODULE that had to be
+        discovered from an exactly-zero injection (x0.90), and unfreezing that
+        read is what B2 measured at x1.33.  Here the read is a substitution into
+        a field that already exists and is already consumed -- the carried
+        columns are queried by real tokens at positive offsets, and
+        `core_block_forward`'s `adapter(cat([x, input_embeds]))` is a pretrained
+        consumer of exactly this concatenation, on every one of the T
+        iterations.
+
+        Also captures s_0 at the summary columns, so the first taped delta is
+        d_1 = s_1 - s_0 and is measured against the state the loop ACTUALLY
+        started from (post-substitution), not against the noise that was
+        discarded.
+
+        THE E/Z READ ASYMMETRY — MEASURED 2026-09-16, and it is not in any
+        earlier design note.  `num_steps_no_grad` is taken so this can be
+        reported rather than discovered:
+
+            a SINGLE no-grad step cuts Z's read gradient to EXACTLY zero.
+
+        The reason is structural, not a tuning problem.  E re-enters the loop on
+        every iteration through `input_embeds` -- `core_block_forward` does
+        `adapter(cat([x, input_embeds]))`, and the carried E columns live in
+        `input_embeds` -- so E's read is refreshed inside the gradient window no
+        matter how long the no-grad prefix is.  Z enters ONCE, at `s0`, and
+        `iterate_forward` runs the no-grad iterations FIRST; anything downstream
+        of a `torch.no_grad()` block is detached, so with n >= 1 there is no path
+        from the carried Z to the loss at all.  Measured on the real loop: E's
+        gate gradient is ~4e-2 at every split, Z's is 6.1e-2 at (0, T) and
+        EXACTLY 0.0 at (1, T-1), (2, T-2) and (3, T-3).
+
+        What this costs.  `randomized_iteration_sampler` gives n = 0 exactly when
+        the sampled p <= mean_backprop_depth, so at mr8 / depth 8 roughly half of
+        training batches carry a Z read gradient and half carry none; at mr32 /
+        depth 8, essentially none do.  It CANNOT be configured away -- p has a
+        Poisson tail, so no finite mean_backprop_depth makes n = 0 always -- and
+        raising mean_backprop_depth only raises the fraction, at the cost of
+        graph memory.
+
+        This does not make Z inert: the forward uses the carried Z on EVERY
+        batch, so the model still benefits from it, and the write still trains
+        on the steps inside the window.  What is reduced is how much gradient
+        signal shapes the READ side.  `latent_read_grad_frac` is the number;
+        put it in the pre-registration, because it changes what a null result
+        for Z means.
+        """
+        if self.prefix is None:
+            return s0
+        if self.latent_carry and num_steps_no_grad is not None:
+            self._z_read_live = int(num_steps_no_grad) == 0
+            self._z_read_n += 1
+            self._z_read_live_n += int(self._z_read_live)
+        if self.latent_carry and self._n_sum:
+            # s0 at the summary columns -- the tape's starting point.  Taken
+            # before any substitution so that d_1 is a real first step.
+            self._z_prev = s0[:, -self._n_sum:]
+            self._z_s0_scale = float(
+                s0.detach().float().flatten(0, -2).norm(dim=-1).mean())
+        n_pre = self._n_pre
+        if not self.latent_carry or not n_pre:
+            return s0
+
+        head = s0[:, :n_pre]
+        null = getattr(self, "latent_read_null", None)
+        if null is not None:
+            # Z's null is FRESH NOISE at s0's own scale -- the model's trained
+            # default for these columns, in distribution, identical column
+            # count.  Contrast E's null, which is zeros: a zero key still scores
+            # a mid-range logit and absorbs ~3-5% of the softmax mass, so the E
+            # axis of the 2x2 is the confounded one and the Z axis is clean.
+            # The asymmetry is stated in eval_carry_2x2.py and must be stated in
+            # the writeup too.
+            z = self._null_latent(null, head)
+        else:
+            _, z = self.prefix.split_channels(self._carried_state())
+            if z is None:
+                return s0
+            z = z.to(device=s0.device, dtype=s0.dtype)
+            if z.shape[1] != n_pre:
+                raise ValueError(
+                    f"carried Z has {z.shape[1]} rows but {n_pre} carried "
+                    f"columns were spliced.  E and Z share the ring pointer and "
+                    f"must share the row count; a mismatch means the two "
+                    f"channels were merged at different widths.")
+            # Rows never written carry exactly zero (see
+            # PrefixGatedBuffer._slot_init_block).  A zero column in s0 is NOT
+            # the trained default -- the model has only ever seen noise there --
+            # so fall back to the noise rather than substituting a dead field.
+            unwritten = (z.detach().abs().sum(dim=-1, keepdim=True) == 0)
+            if bool(unwritten.any()):
+                z = torch.where(unwritten, head, z)
+        if self.latent_renorm == "s0":
+            z = self._renorm_to(z, head)
+        return torch.cat([z, s0[:, n_pre:]], dim=1)
+
+    def _null_latent(self, null, head: torch.Tensor) -> torch.Tensor:
+        """Z's ablation null.  `latent_read_null` is the contract
+        evals/eval_carry_2x2.py sets: ("noise", std, seed)."""
+        kind = null[0] if isinstance(null, (tuple, list)) else str(null)
+        if kind != "noise":
+            raise ValueError(
+                f"latent_read_null kind must be 'noise'; got {kind!r}.  Zeros "
+                "are E's null and the wrong one for Z -- a zeroed latent field "
+                "is not a state the model has ever seen, while noise is its own "
+                "trained default for these columns.")
+        std = float(null[1]) if len(null) > 1 else 0.02
+        seed = int(null[2]) if len(null) > 2 else 0
+        g = torch.Generator(device="cpu").manual_seed(seed)
+        n = torch.empty(head.shape, dtype=torch.float32).normal_(
+            0.0, std, generator=g)
+        return n.to(device=head.device, dtype=head.dtype)
+
+    @staticmethod
+    def _renorm_to(z: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
+        """Rescale each Z row to the per-row norm of the field it replaces.
+
+        NOT THE DEFAULT, on a measurement: at T=8 the staggered delta is already
+        0.90x the noise, so the substitution is in distribution as drawn and a
+        renorm would be a parameter-free transform applied for no reason.  It
+        exists because the ratio is strongly depth-dependent (23.8x at t=1, 0.06x
+        at t=32), so a write rule that lands in the saturated tail -- or a model
+        run far outside the depth it trained at -- would need it.  Decide it with
+        evals/diag_depth_band.py, do not leave it to taste.
+        """
+        zn = z.float().norm(dim=-1, keepdim=True).clamp_min(1e-12)
+        rn = ref.detach().float().norm(dim=-1, keepdim=True)
+        return (z.float() * (rn / zn)).to(z.dtype)
+
+    def latent_write(self) -> Optional[torch.Tensor]:
+        """Harvest the tape into one [B, n_vec, D] write, one depth per slot.
+
+        The n_vec slots are COLUMNS of a single forward, each with its own full
+        trajectory, so this is an n_vec x (T-1) grid and exactly one cell per
+        row is taken: slot j contributes column j of the delta at depth k_j.  A
+        depth that two slots share is therefore TWO INDEPENDENT VIEWS of it --
+        different sequence columns, different trajectories -- and not a
+        duplicate, which is why sampling an 8-wide band with 16 slots is the
+        design and not a waste.
+
+        Staggered, not uniform.  Uniform depth would give semantically identical
+        (E_j, Z_j) pairs but sample one depth and turn the depth-slice ablation
+        into a BETWEEN-run comparison (several training runs instead of one).
+        Staggered buys the depth axis from 16 rows and keeps the ablation
+        WITHIN-run; under the ring, write vector j always lands at rows
+        congruent to j (mod W), so the convention is stable and addressable.
+        """
+        if not self.latent_carry or self.prefix is None:
+            return None
+        if not self._z_tape:
+            raise RuntimeError(
+                "latent_carry is on but the trajectory tape is EMPTY: "
+                "iter_write never fired, so the checkpoint's copy of the "
+                "modeling file predates the Z hooks and this run would train a "
+                "dual-channel buffer whose Z half is never written.  Re-run "
+                "tools/prepare_cortex_checkpoint.py against the base.  (Same "
+                "silent class as the prefix_pack failure that ran 9 hours with "
+                "no cross-segment memory.)")
+        # The tape holds T deltas: d_1 = s_1 - s_0 (s_0 captured by latent_init)
+        # through d_T.  The depth map is asked for the LOOP LENGTH and clamps to
+        # T-1, so d_T is deliberately never selected -- that is the rule as
+        # written down (rule B is specified as k_j = round(f_j * (T-1))), and
+        # matching the specification beats reclaiming one delta at the saturated
+        # end of the trajectory, which is the end P0.1 says carries least.
+        T_loop = len(self._z_tape)
+        W = self.prefix.n_vec
+        depths = self.latent_depth_map(T_loop, W)
+        rows = []
+        for j, k in enumerate(depths):
+            d = self._z_tape[min(max(k, 1), T_loop) - 1]
+            rows.append(d[:, j:j + 1])
+        return torch.cat(rows, dim=1)
+
+    def latent_depth_map(self, T: int, n_slots: int) -> list:
+        """slot -> loop depth.  The two rules P0.7 exists to choose between.
+
+        Mirrors evals/diag_depth_band.slot_depth_map; that file is the probe and
+        this is the consumer, and the two are checked against each other in
+        tests/test_latent_carry.py rather than trusted to stay in step.
+        """
+        lo, hi = self.latent_depth_lo, self.latent_depth_hi
+        if T < 2:
+            return [1] * n_slots
+        if self.latent_depth_rule == "absolute":
+            hi_c = min(hi, T - 1)
+            lo_c = min(lo, hi_c)
+            span = hi_c - lo_c + 1
+            return [lo_c + (j % span) for j in range(n_slots)]
+        f_lo = lo / max(hi, 1)
+        return [max(1, min(T - 1, round((f_lo + (1.0 - f_lo)
+                                         * j / max(n_slots - 1, 1)) * (T - 1))))
+                for j in range(n_slots)]
+
+    @property
+    def latent_read_grad_frac(self) -> float:
+        """Share of forwards SO FAR whose Z read had any gradient path at all.
+
+        Counted across forwards rather than reset per call, because the quantity
+        that matters is a training-run average: on a given batch the read is
+        either fully live or fully dead (see latent_init), and it is the mix
+        over batches that decides how much signal the read side gets.
+
+        Reads 0.0 before any forward with a known split -- the modeling file has
+        to pass `num_steps_no_grad`, so an old snapshot reports 0.0 rather than a
+        wrong number.  `latent_read_measured` says which.
+        """
+        if not self._z_read_n:
+            return 0.0
+        return self._z_read_live_n / self._z_read_n
+
+    @property
+    def latent_read_measured(self) -> bool:
+        """False when the modeling file never told us the split, so
+        latent_read_grad_frac's 0.0 means 'unknown' and not 'dead'."""
+        return self._z_read_n > 0
+
+    @property
+    def latent_write_grad_frac(self) -> float:
+        """Share of the taped steps that were inside the gradient window.
+
+        0.0 means Z is a frozen feature extractor for this batch.  That is a
+        legitimate configuration -- at mr32 it is unavoidable without raising
+        mean_backprop_depth -- but it changes what a null result for Z MEANS,
+        so it belongs in the pre-registration and in the training log, not in a
+        post-hoc explanation.
+        """
+        if not self._z_grad:
+            return 0.0
+        return sum(1 for g in self._z_grad if g) / len(self._z_grad)
 
     # ── hook called in forward() after iterate_forward ──────────────────────
     def cross_write(self, h_T: torch.Tensor) -> Optional[torch.Tensor]:
@@ -654,3 +1043,151 @@ class CortexMemory(nn.Module):
         if new_m_cross is not None and self._valid_write is not None:
             new_m_cross = apply_valid_write(new_m_cross, self._valid_write)
         return new_m_cross
+
+
+def _unwrap_for_reset(model):
+    """Reach the real module through DDP / torch.compile wrappers."""
+    m = model
+    if hasattr(m, "module"):
+        m = m.module
+    if hasattr(m, "_orig_mod"):
+        m = m._orig_mod
+    return m
+
+
+def reset_cortex_graft_init(model, log=None):
+    """Undo post_init's clobbering of the cortex graft's initialization, on the
+    live model after from_pretrained.
+
+    LIVES HERE, NOT IN train.py (moved 2026-09-16).  Every consumer that builds
+    the graft with from_pretrained needs it, not just the trainer:
+    tools/smoke_prefix_real.py was running the buffer with post_init's values --
+    measured at forget_bias = -2.2e12, i.e. fg identically ZERO, a gate that
+    forgets everything on every write -- while asserting that the gate behaved
+    like the run's.  It could not import train.py to fix that (train.py needs
+    wandb and the smoke runs on a login node), and a second copy of this logic
+    would drift.  train.py keeps a thin wrapper that supplies its rank-0 guard.
+
+    `log` is a print-like callable or None (silent); train.py passes print only
+    on rank 0.
+
+    RavenForCausalLM.__init__ builds CortexMemory (designed inits so the memory
+    read is a no-op and step-0 == the base model) and THEN calls post_init().
+    HF's _init_weights treats every cortex tensor as a freshly-'missing' key (the
+    "newly initialized: ['cortex.h_T_proj.weight', 'cortex.m_cross.cand_ln1.bias',
+    ...]" load warning) and re-initializes it with the raven DEPTH-SCALED scheme.
+    The graft modules have no valid layer index, so that scheme hands them an
+    effectively-infinite std -> NON-FINITE weights.  That is the confirmed
+    forward-nan source, and it hits EVERY cortex op in turn (localizer found
+    h_T_proj first, then m_cross.cand_ln1, ...), so restoring hand-picked tensors
+    is whack-a-mole.  Instead reset the WHOLE cortex subtree:
+      (1) every submodule back to its nn default (Linear->kaiming, LayerNorm->
+          weight 1/bias 0) — finite, in place, dtype/device preserved;
+      (2) re-apply the few explicit designed inits the graft sets by hand.
+    Mirrors cortex_graft.CortexMemory + cortex_memory.buffers; skipped on
+    --resume (a resumed ckpt carries trained, not fresh, cortex weights).
+
+    LoRA (cortex_lora) MUST be re-initialized here too — the original "bare
+    Parameters _init_weights never touches, B stays 0" analysis was WRONG under
+    the meta-device from_pretrained path: the skeleton is built on meta (the
+    __init__ kaiming/zeros are no-ops), missing keys are materialized via
+    to_empty() = UNINITIALIZED memory, and _init_weights skips ParameterDicts —
+    so A/B keep whatever bytes the allocator hands them.  Driver-zeroed fresh
+    pages make MOST tensors read as zeros; recycled blocks carry ~1e19 garbage,
+    with run-to-run membership.  Root cause of the entire rung1b failure family:
+    garbage in an A row -> finite grad_B ~1e19 -> inf fp32 grad-norm every step
+    (healthy forward, B~0); garbage in a B -> forward nan from step 1.  Note the
+    non-finite sweep below can NOT catch this — the garbage is FINITE."""
+    unwrapped = _unwrap_for_reset(model)
+    lora = getattr(unwrapped, "cortex_lora", None)
+    if lora is not None:
+        for A in lora.A.values():
+            torch.nn.init.kaiming_uniform_(A, a=math.sqrt(5))
+        for B in lora.B.values():
+            torch.nn.init.zeros_(B)
+        if log is not None:
+            log(f"[cortex] re-initialized {len(lora.A)} LoRA A/B pairs "
+                  f"(A~kaiming, B=0) — undo to_empty() garbage from the "
+                  f"meta-device load path")
+    cortex = getattr(unwrapped, "cortex", None)
+    if cortex is None:
+        return
+    # (1) undo the non-finite clobber: nn defaults for every submodule.
+    n_reset = 0
+    for m in cortex.modules():
+        if m is not cortex and callable(getattr(m, "reset_parameters", None)):
+            m.reset_parameters(); n_reset += 1
+    # (2) re-apply the graft's explicit designed inits (mirror the source).
+    def _read_init(w, tag):
+        torch.nn.init.zeros_(w)
+        return f"{tag}=0"
+    fixed = []
+    if getattr(cortex, "h_T_proj", None) is not None:
+        torch.nn.init.eye_(cortex.h_T_proj.weight); fixed.append("h_T_proj=eye")
+    for buf_name in ("m_cross", "m_iter"):          # LSTMBuffer / GatedAccumBuffer
+        buf = getattr(cortex, buf_name, None)
+        if buf is None:
+            continue
+        read_tag = _read_init(buf.out_proj.weight, "out_proj")  # memory read
+        if hasattr(buf, "slot_emb"):                # LSTMBuffer
+            torch.nn.init.normal_(buf.slot_emb, std=0.02)
+            emb_tag = "slot_emb~N"
+        else:                                       # GatedAccumBuffer (vec_emb queries)
+            torch.nn.init.normal_(buf.vec_emb, std=0.02)
+            emb_tag = "vec_emb~N"
+        torch.nn.init.ones_(buf.forget_bias)                  # LM2 §3.3 forget bias +1
+        torch.nn.init.zeros_(buf.input_bias)
+        fixed.append(f"{buf_name}.[{read_tag},{emb_tag},forget_bias=1,input_bias=0]")
+    ccot = getattr(cortex, "ccot_direct", None)                # DirectCCoT (K=0)
+    if ccot is not None:
+        torch.nn.init.eye_(ccot.state_proj.weight); fixed.append("ccot.state_proj=eye")
+        fixed.append("ccot." + _read_init(ccot.in_proj.weight, "in_proj"))
+    acc = getattr(cortex, "accum", None)                       # AccumCCoT
+    if acc is not None:
+        torch.nn.init.normal_(acc.vec_emb, std=0.02)
+        fixed.append("accum.[vec_emb~N," + _read_init(acc.out_proj.weight, "out_proj") + "]")
+    pre = getattr(cortex, "prefix", None)          # PrefixAccum / PrefixGated
+    if pre is not None:
+        # summary_emb here is a FINITE placeholder only — it is re-seeded from
+        # wte[eos] on the first forward (see the modeling file).  This function
+        # runs on fresh builds ONLY (caller guards on resume_path is None), so
+        # clearing summary_seeded is both safe and necessary: the base graft dir
+        # carries no cortex tensors, and a bool buffer materialised from meta
+        # can come back as garbage -> read True -> seeding silently skipped.
+        torch.nn.init.normal_(pre.summary_emb, std=0.02)
+        pre.summary_seeded.fill_(False)
+        tags = ["summary_emb~N(reseeded from wte on first forward)"]
+        if hasattr(pre, "apply_gate_init"):                    # PrefixGatedBuffer
+            # Step (1) above called reset_parameters() on gate_proj_in/mem,
+            # which puts KAIMING weights back into both projections -- silently
+            # discarding gate_init="zero" and leaving millions of untrained
+            # parameters making per-channel keep/drop decisions at step 0.  The
+            # buffer owns its designed init; re-apply it here.
+            pre.apply_gate_init()
+            tags += ["forget_bias=1", "input_bias=0",
+                     f"gate_init={pre.gate_init}"]
+            if getattr(pre, "carries_latent", False):
+                # apply_gate_init covers the Z gate too -- step (1) above called
+                # reset_parameters() on gate_proj_in_z/mem_z exactly as it does
+                # on the E pair, so BOTH need re-zeroing.  Tagged separately
+                # because "the gate was re-initialised" and "both gates were
+                # re-initialised" are different claims in a run log.
+                tags += ["forget_bias_z=1", "input_bias_z=0",
+                         f"gate_init_z={pre.gate_init}"]
+            if hasattr(pre, "slot_init"):                      # gate_fill=init
+                torch.nn.init.normal_(pre.slot_init, std=0.02)
+                tags += ["slot_init~N(reseeded from wte on first forward)"]
+        elif hasattr(pre, "forget_bias"):                      # legacy gated shape
+            torch.nn.init.ones_(pre.forget_bias)               # LM2 3.3 forget bias +1
+            torch.nn.init.zeros_(pre.input_bias)
+            tags += ["forget_bias=1", "input_bias=0"]
+        fixed.append("prefix.[" + ",".join(tags) + "]")
+    # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
+    #     some module lacked reset_parameters and slipped through.
+    bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]
+    if log is not None:
+        log(f"[cortex] reset {n_reset} cortex submodules to nn defaults + "
+              f"re-applied designed inits {fixed} (undo post_init clobber)")
+        if bad:
+            log(f"[cortex] WARNING: {len(bad)} cortex params STILL non-finite "
+                  f"after reset (no reset_parameters?): {bad[:12]}")

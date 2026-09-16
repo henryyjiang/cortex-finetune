@@ -304,7 +304,17 @@ def main() -> int:
         if r["floor_ratio"] < 4.0:
             suspect.append(r["t"])
 
-    m_cross = _stats(getattr(out, "m_cross", None))
+    # ||m_cross|| is the E channel's write.  On a DUAL-CHANNEL carry the tensor
+    # is [B, K, 2D] with the trajectory at [..., D:], and a per-row norm over
+    # the full width would silently blend a ~171-norm hidden state with a
+    # ~0.35-norm delta and report the mixture as "the E write".  Slice first.
+    _carry = getattr(out, "m_cross", None)
+    if _carry is not None and _carry.shape[-1] == 2 * D:
+        print("[note] dual-channel carry detected: reporting ||m_cross|| for "
+              "the E half only\n       (columns :D).  The Z half is the "
+              "trajectory write and is not a hidden state.")
+        _carry = _carry[..., :D]
+    m_cross = _stats(_carry)
     post_tok = _stats(getattr(out, "hidden_states", None))
     sT = steps[-1]["s"]["mean"]
     d_first = steps[0]["delta"]["mean"]

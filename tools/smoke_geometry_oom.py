@@ -62,6 +62,7 @@ import torch  # noqa: E402
 from cortex_memory.chunking import detach_old_vecs  # noqa: E402
 from recipe_utils import (  # noqa: E402
     carry_rows,
+    gated_carry_rows,
     reduce_chunk_losses,
     worst_case_num_steps,
 )
@@ -97,6 +98,23 @@ def parse_args() -> argparse.Namespace:
                         "the LARGER footprint: the FIFO never trims, so the last "
                         "chunk reads over every earlier write.  Measure this, not "
                         "a capped buffer — a gate must be conservative.")
+    p.add_argument("--gate_slots", type=int, default=0,
+                   help="K for --prefix_memory gated: carried columns held.  "
+                        "0 = same as --accum_vecs (the pre-P1.0 shape).  A3' "
+                        "runs 64.  Ignored by the accum buffer, which is capped "
+                        "by --accum_max instead.")
+    p.add_argument("--latent_carry", action="store_true",
+                   help="price the Z CHANNEL.  Not free and not obviously "
+                        "cheap: the carried tensor widens to 2D (small), the "
+                        "trajectory tape adds T x [B, n_vec, D] (about 1 MB at "
+                        "T=8/W=16/D=2048, also small) -- but the SECOND GATE is "
+                        "two more [D, 2D] Linears, i.e. ~33.5M parameters with "
+                        "their optimizer state, which is not small.  A Z arm "
+                        "that was priced on an E-only run was not priced.")
+    p.add_argument("--gate_route", default="ring", choices=["ring", "mix"])
+    p.add_argument("--gate_norm", default="tanh", choices=["tanh", "rms", "none"])
+    p.add_argument("--gate_init", default="zero", choices=["zero", "default"])
+    p.add_argument("--gate_fill", default="grow", choices=["grow", "init"])
     p.add_argument("--carry_grad_chunks", type=int, default=0,
                    help="0 = cross_chunks // 2, B2's 50%% convention (4 of 8 in "
                         "the arm).  This is a MEMORY parameter, not only a "
@@ -139,6 +157,10 @@ def build_model(args, use_memory: bool):
                  ("prefix_memory", args.prefix_memory),
                  ("accum_vecs", args.accum_vecs),
                  ("accum_max", args.accum_max),
+                 ("gate_slots", args.gate_slots), ("gate_route", args.gate_route),
+                 ("gate_norm", args.gate_norm), ("gate_init", args.gate_init),
+                 ("gate_fill", args.gate_fill),
+                 ("latent_carry", args.latent_carry),
                  ("prefix_pos", "tail"), ("prefix_eos_reset", False)):
         setattr(cfg, k, v)
     model = AutoModelForCausalLM.from_pretrained(
@@ -199,7 +221,8 @@ def init_trivial_process_group():
 
 
 def micro_step(model, x, y, eos_id, n_chunks, num_steps, carry_grad_chunks,
-               accum_vecs, accumulation_steps, amp_args, use_memory):
+               accum_vecs, accumulation_steps, amp_args, use_memory,
+               write_once=True):
     """Mirror of train.py's `cortex_fwd_bwd` (1701-1785), minus DDP and the
     all-masked guard (synthetic rows carry no -100 labels).
 
@@ -211,9 +234,17 @@ def micro_step(model, x, y, eos_id, n_chunks, num_steps, carry_grad_chunks,
     x_chunks = [c.contiguous() for c in torch.chunk(x, n_chunks, dim=1)]
     y_chunks = [c.contiguous() for c in torch.chunk(y, n_chunks, dim=1)]
     m_cross, chunk_losses, chunk_tokens = None, [], []
-    for xc, yc in zip(x_chunks, y_chunks):
+    for gi, (xc, yc) in enumerate(zip(x_chunks, y_chunks)):
+        # train.py's `accum_on` dispatch.  It is a MEMORY fact here, not just a
+        # correctness one: a slice detach frees the older chunks' graphs one
+        # block at a time, while a gated buffer's whole-state detach keeps every
+        # chunk since the last detach alive at once.  Pricing the gated arm with
+        # the accum branch would under-count the peak by most of a lap.
         if carry_grad_chunks > 0 and m_cross is not None:
-            m_cross = detach_old_vecs(m_cross, accum_vecs, carry_grad_chunks)
+            if write_once:
+                m_cross = detach_old_vecs(m_cross, accum_vecs, carry_grad_chunks)
+            elif gi % carry_grad_chunks == 0:
+                m_cross = m_cross.detach()
         with torch.autocast(**amp_args):
             out = model(xc, labels=yc, num_steps=num_steps,
                         m_cross_in=m_cross, return_m_cross=True,
@@ -289,7 +320,10 @@ def main() -> int:
             return 1
         eos_id = cortex.summary_init_token
         n_vec = cortex.prefix.n_vec
+        gated = args.prefix_memory == "gated"
+        n_slots = int(getattr(cortex.prefix, "n_slots", n_vec))
     else:
+        gated, n_slots = False, 0
         # The negative guard, mirroring the positive one: a control that
         # secretly has memory and a memory run that secretly does not both look
         # like a healthy loss curve (recurring bug class 2).
@@ -307,18 +341,53 @@ def main() -> int:
     depth = args.backprop_depth or int(getattr(cfg, "mean_backprop_depth", 8))
     n_ng, k_wg = worst_case_num_steps(args.mean_recurrence, depth)
     num_steps = torch.tensor([n_ng, k_wg], device=model.device)
-    peak_carry = (carry_rows(args.cross_chunks - 1, n_vec, args.accum_max)
-                  if use_memory else 0)
+    if not use_memory:
+        peak_carry = 0
+    elif gated:
+        peak_carry = gated_carry_rows(args.cross_chunks - 1, n_vec, n_slots,
+                                      args.gate_fill)
+    else:
+        peak_carry = carry_rows(args.cross_chunks - 1, n_vec, args.accum_max)
     src = "--backprop_depth" if args.backprop_depth else "the checkpoint config"
     print(f"  recurrence: mean {args.mean_recurrence}, backprop depth {depth} "
           f"(from {src}) -> worst-case num_steps "
           f"[{n_ng} no-grad, {k_wg} with-grad]")
-    print(f"  buffer: accum_vecs {n_vec}, accum_max {args.accum_max}, "
-          f"carry_grad_chunks {args.carry_grad_chunks} of {args.cross_chunks}")
+    if gated:
+        print(f"  buffer: GATED ring, W {n_vec}, K {n_slots}, "
+              f"route {args.gate_route}, norm {args.gate_norm}, "
+              f"init {args.gate_init}, fill {args.gate_fill}, "
+              f"carry_grad_chunks {args.carry_grad_chunks} of "
+              f"{args.cross_chunks}")
+    else:
+        print(f"  buffer: accum_vecs {n_vec}, accum_max {args.accum_max}, "
+              f"carry_grad_chunks {args.carry_grad_chunks} of "
+              f"{args.cross_chunks}")
     print(f"  max packed sequence: {chunk_len} + {peak_carry} carry rows = "
           f"{chunk_len + peak_carry} "
           f"(max_position_embeddings={getattr(cfg, 'max_position_embeddings', '?')})")
-    if use_memory:
+    if use_memory and gated:
+        lap = n_slots // max(n_vec, 1)
+        # The same bound train.py asserts and smoke_prefix_real.py refuses on.
+        # Priced here too, because a geometry whose gate never fires has the
+        # WRONG FOOTPRINT as well as the wrong mechanism: it never reaches the
+        # whole-state-detach regime, so the number this script prints would not
+        # be the number the run faces.
+        if args.cross_chunks < 2 * lap:
+            print(f"  FAIL: cross_chunks {args.cross_chunks} < 2 laps "
+                  f"({2 * lap} = 2 x K/W).  The gate never fires, so this would "
+                  f"price an append buffer with dead gate parameters.")
+            return 1
+        print(f"  note: lap is {lap} chunks; the gate fires from chunk {lap} on, "
+              f"and the read block is PINNED at {n_slots} columns from there. "
+              f"Against a no-trim accum on the same chain "
+              f"({args.cross_chunks * n_vec} columns) this is "
+              f"{100 * n_slots / max(args.cross_chunks * n_vec, 1):.0f}% of the "
+              f"read cost -- the pair is 'cheaper AND?', never 'equal cost AND?'.")
+        print(f"  note: +{sum(p.numel() for p in cortex.prefix.parameters()) / 1e6:.1f}M "
+              f"buffer parameters, which the optimizer holds two moments for. "
+              f"That is the one axis on which the gated arm is the LARGER of "
+              f"the two, and the reason this gate is not a formality.")
+    elif use_memory:
         if args.cross_chunks * n_vec > args.accum_max:
             print(f"  note: the FIFO trim FIRES from chunk "
                   f"{args.accum_max // max(n_vec, 1)} on — eviction is "
@@ -358,7 +427,7 @@ def main() -> int:
         t = time.time()
         loss, _ = micro_step(model, x, y, eos_id, args.cross_chunks, num_steps,
                              args.carry_grad_chunks, n_vec, args.batch_size,
-                             amp_args, use_memory)
+                             amp_args, use_memory, write_once=not gated)
         if optimizer is not None:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
             optimizer.step()
@@ -426,6 +495,11 @@ def main() -> int:
                 "mean_recurrence": args.mean_recurrence, "backprop_depth": depth,
                 "num_steps": [n_ng, k_wg], "carry_rows": peak_carry,
                 "accum_vecs": n_vec, "accum_max": args.accum_max,
+                "buffer": ("gated" if gated else "accum") if use_memory else "none",
+                "gate_slots": n_slots if gated else 0,
+                "gate_route": args.gate_route if gated else "",
+                "gate_fill": args.gate_fill if gated else "",
+                "latent_carry": bool(args.latent_carry),
                 "carry_grad_chunks": args.carry_grad_chunks,
                 "peak_alloc_gib": round(peak_alloc / GIB, 2),
                 "peak_res_gib": round(peak_res / GIB, 2),

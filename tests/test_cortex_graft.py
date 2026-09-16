@@ -53,24 +53,34 @@ class FakeRaven(nn.Module):
     def initialize_state(self, input_embeds):
         return torch.randn_like(input_embeds)
 
-    def core_block_forward(self, x, input_embeds):
+    def core_block_forward(self, x, input_embeds, current_step=0):
         x = self.adapter(torch.cat([x, input_embeds], dim=-1))
         if self.cortex is not None:                       # ← graft hook (read)
             x = self.cortex.read_into(x)
         for block in self.core_block:
             x = block(x)
         if self.cortex is not None:                       # ← graft hook (M_iter write)
-            self.cortex.iter_write(x)
+            # Mirror the REAL call, which passes the loop step (the modeling
+            # files do `iter_write(x, current_step)`).  The graft's second
+            # argument is optional for backward compatibility with older
+            # checkpoint snapshots, so calling it with one argument here would
+            # still "work" -- and would quietly stop this fake from being the
+            # exact hook sequence the file's docstring promises.
+            self.cortex.iter_write(x, current_step)
         return x
 
     def iterate_forward(self, input_embeds, num_steps):
         n, k = num_steps
         x = self.initialize_state(input_embeds)
+        # The step index counts across BOTH loops, exactly as the real
+        # iterate_forward does (`num_steps_no_grad + grad_step`).  Restarting it
+        # at 0 for the with-grad loop would be a fake that disagrees with the
+        # model on which iteration a write came from.
         with torch.no_grad():
-            for _ in range(n):
-                x = self.core_block_forward(x, input_embeds)
-        for _ in range(k):
-            x = self.core_block_forward(x, input_embeds)
+            for i in range(n):
+                x = self.core_block_forward(x, input_embeds, i)
+        for i in range(k):
+            x = self.core_block_forward(x, input_embeds, n + i)
         return x
 
     def forward(self, input_ids, num_steps, labels=None,
@@ -344,3 +354,94 @@ class TestBoth:
         assert out1["m_cross"].shape == (B, K, H)
         assert model.cortex.m_cross.gate_proj_in.weight.grad is not None
         assert model.cortex.m_iter.gate_proj_in.weight.grad is not None
+
+
+# ---------------------------------------------------------------------------
+# reset_cortex_graft_init — moved here from train.py on 2026-09-16
+# ---------------------------------------------------------------------------
+
+class TestResetCortexGraftInit:
+    """The function that undoes post_init's clobbering of the graft.
+
+    It lived in train.py and had no direct test: the only coverage was
+    `apply_gate_init` in isolation, which is the piece the buffer owns rather
+    than the piece that calls it.  It moved into cortex_graft.py so that
+    tools/smoke_prefix_real.py could apply it without importing wandb -- and
+    the move is exactly the moment to cover it, because the reason for the move
+    was a measurement: on a graft-prepared base, from_pretrained left
+    forget_bias at -2.2e12 (fg identically ZERO, a gate that forgets everything
+    on every write) and every structural check still passed.
+    """
+
+    def _clobbered(self, **cfg_kw):
+        from cortex_graft import CortexMemory
+        cfg = SimpleNamespace(
+            n_embd=H, use_memory=True, memory_slots=0, memory_slots_iter=0,
+            prefix_memory="gated", accum_vecs=4, gate_slots=16,
+            gate_route="ring", gate_init="zero", gate_fill="grow",
+            eos_token_id=7, vocab_size=64, **cfg_kw)
+        cortex = CortexMemory(cfg)
+        model = SimpleNamespace(cortex=cortex, cortex_lora=None)
+        # Reproduce what post_init does to a "newly initialized" cortex tensor:
+        # the raven depth-scaled scheme with no valid layer index.
+        for p_ in cortex.parameters():
+            with torch.no_grad():
+                p_.fill_(-2.2e12)
+        return model, cortex
+
+    def test_it_pulls_the_graft_back_from_post_inits_values(self):
+        from cortex_graft import reset_cortex_graft_init
+        model, cortex = self._clobbered()
+        assert float(cortex.prefix.forget_bias.detach()) < -1e11
+        reset_cortex_graft_init(model)
+        for n, p_ in cortex.named_parameters():
+            assert torch.isfinite(p_).all(), n
+            assert float(p_.detach().abs().max()) < 1e4, n
+
+    def test_the_designed_gate_init_survives_the_reset(self):
+        """Step (1) of the reset calls reset_parameters() on every submodule,
+        which puts KAIMING back into the gate projections.  If step (2) did not
+        re-apply apply_gate_init, gate_init='zero' would be silently discarded
+        and millions of untrained parameters would make per-channel keep/drop
+        decisions at step 0.  Bug class 1."""
+        from cortex_graft import reset_cortex_graft_init
+        model, cortex = self._clobbered()
+        reset_cortex_graft_init(model)
+        buf = cortex.prefix
+        assert float(buf.gate_proj_in.weight.detach().abs().sum()) == 0.0
+        assert float(buf.gate_proj_mem.weight.detach().abs().sum()) == 0.0
+        assert float(buf.forget_bias.detach()) == 1.0
+        assert float(buf.input_bias.detach()) == 0.0
+
+    def test_it_covers_the_Z_gate_too(self):
+        """The dual-channel buffer has FOUR projections, not two.  A reset that
+        re-zeroed only the E pair would leave Z's gate at kaiming."""
+        from cortex_graft import reset_cortex_graft_init
+        model, cortex = self._clobbered(latent_carry=True)
+        reset_cortex_graft_init(model)
+        buf = cortex.prefix
+        assert float(buf.gate_proj_in_z.weight.detach().abs().sum()) == 0.0
+        assert float(buf.gate_proj_mem_z.weight.detach().abs().sum()) == 0.0
+        assert float(buf.forget_bias_z.detach()) == 1.0
+        assert float(buf.input_bias_z.detach()) == 0.0
+
+    def test_summary_seeded_is_cleared_so_the_write_path_reseeds(self):
+        """A bool buffer materialised from meta can come back as garbage and
+        read True, which would skip the wte[eos] seeding entirely and leave the
+        write path on noise.  The reset runs on FRESH builds only, so clearing
+        it is both safe and necessary."""
+        from cortex_graft import reset_cortex_graft_init
+        model, cortex = self._clobbered()
+        cortex.prefix.summary_seeded.fill_(True)
+        reset_cortex_graft_init(model)
+        assert not bool(cortex.prefix.summary_seeded)
+
+    def test_it_is_silent_unless_given_a_logger(self, capsys):
+        """train.py passes print only on rank 0; every other caller gets
+        silence by default rather than one line per rank."""
+        from cortex_graft import reset_cortex_graft_init
+        model, _ = self._clobbered()
+        reset_cortex_graft_init(model)
+        assert capsys.readouterr().out == ""
+        reset_cortex_graft_init(model, log=print)
+        assert "[cortex]" in capsys.readouterr().out

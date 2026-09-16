@@ -30,7 +30,8 @@ sys.path.insert(0, os.path.join(REPO, "tools"))
 
 from test_cortex_eval import VOCAB, _build_raven  # noqa: E402
 
-from recipe_utils import carry_rows, worst_case_num_steps  # noqa: E402
+from recipe_utils import (carry_rows, gated_carry_rows,  # noqa: E402
+                          worst_case_num_steps)
 from smoke_geometry_oom import build_param_groups, micro_step  # noqa: E402
 
 NV, CL, NC = 4, 16, 4          # accum_vecs, chunk_len, cross_chunks
@@ -49,6 +50,18 @@ def _model(use_memory=True, **kw):
                         **kw).train()
 
 
+GK, GNC = 16, 8                # gate_slots, cross_chunks for the gated cells
+                               # K/W = 4, so a lap is 4 chunks and 2 laps is 8
+
+
+def _gated(n_slots=GK, **kw):
+    torch.manual_seed(1234)
+    return _build_raven(use_memory=True, memory_slots=0, prefix_memory="gated",
+                        accum_vecs=NV, gate_slots=n_slots, gate_route="ring",
+                        gate_init="zero", gate_fill="grow", eos_token_id=EOS,
+                        **kw).train()
+
+
 def _batch(n_chunks=NC):
     torch.manual_seed(0)
     ids = torch.randint(0, VOCAB - 1, (1, CL * n_chunks + 1))
@@ -57,11 +70,12 @@ def _batch(n_chunks=NC):
     return ids[:, :-1], ids[:, 1:]
 
 
-def _run(model, accumulation_steps=1, use_memory=True, carry_grad_chunks=2):
-    x, y = _batch()
-    return micro_step(model, x, y, EOS, NC, torch.tensor([1, 1]),
+def _run(model, accumulation_steps=1, use_memory=True, carry_grad_chunks=2,
+         n_chunks=NC, write_once=True):
+    x, y = _batch(n_chunks)
+    return micro_step(model, x, y, EOS, n_chunks, torch.tensor([1, 1]),
                       carry_grad_chunks, NV, accumulation_steps, CPU_AMP,
-                      use_memory)
+                      use_memory, write_once=write_once)
 
 
 class TestWorstCaseNumSteps:
@@ -225,3 +239,164 @@ class TestMicroStep:
             assert "no m_cross" in str(e)
         else:
             raise AssertionError("a memory-less model passed as a memory run")
+
+
+class TestGatedCarryRows:
+    """The read-block width the gate prices.  A separate function from
+    carry_rows on purpose -- see its docstring for why reusing carry_rows with
+    accum_max=K would be right by accident."""
+
+    def test_first_chunk_reads_nothing_under_grow(self):
+        assert gated_carry_rows(0, 16, 64) == 0
+
+    def test_it_grows_for_one_lap_then_pins(self):
+        assert gated_carry_rows(1, 16, 64) == 16
+        assert gated_carry_rows(3, 16, 64) == 48
+        assert gated_carry_rows(4, 16, 64) == 64
+        assert gated_carry_rows(7, 16, 64) == 64          # A3' at cc=8
+        assert gated_carry_rows(400, 16, 64) == 64        # and forever
+
+    def test_fill_init_is_full_width_from_chunk_one(self):
+        assert gated_carry_rows(0, 16, 64, fill="init") == 64
+        assert gated_carry_rows(1, 16, 64, fill="init") == 64
+
+    def test_the_first_lap_agrees_with_accum_and_then_does_not(self):
+        """The property A1 vs A3' is built on, stated as a test rather than a
+        remark: identical until eviction, divergent after."""
+        for i in range(0, 4):
+            assert gated_carry_rows(i, 16, 64) == carry_rows(i, 16, 128)
+        assert gated_carry_rows(7, 16, 64) == 64
+        assert carry_rows(7, 16, 128) == 112              # A1 is still growing
+
+    def test_a3_prime_is_half_a1s_read_block_on_the_same_chain(self):
+        """Two asserts bound K from opposite sides (accum needs K >= cc*W, a
+        gated ring needs K <= cc*W/2), so the pair is inherently 'cheaper AND?'
+        and never 'equal cost AND?'.  The writeup has to say so; this pins the
+        arithmetic behind it at the launch geometry."""
+        assert gated_carry_rows(7, 16, 64) * 2 == carry_rows(7, 16, 128) + 16
+
+
+class TestGatedMicroStep:
+    """The gated arm through the same loop the memory is measured around."""
+
+    def test_the_read_block_stops_growing(self):
+        m = _gated()
+        loss, m_cross = _run(m, n_chunks=GNC, write_once=False)
+        assert loss == loss
+        assert m_cross.shape[1] == GK
+        assert m_cross.shape[1] == gated_carry_rows(GNC - 1, NV, GK)
+
+    def test_the_write_is_on_the_loss(self):
+        m = _gated()
+        _run(m, n_chunks=GNC, write_once=False)
+        g = m.cortex.prefix.summary_emb.grad
+        assert g is not None and float(g.norm()) > 0
+
+    def test_the_gate_is_on_the_loss(self):
+        m = _gated()
+        _run(m, n_chunks=GNC, write_once=False)
+        buf = m.cortex.prefix
+        assert float(buf.gate_proj_in.weight.grad.norm()) > 0
+        assert float(buf.gate_proj_mem.weight.grad.norm()) > 0
+
+    def test_whole_state_detach_retains_more_graph_than_a_slice_detach(self):
+        """`write_once` is a MEMORY parameter here, not just a correctness one:
+        the accum branch frees older chunks a block at a time, the gated branch
+        keeps every chunk since the last detach alive at once.  Pricing the
+        gated arm through the accum branch would under-count the peak by most of
+        a lap, which is exactly the kind of error this gate exists to avoid.
+
+        Measured as reachable gradient, which is what the retained graph feeds.
+        """
+        short = _gated()
+        _run(short, n_chunks=GNC, carry_grad_chunks=2, write_once=False)
+        full = _gated()
+        _run(full, n_chunks=GNC, carry_grad_chunks=0, write_once=False)
+        a = float(short.cortex.prefix.summary_emb.grad.norm())
+        b = float(full.cortex.prefix.summary_emb.grad.norm())
+        assert a < b
+
+
+class TestTheZChannelIsPriced:
+    """The Z arms' memory has NEVER been measured: every number in this gate's
+    history came from an E-only run.  The carry widening to 2D is small and the
+    trajectory tape is ~1 MB, but the SECOND GATE is two more [D, 2D] Linears --
+    ~33.5M parameters at D=2048 -- and they carry optimizer state.  An arm priced
+    on an E-only row was not priced.
+    """
+
+    def test_the_flag_reaches_the_config_the_model_is_built_from(self):
+        """Source-level, because build_model needs the real checkpoint.  A
+        --latent_carry that never reached the config would measure the E-only
+        footprint under a Z label, which is exactly the silent class this whole
+        gate exists for."""
+        src = open(os.path.join(REPO, "tools", "smoke_geometry_oom.py"),
+                   encoding="utf-8").read()
+        start = src.index('for k, v in (("use_memory", use_memory),')
+        end = src.index("setattr(cfg, k, v)", start)
+        assert '("latent_carry", args.latent_carry)' in src[start:end]
+        assert 'p.add_argument("--latent_carry"' in src
+
+    def test_the_second_gate_roughly_doubles_the_buffers_parameters(self):
+        e_only = _gated()
+        dual = _gated(latent_carry=True)
+        n_e = sum(p.numel() for p in e_only.cortex.prefix.parameters())
+        n_z = sum(p.numel() for p in dual.cortex.prefix.parameters())
+        # summary_emb is shared, so it is not quite 2x -- but the gate half is.
+        assert n_z > 1.9 * n_e - e_only.cortex.prefix.summary_emb.numel()
+
+    def test_the_z_gate_is_priced_as_adam_and_never_as_muon(self):
+        """Muon holds momentum only; Adam holds two states per parameter.  The Z
+        gate landing in the wrong group would misprice ~33.5M parameters by 2x,
+        and the gate's whole output is a memory number."""
+        dual = _gated(latent_carry=True)
+        groups = build_param_groups(dual, muon_lr=1e-3, adam_lr=5e-5,
+                                    memory_lr=5e-4)
+        z_params = {id(p) for n, p in dual.named_parameters() if "_z" in n}
+        assert z_params, "no Z gate parameters were built"
+        for g in groups:
+            ids = {id(p) for p in g["params"]}
+            if g.get("use_muon"):
+                assert not (ids & z_params), "a Z gate tensor reached Muon"
+        seen = sum(len({id(p) for p in g["params"]} & z_params) for g in groups)
+        assert seen == len(z_params), "a Z gate tensor is in no group at all"
+
+    def test_a_dual_channel_chain_runs_through_the_mirrored_micro_step(self):
+        """The gate measures memory around THIS loop, so the loop has to be the
+        one that runs.  A dual-channel carry that only worked in the real
+        forward would leave the gate pricing an E-only chain under a Z label."""
+        dual = _gated(latent_carry=True)
+        D = dual.cortex.prefix.hidden_size
+        loss, m_cross = micro_step(dual, *_batch(GNC), EOS, GNC,
+                                   torch.tensor([1, 1]), 2, NV, 1, CPU_AMP,
+                                   True, write_once=False)
+        assert loss == loss                                   # not nan
+        assert m_cross.shape[1] == GK                         # rows unchanged
+        assert m_cross.shape[-1] == 2 * D                     # E | Z
+
+    def test_the_gates_worst_case_split_gives_the_z_gate_no_gradient(self):
+        """NOT a defect -- the E/Z read asymmetry, showing up in the one place
+        it is easy to misread as one.
+
+        The OOM gate runs the WORST-CASE recurrence split, which has a no-grad
+        prefix by construction.  One no-grad step detaches everything
+        downstream of s0, and at a 2-step loop the depth map can only select the
+        frozen step's delta, so BOTH halves of Z's gradient path are cut and the
+        Z gate's grad is exactly zero.  The memory being measured is still the
+        dual-channel chain's, which is what the gate is for -- but anyone
+        reading a zero here must not read it as 'Z never trains'.
+        """
+        dual = _gated(latent_carry=True)
+        micro_step(dual, *_batch(GNC), EOS, GNC, torch.tensor([1, 1]),
+                   2, NV, 1, CPU_AMP, True, write_once=False)
+        assert float(dual.cortex.prefix.gate_proj_in_z.weight.grad.norm()) == 0.0
+
+    def test_with_the_whole_loop_in_the_window_the_z_gate_does_train(self):
+        """The same chain at a (0, T) split -- the configuration the walk and
+        the probe use -- so the zero above is attributable to the split and not
+        to the mirrored loop being wired differently from train.py's."""
+        dual = _gated(latent_carry=True)
+        micro_step(dual, *_batch(GNC), EOS, GNC, torch.tensor([0, 4]),
+                   2, NV, 1, CPU_AMP, True, write_once=False)
+        g = dual.cortex.prefix.gate_proj_in_z.weight.grad
+        assert g is not None and float(g.norm()) > 0

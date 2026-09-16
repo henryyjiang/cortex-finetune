@@ -116,10 +116,25 @@ class _PrefixBufferBase(nn.Module):
     at eviction.
     """
 
-    def __init__(self, hidden_size: int, n_vec: int) -> None:
+    def __init__(self, hidden_size: int, n_vec: int,
+                 carries_latent: bool = False) -> None:
         super().__init__()
         self.hidden_size = hidden_size
         self.n_vec = n_vec
+        # THE DUAL-CHANNEL FLAG.  False (the default) leaves every buffer
+        # byte-identical to the E-only design B2 ran.  True widens the carried
+        # state's LAST dim to 2D -- E at [..., :D], Z at [..., D:] -- and is
+        # duck-typed by evals/eval_carry_2x2.py, which refuses to report a 2x2
+        # unless it finds this True.
+        #
+        # WHY THE LAST DIM AND NOT A SECOND TENSOR.  The carry is threaded
+        # through forward(m_cross_in=...) as ONE tensor and sliced on dim 1 by
+        # train.py's stop-gradient horizon (detach_old_vecs), by the graft's
+        # shape asserts, and by every eval that counts carried rows.  Widening
+        # dim -1 leaves all of that correct by construction; a tuple would
+        # require editing each one, and the ones that were missed would fail
+        # silently rather than loudly.
+        self.carries_latent = bool(carries_latent)
 
         # The analog of AutoCompressor's `embed_summary` (auto_compressor.py:47).
         # Overwritten by init_from_token_embedding once the base weights exist;
@@ -162,8 +177,51 @@ class _PrefixBufferBase(nn.Module):
         return (self.summary_emb.unsqueeze(0)
                 .expand(batch_size, -1, -1).to(device=device, dtype=dtype))
 
+    # -- dual-channel plumbing ---------------------------------------------
+
+    def split_channels(self, state: Optional[torch.Tensor]):
+        """[B, K, 2D] -> (E, Z).  Returns (state, None) on an E-only buffer.
+
+        Raises rather than guessing when the width does not match the flag: an
+        E-only carry reaching a dual-channel buffer (or the reverse) is a
+        checkpoint/config mismatch, and the failure mode if it were tolerated is
+        a Z channel reading the second half of E as a latent state -- finite,
+        plausible, and wrong, behind a healthy loss curve.
+        """
+        if state is None:
+            return None, None
+        D, got = self.hidden_size, state.shape[-1]
+        if not self.carries_latent:
+            if got != D:
+                raise ValueError(
+                    f"carry is {got}-wide but this buffer is E-only (D={D}). "
+                    "A dual-channel checkpoint is being loaded into an E-only "
+                    "config -- set --cortex.latent_carry true.")
+            return state, None
+        if got != 2 * D:
+            raise ValueError(
+                f"carry is {got}-wide but this buffer carries E+Z (expects "
+                f"{2 * D} = 2 x {D}).  An E-only carry reached a dual-channel "
+                "buffer -- the arm was branched from an E-only checkpoint "
+                "without clearing the carry, or --cortex.latent_carry was "
+                "turned on mid-chain.")
+        return state[..., :D], state[..., D:]
+
+    def join_channels(self, e: torch.Tensor,
+                      z: Optional[torch.Tensor]) -> torch.Tensor:
+        if not self.carries_latent:
+            return e
+        if z is None:
+            raise ValueError(
+                "a dual-channel buffer was asked to merge without a latent "
+                "write.  The tape is empty, which means the loop hook never "
+                "fired -- see CortexMemory.iter_write and the modeling file's "
+                "core_block_forward.")
+        return torch.cat([e, z], dim=-1)
+
     def merge(self, state: Optional[torch.Tensor],
-              new_vecs: torch.Tensor) -> torch.Tensor:
+              new_vecs: torch.Tensor,
+              new_latent: Optional[torch.Tensor] = None) -> torch.Tensor:
         raise NotImplementedError
 
 
@@ -182,14 +240,23 @@ class PrefixAccumBuffer(_PrefixBufferBase):
     """
 
     def __init__(self, hidden_size: int, n_vec: int = 32,
-                 max_vecs: int = 128) -> None:
-        super().__init__(hidden_size, n_vec)
+                 max_vecs: int = 128, carries_latent: bool = False) -> None:
+        super().__init__(hidden_size, n_vec, carries_latent)
         assert max_vecs >= n_vec, "max_vecs must hold at least one chunk's write"
         self.max_vecs = max_vecs
 
     def merge(self, state: Optional[torch.Tensor],
-              new_vecs: torch.Tensor) -> torch.Tensor:
-        """state [B, N, D] (None on chunk 1) + [B, n_vec, D] -> [B, N', D]."""
+              new_vecs: torch.Tensor,
+              new_latent: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """state [B, N, D*] (None on chunk 1) + [B, n_vec, D] -> [B, N', D*].
+
+        D* is D, or 2D when `carries_latent`.  E and Z ride the SAME rows: the
+        append is write-once either way, so the FIFO, the stop-gradient slice
+        and the per-chunk separability are all unchanged -- which is the reason
+        A2 (accum + Z) is the cell that keeps the depth-slice ablation as a
+        within-run measurement.
+        """
+        new_vecs = self.join_channels(new_vecs, new_latent)
         out = new_vecs if state is None else torch.cat([state, new_vecs], dim=1)
         if out.shape[1] > self.max_vecs:
             out = out[:, -self.max_vecs:]          # FIFO: drop the oldest
@@ -328,8 +395,9 @@ class PrefixGatedBuffer(_PrefixBufferBase):
     def __init__(self, hidden_size: int, n_vec: int = 32,
                  n_slots: Optional[int] = None, route: str = "ring",
                  gate_norm: str = "tanh", gate_init: str = "zero",
-                 fill: str = "grow", route_init_std: float = 0.02) -> None:
-        super().__init__(hidden_size, n_vec)
+                 fill: str = "grow", route_init_std: float = 0.02,
+                 carries_latent: bool = False) -> None:
+        super().__init__(hidden_size, n_vec, carries_latent)
         self.n_slots = int(n_slots) if n_slots else int(n_vec)
         if self.n_slots < n_vec:
             raise ValueError(
@@ -362,6 +430,29 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         self.gate_proj_mem = nn.Linear(hidden_size, hidden_size * 2)
         self.forget_bias   = nn.Parameter(torch.ones(1))    # +1.0, LM2 3.3
         self.input_bias    = nn.Parameter(torch.zeros(1))
+        if carries_latent:
+            # E AND Z GET SEPARATE GATES, SHARING THE RING POINTER.  This is the
+            # one place "two buffers on one pointer" is a genuine objection and
+            # the answer is to split the gate, not the pointer:
+            #
+            #   * SCALE.  E rows are post-`ln_f` hidden states at norm ~171; Z
+            #     rows are trajectory deltas at ~0.35 -- a factor of ~500.  One
+            #     projection reading the concatenation would be dominated by E
+            #     the moment it trained, and Z's keep/drop decision would be
+            #     made on evidence about E.
+            #   * SEMANTICS.  "This chunk's conclusion is still worth holding"
+            #     and "the pathway that produced it is still worth holding" are
+            #     different questions with different answers; a shared gate
+            #     forces them to agree.
+            #
+            # The POINTER stays shared, which is what keeps row r holding the
+            # same chunk's and same slot's (E, Z) pair -- and that co-location
+            # is the whole economic argument for carrying both: the read cost is
+            # the COLUMNS, and once 64 columns are paid for, E rides along free.
+            self.gate_proj_in_z  = nn.Linear(hidden_size, hidden_size * 2)
+            self.gate_proj_mem_z = nn.Linear(hidden_size, hidden_size * 2)
+            self.forget_bias_z   = nn.Parameter(torch.ones(1))
+            self.input_bias_z    = nn.Parameter(torch.zeros(1))
         self.apply_gate_init()
 
         if fill == "init":
@@ -400,6 +491,9 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         """
         nn.init.ones_(self.forget_bias)
         nn.init.zeros_(self.input_bias)
+        if self.carries_latent:
+            nn.init.ones_(self.forget_bias_z)
+            nn.init.zeros_(self.input_bias_z)
         if self.gate_init != "zero":
             return
         # Zero the WEIGHTS and biases of both projections, so step 0 is exactly
@@ -416,7 +510,10 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         # spread p10 0.13 / p90 0.98: millions of untrained parameters making
         # strong per-channel keep/drop decisions about a write they know nothing
         # about, on top of a candidate that is ~98% a constant direction.
-        for proj in (self.gate_proj_in, self.gate_proj_mem):
+        projs = [self.gate_proj_in, self.gate_proj_mem]
+        if self.carries_latent:
+            projs += [self.gate_proj_in_z, self.gate_proj_mem_z]
+        for proj in projs:
             nn.init.zeros_(proj.weight)
             nn.init.zeros_(proj.bias)
 
@@ -466,27 +563,72 @@ class PrefixGatedBuffer(_PrefixBufferBase):
             ).to(state.dtype)
         return state
 
+    def _gate_with(self, state: torch.Tensor, candidate: torch.Tensor,
+                   proj_in, proj_mem, f_bias, i_bias):
+        combined = proj_in(candidate) + proj_mem(self._mem_side(state))
+        ig_logits, fg_logits = combined.chunk(2, dim=-1)
+        ig = torch.sigmoid(ig_logits + i_bias)
+        fg = torch.sigmoid(fg_logits + f_bias)
+        return fg * state + ig * candidate, ig, fg
+
     def gate(self, state: torch.Tensor, candidate: torch.Tensor):
-        """The LM2 update on matched [B, n, D] tensors.
+        """The LM2 update on matched [B, n, D] tensors -- the E channel.
 
         Returns (state', ig, fg) so diagnostics can read the gates without a
         second forward -- the trained spread of fg across rows and inputs is the
         pre-registered test of whether the gate learned anything or collapsed to
-        an EMA with extra parameters.
+        an EMA with extra parameters (evals/eval_gate_prereg.py).
         """
-        combined = (self.gate_proj_in(candidate)
-                    + self.gate_proj_mem(self._mem_side(state)))
-        ig_logits, fg_logits = combined.chunk(2, dim=-1)
-        ig = torch.sigmoid(ig_logits + self.input_bias)
-        fg = torch.sigmoid(fg_logits + self.forget_bias)
-        return fg * state + ig * candidate, ig, fg
+        return self._gate_with(state, candidate, self.gate_proj_in,
+                               self.gate_proj_mem, self.forget_bias,
+                               self.input_bias)
+
+    def gate_latent(self, state: torch.Tensor, candidate: torch.Tensor):
+        """The same update on the Z channel, with its OWN parameters.
+
+        `gate_norm` is shared and that is deliberate rather than an oversight.
+        At the default "tanh" the two channels land in opposite regimes and both
+        are fine: E states are large enough that tanh SATURATES (72.7% of entries
+        past |2|, where tanh' < 0.08, so the forget gate reads sign(state)),
+        while Z deltas are ~0.35 in norm over D=2048, i.e. ~0.008 per entry,
+        where tanh is essentially the identity.  So the published LM2 non-
+        linearity happens to be a near-linear pass-through for Z and a sign
+        function for E, which is the opposite of a problem -- but it does mean
+        `gate_norm="rms"` changes the two channels very differently, and an A/B
+        on it must be read per channel rather than as one number.
+        """
+        if not self.carries_latent:
+            raise ValueError(
+                "gate_latent on an E-only buffer.  carries_latent is False, so "
+                "the Z gate's parameters were never allocated.")
+        return self._gate_with(state, candidate, self.gate_proj_in_z,
+                               self.gate_proj_mem_z, self.forget_bias_z,
+                               self.input_bias_z)
+
+    def gate_pair(self, state: torch.Tensor, candidate: torch.Tensor):
+        """Gate a [B, n, D*] block, routing each channel to its own gate.
+
+        Returns (merged, ig, fg) where ig/fg are the E channel's, so every
+        existing diagnostic keeps reading the same quantity it always did.
+        """
+        if not self.carries_latent:
+            return self.gate(state, candidate)
+        e_s, z_s = self.split_channels(state)
+        e_c, z_c = self.split_channels(candidate)
+        e_out, ig, fg = self.gate(e_s, e_c)
+        z_out, _, _ = self.gate_latent(z_s, z_c)
+        return torch.cat([e_out, z_out], dim=-1), ig, fg
 
     def merge(self, state: Optional[torch.Tensor],
-              new_vecs: torch.Tensor) -> torch.Tensor:
-        """state [B, K, D] (None on chunk 1) + [B, W, D] -> [B, K', D].
+              new_vecs: torch.Tensor,
+              new_latent: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """state [B, K, D*] (None on chunk 1) + [B, W, D] -> [B, K', D*].
 
         K' is K except during a "grow" first lap, where it is the number of rows
-        written so far.
+        written so far.  D* is D, or 2D when `carries_latent` -- in which case
+        `new_latent` [B, W, D] is the loop-trajectory write and rides the SAME
+        ring pointer through its OWN gate, so row r always holds the same
+        chunk's and same slot's (E, Z) pair.
         """
         B, W, _ = new_vecs.shape
         K = self.n_slots
@@ -495,22 +637,25 @@ class PrefixGatedBuffer(_PrefixBufferBase):
                 f"merge got {W} new vectors, buffer writes {self.n_vec}.  The "
                 "write width is summary_emb's shape -- it cannot change after "
                 "training.")
+        # Widen the candidate ONCE, here, so every branch below is channel-
+        # agnostic and the routing / ring / fill logic has exactly one form.
+        cand_full = self.join_channels(new_vecs, new_latent)
 
         if state is None:                       # chunk 1: adopt whole
             self._chunk = 1
             if self.route != "ring":
-                return self.route_candidate(new_vecs)
+                return self.route_candidate(cand_full)
             if K == W or self.fill == "grow":
-                return new_vecs
-            out = (self.slot_init.to(device=new_vecs.device,
-                                     dtype=new_vecs.dtype)
+                return cand_full
+            out = (self._slot_init_block().to(device=cand_full.device,
+                                              dtype=cand_full.dtype)
                    .unsqueeze(0).expand(B, -1, -1).clone())
-            out[:, :W] = new_vecs
+            out[:, :W] = cand_full
             return out
 
         if self.route == "ring" and self.fill == "grow" and state.shape[1] < K:
             self._chunk += 1                    # still filling: append, as accum does
-            return torch.cat([state, new_vecs], dim=1)
+            return torch.cat([state, cand_full], dim=1)
 
         if state.shape[1] != K:
             raise ValueError(
@@ -519,7 +664,7 @@ class PrefixGatedBuffer(_PrefixBufferBase):
                 "mismatch means an accum-shaped carry reached a gated buffer.")
 
         if self.route != "ring":
-            merged, _, _ = self.gate(state, self.route_candidate(new_vecs))
+            merged, _, _ = self.gate_pair(state, self.route_candidate(cand_full))
             self._chunk += 1
             return merged
 
@@ -529,10 +674,28 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         # applied with fg == 1.
         idx = ((self._chunk * W) % K
                + torch.arange(W, device=state.device)) % K
-        sub, _, _ = self.gate(state.index_select(1, idx), new_vecs)
+        sub, _, _ = self.gate_pair(state.index_select(1, idx), cand_full)
         out = state.index_copy(1, idx, sub)
         self._chunk += 1
         return out
+
+    def _slot_init_block(self) -> torch.Tensor:
+        """`slot_init` widened to the carried width.
+
+        Under fill="init" the pad rows must be 2D wide when Z is carried.  The Z
+        half is ZEROS rather than another learned block, and deliberately: an
+        unreached row's LATENT field is substituted into `s0`, where the model's
+        trained default for those columns is `trunc_normal_` noise -- so the
+        honest pad is the one the read path already replaces (the graft falls
+        back to fresh noise for rows it has no Z for).  A learned slot_init in
+        latent space would be a second untrained parameter block entering `s0`
+        at an unmeasured scale, which is the failure `fill="grow"` exists to
+        avoid on the E side.
+        """
+        if not self.carries_latent:
+            return self.slot_init
+        return torch.cat([self.slot_init,
+                          torch.zeros_like(self.slot_init)], dim=-1)
 
     # -- seeding ------------------------------------------------------------
 
@@ -563,6 +726,7 @@ class PrefixGatedBuffer(_PrefixBufferBase):
             "gate_norm": self.gate_norm,
             "gate_init": self.gate_init,
             "fill": self.fill,
+            "carries_latent": self.carries_latent,
             "compression": chunk_len / max(self.n_vec, 1),
             "read_cols_per_chunk": self.n_slots,
             "write_cols_per_chunk": self.n_vec,

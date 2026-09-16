@@ -99,6 +99,14 @@ def parse_args() -> argparse.Namespace:
                    default=[1, 2, 3, 4, 6],
                    help="d values to probe.  Every d must be < n_chunks.")
     p.add_argument("--damage", default="donor", choices=["donor", "zero"])
+    p.add_argument("--damage_channel", default="both",
+                   choices=["both", "e", "z"],
+                   help="WHICH CHANNEL to damage on a dual-channel carry.  "
+                        "'both' was the only behaviour before the Z channel "
+                        "existed and it CONFLATES the two: a horizon measured "
+                        "by wrecking E and Z together cannot say which one "
+                        "carries the distance.  On an E-only carry all three "
+                        "are the same thing and the choice is inert.")
     p.add_argument("--T", type=int, default=None,
                    help="recurrence depth.  Leave unset to take the config's "
                         "mean_recurrence -- which on the mr8 arms is 32 and "
@@ -121,8 +129,27 @@ def _is_append(buf) -> bool:
     return buf is not None and hasattr(buf, "max_vecs")
 
 
+def damage_write(w, donor_write, mode: str, channel: str, hidden_size: int):
+    """Apply the damage to one channel of a write, leaving the other intact.
+
+    Splitting here rather than at the call site because BOTH damage modes need
+    it and a `zeros_like` on a 2D-wide write nulls Z as well -- the same defect
+    eval_carry_2x2's `null_e` was fixed for, which reported an E0Z1 cell as
+    E0Z0 under the wrong label.
+    """
+    dst = (torch.zeros_like(w) if mode == "zero"
+           else donor_write.to(w.device, w.dtype))
+    if channel == "both" or w.shape[-1] == hidden_size:
+        return dst
+    D = hidden_size
+    if channel == "e":
+        return torch.cat([dst[..., :D], w[..., D:]], dim=-1)
+    return torch.cat([w[..., :D], dst[..., D:]], dim=-1)
+
+
 def run_chain(model, buf, chunks, labels, masks, num_steps, device,
-              seed: int, damage_at: int | None, donor_write, mode: str):
+              seed: int, damage_at: int | None, donor_write, mode: str,
+              channel: str = "both", hidden_size: int = 0):
     """Replay one row's chunk chain, optionally damaging one chunk's write.
 
     Returns per-chunk (loss, n_tokens).  `damage_at` is a CHUNK INDEX, not a
@@ -145,8 +172,7 @@ def run_chain(model, buf, chunks, labels, masks, num_steps, device,
             w = new_state[:, -buf.n_vec:]
             writes.append(w)
             if i == damage_at:
-                w = (torch.zeros_like(w) if mode == "zero"
-                     else donor_write.to(w.device, w.dtype))
+                w = damage_write(w, donor_write, mode, channel, hidden_size)
             state = w if state is None else torch.cat([state, w], dim=1)
             if state.shape[1] > buf.max_vecs:
                 state = state[:, -buf.max_vecs:]
@@ -203,6 +229,17 @@ def main() -> int:
         return 2
     kind = "append" if _is_append(buf) else "gated"
     num_steps = to_num_steps(args.T)
+    D_HIDDEN = int(buf.hidden_size)
+    dual = bool(getattr(buf, "carries_latent", False))
+    if args.damage_channel != "both" and not dual:
+        print(f"FAILED: --damage_channel {args.damage_channel} on an E-only "
+              f"carry.  There is no second channel to spare, and running it as "
+              f"'both' under a per-channel label is how a 1x2 becomes a 2x2.")
+        return 2
+    if dual:
+        print(f"[carry] dual-channel (E+Z); damaging {args.damage_channel}.  "
+              f"A horizon measured on 'both' cannot say which channel carries "
+              f"the distance -- run e and z as well before quoting one.")
 
     from datasets import load_from_disk
     ds = load_from_disk(args.data)
@@ -246,7 +283,8 @@ def main() -> int:
                           else getattr(dout, "m_cross", None))
                 donor_w = (dstate[:, -buf.n_vec:] if _is_append(buf) else dstate)
             damaged, _ = run_chain(model, buf, xs, ys, ms, num_steps, device,
-                                   seed, at, donor_w, args.damage)
+                                   seed, at, donor_w, args.damage,
+                                   args.damage_channel, D_HIDDEN)
             if damaged[-1][0] is None:
                 continue
             per_depth[d].append(damaged[-1][0] - intact[-1][0])
@@ -256,6 +294,8 @@ def main() -> int:
 
     report = {
         "instrument": "influence horizon I(d)",
+        "damage_channel": args.damage_channel,
+        "dual_channel_carry": dual,
         "when": datetime.now().isoformat(timespec="seconds"),
         "model_name": args.model_name,
         "buffer": {"kind": kind, "class": type(buf).__name__,

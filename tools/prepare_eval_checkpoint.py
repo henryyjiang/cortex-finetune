@@ -44,8 +44,30 @@ import shutil
 
 MODELING_FILE = "raven_modeling_minimal_cortex.py"
 CONFIG_FILE = "raven_config_minimal.py"
+# EVERY cortex flag that changes what the graft BUILDS has to be copied here, or
+# the eval rebuilds a DIFFERENT buffer from the same weights and nothing says so.
+#
+# This list was missing the five P1.0 gate keys from 2026-09-16 until the audit
+# later that day.  The consequence was specific and silent: under gate_route
+# "ring" NO parameter has a gate_slots dimension, so an A3' checkpoint
+# (W=16/K=64) would load its gate weights cleanly into a buffer rebuilt at the
+# `gate_slots=0` default -- i.e. K = W = 16, a QUARTER of the read block it
+# trained with -- and every eval number would be for a geometry that never
+# existed.  The same hazard, one channel down, applies to the latent keys:
+# latent_carry=False rebuilds an E-only buffer, the Z gate's weights become
+# unexpected keys and are dropped, and the carry runs half-width.
+#
+# tests/test_eval_checkpoint_flags.py pins this against train.py's own persist
+# list so the two cannot drift again.
 CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads",
                 "prefix_memory", "accum_vecs", "accum_max",
+                "summary_init_token", "prefix_pos", "prefix_eos_reset",
+                # P1.0 gated geometry
+                "gate_slots", "gate_route", "gate_norm", "gate_init",
+                "gate_fill",
+                # the Z channel
+                "latent_carry", "latent_depth_rule", "latent_depth_lo",
+                "latent_depth_hi", "latent_renorm",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

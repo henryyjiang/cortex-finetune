@@ -803,13 +803,44 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
         num_steps: Optional[torch.Tensor] = None,
         init_scale: float = 1.0,
     ):
-        x = xk = self.initialize_state(input_embeds, scale=init_scale) if input_states is None else input_states.clone()
+        if input_states is None:
+            x = self.initialize_state(input_embeds, scale=init_scale)
+            # cortex Z channel: substitute the carried recurrence trajectory
+            # into s0's CARRIED COLUMNS, replacing the trunc_normal_ noise
+            # initialize_state just put there.  No-op unless
+            # --cortex.latent_carry is set.
+            #
+            # IT HAS TO BE HERE AND NOWHERE ELSE.  initialize_state runs AFTER
+            # prefix_pack, so by this line the carried columns already exist in
+            # the packed sequence and are filled with fresh noise that nothing
+            # reads -- positions the loop pays for on every one of the T
+            # iterations and that carry nothing.  Substituting into them costs
+            # no sequence length, no parameters, and nothing zero-initialised;
+            # that is the entire reason a latent carry is viable here when the
+            # earlier module-based read was not.
+            #
+            # Not applied when input_states is supplied: that is the generation
+            # path, where the caller owns the state (it threads
+            # outputs.latent_states between decode steps) and overwriting it
+            # would discard the token-level carry that path depends on.
+        else:
+            x = input_states.clone()
         if num_steps is None:
             num_steps_no_grad, num_steps_with_grad = self.randomized_iteration_sampler()  # type: ignore
         elif hasattr(num_steps, "__len__") and len(num_steps) > 1:
             num_steps_no_grad, num_steps_with_grad = num_steps
         else:
             num_steps_no_grad, num_steps_with_grad = num_steps, torch.tensor(0) if not x.is_meta else 0
+        # The Z substitution runs AFTER the split is known, so the graft can
+        # report whether this batch's read has a gradient path at all: the
+        # no-grad iterations run FIRST, and a single one of them detaches
+        # everything downstream of s0.  E is unaffected (it re-enters through
+        # input_embeds on every iteration); Z enters once, here.  Moving this
+        # below the split costs nothing -- x is untouched in between -- and buys
+        # a measured number instead of an assumption.
+        if input_states is None and self.cortex is not None:
+            x = self.cortex.latent_init(x, int(num_steps_no_grad))
+        xk = x
 
         with torch.no_grad():
             # ultra annoying in ddp due to
@@ -851,7 +882,7 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
         # cortex: write each position's M_iter slots after the core layers
         # (end of one loop iteration).  No-op unless M_iter is active.
         if self.cortex is not None:
-            self.cortex.iter_write(x)
+            self.cortex.iter_write(x, current_step)
         return x, block_idx
 
     @torch.no_grad()

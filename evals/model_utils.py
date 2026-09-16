@@ -89,10 +89,47 @@ def load_checkpoint(
     dtype: torch.dtype,
     device: torch.device,
     accum_max: Optional[int] = None,
+    config_overrides: Optional[dict] = None,
 ):
+    # A --checkpoint that is not a file used to be IGNORED here, and the run
+    # went ahead on the base weights with nothing in the log saying so -- the
+    # exact silent class this file's other guards exist for.  A checkpoint DIR
+    # is the natural thing to pass (train.py writes checkpoint_<step>/chkpt.pt
+    # and every other tool in the repo takes the dir), so resolve it; anything
+    # else raises.
+    if checkpoint and os.path.isdir(checkpoint):
+        cand = os.path.join(checkpoint, "chkpt.pt")
+        if not os.path.isfile(cand):
+            raise FileNotFoundError(
+                f"{checkpoint} is a directory with no chkpt.pt in it.  Pass the "
+                f"checkpoint dir or the .pt file; passing neither used to run "
+                f"silently on the BASE weights.")
+        checkpoint = cand
+    elif checkpoint and not os.path.isfile(checkpoint):
+        raise FileNotFoundError(
+            f"--checkpoint {checkpoint} does not exist.  This used to be "
+            f"ignored, and the eval ran on the base weights with a healthy-"
+            f"looking log.")
+
     from transformers import AutoConfig, AutoModelForCausalLM
 
     config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
+    # config_overrides FORCES graft-building flags that config.json does not
+    # carry -- the only way to run the pre-launch gates on a PARENT checkpoint,
+    # before any arm with that geometry exists (e.g. latent_carry on the E-only
+    # heal checkpoint the Z arms branch from).
+    #
+    # It is printed, loudly, because a geometry the checkpoint was not trained
+    # with is exactly the silent mismatch every other guard in this file exists
+    # to prevent -- the difference is that here it is deliberate, and a
+    # deliberate override that nothing announces is indistinguishable from the
+    # accident.
+    if config_overrides:
+        for _k, _v in config_overrides.items():
+            print(f"[cortex] OVERRIDE config.{_k}: "
+                  f"{getattr(config, _k, '<absent>')!r} -> {_v!r}  "
+                  f"(NOT what this checkpoint trained with unless they match)")
+            setattr(config, _k, _v)
     if memory_slots is not None:
         # Force the graft on (model_name must use the grafted modeling file).
         config.use_memory = True
@@ -115,7 +152,7 @@ def load_checkpoint(
     )
 
     # Optional overlay of finetuned weights from a train.py checkpoint.
-    if checkpoint and os.path.isfile(checkpoint):
+    if checkpoint:
         sd = torch.load(checkpoint, map_location="cpu", weights_only=False)
         if isinstance(sd, dict) and "model" in sd:
             sd = sd["model"]

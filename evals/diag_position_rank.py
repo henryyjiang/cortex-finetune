@@ -252,6 +252,17 @@ def run_chunk(model, inner, input_ids, num_steps: int, m_cross_in,
         # contribution.  (A zero key still scores a mid-range logit rather than
         # -inf, so this null absorbs a few percent of softmax mass -- it is the
         # project's standing null, not a perfect one.)
+        # E-only by construction: this probe runs on single-channel
+        # checkpoints, and zeros_like on a DUAL-channel carry would null the Z
+        # trajectory as well as the token summary -- an "E off" condition that
+        # is silently "everything off".  Assert rather than branch: the probe
+        # has no Z-aware interpretation to offer, so a dual-channel checkpoint
+        # here means the wrong tool, not a special case.
+        assert m_cross_in.shape[-1] == int(cfg.n_embd), (
+            f"carry is {m_cross_in.shape[-1]}-wide, expected {cfg.n_embd}: this "
+            f"is a dual-channel (E+Z) checkpoint and this probe only "
+            f"interprets the token channel.  Use evals/eval_carry_2x2.py, whose "
+            f"null_e nulls the E half only.")
         m_cross_in = torch.zeros_like(m_cross_in)
     cortex = getattr(inner, "cortex", None)
     if cortex is None or not hasattr(cortex, "prefix_pack"):

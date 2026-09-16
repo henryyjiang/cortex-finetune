@@ -140,6 +140,34 @@ def carry_rows(chunk_index: int, accum_vecs: int, accum_max: int) -> int:
     return min(chunk_index * int(accum_vecs), int(accum_max))
 
 
+def gated_carry_rows(chunk_index: int, n_vec: int, n_slots: int,
+                     fill: str = "grow") -> int:
+    """Rows a gated ring presents to chunk `chunk_index`.  The twin of
+    `carry_rows`, and it is a DIFFERENT function, not the same one with a
+    different cap.
+
+    An accum buffer appends and then FIFO-trims, so its width is
+    `min(i * W, accum_max)` and the trim is a branch the run can be configured
+    never to take.  A gated ring under `fill="grow"` grows the same way for
+    exactly one lap and is then PINNED at `n_slots` forever, because merge
+    overwrites in place — there is no trim to avoid and no configuration in
+    which the width keeps climbing.  Under `fill="init"` the block is
+    full-width from chunk 1.
+
+    The two happen to agree while `i * W < n_slots`, which is precisely the
+    "first lap is bit-identical to accum" property A1 vs A3' is built on; they
+    part company at the chunk where accum would start dropping rows.  Reusing
+    `carry_rows` with `accum_max=n_slots` would give the right number by
+    accident and the wrong reason, and it would be silently wrong the moment
+    `fill="init"` is selected.
+    """
+    if chunk_index <= 0:
+        return 0 if fill == "grow" else int(n_slots)
+    if fill != "grow":
+        return int(n_slots)
+    return min(int(chunk_index) * int(n_vec), int(n_slots))
+
+
 def select_fwd_bwd_path(non_recurrent_model: bool, cross_chunks: int) -> str:
     """Which forward/backward implementation train.py dispatches to.
 

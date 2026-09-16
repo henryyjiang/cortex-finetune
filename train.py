@@ -4,6 +4,7 @@
 # Imports.
 ####################################################################################################
 
+import json
 import time
 
 global_start_time = time.monotonic()
@@ -23,7 +24,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, get_scheduler, Aut
 from datasets import load_dataset, Dataset, load_from_disk
 from contextlib import nullcontext
 from stateful_parquet_dataset import get_parquet_dataloader
+from cortex_graft import reset_cortex_graft_init as _reset_cortex_graft_init
 from cortex_memory.chunking import random_chunk_sizes, detach_old_vecs
+from cortex_memory.health import training_diag
 from recipe_utils import (
     control_has_memory,
     fast_forward_indices,
@@ -297,6 +300,34 @@ class CLISettings:
             #   accum_vecs 16, gate_slots 64, gate_route ring.
             gate_slots=0, gate_route="ring", gate_norm="tanh",
             gate_init="zero", gate_fill="grow",
+            # THE Z CHANNEL (the dual-channel carry).  latent_carry false is
+            # byte-identical to B2 and to every arm run so far; true widens the
+            # carried tensor to 2D (E at [...,:D], Z at [...,D:]), adds a second
+            # gate on the gated buffer, and turns on the s0 substitution in the
+            # modeling file.
+            #
+            # latent_depth_rule is the one knob P0.7 exists to set
+            # (evals/diag_depth_band.py).  It defaults to "absolute" because
+            # that is what P0.1 measured (band t ~ 2..9 at a single T), NOT
+            # because the question is settled -- P0.1 could not distinguish
+            # "steps 2..9 whatever T is" from "the first quarter of the loop",
+            # and the two diverge sharply at T=32.  The banner says so on every
+            # run.  Do not launch a Z arm before P0.7 reports.
+            latent_carry=False, latent_depth_rule="absolute",
+            latent_depth_lo=2, latent_depth_hi=9, latent_renorm="none",
+            # diag_interval: every N optimizer steps, log the architecture's
+            # health (carry rank + per-channel norms, whether either gate has
+            # left its exactly-zero init, the Z read/write gradient fractions)
+            # to wandb AND to <out_path>/<run_name>/cortex_diag.jsonl.
+            #
+            # 0 = OFF, and off is the default so every arm on record keeps its
+            # exact behaviour.  It is not free -- one SVD of a [K, D] matrix per
+            # call -- and it is not optional for a PROBE: every quantity that
+            # decides whether an arm is worth finishing moves in the first few
+            # hundred steps and is settled thereafter, so reading them off the
+            # final checkpoint answers the question too late and shows no
+            # trajectory.  pace/p1_arms.sbatch sets it under PROBE=1.
+            diag_interval=0,
             # summary_init_token: token whose embedding seeds the summary
             # slots (AutoCompressor uses EOS).  -1 = take config.eos_token_id;
             # set it explicitly when the checkpoint config carries none, which
@@ -442,6 +473,54 @@ class CLISettings:
                         "fires during training and receives zero gradient.  "
                         "Lower gate_slots, raise accum_vecs, or raise "
                         "cross_chunks.")
+        if self.cortex["latent_carry"]:
+            assert self.cortex["prefix_memory"] in ("accum", "gated"), (
+                "cortex.latent_carry needs --cortex.prefix_memory accum|gated. "
+                "Z is read by substituting into the CARRIED COLUMNS of s0, so "
+                "without a prefix buffer there are no carried columns: the read "
+                "would be a no-op and the arm would train a write that nothing "
+                "consumes.")
+            assert self.cortex["latent_depth_rule"] in ("absolute", "relative"), (
+                f"cortex.latent_depth_rule must be 'absolute' or 'relative'; "
+                f"got {self.cortex['latent_depth_rule']!r}")
+            assert self.cortex["latent_renorm"] in ("none", "s0"), (
+                f"cortex.latent_renorm must be 'none' or 's0'; got "
+                f"{self.cortex['latent_renorm']!r}")
+            lo, hi = (int(self.cortex["latent_depth_lo"]),
+                      int(self.cortex["latent_depth_hi"]))
+            assert 1 <= lo <= hi, (
+                f"cortex.latent_depth_lo/hi ({lo}/{hi}) must satisfy 1 <= lo "
+                f"<= hi.  Depth 0 is s0 itself, which is what Z REPLACES, not "
+                f"something to write.")
+            assert lo >= 2, (
+                f"cortex.latent_depth_lo is {lo}.  d_1 measured 23.8x the noise "
+                f"it replaces -- a different regime, not a larger version of "
+                f"the same one -- and writing it would put one slot three "
+                f"orders of magnitude off the rest.  Set 2 or higher, or turn "
+                f"on --cortex.latent_renorm s0 deliberately.")
+            # The Z write only trains while the depths it samples are inside the
+            # gradient window, and the no-grad steps run FIRST, so the trainable
+            # region is always the LAST mean_backprop_depth iterations.  This is
+            # a config-level warning, not an assert, because a frozen Z write is
+            # a legitimate CHOICE at high recurrence -- it just has to be one.
+            mr = int(self.mean_recurrence_schedule.get("max_mean_rec", 0) or 0)
+            # The model config owns mean_backprop_depth and is not loaded yet,
+            # so use the override when one is set and otherwise assume the
+            # retrofit checkpoints' 8.  Named as an assumption rather than read
+            # as a fact: a wrong guess here costs a spurious warning, while
+            # staying silent costs a frozen write path nobody decided on.
+            depth = int(self.override_mean_backprop_depth or 8)
+            if mr and mr - depth >= hi:
+                print(f"[cortex] WARNING: latent_carry with max_mean_rec {mr} "
+                      f"and mean_backprop_depth {depth} (assumed; set "
+                      f"--override_mean_backprop_depth to be sure) freezes the first "
+                      f"{mr - depth} loop steps, which covers the whole write "
+                      f"band {lo}..{hi}.  Z becomes a FROZEN FEATURE EXTRACTOR: "
+                      f"the model can learn to USE it, never to SHAPE it.  That "
+                      f"is the mirror of the frozen-READ failure that cost "
+                      f"x0.90 -> x1.33.  Raise mean_backprop_depth or accept it "
+                      f"IN THE PRE-REGISTRATION -- it changes what a null "
+                      f"result for Z means.")
         if self.cortex["accum_ccot"]:
             assert self.cortex["memory_slots"] == 0 and not self.cortex["ccot_direct"], (
                 "cortex.accum_ccot replaces the K-slot buffer / DirectCCoT — "
@@ -658,6 +737,32 @@ def load_checkpoint(state, cfg, device, branch: bool = False):
     path = cfg.branch_path if branch else cfg.resume_path
     ckpt = torch.load(f"{path}/chkpt.pt", map_location=device)
     unwrap = get_unwrapped_model(state)
+    # tools/slice_summary_emb.py narrows a trained summary_emb (W=32 -> 16) so a
+    # P1 arm can branch at a width the parent never trained at.  It stamps this
+    # record on the checkpoint.  A BRANCH is the intended use and is announced
+    # loudly; a RESUME is not, because the optimizer state in that file still
+    # carries the PARENT's [W_old, D] moments for a parameter that is now
+    # [W_new, D], and load_state_dict would either raise here or, on a future
+    # optimizer that reshapes silently, carry the wrong second moment for the
+    # whole write path behind a healthy loss curve.
+    sliced = ckpt.get("cortex_slice")
+    if sliced is not None:
+        if not branch:
+            raise RuntimeError(
+                f"resume_path={path} is a summary_emb-SLICED checkpoint "
+                f"({sliced.get('W_old')} -> {sliced.get('W_new')} write "
+                f"columns, written {sliced.get('when')}).  Its optimizer state "
+                f"still has the parent's width.  Slices are for --branch_path; "
+                f"resume the PARENT run instead, or branch off this one.")
+        if is_main_process():
+            print(f"[branch] summary_emb was SLICED {sliced.get('W_old')} -> "
+                  f"{sliced.get('W_new')} rows ({sliced.get('rule')}), "
+                  f"{sliced.get('when')}, from {sliced.get('src')}")
+            k, a = sliced.get("kept") or {}, sliced.get("all") or {}
+            if k and a:
+                print(f"[branch]   effective rank {k.get('participation_rank', 0):.2f} "
+                      f"of the parent's {a.get('participation_rank', 0):.2f}; "
+                      f"kept-row centred cos {k.get('centred_cos_mean', 0):+.4f}")
     if branch:
         # The arm may have MORE parameters than the phase it branches from
         # (gated adds the LM2 gate on top of the shared summary embeddings).
@@ -772,121 +877,15 @@ def set_loop_trainable(model, trainable: bool) -> int:
 
 
 def reset_cortex_graft_init(model):
-    """Undo post_init's clobbering of the cortex graft's initialization, on the
-    live model after from_pretrained.
+    """Rank-0-logging wrapper over cortex_graft.reset_cortex_graft_init.
 
-    RavenForCausalLM.__init__ builds CortexMemory (designed inits so the memory
-    read is a no-op and step-0 == the base model) and THEN calls post_init().
-    HF's _init_weights treats every cortex tensor as a freshly-'missing' key (the
-    "newly initialized: ['cortex.h_T_proj.weight', 'cortex.m_cross.cand_ln1.bias',
-    ...]" load warning) and re-initializes it with the raven DEPTH-SCALED scheme.
-    The graft modules have no valid layer index, so that scheme hands them an
-    effectively-infinite std -> NON-FINITE weights.  That is the confirmed
-    forward-nan source, and it hits EVERY cortex op in turn (localizer found
-    h_T_proj first, then m_cross.cand_ln1, ...), so restoring hand-picked tensors
-    is whack-a-mole.  Instead reset the WHOLE cortex subtree:
-      (1) every submodule back to its nn default (Linear->kaiming, LayerNorm->
-          weight 1/bias 0) — finite, in place, dtype/device preserved;
-      (2) re-apply the few explicit designed inits the graft sets by hand.
-    Mirrors cortex_graft.CortexMemory + cortex_memory.buffers; skipped on
-    --resume (a resumed ckpt carries trained, not fresh, cortex weights).
-
-    LoRA (cortex_lora) MUST be re-initialized here too — the original "bare
-    Parameters _init_weights never touches, B stays 0" analysis was WRONG under
-    the meta-device from_pretrained path: the skeleton is built on meta (the
-    __init__ kaiming/zeros are no-ops), missing keys are materialized via
-    to_empty() = UNINITIALIZED memory, and _init_weights skips ParameterDicts —
-    so A/B keep whatever bytes the allocator hands them.  Driver-zeroed fresh
-    pages make MOST tensors read as zeros; recycled blocks carry ~1e19 garbage,
-    with run-to-run membership.  Root cause of the entire rung1b failure family:
-    garbage in an A row -> finite grad_B ~1e19 -> inf fp32 grad-norm every step
-    (healthy forward, B~0); garbage in a B -> forward nan from step 1.  Note the
-    non-finite sweep below can NOT catch this — the garbage is FINITE."""
-    unwrapped = get_unwrapped_model_from_module(model)
-    lora = getattr(unwrapped, "cortex_lora", None)
-    if lora is not None:
-        for A in lora.A.values():
-            torch.nn.init.kaiming_uniform_(A, a=math.sqrt(5))
-        for B in lora.B.values():
-            torch.nn.init.zeros_(B)
-        if is_main_process():
-            print(f"[cortex] re-initialized {len(lora.A)} LoRA A/B pairs "
-                  f"(A~kaiming, B=0) — undo to_empty() garbage from the "
-                  f"meta-device load path")
-    cortex = getattr(unwrapped, "cortex", None)
-    if cortex is None:
-        return
-    # (1) undo the non-finite clobber: nn defaults for every submodule.
-    n_reset = 0
-    for m in cortex.modules():
-        if m is not cortex and callable(getattr(m, "reset_parameters", None)):
-            m.reset_parameters(); n_reset += 1
-    # (2) re-apply the graft's explicit designed inits (mirror the source).
-    def _read_init(w, tag):
-        torch.nn.init.zeros_(w)
-        return f"{tag}=0"
-    fixed = []
-    if getattr(cortex, "h_T_proj", None) is not None:
-        torch.nn.init.eye_(cortex.h_T_proj.weight); fixed.append("h_T_proj=eye")
-    for buf_name in ("m_cross", "m_iter"):          # LSTMBuffer / GatedAccumBuffer
-        buf = getattr(cortex, buf_name, None)
-        if buf is None:
-            continue
-        read_tag = _read_init(buf.out_proj.weight, "out_proj")  # memory read
-        if hasattr(buf, "slot_emb"):                # LSTMBuffer
-            torch.nn.init.normal_(buf.slot_emb, std=0.02)
-            emb_tag = "slot_emb~N"
-        else:                                       # GatedAccumBuffer (vec_emb queries)
-            torch.nn.init.normal_(buf.vec_emb, std=0.02)
-            emb_tag = "vec_emb~N"
-        torch.nn.init.ones_(buf.forget_bias)                  # LM2 §3.3 forget bias +1
-        torch.nn.init.zeros_(buf.input_bias)
-        fixed.append(f"{buf_name}.[{read_tag},{emb_tag},forget_bias=1,input_bias=0]")
-    ccot = getattr(cortex, "ccot_direct", None)                # DirectCCoT (K=0)
-    if ccot is not None:
-        torch.nn.init.eye_(ccot.state_proj.weight); fixed.append("ccot.state_proj=eye")
-        fixed.append("ccot." + _read_init(ccot.in_proj.weight, "in_proj"))
-    acc = getattr(cortex, "accum", None)                       # AccumCCoT
-    if acc is not None:
-        torch.nn.init.normal_(acc.vec_emb, std=0.02)
-        fixed.append("accum.[vec_emb~N," + _read_init(acc.out_proj.weight, "out_proj") + "]")
-    pre = getattr(cortex, "prefix", None)          # PrefixAccum / PrefixGated
-    if pre is not None:
-        # summary_emb here is a FINITE placeholder only — it is re-seeded from
-        # wte[eos] on the first forward (see the modeling file).  This function
-        # runs on fresh builds ONLY (caller guards on resume_path is None), so
-        # clearing summary_seeded is both safe and necessary: the base graft dir
-        # carries no cortex tensors, and a bool buffer materialised from meta
-        # can come back as garbage -> read True -> seeding silently skipped.
-        torch.nn.init.normal_(pre.summary_emb, std=0.02)
-        pre.summary_seeded.fill_(False)
-        tags = ["summary_emb~N(reseeded from wte on first forward)"]
-        if hasattr(pre, "apply_gate_init"):                    # PrefixGatedBuffer
-            # Step (1) above called reset_parameters() on gate_proj_in/mem,
-            # which puts KAIMING weights back into both projections -- silently
-            # discarding gate_init="zero" and leaving millions of untrained
-            # parameters making per-channel keep/drop decisions at step 0.  The
-            # buffer owns its designed init; re-apply it here.
-            pre.apply_gate_init()
-            tags += ["forget_bias=1", "input_bias=0",
-                     f"gate_init={pre.gate_init}"]
-            if hasattr(pre, "slot_init"):                      # gate_fill=init
-                torch.nn.init.normal_(pre.slot_init, std=0.02)
-                tags += ["slot_init~N(reseeded from wte on first forward)"]
-        elif hasattr(pre, "forget_bias"):                      # legacy gated shape
-            torch.nn.init.ones_(pre.forget_bias)               # LM2 3.3 forget bias +1
-            torch.nn.init.zeros_(pre.input_bias)
-            tags += ["forget_bias=1", "input_bias=0"]
-        fixed.append("prefix.[" + ",".join(tags) + "]")
-    # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
-    #     some module lacked reset_parameters and slipped through.
-    bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]
-    if is_main_process():
-        print(f"[cortex] reset {n_reset} cortex submodules to nn defaults + "
-              f"re-applied designed inits {fixed} (undo post_init clobber)")
-        if bad:
-            print(f"[cortex] WARNING: {len(bad)} cortex params STILL non-finite "
-                  f"after reset (no reset_parameters?): {bad[:12]}")
+    The body moved to cortex_graft.py on 2026-09-16 so that every consumer which
+    builds the graft through from_pretrained can apply it -- notably
+    tools/smoke_prefix_real.py, which cannot import this module (wandb) and was
+    therefore smoking a buffer whose gate post_init had left at forget_bias
+    = -2.2e12.  Nothing about the reset itself changed; see the docstring there.
+    """
+    _reset_cortex_graft_init(model, log=print if is_main_process() else None)
 
 
 def get_unwrapped_model_from_module(model):
@@ -970,7 +969,15 @@ def startup(cfg: CLISettings):
                    # (K back to W, route back to ring, gate back to kaiming)
                    # behind a healthy loss curve.
                    "gate_slots", "gate_route", "gate_norm", "gate_init",
-                   "gate_fill"):
+                   "gate_fill",
+                   # The Z channel.  These MUST persist for the same reason the
+                   # gate keys do, and one of them harder: latent_carry changes
+                   # the carried tensor's WIDTH and the buffer's PARAMETER SET,
+                   # so a resume or an eval that rebuilt the graft without it
+                   # would construct an E-only buffer, drop the Z gate's weights
+                   # as unexpected keys, and run a half-width carry.
+                   "latent_carry", "latent_depth_rule", "latent_depth_lo",
+                   "latent_depth_hi", "latent_renorm"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -985,13 +992,26 @@ def startup(cfg: CLISettings):
                      f",norm={cfg.cortex['gate_norm']}"
                      f",init={cfg.cortex['gate_init']}"
                      f",fill={cfg.cortex['gate_fill']}) "
-                     if cfg.cortex['prefix_memory'] == 'gated' else "") +
+                     if cfg.cortex['prefix_memory'] == 'gated' else "")
+                  + (f"latent(Z on, rule={cfg.cortex['latent_depth_rule']}"
+                     f",band={cfg.cortex['latent_depth_lo']}.."
+                     f"{cfg.cortex['latent_depth_hi']}"
+                     f",renorm={cfg.cortex['latent_renorm']}) "
+                     if cfg.cortex['latent_carry'] else "") +
                   f"prefix_pos={cfg.cortex['prefix_pos']} "
                   f"prefix_eos_reset={cfg.cortex['prefix_eos_reset']} "
                   f"cross_chunks={cfg.cortex['cross_chunks']} "
                   f"carry_grad_chunks={cfg.cortex['carry_grad_chunks']} "
                   f"random_segments={cfg.cortex['random_segments']} "
                   f"lora_rank={cfg.cortex['lora_rank']}")
+            if cfg.cortex["latent_carry"]:
+                print("[cortex] Z channel ON.  latent_depth_rule="
+                      f"{cfg.cortex['latent_depth_rule']!r} is P0.7's question "
+                      "(evals/diag_depth_band.py): P0.1 measured the band at a "
+                      "SINGLE T and cannot say whether 'informative' tracks the "
+                      "absolute step or the fraction of the loop.  If P0.7 has "
+                      "not reported, this run is asserting an answer it does "
+                      "not have -- record which, in this run's sbatch header.")
     if cfg.init_from_scratch:
         # https://huggingface.co/smcleish/Recurrent-Llama-3.2-2-4-2-untrained/blob/main/raven_modeling_minimal_with_init.py
         if cfg.non_recurrent_model:
@@ -1693,6 +1713,11 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
     k_mean_tracker = [0,0]
     consecutive_nonfinite = 0   # run-abort guard: see max_nonfinite_skips
     elapsed_time = 0.0
+    # The last chunk chain's carry, kept ONLY when --cortex.diag_interval is on.
+    # Detached, so no graph is retained; [K, 2D] at most, so the memory is
+    # nothing.  It is held because the diagnostic runs at the wandb log site,
+    # which is outside the closure that produced it.
+    cortex_diag_state = {"carry": None}
 
     output_details = {
         "return_logits": False,
@@ -1908,6 +1933,11 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         # micro-batch.
                         z = torch.zeros((), device=input_ids.device)
                         return z, z, n_ng, n_wg
+                    if cfg.cortex["diag_interval"] and m_cross is not None:
+                        # Detach: the diagnostic reads geometry, never gradient,
+                        # and holding the graph here would keep the whole chain
+                        # alive past the backward.
+                        cortex_diag_state["carry"] = m_cross.detach()
                     total = reduce_chunk_losses(
                         chunk_losses, chunk_tokens,
                         mode=cfg.cortex["chunk_loss_reduction"])
@@ -2029,8 +2059,33 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                 total_tokens_with_loss_to_log = total_tokens_with_loss_from_restart + agg_metrics.pop("total_tokens_with_loss")
                 elapsed_time_to_log = elapsed_time_from_restart + elapsed_time
 
+                # THE ARCHITECTURE'S HEALTH, every diag_interval steps.
+                # Off by default (diag_interval=0), so no arm on record changes.
+                # It goes to wandb AND to a jsonl beside the checkpoints: wandb
+                # is for looking at a trajectory, the jsonl is what
+                # tools/compare_arms.py reads back when the run is over and is
+                # the only copy that survives a project being moved.
+                cortex_diag_row = {}
+                di = int(cfg.cortex["diag_interval"])
+                if di and optimizer_step % di == 0 and is_main_process():
+                    cortex_diag_row = training_diag(
+                        getattr(get_unwrapped_model(model), "cortex", None),
+                        cortex_diag_state["carry"])
+                    if cortex_diag_row:
+                        cortex_diag_row["step"] = optimizer_step
+                        cortex_diag_row["loss"] = float(loss.item())
+                        cortex_diag_row["grad_norm"] = float(total_norm)
+                        cortex_diag_row["num_steps_no_grad"] = int(num_steps_no_grad)
+                        cortex_diag_row["num_steps_with_grad"] = int(num_steps_with_grad)
+                        _dp = f"{cfg.out_path}/{cfg.run_name}/cortex_diag.jsonl"
+                        os.makedirs(os.path.dirname(_dp), exist_ok=True)
+                        with open(_dp, "a", encoding="ascii") as _fh:
+                            print(json.dumps(cortex_diag_row), file=_fh)
+
                 if is_main_process():
                     wandb.log({
+                        **{f"cortex/{k}": v for k, v in cortex_diag_row.items()
+                           if k != "step"},
                         "train/step": optimizer_step,
                         "train/epoch": epoch,
                         "train/lr": state["scheduler"].get_last_lr()[1 if cfg.throttle else 0],
