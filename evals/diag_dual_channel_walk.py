@@ -421,7 +421,8 @@ def _chunks_from_args(args, model, tok_vocab):
 
 def main() -> int:
     args = parse_args()
-    from model_utils import (load_checkpoint, parse_config_overrides,  # noqa: E402
+    from model_utils import (explain_missing_cortex,  # noqa: E402
+                             load_checkpoint, parse_config_overrides,
                              to_num_steps, _unwrap)
     device = torch.device(args.device)
     overrides = parse_config_overrides(args.set)
@@ -431,9 +432,8 @@ def main() -> int:
     inner = _unwrap(model)
     cortex = getattr(inner, "cortex", None)
     if cortex is None or cortex.prefix is None:
-        print("ERROR: this checkpoint has no prefix buffer -- the walk has "
-              "nothing to instrument.  Check --cortex.prefix_memory in the run "
-              "that produced it.")
+        print("ERROR: no prefix buffer on this model -- nothing to run.")
+        print("  " + explain_missing_cortex(cfg, overrides))
         return 1
     # TRAIN MODE, on purpose.  In eval the sampler returns (mean_recurrence, 0),
     # so every chunk would report read_live=no for a reason that has nothing to

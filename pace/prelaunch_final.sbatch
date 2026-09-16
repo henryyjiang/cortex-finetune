@@ -73,6 +73,10 @@ BRANCH_PATH=${BRANCH_PATH:-}
 # is the only way the comparison isolates width from training.
 PARENT_PATH=${PARENT_PATH:-}
 PARENT_VECS=${PARENT_VECS:-32}
+# The PARENT is an accum run; the walk instruments whatever buffer the
+# checkpoint's weights actually belong to, so the width contrast reads both
+# sides as accum.  The gate geometry is exercised in step 4, not here.
+WALK_MODE=${WALK_MODE:-accum}
 ACCUM_VECS=${ACCUM_VECS:-16}
 GATE_SLOTS=${GATE_SLOTS:-64}
 CROSS_CHUNKS=${CROSS_CHUNKS:-8}
@@ -127,9 +131,15 @@ fi
 
 # The Z geometry is FORCED here.  The parent is E-only, so without --set these
 # gates would silently test the thing that is already known to work.
-SETS="--set latent_carry=true --set prefix_memory=gated \
-      --set accum_vecs=$ACCUM_VECS --set gate_slots=$GATE_SLOTS \
-      --set gate_route=ring --set gate_init=zero --set gate_fill=grow"
+# use_memory IS THE MASTER SWITCH -- cortex_graft.memory_enabled reads it and
+# nothing else, and this base dir carries no cortex flags at all.  Without it
+# the graft builds NOTHING, the checkpoint's cortex tensors load as "unexpected
+# keys" and are dropped, and every gate below runs against a no-memory baseline
+# while reporting only "no prefix buffer" (job 13266470).
+SETS="--set use_memory=true --set memory_slots=0"
+SETS="$SETS --set latent_carry=true --set prefix_memory=gated"
+SETS="$SETS --set accum_vecs=$ACCUM_VECS --set gate_slots=$GATE_SLOTS"
+SETS="$SETS --set gate_route=ring --set gate_init=zero --set gate_fill=grow"
 
 echo ""
 echo "######## 3. the 8-chunk dual-channel walk ########"
@@ -138,7 +148,8 @@ echo "######## 3. the 8-chunk dual-channel walk ########"
 # A [16, D] slice loaded against it is a size mismatch, so the walk would die
 # before printing a single row.
 python evals/diag_dual_channel_walk.py --model_name $MODEL $CKPT_ARG \
-    --set accum_vecs=$ACCUM_VECS \
+    --set use_memory=true --set memory_slots=0 \
+    --set prefix_memory=$WALK_MODE --set accum_vecs=$ACCUM_VECS \
     --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
     --out $OUT/walk.json || RC=1
 
@@ -161,7 +172,9 @@ if [ -n "$PARENT_PATH" ]; then
     # was cut from; using it would confound width with training, so both sides
     # read the 91552 chkpt.pt.
     python evals/diag_dual_channel_walk.py --model_name $MODEL \
-        --checkpoint $PARENT_PATH/chkpt.pt --set accum_vecs=$PARENT_VECS \
+        --checkpoint $PARENT_PATH/chkpt.pt \
+        --set use_memory=true --set memory_slots=0 \
+        --set prefix_memory=$WALK_MODE --set accum_vecs=$PARENT_VECS \
         --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
         --no_backward --out $OUT/walk-parent-w$PARENT_VECS.json || RC=1
     python tools/compare_width.py --parent $OUT/walk-parent-w$PARENT_VECS.json \

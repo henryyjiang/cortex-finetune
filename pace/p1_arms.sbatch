@@ -223,7 +223,14 @@ esac
 #
 # Built from the SAME variables the training command uses, immediately after
 # them, so the two cannot drift.
-PROBE_SETS="--set prefix_memory=$PREFIX_MODE --set accum_vecs=$ACCUM_VECS"
+# use_memory IS THE MASTER SWITCH (cortex_graft.memory_enabled reads only
+# this).  Without it the graft builds NOTHING, the checkpoint's cortex
+# tensors load as "unexpected keys" and are dropped, and every check runs
+# against a no-memory baseline -- which is how job 13266470 failed all
+# three of its post-load steps at once.
+PROBE_SETS="--set use_memory=true --set memory_slots=0"
+PROBE_SETS="$PROBE_SETS --set prefix_memory=$PREFIX_MODE"
+PROBE_SETS="$PROBE_SETS --set accum_vecs=$ACCUM_VECS"
 if [ "$PREFIX_MODE" = "accum" ]; then
     PROBE_SETS="$PROBE_SETS --set accum_max=$ACCUM_MAX"
 else

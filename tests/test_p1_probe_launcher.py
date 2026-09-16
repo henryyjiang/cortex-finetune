@@ -192,22 +192,87 @@ class TestThePostProbeChecksRunAtTheArmsGeometry:
     def test_probe_sets_is_built_from_the_same_variables_as_the_run(self):
         """Built next to the training command's own GATE_ARGS / LATENT_ARGS so
         the checks and the run cannot describe different geometries."""
-        assert 'PROBE_SETS="--set prefix_memory=$PREFIX_MODE' in ARMS
+        assert "--set prefix_memory=$PREFIX_MODE" in ARMS
         assert "--set accum_vecs=$ACCUM_VECS" in ARMS
         for flag in ("gate_slots=$GATE_SLOTS", "gate_route=", "gate_norm=",
                      "gate_init=", "gate_fill="):
             assert flag in ARMS, flag
 
     def test_an_accum_arm_does_not_claim_a_gate_it_does_not_have(self):
-        i = ARMS.index('PROBE_SETS="--set prefix_memory=$PREFIX_MODE')
-        block = ARMS[i:i + 1400]
+        i = ARMS.index('PROBE_SETS="--set use_memory=true')
+        block = ARMS[i:i + 1600]
         assert 'if [ "$PREFIX_MODE" = "accum" ]; then' in block
         assert "--set accum_max=$ACCUM_MAX" in block
 
     def test_the_z_flags_are_gated_on_the_arm_actually_carrying_z(self):
         """a1/a3 are E-only: forcing latent_carry on their checks would gate a
         channel those weights never had."""
-        i = ARMS.index('PROBE_SETS="--set prefix_memory=$PREFIX_MODE')
-        block = ARMS[i:i + 1600]
+        i = ARMS.index('PROBE_SETS="--set use_memory=true')
+        block = ARMS[i:i + 1800]
         j = block.index("--set latent_carry=true")
         assert 'if [ "$LATENT" = "1" ]; then' in block[:j]
+
+
+class TestUseMemoryIsTheMasterSwitch:
+    """REGRESSION from job 13266470, which failed all three of its post-load
+    steps at once with only "no prefix buffer" to show for it.
+
+    `cortex_graft.memory_enabled` reads `use_memory` AND NOTHING ELSE.  A
+    graft-prepared BASE dir can carry no cortex flags at all (the log showed
+    `config.accum_vecs: '<absent>'`), so overriding prefix_memory / accum_vecs /
+    gate_slots without use_memory builds nothing: the checkpoint's cortex
+    tensors arrive as UNEXPECTED keys, get dropped, and the run silently becomes
+    a no-memory baseline.
+    """
+
+    def test_every_set_list_in_the_prelaunch_job_turns_memory_on(self):
+        # Scan from each marker to the END of the invocation it introduces,
+        # not a fixed window -- the comment blocks are long and a fixed window
+        # would pass or fail on prose length rather than on the flag.
+        for marker in ('echo "######## 3. the 8-chunk',
+                       'echo "######## 3b. THE WIDTH CONTRAST',
+                       'SETS="--set use_memory=true'):
+            i = PRELAUNCH.index(marker)
+            j = PRELAUNCH.index("|| RC=1", i) if "########" in marker else i + 400
+            assert "--set use_memory=true" in PRELAUNCH[i:j], marker
+
+    def test_the_probe_set_list_turns_memory_on(self):
+        assert '--set use_memory=true' in ARMS
+        i = ARMS.index('PROBE_SETS="--set use_memory=true')
+        assert "--set prefix_memory=$PREFIX_MODE" in ARMS[i:i + 400]
+
+    def test_the_master_switch_is_what_the_graft_actually_reads(self):
+        """Pinned against the graft, so this test fails if the switch moves."""
+        import os
+        src = open(os.path.join(REPO, "cortex_graft.py"), encoding="utf-8").read()
+        i = src.index("def memory_enabled(")
+        body = src[i:i + 400]
+        assert 'getattr(config, "use_memory", False)' in body
+
+    def test_the_failure_diagnoses_itself(self):
+        """Three steps reported the same symptom and none named the cause."""
+        import sys, os
+        sys.path.insert(0, os.path.join(REPO, "evals"))
+        from model_utils import explain_missing_cortex
+
+        class Cfg:
+            pass
+        msg = explain_missing_cortex(Cfg(), {"prefix_memory": "gated",
+                                             "accum_vecs": 16})
+        assert "use_memory is the master switch" in msg
+        assert "--set use_memory=true" in msg
+        on = Cfg()
+        on.use_memory = True
+        assert "master switch" not in explain_missing_cortex(on, {})
+
+
+class TestAnEmptyGeometryListMeansNone:
+    """`${VAR:-default}` falls back on an EMPTY value, so the OOM gate's own
+    documented invocation -- `P1=1 GEOMETRIES= sbatch ...` -- ran all three
+    config-D rows anyway (job 13266470).  Without the colon, empty means empty.
+    """
+
+    def test_geometries_uses_the_non_colon_form(self):
+        sb = _read("smoke_geometry_oom.sbatch")
+        assert 'GEOMETRIES=${GEOMETRIES-"' in sb
+        assert 'GEOMETRIES=${GEOMETRIES:-"' not in sb

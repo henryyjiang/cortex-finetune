@@ -130,7 +130,12 @@ MAX_STEPS=${MAX_STEPS:-38147}
 #   16384:16:8  stretch      1024-tok chunks AND depth 16 at the same tokens/step;
 #                            dominates D on both axes if it fits, and it probably
 #                            does not (4x B2's per-row activations against D's 2x)
-GEOMETRIES=${GEOMETRIES:-"4096:8:32 8192:16:16 16384:16:8"}
+# `${VAR-default}` WITHOUT THE COLON, so an explicitly EMPTY GEOMETRIES
+# means "run none of them".  With `:-` an empty value falls back to the
+# default, so this file's own documented invocation
+#   P1=1 GEOMETRIES= sbatch pace/smoke_geometry_oom.sbatch
+# silently ran all three config-D rows anyway (job 13266470).
+GEOMETRIES=${GEOMETRIES-"4096:8:32 8192:16:16 16384:16:8"}
 
 JSON=logs/oom_smoke_${SLURM_JOB_ID}.jsonl
 

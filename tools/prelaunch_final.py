@@ -515,7 +515,8 @@ def build_e_twin(model):
 
 def main() -> int:
     args = parse_args()
-    from model_utils import load_checkpoint, _unwrap  # noqa: E402
+    from model_utils import (explain_missing_cortex, load_checkpoint,  # noqa: E402
+                             _unwrap)
     device = torch.device(args.device)
     overrides = _parse_set(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
@@ -524,7 +525,8 @@ def main() -> int:
     inner = _unwrap(model)
     cortex = getattr(inner, "cortex", None)
     if cortex is None or cortex.prefix is None:
-        print("ERROR: no prefix buffer on this checkpoint -- nothing to gate.")
+        print("ERROR: no prefix buffer on this model -- nothing to run.")
+        print("  " + explain_missing_cortex(cfg, overrides))
         return 1
     inner.train()
     torch.manual_seed(args.seed)

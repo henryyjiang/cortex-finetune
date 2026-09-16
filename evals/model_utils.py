@@ -109,6 +109,36 @@ def parse_config_overrides(items) -> dict:
     return out
 
 
+def explain_missing_cortex(cfg, overrides) -> str:
+    """Why is `model.cortex` None?  Name the cause instead of the symptom.
+
+    `use_memory` is the MASTER SWITCH -- cortex_graft.memory_enabled reads that
+    and nothing else -- and a graft-prepared BASE dir may carry no cortex flags
+    at all.  So overriding prefix_memory/accum_vecs/gate_slots without it builds
+    nothing, the checkpoint's cortex tensors load as "unexpected keys" and are
+    dropped, and the run silently becomes a no-memory baseline.  That is how
+    job 13266470 failed three post-load steps at once, each reporting only
+    "no prefix buffer".
+    """
+    on = bool(getattr(cfg, "use_memory", False))
+    geom = [k for k in ("prefix_memory", "accum_vecs", "accum_max", "gate_slots",
+                        "latent_carry")
+            if (overrides or {}).get(k) is not None or hasattr(cfg, k)]
+    if not on and geom:
+        return ("config.use_memory is FALSE/absent while memory geometry was "
+                f"given ({', '.join(sorted(geom))}).  use_memory is the master "
+                "switch the graft reads; without it nothing is built and the "
+                "checkpoint's cortex tensors are dropped as unexpected keys.  "
+                "Add: --set use_memory=true --set memory_slots=0")
+    if not on:
+        return ("config.use_memory is FALSE/absent, so this model has no cortex "
+                "at all.  Add --set use_memory=true, or point --model_name at a "
+                "graft-prepared dir whose config.json carries the flags.")
+    return ("use_memory is set but no prefix buffer was built -- check "
+            "--set prefix_memory=accum|gated, and that cortex_graft imported "
+            "(run from the repo root).")
+
+
 def load_checkpoint(
     checkpoint: Optional[str],
     model_name: str,
