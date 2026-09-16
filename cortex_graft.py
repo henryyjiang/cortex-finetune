@@ -26,7 +26,32 @@ Config flags (getattr defaults)
                                        (only when memory_slots==0, replaces
                                        ccot_direct's single overwritten vector)
   accum_vecs          : int  = 4       summary vectors extracted per chunk
-  accum_max           : int  = 64      FIFO cap on accumulated vectors (eval)
+  accum_max           : int  = 64      FIFO cap on accumulated vectors (eval).
+                                       ACCUM ONLY -- the gated buffer's capacity
+                                       is gate_slots.
+  gate_slots          : int  = 0       K for prefix_memory=gated: carried columns
+                                       held, i.e. the fixed read cost per chunk.
+                                       0 means "same as accum_vecs", the
+                                       pre-P1.0 shape.  DECOUPLED from accum_vecs
+                                       (the write width) since 2026-09-16.
+                                       Under gate_route=ring no parameter has a
+                                       gate_slots dimension, so unlike
+                                       accum_vecs it can be changed after
+                                       training and swept at eval.
+  gate_route          : str  = "ring"  how accum_vecs writes reach gate_slots
+                                       rows.  "ring" = sparse FIFO-indexed write
+                                       (default), "mix" = dense learned [K,W]
+                                       routing.  See the PrefixGatedBuffer
+                                       docstring for why sparse is the default.
+  gate_norm           : str  = "tanh"  what the memory half of the gate sees:
+                                       "tanh" (LM2 as published), "rms", "none".
+  gate_init           : str  = "zero"  "zero" makes step 0 the constant EMA
+                                       0.731*state + 0.5*candidate; "default"
+                                       restores PyTorch's kaiming gate weights.
+  gate_fill           : str  = "grow"  rows a ring has not reached on its first
+                                       lap: "grow" emits only written rows (the
+                                       buffer IS PrefixAccumBuffer for one lap),
+                                       "init" pads from a learned slot_init.
   prefix_pos          : str  = "tail"  ONLY value; asserted, not branched on.
                                        Where the trailing summary slots sit in
                                        POSITION space: "tail" = continue the
@@ -247,7 +272,17 @@ class CortexMemory(nn.Module):
             self.prefix = PrefixAccumBuffer(
                 D, n_vec, int(getattr(config, "accum_max", 128)))
         elif pmode == "gated":
-            self.prefix = PrefixGatedBuffer(D, n_vec)
+            # gate_slots 0 => the pre-P1.0 shape (K == W).  Everything else
+            # defaults to the P1.0 recommendation; see the PrefixGatedBuffer
+            # docstring for why, and train.py for the cross_chunks assert that
+            # stops a configuration where the gate never fires.
+            self.prefix = PrefixGatedBuffer(
+                D, n_vec,
+                n_slots=int(getattr(config, "gate_slots", 0) or 0) or None,
+                route=str(getattr(config, "gate_route", "ring") or "ring"),
+                gate_norm=str(getattr(config, "gate_norm", "tanh") or "tanh"),
+                gate_init=str(getattr(config, "gate_init", "zero") or "zero"),
+                fill=str(getattr(config, "gate_fill", "grow") or "grow"))
         elif pmode:
             raise ValueError(f"prefix_memory must be '', 'accum' or 'gated'; got {pmode!r}")
         else:

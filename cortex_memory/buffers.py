@@ -9,10 +9,15 @@ THE LIVE SURFACE (what a new run may select):
 
   _PrefixBufferBase  -- shared summary-token machinery
   PrefixAccumBuffer  -- AutoCompressor-faithful append (accumulate_summary)
-  PrefixGatedBuffer  -- the same write with an LM2 gate at constant width
+  PrefixGatedBuffer  -- the same write with an LM2-style gate at constant
+                        width, and (P1.0, 2026-09-16) writes-per-chunk
+                        decoupled from that width via n_slots/route
 
-Subclasses differ ONLY in `merge`, which is what makes append-vs-gated a
-controlled comparison.
+Subclasses differ only in `merge` -- and, for the gated buffer at
+n_slots == n_vec, in nothing else at all, which is what makes append-vs-gated
+a controlled comparison.  Widening n_slots past n_vec adds a routing stage;
+that is a second variable, so an A/B on the merge rule must not move both at
+once.  `PrefixGatedBuffer.geometry()` reports what a configuration costs.
 
 THE LEGACY SURFACE lives in `legacy.py` -- LSTMBuffer, DirectCCoT, AccumCCoT,
 GatedAccumBuffer.  They are re-exported below so existing imports keep working,
@@ -102,9 +107,13 @@ from .legacy import (  # noqa: F401
 class _PrefixBufferBase(nn.Module):
     """Shared summary-token machinery for the two prefix buffers.
 
-    Subclasses differ ONLY in `merge` — append (AutoCompressor's
-    accumulate_summary) vs the LM2 gated update at constant memory.  Keeping
-    everything else identical is what makes the two arms a clean contrast.
+    Subclasses differ in `merge` — append (AutoCompressor's
+    accumulate_summary) vs the LM2-style gated update at constant memory — and
+    the gated one additionally owns the write-to-row routing P1.0 introduced.
+    At n_slots == n_vec that routing is the identity and the two arms differ in
+    nothing but the merge rule; a gated buffer's FIRST LAP is bit-identical to
+    PrefixAccumBuffer at the same (n_vec, n_slots), so the two diverge exactly
+    at eviction.
     """
 
     def __init__(self, hidden_size: int, n_vec: int) -> None:
@@ -188,46 +197,379 @@ class PrefixAccumBuffer(_PrefixBufferBase):
 
 
 class PrefixGatedBuffer(_PrefixBufferBase):
-    """LM2-gated fixed-K carry over the same AutoCompressor write/read paths.
+    """LM2-style gated carry with writes-per-chunk DECOUPLED from buffer width.
 
-    Identical to PrefixAccumBuffer except that `merge` is the LM2 gated update
-    (create_gates, LM2 section 3.3) at CONSTANT memory instead of an append:
+    `merge` is the LM2 gated update (create_gates, LM2 section 3.3) at CONSTANT
+    memory instead of an append:
 
-        combined = gate_proj_in(candidate) + gate_proj_mem(tanh(state))
+        combined = gate_proj_in(candidate) + gate_proj_mem(norm(state))
         ig, fg   = chunk(combined, 2, -1);  sigmoid(. + bias)
         state'   = fg * state + ig * candidate
 
-    n_slots == n_vec, so the update is per-slot: slot i weighs what it would
-    write against what it already holds.  Forget bias +1.0 biases toward
-    retention at init.  gate_proj_mem (the memory-feedback side) only receives
-    gradient through a chain of >= 3 chunks — keep carry_grad_chunks >= 2.
+    THE P1.0 CHANGE (2026-09-16).  Until now `self.n_slots = n_vec` and merge was
+    [B,K,D] + [B,K,D] -> [B,K,D], so writes-per-chunk was LOCKED to buffer width
+    and two different quantities wore one name:
 
-    Because merge overwrites in place, rows are NOT separable across chunks;
-    train.py detaches the whole state every carry_grad_chunks chunks instead of
-    slicing (truncated BPTT), which the existing loop already handles.
+        n_vec    summary columns APPENDED per chunk -> compression (chunk_len /
+                 n_vec) and per-chunk write cost.  A PARAMETER SHAPE
+                 (`summary_emb`), so it can never change after training.
+        n_slots  carried columns PREPENDED per chunk -> capacity and the fixed
+                 per-chunk read cost.  Under route="ring" NO parameter has an
+                 n_slots dimension, so it is a RUNTIME knob, sweepable at eval
+                 the way `accum_max` is.
+
+    At n_slots == n_vec with route="ring" this class is bit-identical to the
+    pre-P1.0 version, and for its first lap it is bit-identical to
+    `PrefixAccumBuffer(D, n_vec, n_slots)`.  `tests/test_gate_geometry.py` pins
+    both.
+
+    ROUTING.  How W = n_vec candidate vectors reach K = n_slots state rows.
+
+      "ring"   (default, and the recommended one) SPARSE: chunk c gates rows
+               [cW, cW+W) mod K and leaves the other K-W rows untouched -- not
+               decayed, not gated, passed through.
+      "mix"    DENSE control: candidate = M @ new_vecs for a learned [K, W]
+               matrix, so every row is refreshed every chunk.
+
+    WHY SPARSE IS THE DEFAULT.  Three reasons, in the order they actually bind.
+
+      1. THE READ IS ATTENTION, AND SUPERPOSED ROWS ARE NOT SELECTABLE.  A dense
+         route makes every row a weighted sum of EVERY chunk seen so far.  These
+         rows are consumed as keys and values by the base model's own attention
+         (that is the whole point of the AutoCompressor read), and a row that
+         superposes thirty chunks cannot be selected against.  This is not
+         hypothetical: B2's accum rows already measure centred cosine 0.96 and
+         effective rank ~4 of 32, and the documented active-harm mechanism is
+         "many near-identical keys take softmax mass by count".  Dense gating
+         makes that pathology structural rather than incidental.
+      2. TRUNCATED BPTT CANNOT TEACH A DENSE ROUTE TO REMEMBER.  A dense route's
+         horizon is entirely `fg^d`, so a long horizon must be LEARNED -- but
+         `carry_grad_chunks` bounds credit assignment at 2-3 chunks, so there is
+         no gradient path long enough to learn one.  The ring's horizon is
+         mechanical (K/W chunks before a row is even touched) and needs no
+         gradient at all.  This is the same structural fact behind
+         AutoCompressor's own result that stop-gradient after ~2 compression
+         steps costs nothing: their retention is mechanical too.
+      3. IT KEEPS THE DEPTH-SLICE ABLATION.  Under the ring, write vector j
+         always lands at rows congruent to j (mod W), forever -- see
+         `depth_rows`.  So if the j-th write carries loop depth k_j, that depth
+         stays addressable and the ablation that picks the write depths still
+         works.  Dense routing destroys the mapping.  (What gating does kill,
+         under either route, is CHUNK separability -- which chunk wrote a row.
+         Those are different slices and the two have been conflated.)
+
+    What sparse gives up is content-based allocation: the ring's schedule is
+    content-blind.  That is real, but it is unreachable at carry_grad_chunks=2
+    for reason 2, so it is not a capability being traded away today.
+
+    "attn" (K learned queries cross-attending the W candidates) is deliberately
+    NOT implemented.  It measured worst of every routing on retention, costs 4D^2
+    parameters, and it is not what published LM2 does anyway -- LM2's memory is
+    [N, N], identity-initialised, updated per LAYER, and added to the attention
+    output rather than spliced into the sequence (see lm2/src/memory.py).  Adding
+    it here would buy neither the mechanism nor the citation.
+
+    GEOMETRY CONSTRAINT, and nothing else checks it: the gate only starts acting
+    on lap 2, so
+
+        cross_chunks >= 2 * (n_slots / n_vec)
+
+    or the ring never completes a lap during training and the gate receives ZERO
+    gradient -- you would have trained an accum buffer with dead gate parameters
+    attached.  train.py asserts this.
+
+    CHUNK 1, AND THE FIRST LAP.  The candidate is adopted whole (AutoCompressor's
+    behaviour when the softprompt is empty: nothing to retain, so a gate could
+    only attenuate).  Under "ring" with K > W that leaves rows unreached for the
+    first K/W chunks, and `fill` says what happens to them:
+
+      "grow"  (default)  they do not exist yet.  The read block starts at W and
+              grows by W per chunk until it reaches K, then is fixed forever.
+              For that first lap the buffer is bit-identical to
+              `PrefixAccumBuffer(D, W, K)`, so an accum arm and a gated arm
+              branched from the same checkpoint diverge at EXACTLY the chunk
+              where accum starts dropping its oldest rows and the ring starts
+              gating them instead.  That is the cleanest available contrast for
+              the horizon claim.
+      "init"  they are filled from `slot_init`, a learned [K, D] parameter
+              seeded from the same real token as `summary_emb`.  NOT the
+              default, and the reason is measured: the carried block holds
+              post-`ln_f` states with row norm ~171 on the B2 checkpoint, while
+              `wte` rows are ~9.8 and the trained `summary_emb` ~9.06.  An
+              EOS-seeded row enters the read block ~19x shorter than the real
+              rows beside it -- nearly the dead key AutoCompressor's EOS trick
+              exists to avoid, because that trick seeds an INPUT EMBEDDING and
+              these rows are not embeddings.  Zeros would be worse: a zero key
+              scores a mid-range logit rather than -inf, the documented
+              3-5%-of-softmax-mass artifact.  `slot_init` is only allocated when
+              fill="init", so the default carries no unused parameter.
+
+    RETENTION MODEL.  Content enters through the input gate and decays once per
+    lap through the forget gate:
+
+        F(d) = ig * fg ** floor(d / (K/W))
+
+    At gate_init="zero" that is exact at step 0 (ig = 0.500, fg = 0.731), and it
+    reproduces the measured donor-swap curve to ~2%.  At W=16/K=64 it gives 0.50
+    retained for 0-3 chunks, 0.27 at 8-11, 0.10 at ~21, 0.05 at ~29 -- against
+    accum's 1.0-then-exactly-zero cliff at 8.  `evals/diag_gate_geometry.py`
+    measures it; do not requote the model where the measurement exists.
+
+    TRAINING NOTES.  merge overwrites rows in place, so rows are not separable by
+    chunk and train.py detaches the whole state every carry_grad_chunks chunks
+    (truncated BPTT) rather than slicing.  `gate_proj_mem` only receives gradient
+    through a chain of >= 3 chunks -- keep carry_grad_chunks >= 2 or it never
+    trains.  Under "ring" an untouched row keeps a live graph edge for up to K/W
+    chunks, which the whole-state detach already bounds.
     """
 
-    def __init__(self, hidden_size: int, n_vec: int = 32) -> None:
+    ROUTES = ("ring", "mix")
+
+    def __init__(self, hidden_size: int, n_vec: int = 32,
+                 n_slots: Optional[int] = None, route: str = "ring",
+                 gate_norm: str = "tanh", gate_init: str = "zero",
+                 fill: str = "grow", route_init_std: float = 0.02) -> None:
         super().__init__(hidden_size, n_vec)
-        self.n_slots = n_vec
+        self.n_slots = int(n_slots) if n_slots else int(n_vec)
+        if self.n_slots < n_vec:
+            raise ValueError(
+                f"n_slots ({self.n_slots}) < n_vec ({n_vec}): the gated buffer "
+                "cannot hold fewer rows than one chunk writes.  Lower "
+                "--cortex.accum_vecs instead; the point of decoupling is cheap "
+                "writes into a WIDE state, not the reverse.")
+        if route not in self.ROUTES:
+            raise ValueError(f"route must be one of {self.ROUTES}; got {route!r}")
+        if gate_norm not in ("tanh", "rms", "none"):
+            raise ValueError(
+                f"gate_norm must be 'tanh', 'rms' or 'none'; got {gate_norm!r}")
+        if gate_init not in ("zero", "default"):
+            raise ValueError(
+                f"gate_init must be 'zero' or 'default'; got {gate_init!r}")
+        if fill not in ("grow", "init"):
+            raise ValueError(f"fill must be 'grow' or 'init'; got {fill!r}")
+        if route == "ring" and self.n_slots % n_vec:
+            raise ValueError(
+                f"route='ring' needs n_slots ({self.n_slots}) to be a multiple "
+                f"of n_vec ({n_vec}) -- a partial lap would write a different "
+                "row set every time round and break the depth->row map that "
+                "`depth_rows` depends on.  Use route='mix' for a ragged ratio.")
+        self.route = route
+        self.gate_norm = gate_norm
+        self.gate_init = gate_init
+        self.fill = fill
 
         self.gate_proj_in  = nn.Linear(hidden_size, hidden_size * 2)
         self.gate_proj_mem = nn.Linear(hidden_size, hidden_size * 2)
         self.forget_bias   = nn.Parameter(torch.ones(1))    # +1.0, LM2 3.3
         self.input_bias    = nn.Parameter(torch.zeros(1))
+        self.apply_gate_init()
 
-    def merge(self, state: Optional[torch.Tensor],
-              new_vecs: torch.Tensor) -> torch.Tensor:
-        """state [B, K, D] (None on chunk 1) + [B, K, D] -> [B, K, D]."""
-        if state is None:
-            # First chunk: nothing to retain, so the gate would only attenuate
-            # a candidate it has no memory to weigh against.  Adopt it whole —
-            # what AutoCompressor effectively does when softprompt is empty.
-            return new_vecs
-        combined = (self.gate_proj_in(new_vecs)
-                    + self.gate_proj_mem(torch.tanh(state)))       # [B, K, 2D]
+        if fill == "init":
+            self.slot_init = nn.Parameter(torch.empty(self.n_slots, hidden_size))
+            nn.init.normal_(self.slot_init, std=0.02)
+            self.slot_init._no_weight_decay = True
+
+        if route == "mix":
+            # Tile pattern + noise.  The tile part keeps the routing
+            # in-distribution at init (each row starts as ONE real candidate,
+            # not an average of W of them); the noise is the symmetry breaker.
+            # WITHOUT IT THIS IS PROVABLY DEGENERATE: rows r and r+W would
+            # receive the same candidate from the same state under a pointwise
+            # gate, so their trajectories would be equal forever and the state
+            # would be pinned at rank <= W.  route_init_std=0.0 reproduces that
+            # on purpose in the tests.
+            m = torch.zeros(self.n_slots, n_vec)
+            m[torch.arange(self.n_slots), torch.arange(self.n_slots) % n_vec] = 1.0
+            m = m + torch.randn_like(m) * route_init_std
+            self.route_mix = nn.Parameter(m)
+
+        # Chunk counter for the ring cursor.  NOT a parameter and NOT persistent:
+        # it is per-SEQUENCE runtime, and `state is None` (chunk 1) is the reset
+        # signal, so it re-synchronises at the start of every forward without the
+        # graft having to reach in.  A stale value would only rotate WHICH rows a
+        # chunk writes, never how many.
+        self._chunk = 0
+
+    def apply_gate_init(self) -> None:
+        """(Re-)apply the designed gate initialisation.
+
+        MUST be called from train.py's reset_cortex_graft_init: that function
+        calls reset_parameters() on every cortex submodule to undo post_init's
+        non-finite clobber, which puts kaiming weights back into both gate
+        projections and silently discards gate_init="zero".  Bug class 1.
+        """
+        nn.init.ones_(self.forget_bias)
+        nn.init.zeros_(self.input_bias)
+        if self.gate_init != "zero":
+            return
+        # Zero the WEIGHTS and biases of both projections, so step 0 is exactly
+        # the constant EMA  s' = sigmoid(1)*s + sigmoid(0)*c = 0.731*s + 0.5*c,
+        # uniform over rows and channels.
+        #
+        # This is NOT the zero-init failure the project already paid for.
+        # LSTMBuffer zero-init'ed `out_proj`, which made the READ a literal
+        # no-op that had to be discovered from nothing.  Here the read is
+        # untouched and fully live -- an EMA is a working memory -- and what is
+        # switched off at init is only the gate's CONTENT SENSITIVITY, which
+        # training then earns rather than unlearns.  The alternative (PyTorch's
+        # kaiming default) measures, on the real write tape, as fg already
+        # spread p10 0.13 / p90 0.98: millions of untrained parameters making
+        # strong per-channel keep/drop decisions about a write they know nothing
+        # about, on top of a candidate that is ~98% a constant direction.
+        for proj in (self.gate_proj_in, self.gate_proj_mem):
+            nn.init.zeros_(proj.weight)
+            nn.init.zeros_(proj.bias)
+
+    # -- addressing ---------------------------------------------------------
+
+    def depth_rows(self, j: int) -> list[int]:
+        """Rows that always receive write-vector j, under route='ring'.
+
+        Chunk c writes vector j to row (cW + j) mod K, and cW mod K cycles
+        through multiples of W, so row r holds write-index r mod W for every
+        chunk.  If the j-th summary column is written at loop depth k_j, this is
+        the row set to ablate to remove depth k_j -- which is why gating does not
+        cost the depth-slice ablation.
+        """
+        if self.route != "ring":
+            raise ValueError(
+                f"depth_rows is only defined for route='ring'; this buffer is "
+                f"{self.route!r}, which mixes every write into every row and has "
+                "no depth->row map.")
+        if not 0 <= j < self.n_vec:
+            raise ValueError(f"write index {j} outside 0..{self.n_vec - 1}")
+        return [r for r in range(self.n_slots) if r % self.n_vec == j]
+
+    # -- the update ---------------------------------------------------------
+
+    def route_candidate(self, new_vecs: torch.Tensor) -> torch.Tensor:
+        """[B, n_vec, D] -> [B, n_slots, D] dense candidate (route='mix')."""
+        return torch.einsum("kw,bwd->bkd",
+                            self.route_mix.to(new_vecs.dtype), new_vecs)
+
+    def _mem_side(self, state: torch.Tensor) -> torch.Tensor:
+        """What the memory half of the gate sees.
+
+        "tanh" is LM2 as published.  It is a knob because `state` here is a stack
+        of post-`ln_f` hidden states whose scale is set by the base model, not a
+        normalised memory bank: measured on the B2 checkpoint, 60-75% of entries
+        are past |2|, where tanh' < 0.08, so the forget gate is reading
+        sign(state) and cannot see HOW MUCH a row holds.  "rms" removes the
+        question at no measured cost in retention.  Do not guess which --
+        evals/diag_gate_geometry.py reports the saturated fraction.
+        """
+        if self.gate_norm == "tanh":
+            return torch.tanh(state)
+        if self.gate_norm == "rms":
+            return state * torch.rsqrt(
+                state.float().pow(2).mean(-1, keepdim=True).clamp_min(1e-12)
+            ).to(state.dtype)
+        return state
+
+    def gate(self, state: torch.Tensor, candidate: torch.Tensor):
+        """The LM2 update on matched [B, n, D] tensors.
+
+        Returns (state', ig, fg) so diagnostics can read the gates without a
+        second forward -- the trained spread of fg across rows and inputs is the
+        pre-registered test of whether the gate learned anything or collapsed to
+        an EMA with extra parameters.
+        """
+        combined = (self.gate_proj_in(candidate)
+                    + self.gate_proj_mem(self._mem_side(state)))
         ig_logits, fg_logits = combined.chunk(2, dim=-1)
         ig = torch.sigmoid(ig_logits + self.input_bias)
         fg = torch.sigmoid(fg_logits + self.forget_bias)
-        return fg * state + ig * new_vecs
+        return fg * state + ig * candidate, ig, fg
 
+    def merge(self, state: Optional[torch.Tensor],
+              new_vecs: torch.Tensor) -> torch.Tensor:
+        """state [B, K, D] (None on chunk 1) + [B, W, D] -> [B, K', D].
+
+        K' is K except during a "grow" first lap, where it is the number of rows
+        written so far.
+        """
+        B, W, _ = new_vecs.shape
+        K = self.n_slots
+        if W != self.n_vec:
+            raise ValueError(
+                f"merge got {W} new vectors, buffer writes {self.n_vec}.  The "
+                "write width is summary_emb's shape -- it cannot change after "
+                "training.")
+
+        if state is None:                       # chunk 1: adopt whole
+            self._chunk = 1
+            if self.route != "ring":
+                return self.route_candidate(new_vecs)
+            if K == W or self.fill == "grow":
+                return new_vecs
+            out = (self.slot_init.to(device=new_vecs.device,
+                                     dtype=new_vecs.dtype)
+                   .unsqueeze(0).expand(B, -1, -1).clone())
+            out[:, :W] = new_vecs
+            return out
+
+        if self.route == "ring" and self.fill == "grow" and state.shape[1] < K:
+            self._chunk += 1                    # still filling: append, as accum does
+            return torch.cat([state, new_vecs], dim=1)
+
+        if state.shape[1] != K:
+            raise ValueError(
+                f"carried state has {state.shape[1]} rows, buffer holds {K}.  A "
+                "gated buffer's read block is fixed-width once filled; a "
+                "mismatch means an accum-shaped carry reached a gated buffer.")
+
+        if self.route != "ring":
+            merged, _, _ = self.gate(state, self.route_candidate(new_vecs))
+            self._chunk += 1
+            return merged
+
+        # Sparse ring write: gate ONLY the W rows this chunk touches and leave
+        # the other K-W rows exactly as they are.  index_copy is out-of-place, so
+        # autograd sees untouched rows as a pass-through rather than as a gate
+        # applied with fg == 1.
+        idx = ((self._chunk * W) % K
+               + torch.arange(W, device=state.device)) % K
+        sub, _, _ = self.gate(state.index_select(1, idx), new_vecs)
+        out = state.index_copy(1, idx, sub)
+        self._chunk += 1
+        return out
+
+    # -- seeding ------------------------------------------------------------
+
+    @torch.no_grad()
+    def init_from_token_embedding(self, wte_weight: torch.Tensor,
+                                  token_id: int) -> None:
+        """Seed summary_emb, and slot_init when it exists.
+
+        See the `fill` note above for why an embedding-scaled `slot_init` is the
+        wrong scale for the carry block, and why "grow" is the default.
+        """
+        super().init_from_token_embedding(wte_weight, token_id)
+        if hasattr(self, "slot_init"):
+            self.slot_init.data.copy_(
+                wte_weight[token_id].to(self.slot_init.dtype)
+                .unsqueeze(0).expand(self.n_slots, -1)
+            )
+
+    # -- accounting ---------------------------------------------------------
+
+    def geometry(self, chunk_len: int) -> dict:
+        """The numbers P1.0 is trading off, in one place."""
+        lap = self.n_slots // self.n_vec if self.route == "ring" else 1
+        return {
+            "n_vec": self.n_vec,
+            "n_slots": self.n_slots,
+            "route": self.route,
+            "gate_norm": self.gate_norm,
+            "gate_init": self.gate_init,
+            "fill": self.fill,
+            "compression": chunk_len / max(self.n_vec, 1),
+            "read_cols_per_chunk": self.n_slots,
+            "write_cols_per_chunk": self.n_vec,
+            "packed_cols": self.n_slots + chunk_len + self.n_vec,
+            # Chunks before a ring row is revisited.  Dense routings touch every
+            # row every chunk, so their lap is 1.
+            "lap_chunks": lap,
+            "min_cross_chunks": 2 * lap,
+            "params": sum(p.numel() for p in self.parameters()),
+        }

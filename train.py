@@ -223,6 +223,35 @@ class CLISettings:
     # accum_max           : FIFO cap on accumulated vectors — only binds at
     #                       eval on long chunk chains (training asserts
     #                       cross_chunks * accum_vecs <= accum_max).
+    #                       ACCUM ONLY; the gated buffer's capacity is
+    #                       gate_slots and its cap never "binds", it gates.
+    # gate_slots          : K for prefix_memory=gated — carried columns held,
+    #                       i.e. the FIXED read cost per chunk, decoupled from
+    #                       accum_vecs (the write width) by P1.0 on 2026-09-16.
+    #                       0 = same as accum_vecs (the pre-P1.0 shape, which
+    #                       forced every row to be overwritten every chunk and
+    #                       measured strictly worse than accum on every axis).
+    #                       Under gate_route=ring nothing has a gate_slots
+    #                       dimension, so unlike accum_vecs it is a runtime knob
+    #                       and can be swept at eval.
+    # gate_route          : 'ring' (sparse FIFO-indexed write, the default and
+    #                       the recommendation) or 'mix' (dense learned [K,W]
+    #                       routing, kept as the control).  See the
+    #                       PrefixGatedBuffer docstring for the three reasons
+    #                       sparse wins — key selectivity, truncated BPTT, and
+    #                       keeping the depth->row map.
+    # gate_norm           : what the memory half of the gate sees — 'tanh'
+    #                       (LM2 as published), 'rms', 'none'.  60-75% of the
+    #                       real state's entries sit past |2| where tanh is
+    #                       saturated, so this is a measured question.
+    # gate_init           : 'zero' makes step 0 the constant EMA
+    #                       0.731*state + 0.5*candidate and leaves the read
+    #                       fully live; 'default' restores kaiming gate weights.
+    # gate_fill           : rows a ring has not reached on its first lap —
+    #                       'grow' (emit only written rows; the buffer IS
+    #                       PrefixAccumBuffer for exactly one lap, so an accum
+    #                       arm and a gated arm diverge at eviction and nowhere
+    #                       else) or 'init' (pad from a learned slot_init).
     # gated_accum         : gated-accumulation LM2 variant (two-track plan
     #                       buffer-choice note): the K-slot M_cross becomes a
     #                       GatedAccumBuffer — AccumCCoT's extraction write
@@ -262,6 +291,12 @@ class CLISettings:
             # is spliced into the token stream and read by the base model's own
             # attention, so there is no read module to configure.
             prefix_memory="",
+            # The gated buffer geometry (P1.0).  Defaults reproduce the
+            # pre-P1.0 shape (gate_slots 0 => K == W) so nothing moves
+            # unless a run asks for it; the recommended arm is
+            #   accum_vecs 16, gate_slots 64, gate_route ring.
+            gate_slots=0, gate_route="ring", gate_norm="tanh",
+            gate_init="zero", gate_fill="grow",
             # summary_init_token: token whose embedding seeds the summary
             # slots (AutoCompressor uses EOS).  -1 = take config.eos_token_id;
             # set it explicitly when the checkpoint config carries none, which
@@ -372,6 +407,41 @@ class CLISettings:
                     f"cross_chunks x accum_vecs "
                     f"({self.cortex['cross_chunks']} x {self.cortex['accum_vecs']})"
                 )
+            if self.cortex["prefix_memory"] == "gated":
+                for key, allowed in (("gate_route", ("ring", "mix")),
+                                     ("gate_norm", ("tanh", "rms", "none")),
+                                     ("gate_init", ("zero", "default")),
+                                     ("gate_fill", ("grow", "init"))):
+                    assert self.cortex[key] in allowed, (
+                        f"cortex.{key} must be one of {allowed}; got "
+                        f"{self.cortex[key]!r}")
+                K = int(self.cortex["gate_slots"]) or int(self.cortex["accum_vecs"])
+                W = int(self.cortex["accum_vecs"])
+                assert K >= W, (
+                    f"cortex.gate_slots ({K}) < cortex.accum_vecs ({W}): the "
+                    "gated buffer cannot hold fewer rows than one chunk writes")
+                if self.cortex["gate_route"] == "ring":
+                    assert K % W == 0, (
+                        f"cortex.gate_slots ({K}) must be a multiple of "
+                        f"cortex.accum_vecs ({W}) under gate_route=ring, or a "
+                        "partial lap writes a different row set every time "
+                        "round and the depth->row map breaks")
+                    # THE CONSTRAINT NOTHING ELSE CHECKS.  A ring's gate only
+                    # starts acting on lap 2 -- the first lap is a plain append
+                    # (gate_fill=grow) or a pad (init).  If the chain is shorter
+                    # than two laps the gate NEVER FIRES in training and the run
+                    # trains an accum buffer with dead gate parameters bolted
+                    # on, behind a perfectly healthy loss curve.  The gated
+                    # analogue of "raising accum_max moves the cliff, it does
+                    # not train eviction".
+                    lap = K // W
+                    assert self.cortex["cross_chunks"] >= 2 * lap, (
+                        f"cortex.cross_chunks ({self.cortex['cross_chunks']}) "
+                        f"must be at least 2 x the ring lap ({lap} = gate_slots "
+                        f"{K} / accum_vecs {W}) = {2 * lap}, or the gate never "
+                        "fires during training and receives zero gradient.  "
+                        "Lower gate_slots, raise accum_vecs, or raise "
+                        "cross_chunks.")
         if self.cortex["accum_ccot"]:
             assert self.cortex["memory_slots"] == 0 and not self.cortex["ccot_direct"], (
                 "cortex.accum_ccot replaces the K-slot buffer / DirectCCoT — "
@@ -791,7 +861,19 @@ def reset_cortex_graft_init(model):
         torch.nn.init.normal_(pre.summary_emb, std=0.02)
         pre.summary_seeded.fill_(False)
         tags = ["summary_emb~N(reseeded from wte on first forward)"]
-        if hasattr(pre, "forget_bias"):                        # PrefixGatedBuffer
+        if hasattr(pre, "apply_gate_init"):                    # PrefixGatedBuffer
+            # Step (1) above called reset_parameters() on gate_proj_in/mem,
+            # which puts KAIMING weights back into both projections -- silently
+            # discarding gate_init="zero" and leaving millions of untrained
+            # parameters making per-channel keep/drop decisions at step 0.  The
+            # buffer owns its designed init; re-apply it here.
+            pre.apply_gate_init()
+            tags += ["forget_bias=1", "input_bias=0",
+                     f"gate_init={pre.gate_init}"]
+            if hasattr(pre, "slot_init"):                      # gate_fill=init
+                torch.nn.init.normal_(pre.slot_init, std=0.02)
+                tags += ["slot_init~N(reseeded from wte on first forward)"]
+        elif hasattr(pre, "forget_bias"):                      # legacy gated shape
             torch.nn.init.ones_(pre.forget_bias)               # LM2 3.3 forget bias +1
             torch.nn.init.zeros_(pre.input_bias)
             tags += ["forget_bias=1", "input_bias=0"]
@@ -881,7 +963,14 @@ def startup(cfg: CLISettings):
                    "lora_rank", "lora_alpha",
                    "accum_ccot", "accum_vecs", "accum_max",
                    "gated_accum", "prefix_memory", "summary_init_token",
-                   "prefix_pos", "prefix_eos_reset"):
+                   "prefix_pos", "prefix_eos_reset",
+                   # P1.0 gated geometry.  These MUST persist: the graft reads
+                   # them from config.json on every load, so a key missing here
+                   # silently rebuilds a DIFFERENT buffer on resume or at eval
+                   # (K back to W, route back to ring, gate back to kaiming)
+                   # behind a healthy loss curve.
+                   "gate_slots", "gate_route", "gate_norm", "gate_init",
+                   "gate_fill"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -891,6 +980,12 @@ def startup(cfg: CLISettings):
                   f"(vecs={cfg.cortex['accum_vecs']}/max={cfg.cortex['accum_max']}) "
                   f"gated_accum={cfg.cortex['gated_accum']} "
                   f"prefix_memory={cfg.cortex['prefix_memory'] or 'off'} "
+                  + (f"gate(K={cfg.cortex['gate_slots'] or cfg.cortex['accum_vecs']}"
+                     f",route={cfg.cortex['gate_route']}"
+                     f",norm={cfg.cortex['gate_norm']}"
+                     f",init={cfg.cortex['gate_init']}"
+                     f",fill={cfg.cortex['gate_fill']}) "
+                     if cfg.cortex['prefix_memory'] == 'gated' else "") +
                   f"prefix_pos={cfg.cortex['prefix_pos']} "
                   f"prefix_eos_reset={cfg.cortex['prefix_eos_reset']} "
                   f"cross_chunks={cfg.cortex['cross_chunks']} "
