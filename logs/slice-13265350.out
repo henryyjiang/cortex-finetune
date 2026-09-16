@@ -1,0 +1,44 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-16-2026 16:54:48
+Job ID:    13265350
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  wrap
+Partition: cpu-large
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+loading cortex-retrofit/retro-b2-heal/checkpoint_91552/chkpt.pt ...
+  cortex.prefix.summary_emb: [32, 2048] -> [16, 2048]
+  summary_seeded = True
+  max row deviation from the row mean: 6.68936
+
+-- what was kept, and what it cost ------------------------------
+  all      rows=32  |row|    9.549 [8.116, 10.164]  centred cos -0.0314  eff. rank 20.02
+  kept     rows=16  |row|    9.369 [8.116, 10.164]  centred cos -0.0652  eff. rank 10.90
+  dropped  rows=16  |row|    9.728 [9.478, 10.006]  centred cos -0.0659  eff. rank 12.03
+  kept vs dropped, centred cosine: -0.0508
+  effective rank retained: 54% of the parent's, at 50% of the write columns
+  (P1.0's bet, on trained weights: halving W costs far less rank than half.
+   If this reads near 50%, the rows WERE carrying W independent things and the
+   horizon argument has to be re-made against a real cost.)
+
+  wrote cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt
+  wrote cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/cortex_slice.json
+
+  BRANCH off this dir (--branch_path).  A --resume_path is refused: the
+  optimizer state in it still has the parent's width.
+---------------------------------------
+Begin Slurm Epilog: Sep-16-2026 16:56:37
+Job ID:        13265350
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      wrap
+Resources:     cpu=1,mem=48G,node=1
+Rsrc Used:     cput=00:01:49,vmem=0,walltime=00:01:49,mem=23536648K,energy_used=0
+Partition:     cpu-large
+QOS:           inferno
+Nodes:         atl1-1-01-002-22-2
+---------------------------------------
