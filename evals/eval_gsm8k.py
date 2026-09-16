@@ -1,9 +1,18 @@
 """
 GSM8K evaluation for CortexGPT.
 
-8-shot chain-of-thought prompting on the GSM8K test set (1319 problems).
+Few-shot chain-of-thought prompting on the GSM8K test set (1319 problems).
 The model generates up to 256 tokens; we extract the final numeric answer
 after "####" or fall back to the last number in the response.
+
+--n_shot controls the exemplar count (default 8, the harness standard).  It is
+a PROBE, not a tuning knob: sweeping it varies prompt length across the
+max_length/cross_chunks bound the recipe ever trained on.
+
+Every item is written to records.json with its index and correct flag, so two
+runs can be compared pairwise rather than as two independent binomials.  s0 is
+pinned per example (seed_example), so a rerun of the same checkpoint reproduces
+-- it did not before 2026-09-16.
 
 Dataset: openai/gsm8k  (main config, test split)
 
@@ -23,7 +32,8 @@ import torch
 from transformers import AutoTokenizer
 
 from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
-                         ccot_prime, greedy_generate)
+                         ccot_prime, greedy_generate, seed_example,
+                         score_continuation)
 
 
 # ---------------------------------------------------------------------------
@@ -78,10 +88,22 @@ FEW_SHOT_EXAMPLES = [
 ]
 
 
-def build_prompt(question: str) -> str:
-    shots = [f"Question: {q}\nAnswer: {a}" for q, a in FEW_SHOT_EXAMPLES]
+def build_prompt(question: str, n_shot: int = 8) -> str:
+    shots = [f"Question: {q}\nAnswer: {a}"
+             for q, a in FEW_SHOT_EXAMPLES[:n_shot]]
     shots.append(f"Question: {question}\nAnswer:")
     return "\n\n".join(shots)
+
+
+_CALC = re.compile(r"<<[^>]*>>")
+
+
+def gold_continuation(answer: str) -> str:
+    """The gold CoT in the format the few-shot prompt demonstrates: GSM8K's
+    <<43-5=38>> calculator annotations stripped, one leading space to follow
+    "Answer:".  Stripping is applied identically at every --n_shot, so it
+    cannot manufacture a trend across the sweep."""
+    return " " + _CALC.sub("", answer).strip()
 
 
 def extract_answer(text: str) -> Optional[str]:
@@ -93,7 +115,16 @@ def extract_answer(text: str) -> Optional[str]:
 
 
 def normalize(ans: str) -> str:
-    return ans.replace(",", "").strip().lstrip("0") or "0"
+    """Canonicalise a numeric answer for exact comparison.
+
+    The rstrip(".") is load-bearing.  extract_answer's fallback regex captures
+    the sentence-final period out of "the answer is 8.", and without this the
+    result scored as a miss against gold "8".  Three such cases turned up in
+    800 sampled P0.5 failures -- roughly two questions per 500-item run, the
+    same order as the heal-to-anneal trend the ladder was trying to measure.
+    """
+    ans = ans.replace(",", "").strip().rstrip(".")
+    return ans.lstrip("0") or "0"
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +141,29 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--T",              type=int, default=None,
                    help="Recurrence depth at eval (None = use checkpoint mean_recurrence)")
     p.add_argument("--max_new_tokens", type=int, default=256)
+    p.add_argument("--n_shot",         type=int, default=8,
+                   choices=range(0, len(FEW_SHOT_EXAMPLES) + 1),
+                   metavar="[0-8]",
+                   help="Few-shot exemplars in the prompt (default 8, the "
+                        "harness standard). Lower values exist to test the "
+                        "chunk-length hypothesis: the retrofit recipe never "
+                        "shows the model more than max_length/cross_chunks "
+                        "contiguous tokens (512 on the B2 arm), and the "
+                        "8-shot prompt crosses that bound while the 4-shot one "
+                        "does not. Accuracy that RECOVERS as the prompt drops "
+                        "under the bound localises the GSM8K "
+                        "floor to the chunk geometry rather than to memory or "
+                        "to conversion budget. Sweep it; do not tune it.")
+    p.add_argument("--score_only",     action="store_true",
+                   help="Skip generation entirely: teacher-force the gold CoT "
+                        "and report its NLL in nats/token. ONE forward per "
+                        "example against a 256-token decode -- measured at "
+                        "0.025 s/forward vs 23.8 s/example, ~950x -- and the "
+                        "metric is continuous, so it resolves at an n where "
+                        "3%-accuracy cannot. This is the powered and the cheap "
+                        "way to run the --n_shot sweep: accuracy pinned at the "
+                        "floor cannot show a break against prompt length, NLL "
+                        "can.")
     p.add_argument("--ccot_passes",    type=int, default=0,
                    help="Mixed CCoT+CoT: run N silent full forward passes over "
                         "the prompt first, carrying M_cross between passes "
@@ -187,43 +241,100 @@ def main() -> None:
     if args.max_examples > 0:
         ds = ds.select(range(min(args.max_examples, len(ds))))
 
-    correct  = 0
-    total    = 0
-    failures = []
+    correct = 0
+    total   = 0
+    records = []
+    nll_sum = 0.0
+    n_tok   = 0
 
     for i, ex in enumerate(ds):
         gold_ans = extract_answer(ex["answer"])
         if gold_ans is None:
             continue
-        response = generate(model, tokenizer, build_prompt(ex["question"]),
+        prompt = build_prompt(ex["question"], args.n_shot)
+        n_prompt_tok = len(tokenizer(prompt, add_special_tokens=False).input_ids)
+        # s0 is drawn fresh per forward (initialize_state), so the SAME weights
+        # decode differently run to run: the P0.5 replicate of chkpt 305,000
+        # moved 16/500 -> 19/500, with 22 of the top 50 predictions changed.
+        # Pinning the draw from the example id makes a rerun reproducible and
+        # makes arm-vs-arm contrasts paired, as eval_babilong.py already does.
+        seed_example(f"gsm8k:{i}")
+        if args.score_only:
+            prompt_ids = tokenizer(prompt, add_special_tokens=False,
+                                   return_tensors="pt").input_ids
+            cont_ids   = tokenizer(gold_continuation(ex["answer"]),
+                                   add_special_tokens=False,
+                                   return_tensors="pt").input_ids
+            sc = score_continuation(model, prompt_ids, cont_ids,
+                                    to_num_steps(T))
+            nll_sum += sc["nll_sum"]
+            n_tok   += sc["n_tok"]
+            total   += 1
+            records.append({"idx": i, "gold": gold_ans,
+                            "nll_sum": sc["nll_sum"], "n_tok": sc["n_tok"],
+                            "entropy_first": sc.get("entropy_first"),
+                            "prompt_tokens": n_prompt_tok})
+            if total % 100 == 0:
+                print(f"  {total}/{len(ds)}  "
+                      f"nll/tok={nll_sum / max(n_tok, 1):.4f}")
+            continue
+        response = generate(model, tokenizer, prompt,
                             args.max_new_tokens, T, device,
                             ccot_passes=args.ccot_passes,
                             use_cache=not args.no_cache)
         pred_ans   = extract_answer(response)
         is_correct = pred_ans is not None and normalize(pred_ans) == normalize(gold_ans)
-        if is_correct:
-            correct += 1
-        else:
-            failures.append({"question": ex["question"], "gold": gold_ans, "pred": pred_ans})
-        total += 1
+        correct += int(is_correct)
+        total   += 1
+        records.append({"idx": i, "question": ex["question"], "gold": gold_ans,
+                        "pred": pred_ans, "correct": is_correct,
+                        "prompt_tokens": n_prompt_tok})
         if total % 100 == 0:
             print(f"  {total}/{len(ds)}  acc={correct/total:.4f}")
 
-    accuracy = correct / total if total > 0 else 0.0
-    print(f"\nGSM8K accuracy: {correct}/{total} = {accuracy:.4f}")
+    accuracy     = correct / total if total > 0 else 0.0
+    nll_per_tok  = nll_sum / n_tok if n_tok > 0 else None
+    tok          = sorted(r["prompt_tokens"] for r in records)
+    median_tok   = tok[len(tok) // 2] if tok else 0
+    if args.score_only:
+        print(f"\nGSM8K gold-CoT NLL: {nll_per_tok:.4f} nats/token "
+              f"over {total} examples, {n_tok} scored tokens")
+    else:
+        print(f"\nGSM8K accuracy: {correct}/{total} = {accuracy:.4f}")
+    print(f"  n_shot={args.n_shot}  prompt tokens: median {median_tok}, "
+          f"max {tok[-1] if tok else 0}")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     with open(out_dir / "results.json", "w") as f:
-        json.dump({"correct": correct, "total": total, "accuracy": accuracy}, f, indent=2)
+        json.dump({"mode": "score" if args.score_only else "generate",
+                   "correct": correct, "total": total, "accuracy": accuracy,
+                   "nll_per_token": nll_per_tok, "scored_tokens": n_tok,
+                   "n_shot": args.n_shot,
+                   "T": T if T is not None else cfg.mean_recurrence,
+                   "ccot_passes": args.ccot_passes,
+                   "median_prompt_tokens": median_tok}, f, indent=2)
 
     with open(out_dir / "summary.csv", "w") as f:
-        f.write("correct,total,accuracy\n")
-        f.write(f"{correct},{total},{accuracy:.4f}\n")
+        f.write("correct,total,accuracy,nll_per_token,n_shot,"
+                "median_prompt_tokens\n")
+        f.write(f"{correct},{total},{accuracy:.4f},"
+                f"{'' if nll_per_tok is None else f'{nll_per_tok:.6f}'},"
+                f"{args.n_shot},{median_tok}\n")
+
+    # EVERY item, not a truncated failure list.  Without a per-example id and a
+    # correct flag nothing downstream can be PAIRED, and the deltas this
+    # instrument has to resolve -- arm vs control, carry on vs off -- are a few
+    # points at n=500, where McNemar on the same items is several times tighter
+    # than two independent binomials.  failures.json stays for reading by eye.
+    with open(out_dir / "records.json", "w") as f:
+        json.dump(records, f, indent=2)
 
     with open(out_dir / "failures.json", "w") as f:
-        json.dump(failures[:50], f, indent=2)
+        json.dump([{k: r[k] for k in ("question", "gold", "pred")}
+                   for r in records if not r.get("correct", True)][:50],
+                  f, indent=2)
 
     print(f"Results saved → {out_dir}")
 

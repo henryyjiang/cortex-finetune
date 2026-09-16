@@ -251,6 +251,36 @@ class TestGSM8K:
         import eval_gsm8k as eg
         assert eg.extract_answer("the answer is #### 42") == "42"
 
+    def test_normalize_tolerates_a_trailing_period(self):
+        """The fallback regex captures the sentence-final period out of "the
+        answer is 8.", which scored as a miss against gold "8" until
+        2026-09-16 -- worth ~2 questions per 500-item run on the P0.5 ladder."""
+        import eval_gsm8k as eg
+        assert eg.extract_answer("the answer is 8.") == "8."
+        assert eg.normalize("8.") == eg.normalize("8")
+        assert eg.normalize("90000.") == eg.normalize("90000")
+        # and the cases that must NOT collapse
+        assert eg.normalize("1.92") != eg.normalize("192")
+        assert eg.normalize("9") != eg.normalize("18")
+
+    def test_gold_continuation_strips_calculator_annotations(self):
+        """--score_only teacher-forces the gold CoT, and GSM8K golds carry
+        <<48/2=24>> annotations the few-shot prompt never demonstrates."""
+        import eval_gsm8k as eg
+        raw = ("Natalia sold 48/2 = <<48/2=24>>24 clips in May.\n"
+               "48+24 = <<48+24=72>>72 clips altogether.\n#### 72")
+        out = eg.gold_continuation(raw)
+        assert "<<" not in out and ">>" not in out
+        assert out.startswith(" ") and out.endswith("#### 72")
+        assert "24 clips in May" in out
+
+    def test_n_shot_truncates_the_exemplar_list(self):
+        import eval_gsm8k as eg
+        assert eg.build_prompt("Q?", 0).strip() == "Question: Q?\nAnswer:"
+        assert eg.build_prompt("Q?", 8) == eg.build_prompt("Q?")
+        lens = [len(eg.build_prompt("Q?", n)) for n in (0, 1, 2, 4, 8)]
+        assert lens == sorted(lens) and len(set(lens)) == len(lens)
+
 
 # ---------------------------------------------------------------------------
 # Multiple choice -- completion log-prob scoring

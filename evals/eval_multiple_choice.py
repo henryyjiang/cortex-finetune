@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 from typing import Optional
 
@@ -22,7 +23,8 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer
 
-from model_utils import load_checkpoint, has_cross_state, to_num_steps
+from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
+                         seed_example)
 
 
 TASK_CHOICES = ["hellaswag", "winogrande", "arc_easy", "arc_challenge", "piqa"]
@@ -154,6 +156,7 @@ LOADERS = {
 
 def run_task(task_name, examples, model, tokenizer, T, seq_len, device):
     correct = 0
+    records = []
     for i, (context, choices, label) in enumerate(examples):
         ctx_ids = tokenizer(context, add_special_tokens=False).input_ids
         scores  = []
@@ -162,13 +165,27 @@ def run_task(task_name, examples, model, tokenizer, T, seq_len, device):
             if not comp_ids:
                 scores.append(float("-inf"))
                 continue
+            # Re-pin the RNG before EVERY choice, not once per example.  Each
+            # scoring forward draws its own s0 (initialize_state), so without
+            # this the choices of a single question are ranked under DIFFERENT
+            # random states and part of the argmax is the draw rather than the
+            # model.  One seed per example makes the within-question contrast
+            # paired, and makes the run reproducible across jobs -- which the
+            # P0.5 replicate showed it was not.
+            seed_example(f"{task_name}:{i}")
             scores.append(log_prob_of_completion(model, ctx_ids, comp_ids, T, seq_len, device))
-        if max(range(len(scores)), key=lambda j: scores[j]) == label:
-            correct += 1
+        pred       = max(range(len(scores)), key=lambda j: scores[j])
+        is_correct = pred == label
+        correct   += int(is_correct)
+        records.append({"idx": i, "label": label, "pred": pred,
+                        "correct": is_correct,
+                        "scores": [x if math.isfinite(x) else None
+                                   for x in scores]})
         if (i + 1) % 200 == 0:
             print(f"  [{task_name}] {i+1}/{len(examples)}  acc={correct/(i+1):.4f}")
     accuracy = correct / len(examples) if examples else 0.0
-    return {"correct": correct, "total": len(examples), "accuracy": accuracy}
+    return ({"correct": correct, "total": len(examples), "accuracy": accuracy},
+            records)
 
 
 # ---------------------------------------------------------------------------
@@ -194,11 +211,14 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     all_results = {}
+    all_records = {}
     for task in args.tasks:
         print(f"\n{'='*55}\nTask: {task}\n{'='*55}")
         examples = LOADERS[task](args.max_examples)
-        result   = run_task(task, examples, model, tokenizer, T, args.seq_len, device)
+        result, records = run_task(task, examples, model, tokenizer, T,
+                                   args.seq_len, device)
         all_results[task] = result
+        all_records[task] = records
         print(f"  {task}: {result['correct']}/{result['total']} = {result['accuracy']:.4f}")
 
     print(f"\n{'Task':<18} {'Correct':>8} {'Total':>8} {'Acc':>8}")
@@ -208,6 +228,13 @@ def main() -> None:
 
     with open(out_dir / "results.json", "w") as f:
         json.dump(all_results, f, indent=2)
+
+    # Per-item outcomes, so a later arm-vs-arm read can be PAIRED.  These are
+    # the powered half of the suite -- hellaswag alone is n=10,042 -- and a
+    # McNemar on the same items resolves differences that two independent
+    # binomials at +/-0.5 pt each cannot.
+    with open(out_dir / "records.json", "w") as f:
+        json.dump(all_records, f, indent=2)
 
     with open(out_dir / "summary.csv", "w") as f:
         f.write("task,correct,total,accuracy\n")

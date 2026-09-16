@@ -65,6 +65,24 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 EVAL_TAG=${EVAL_TAG:-$(date +%Y%m%d)}
 GSM8K_MAX=${GSM8K_MAX:-500}
 CCOT_PASSES=${CCOT_PASSES:-0}
+# Few-shot count in the GSM8K prompt.  8 is the harness standard and the only
+# value that is comparable to any published number -- leave it alone unless you
+# are running the CHUNK-LENGTH PROBE.  That probe: the recipe never shows the
+# model more than max_length/cross_chunks contiguous tokens (512 on the B2 arm),
+# and the 8-shot prompt crosses that bound while the 4-shot one does not, so a
+# sweep 0/1/2/4/8 that RECOVERS below the bound localises the GSM8K floor to the
+# chunk geometry.  P0.5 already ruled out conversion budget, so this is the
+# standing next hypothesis and it costs no training.
+#   N_SHOT="0 1 2 4 8" SCORE_ONLY=true SKIP_MC=true T_OVERRIDE=8 \
+#     EVAL_TAG=nshot-b2final sbatch pace/eval_basic.sbatch
+# One job, one checkpoint load, five rungs of gold-CoT NLL.  Minutes, not hours.
+N_SHOT=${N_SHOT:-8}
+# Skip the generative half entirely.  See the cost note above the invocation.
+SKIP_GSM8K=${SKIP_GSM8K:-false}
+# Score the gold CoT instead of decoding one: one forward per example, and a
+# continuous metric.  The ONLY sane way to run the n-shot sweep -- GSM8K
+# accuracy sits at 1-4%, where no affordable n can resolve a break.
+SCORE_ONLY=${SCORE_ONLY:-false}
 T_OVERRIDE=${T_OVERRIDE:-}
 SKIP_MC=${SKIP_MC:-false}
 BASE=${BASE:-false}
@@ -103,6 +121,9 @@ if [ "$CCOT_PASSES" -gt 0 ]; then
     GSM8K_ARGS+=(--ccot_passes "$CCOT_PASSES")
     SKIP_MC=true    # only GSM8K differs in a CCoT ablation run
 fi
+if [ "$N_SHOT" != "8" ]; then
+    SKIP_MC=true    # the MC suite has no few-shot prompt to vary
+fi
 # T_OVERRIDE used to force SKIP_MC=true here, on the assumption that the only
 # reason to set T was a compute-matched GSM8K control.  That assumption breaks
 # on the retrofit line, where T_OVERRIDE=8 is the CORRECT depth rather than an
@@ -117,8 +138,30 @@ if [ "$SKIP_MC" != "true" ]; then
         --out_dir "$MC_OUT"
 fi
 
-python evals/eval_gsm8k.py \
-    --model_name "$MODEL_DIR" \
-    --max_examples $GSM8K_MAX \
-    "${T_ARGS[@]}" "${GSM8K_ARGS[@]}" \
-    --out_dir "$GSM8K_OUT"
+# GSM8K IS THE EXPENSIVE HALF OF THIS SCRIPT, not the free rider the handoff
+# assumed.  Measured on the P0.5 pair: job 13225106 (GSM8K 500 alone) ran
+# 3:19:21 and job 13225035 (the same GSM8K plus the whole 5-task MC suite and a
+# second checkpoint load) ran 3:42:52 -- so the MC suite is ~21 min for 49,854
+# scoring forwards (0.025 s each) and GSM8K is ~3.3 h for 500 256-token decodes
+# (23.8 s each).  GSM8K is ~90% of the wall clock and supports ZERO rows of the
+# claim-to-experiment map (framework S8).  Pass SKIP_GSM8K=true on any rung
+# where you only want the powered half.
+if [ "$SKIP_GSM8K" != "true" ]; then
+# N_SHOT may be a LIST.  Looping inside one job amortises the checkpoint load
+# across the whole sweep instead of paying it five times.
+for NS in $N_SHOT; do
+    G_OUT="$GSM8K_OUT"
+    G_ARGS=("${GSM8K_ARGS[@]}")
+    [ "$NS" = "8" ] || { G_OUT="${G_OUT}-s${NS}"; G_ARGS+=(--n_shot "$NS"); }
+    if [ "$SCORE_ONLY" = "true" ]; then
+        G_OUT="${G_OUT}-nll"
+        G_ARGS+=(--score_only)
+    fi
+    echo "--- gsm8k: n_shot=$NS score_only=$SCORE_ONLY -> $G_OUT ---"
+    python evals/eval_gsm8k.py \
+        --model_name "$MODEL_DIR" \
+        --max_examples $GSM8K_MAX \
+        "${T_ARGS[@]}" "${G_ARGS[@]}" \
+        --out_dir "$G_OUT"
+done
+fi
