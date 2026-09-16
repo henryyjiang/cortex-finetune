@@ -1,0 +1,4002 @@
+[
+  {
+    "idx": 0,
+    "gold": "18",
+    "nll_sum": 51.734710693359375,
+    "n_tok": 39,
+    "entropy_first": 5.892330169677734,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 1,
+    "gold": "3",
+    "nll_sum": 60.629825592041016,
+    "n_tok": 33,
+    "entropy_first": 3.304201602935791,
+    "prompt_tokens": 115
+  },
+  {
+    "idx": 2,
+    "gold": "70000",
+    "nll_sum": 129.2422637939453,
+    "n_tok": 88,
+    "entropy_first": 5.311122894287109,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 3,
+    "gold": "540",
+    "nll_sum": 50.47077178955078,
+    "n_tok": 25,
+    "entropy_first": 3.094724655151367,
+    "prompt_tokens": 123
+  },
+  {
+    "idx": 4,
+    "gold": "20",
+    "nll_sum": 99.29447937011719,
+    "n_tok": 76,
+    "entropy_first": 3.594914674758911,
+    "prompt_tokens": 197
+  },
+  {
+    "idx": 5,
+    "gold": "64",
+    "nll_sum": 169.88629150390625,
+    "n_tok": 116,
+    "entropy_first": 3.668485164642334,
+    "prompt_tokens": 143
+  },
+  {
+    "idx": 6,
+    "gold": "260",
+    "nll_sum": 82.21255493164062,
+    "n_tok": 67,
+    "entropy_first": 5.29406213760376,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 7,
+    "gold": "160",
+    "nll_sum": 186.3367156982422,
+    "n_tok": 131,
+    "entropy_first": 4.793000221252441,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 8,
+    "gold": "45",
+    "nll_sum": 181.3997039794922,
+    "n_tok": 106,
+    "entropy_first": 4.026233196258545,
+    "prompt_tokens": 190
+  },
+  {
+    "idx": 9,
+    "gold": "460",
+    "nll_sum": 154.231201171875,
+    "n_tok": 92,
+    "entropy_first": 4.117209434509277,
+    "prompt_tokens": 146
+  },
+  {
+    "idx": 10,
+    "gold": "366",
+    "nll_sum": 133.94549560546875,
+    "n_tok": 108,
+    "entropy_first": 3.645328998565674,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 11,
+    "gold": "694",
+    "nll_sum": 86.73512268066406,
+    "n_tok": 80,
+    "entropy_first": 3.5828135013580322,
+    "prompt_tokens": 150
+  },
+  {
+    "idx": 12,
+    "gold": "13",
+    "nll_sum": 139.63497924804688,
+    "n_tok": 98,
+    "entropy_first": 4.709156513214111,
+    "prompt_tokens": 155
+  },
+  {
+    "idx": 13,
+    "gold": "18",
+    "nll_sum": 171.4944610595703,
+    "n_tok": 112,
+    "entropy_first": 4.811856269836426,
+    "prompt_tokens": 146
+  },
+  {
+    "idx": 14,
+    "gold": "60",
+    "nll_sum": 86.51136779785156,
+    "n_tok": 99,
+    "entropy_first": 3.3448376655578613,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 15,
+    "gold": "125",
+    "nll_sum": 110.92680358886719,
+    "n_tok": 97,
+    "entropy_first": 4.460478782653809,
+    "prompt_tokens": 179
+  },
+  {
+    "idx": 16,
+    "gold": "230",
+    "nll_sum": 154.90310668945312,
+    "n_tok": 91,
+    "entropy_first": 3.9350175857543945,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 17,
+    "gold": "57500",
+    "nll_sum": 130.18417358398438,
+    "n_tok": 125,
+    "entropy_first": 4.790580749511719,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 18,
+    "gold": "7",
+    "nll_sum": 96.65739440917969,
+    "n_tok": 79,
+    "entropy_first": 3.264883041381836,
+    "prompt_tokens": 117
+  },
+  {
+    "idx": 19,
+    "gold": "6",
+    "nll_sum": 163.33555603027344,
+    "n_tok": 151,
+    "entropy_first": 3.864898204803467,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 20,
+    "gold": "15",
+    "nll_sum": 108.61690521240234,
+    "n_tok": 98,
+    "entropy_first": 4.049370288848877,
+    "prompt_tokens": 149
+  },
+  {
+    "idx": 21,
+    "gold": "14",
+    "nll_sum": 61.74858093261719,
+    "n_tok": 42,
+    "entropy_first": 6.473160743713379,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 22,
+    "gold": "7",
+    "nll_sum": 51.48188781738281,
+    "n_tok": 52,
+    "entropy_first": 3.950666904449463,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 23,
+    "gold": "8",
+    "nll_sum": 36.743003845214844,
+    "n_tok": 35,
+    "entropy_first": 3.5065805912017822,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 24,
+    "gold": "26",
+    "nll_sum": 77.40631103515625,
+    "n_tok": 60,
+    "entropy_first": 3.880537986755371,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 25,
+    "gold": "2",
+    "nll_sum": 74.71527862548828,
+    "n_tok": 89,
+    "entropy_first": 4.470445156097412,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 26,
+    "gold": "243",
+    "nll_sum": 53.10277557373047,
+    "n_tok": 32,
+    "entropy_first": 5.148855209350586,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 27,
+    "gold": "16",
+    "nll_sum": 101.00828552246094,
+    "n_tok": 70,
+    "entropy_first": 5.294877052307129,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 28,
+    "gold": "25",
+    "nll_sum": 77.08827209472656,
+    "n_tok": 43,
+    "entropy_first": 2.9164304733276367,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 29,
+    "gold": "104",
+    "nll_sum": 86.13362884521484,
+    "n_tok": 57,
+    "entropy_first": 4.7443037033081055,
+    "prompt_tokens": 155
+  },
+  {
+    "idx": 30,
+    "gold": "109",
+    "nll_sum": 112.34427642822266,
+    "n_tok": 76,
+    "entropy_first": 4.5735578536987305,
+    "prompt_tokens": 124
+  },
+  {
+    "idx": 31,
+    "gold": "80",
+    "nll_sum": 115.49540710449219,
+    "n_tok": 75,
+    "entropy_first": 4.006192207336426,
+    "prompt_tokens": 149
+  },
+  {
+    "idx": 32,
+    "gold": "35",
+    "nll_sum": 56.449462890625,
+    "n_tok": 29,
+    "entropy_first": 2.950383186340332,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 33,
+    "gold": "70",
+    "nll_sum": 87.06536865234375,
+    "n_tok": 54,
+    "entropy_first": 5.551713943481445,
+    "prompt_tokens": 116
+  },
+  {
+    "idx": 34,
+    "gold": "23",
+    "nll_sum": 68.0340576171875,
+    "n_tok": 65,
+    "entropy_first": 6.316000938415527,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 35,
+    "gold": "9",
+    "nll_sum": 74.17227935791016,
+    "n_tok": 56,
+    "entropy_first": 3.434403896331787,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 36,
+    "gold": "75",
+    "nll_sum": 138.9520263671875,
+    "n_tok": 101,
+    "entropy_first": 4.041604995727539,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 37,
+    "gold": "2",
+    "nll_sum": 106.5847396850586,
+    "n_tok": 70,
+    "entropy_first": 3.420999526977539,
+    "prompt_tokens": 149
+  },
+  {
+    "idx": 38,
+    "gold": "10",
+    "nll_sum": 147.2732696533203,
+    "n_tok": 79,
+    "entropy_first": 3.5114870071411133,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 39,
+    "gold": "18",
+    "nll_sum": 167.68617248535156,
+    "n_tok": 177,
+    "entropy_first": 6.298741340637207,
+    "prompt_tokens": 161
+  },
+  {
+    "idx": 40,
+    "gold": "8",
+    "nll_sum": 43.092559814453125,
+    "n_tok": 31,
+    "entropy_first": 7.215618133544922,
+    "prompt_tokens": 133
+  },
+  {
+    "idx": 41,
+    "gold": "200",
+    "nll_sum": 106.16529083251953,
+    "n_tok": 66,
+    "entropy_first": 6.207573890686035,
+    "prompt_tokens": 213
+  },
+  {
+    "idx": 42,
+    "gold": "26",
+    "nll_sum": 99.49252319335938,
+    "n_tok": 54,
+    "entropy_first": 3.1669921875,
+    "prompt_tokens": 169
+  },
+  {
+    "idx": 43,
+    "gold": "48",
+    "nll_sum": 177.874267578125,
+    "n_tok": 145,
+    "entropy_first": 3.402783155441284,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 44,
+    "gold": "20",
+    "nll_sum": 156.84552001953125,
+    "n_tok": 138,
+    "entropy_first": 4.472201347351074,
+    "prompt_tokens": 161
+  },
+  {
+    "idx": 45,
+    "gold": "104",
+    "nll_sum": 136.75711059570312,
+    "n_tok": 122,
+    "entropy_first": 5.178101062774658,
+    "prompt_tokens": 181
+  },
+  {
+    "idx": 46,
+    "gold": "163",
+    "nll_sum": 150.96353149414062,
+    "n_tok": 97,
+    "entropy_first": 5.153929710388184,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 47,
+    "gold": "800",
+    "nll_sum": 108.53848266601562,
+    "n_tok": 89,
+    "entropy_first": 3.911376476287842,
+    "prompt_tokens": 135
+  },
+  {
+    "idx": 48,
+    "gold": "8",
+    "nll_sum": 89.82780456542969,
+    "n_tok": 65,
+    "entropy_first": 3.393953323364258,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 49,
+    "gold": "30",
+    "nll_sum": 61.569114685058594,
+    "n_tok": 79,
+    "entropy_first": 3.2042078971862793,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 50,
+    "gold": "294",
+    "nll_sum": 84.8935546875,
+    "n_tok": 56,
+    "entropy_first": 4.336273670196533,
+    "prompt_tokens": 123
+  },
+  {
+    "idx": 51,
+    "gold": "5",
+    "nll_sum": 80.24203491210938,
+    "n_tok": 44,
+    "entropy_first": 3.6048686504364014,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 52,
+    "gold": "15",
+    "nll_sum": 74.71087646484375,
+    "n_tok": 68,
+    "entropy_first": 7.344557762145996,
+    "prompt_tokens": 149
+  },
+  {
+    "idx": 53,
+    "gold": "40",
+    "nll_sum": 90.72547912597656,
+    "n_tok": 67,
+    "entropy_first": 5.008973598480225,
+    "prompt_tokens": 186
+  },
+  {
+    "idx": 54,
+    "gold": "40",
+    "nll_sum": 121.5647964477539,
+    "n_tok": 69,
+    "entropy_first": 5.6244940757751465,
+    "prompt_tokens": 170
+  },
+  {
+    "idx": 55,
+    "gold": "14",
+    "nll_sum": 56.65467834472656,
+    "n_tok": 37,
+    "entropy_first": 3.1532063484191895,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 56,
+    "gold": "3",
+    "nll_sum": 58.04557800292969,
+    "n_tok": 42,
+    "entropy_first": 3.143035650253296,
+    "prompt_tokens": 133
+  },
+  {
+    "idx": 57,
+    "gold": "83",
+    "nll_sum": 70.10501861572266,
+    "n_tok": 51,
+    "entropy_first": 3.0736117362976074,
+    "prompt_tokens": 161
+  },
+  {
+    "idx": 58,
+    "gold": "57",
+    "nll_sum": 195.58436584472656,
+    "n_tok": 112,
+    "entropy_first": 4.267746448516846,
+    "prompt_tokens": 168
+  },
+  {
+    "idx": 59,
+    "gold": "187",
+    "nll_sum": 64.4169692993164,
+    "n_tok": 53,
+    "entropy_first": 2.6974244117736816,
+    "prompt_tokens": 119
+  },
+  {
+    "idx": 60,
+    "gold": "17",
+    "nll_sum": 82.58522033691406,
+    "n_tok": 61,
+    "entropy_first": 3.483959674835205,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 61,
+    "gold": "1430",
+    "nll_sum": 115.40010070800781,
+    "n_tok": 43,
+    "entropy_first": 5.467527389526367,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 62,
+    "gold": "25000",
+    "nll_sum": 133.73944091796875,
+    "n_tok": 88,
+    "entropy_first": 4.326746940612793,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 63,
+    "gold": "1596",
+    "nll_sum": 230.6617431640625,
+    "n_tok": 139,
+    "entropy_first": 4.985404968261719,
+    "prompt_tokens": 155
+  },
+  {
+    "idx": 64,
+    "gold": "300",
+    "nll_sum": 77.97489929199219,
+    "n_tok": 50,
+    "entropy_first": 5.514294624328613,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 65,
+    "gold": "36",
+    "nll_sum": 100.78988647460938,
+    "n_tok": 65,
+    "entropy_first": 3.359210729598999,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 66,
+    "gold": "48",
+    "nll_sum": 123.77662658691406,
+    "n_tok": 105,
+    "entropy_first": 2.534273147583008,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 67,
+    "gold": "595",
+    "nll_sum": 59.42395782470703,
+    "n_tok": 62,
+    "entropy_first": 3.5498952865600586,
+    "prompt_tokens": 140
+  },
+  {
+    "idx": 68,
+    "gold": "36",
+    "nll_sum": 80.01063537597656,
+    "n_tok": 70,
+    "entropy_first": 3.067843437194824,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 69,
+    "gold": "60",
+    "nll_sum": 54.937164306640625,
+    "n_tok": 34,
+    "entropy_first": 4.885537624359131,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 70,
+    "gold": "7425",
+    "nll_sum": 145.35165405273438,
+    "n_tok": 106,
+    "entropy_first": 4.764670372009277,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 71,
+    "gold": "60",
+    "nll_sum": 56.36260223388672,
+    "n_tok": 37,
+    "entropy_first": 4.325177192687988,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 72,
+    "gold": "221",
+    "nll_sum": 100.39315795898438,
+    "n_tok": 55,
+    "entropy_first": 5.8760986328125,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 73,
+    "gold": "255",
+    "nll_sum": 107.09974670410156,
+    "n_tok": 74,
+    "entropy_first": 4.397243976593018,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 74,
+    "gold": "88",
+    "nll_sum": 136.4325714111328,
+    "n_tok": 161,
+    "entropy_first": 4.02664041519165,
+    "prompt_tokens": 210
+  },
+  {
+    "idx": 75,
+    "gold": "60",
+    "nll_sum": 83.80148315429688,
+    "n_tok": 102,
+    "entropy_first": 3.6263747215270996,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 76,
+    "gold": "5",
+    "nll_sum": 86.56915283203125,
+    "n_tok": 116,
+    "entropy_first": 5.422086715698242,
+    "prompt_tokens": 171
+  },
+  {
+    "idx": 77,
+    "gold": "100",
+    "nll_sum": 80.99064636230469,
+    "n_tok": 85,
+    "entropy_first": 5.533439636230469,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 78,
+    "gold": "6",
+    "nll_sum": 81.67326354980469,
+    "n_tok": 98,
+    "entropy_first": 4.9070143699646,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 79,
+    "gold": "70",
+    "nll_sum": 85.77180480957031,
+    "n_tok": 27,
+    "entropy_first": 3.1889376640319824,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 80,
+    "gold": "10",
+    "nll_sum": 73.99452209472656,
+    "n_tok": 82,
+    "entropy_first": 3.0795469284057617,
+    "prompt_tokens": 123
+  },
+  {
+    "idx": 81,
+    "gold": "17",
+    "nll_sum": 63.84031677246094,
+    "n_tok": 56,
+    "entropy_first": 3.472133159637451,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 82,
+    "gold": "623",
+    "nll_sum": 49.6254997253418,
+    "n_tok": 28,
+    "entropy_first": 4.4132399559021,
+    "prompt_tokens": 117
+  },
+  {
+    "idx": 83,
+    "gold": "600",
+    "nll_sum": 47.45471954345703,
+    "n_tok": 56,
+    "entropy_first": 2.930593729019165,
+    "prompt_tokens": 120
+  },
+  {
+    "idx": 84,
+    "gold": "15",
+    "nll_sum": 113.46414947509766,
+    "n_tok": 85,
+    "entropy_first": 3.3514418601989746,
+    "prompt_tokens": 112
+  },
+  {
+    "idx": 85,
+    "gold": "44",
+    "nll_sum": 116.97264862060547,
+    "n_tok": 77,
+    "entropy_first": 3.778724193572998,
+    "prompt_tokens": 170
+  },
+  {
+    "idx": 86,
+    "gold": "22",
+    "nll_sum": 98.87662506103516,
+    "n_tok": 90,
+    "entropy_first": 4.12057638168335,
+    "prompt_tokens": 177
+  },
+  {
+    "idx": 87,
+    "gold": "9360",
+    "nll_sum": 192.88128662109375,
+    "n_tok": 102,
+    "entropy_first": 5.877769470214844,
+    "prompt_tokens": 165
+  },
+  {
+    "idx": 88,
+    "gold": "8000",
+    "nll_sum": 89.4798583984375,
+    "n_tok": 96,
+    "entropy_first": 5.458991527557373,
+    "prompt_tokens": 123
+  },
+  {
+    "idx": 89,
+    "gold": "24",
+    "nll_sum": 43.90864944458008,
+    "n_tok": 34,
+    "entropy_first": 5.311172962188721,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 90,
+    "gold": "225",
+    "nll_sum": 98.20240020751953,
+    "n_tok": 81,
+    "entropy_first": 3.9754955768585205,
+    "prompt_tokens": 173
+  },
+  {
+    "idx": 91,
+    "gold": "28",
+    "nll_sum": 43.5998649597168,
+    "n_tok": 47,
+    "entropy_first": 5.9842681884765625,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 92,
+    "gold": "4",
+    "nll_sum": 92.58723449707031,
+    "n_tok": 74,
+    "entropy_first": 5.092738628387451,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 93,
+    "gold": "36",
+    "nll_sum": 122.00981903076172,
+    "n_tok": 85,
+    "entropy_first": 4.976809978485107,
+    "prompt_tokens": 163
+  },
+  {
+    "idx": 94,
+    "gold": "348",
+    "nll_sum": 99.5640640258789,
+    "n_tok": 96,
+    "entropy_first": 3.5833024978637695,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 95,
+    "gold": "40",
+    "nll_sum": 68.90374755859375,
+    "n_tok": 75,
+    "entropy_first": 3.376173973083496,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 96,
+    "gold": "3",
+    "nll_sum": 34.59780502319336,
+    "n_tok": 35,
+    "entropy_first": 3.72975492477417,
+    "prompt_tokens": 121
+  },
+  {
+    "idx": 97,
+    "gold": "12",
+    "nll_sum": 87.11587524414062,
+    "n_tok": 72,
+    "entropy_first": 4.277944564819336,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 98,
+    "gold": "5",
+    "nll_sum": 161.8400421142578,
+    "n_tok": 88,
+    "entropy_first": 2.5932345390319824,
+    "prompt_tokens": 180
+  },
+  {
+    "idx": 99,
+    "gold": "58",
+    "nll_sum": 164.07168579101562,
+    "n_tok": 85,
+    "entropy_first": 3.250244140625,
+    "prompt_tokens": 169
+  },
+  {
+    "idx": 100,
+    "gold": "175",
+    "nll_sum": 199.64645385742188,
+    "n_tok": 154,
+    "entropy_first": 4.445650100708008,
+    "prompt_tokens": 180
+  },
+  {
+    "idx": 101,
+    "gold": "6",
+    "nll_sum": 80.07048034667969,
+    "n_tok": 65,
+    "entropy_first": 6.444409370422363,
+    "prompt_tokens": 164
+  },
+  {
+    "idx": 102,
+    "gold": "26",
+    "nll_sum": 122.57258605957031,
+    "n_tok": 70,
+    "entropy_first": 2.872251033782959,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 103,
+    "gold": "140",
+    "nll_sum": 53.60484313964844,
+    "n_tok": 46,
+    "entropy_first": 3.5307862758636475,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 104,
+    "gold": "500",
+    "nll_sum": 88.80525207519531,
+    "n_tok": 70,
+    "entropy_first": 4.259496688842773,
+    "prompt_tokens": 135
+  },
+  {
+    "idx": 105,
+    "gold": "20",
+    "nll_sum": 50.11382293701172,
+    "n_tok": 29,
+    "entropy_first": 8.180564880371094,
+    "prompt_tokens": 118
+  },
+  {
+    "idx": 106,
+    "gold": "72",
+    "nll_sum": 128.10659790039062,
+    "n_tok": 97,
+    "entropy_first": 3.5584397315979004,
+    "prompt_tokens": 133
+  },
+  {
+    "idx": 107,
+    "gold": "3",
+    "nll_sum": 99.61888122558594,
+    "n_tok": 136,
+    "entropy_first": 6.4675164222717285,
+    "prompt_tokens": 200
+  },
+  {
+    "idx": 108,
+    "gold": "50",
+    "nll_sum": 146.1771697998047,
+    "n_tok": 68,
+    "entropy_first": 3.4952831268310547,
+    "prompt_tokens": 166
+  },
+  {
+    "idx": 109,
+    "gold": "28",
+    "nll_sum": 139.03103637695312,
+    "n_tok": 98,
+    "entropy_first": 3.84843373298645,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 110,
+    "gold": "45",
+    "nll_sum": 64.07608795166016,
+    "n_tok": 65,
+    "entropy_first": 5.2392778396606445,
+    "prompt_tokens": 174
+  },
+  {
+    "idx": 111,
+    "gold": "16",
+    "nll_sum": 126.16265106201172,
+    "n_tok": 104,
+    "entropy_first": 4.555168628692627,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 112,
+    "gold": "24",
+    "nll_sum": 73.59520721435547,
+    "n_tok": 45,
+    "entropy_first": 2.8299293518066406,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 113,
+    "gold": "25",
+    "nll_sum": 57.044071197509766,
+    "n_tok": 36,
+    "entropy_first": 3.5123298168182373,
+    "prompt_tokens": 118
+  },
+  {
+    "idx": 114,
+    "gold": "6",
+    "nll_sum": 128.9971923828125,
+    "n_tok": 83,
+    "entropy_first": 6.2945685386657715,
+    "prompt_tokens": 166
+  },
+  {
+    "idx": 115,
+    "gold": "90",
+    "nll_sum": 131.35162353515625,
+    "n_tok": 100,
+    "entropy_first": 5.463458061218262,
+    "prompt_tokens": 176
+  },
+  {
+    "idx": 116,
+    "gold": "42",
+    "nll_sum": 95.88456726074219,
+    "n_tok": 52,
+    "entropy_first": 4.790119171142578,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 117,
+    "gold": "360",
+    "nll_sum": 58.914405822753906,
+    "n_tok": 25,
+    "entropy_first": 3.169090747833252,
+    "prompt_tokens": 118
+  },
+  {
+    "idx": 118,
+    "gold": "4",
+    "nll_sum": 113.45999908447266,
+    "n_tok": 62,
+    "entropy_first": 3.1599009037017822,
+    "prompt_tokens": 161
+  },
+  {
+    "idx": 119,
+    "gold": "95200",
+    "nll_sum": 309.791015625,
+    "n_tok": 207,
+    "entropy_first": 4.084293842315674,
+    "prompt_tokens": 167
+  },
+  {
+    "idx": 120,
+    "gold": "240",
+    "nll_sum": 34.64497756958008,
+    "n_tok": 37,
+    "entropy_first": 4.651423454284668,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 121,
+    "gold": "27",
+    "nll_sum": 67.87715148925781,
+    "n_tok": 57,
+    "entropy_first": 4.373573303222656,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 122,
+    "gold": "48",
+    "nll_sum": 139.01278686523438,
+    "n_tok": 124,
+    "entropy_first": 4.279758453369141,
+    "prompt_tokens": 150
+  },
+  {
+    "idx": 123,
+    "gold": "50",
+    "nll_sum": 104.61387634277344,
+    "n_tok": 83,
+    "entropy_first": 6.367761135101318,
+    "prompt_tokens": 124
+  },
+  {
+    "idx": 124,
+    "gold": "10",
+    "nll_sum": 73.44804382324219,
+    "n_tok": 32,
+    "entropy_first": 4.298738479614258,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 125,
+    "gold": "10",
+    "nll_sum": 98.39437866210938,
+    "n_tok": 49,
+    "entropy_first": 3.5649333000183105,
+    "prompt_tokens": 204
+  },
+  {
+    "idx": 126,
+    "gold": "82",
+    "nll_sum": 63.5130500793457,
+    "n_tok": 35,
+    "entropy_first": 6.36187219619751,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 127,
+    "gold": "120",
+    "nll_sum": 70.17257690429688,
+    "n_tok": 37,
+    "entropy_first": 6.378432750701904,
+    "prompt_tokens": 122
+  },
+  {
+    "idx": 128,
+    "gold": "880",
+    "nll_sum": 172.10874938964844,
+    "n_tok": 109,
+    "entropy_first": 4.670197486877441,
+    "prompt_tokens": 171
+  },
+  {
+    "idx": 129,
+    "gold": "10000",
+    "nll_sum": 136.01107788085938,
+    "n_tok": 72,
+    "entropy_first": 4.114175319671631,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 130,
+    "gold": "30",
+    "nll_sum": 161.11355590820312,
+    "n_tok": 100,
+    "entropy_first": 2.9634761810302734,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 131,
+    "gold": "940",
+    "nll_sum": 44.69409942626953,
+    "n_tok": 34,
+    "entropy_first": 3.516169786453247,
+    "prompt_tokens": 120
+  },
+  {
+    "idx": 132,
+    "gold": "60",
+    "nll_sum": 85.47052764892578,
+    "n_tok": 71,
+    "entropy_first": 6.1314897537231445,
+    "prompt_tokens": 146
+  },
+  {
+    "idx": 133,
+    "gold": "13",
+    "nll_sum": 81.15159606933594,
+    "n_tok": 50,
+    "entropy_first": 5.40513277053833,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 134,
+    "gold": "720",
+    "nll_sum": 66.47533416748047,
+    "n_tok": 28,
+    "entropy_first": 3.243264675140381,
+    "prompt_tokens": 116
+  },
+  {
+    "idx": 135,
+    "gold": "40",
+    "nll_sum": 154.88909912109375,
+    "n_tok": 84,
+    "entropy_first": 4.961468696594238,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 136,
+    "gold": "6",
+    "nll_sum": 73.88311004638672,
+    "n_tok": 28,
+    "entropy_first": 3.4182937145233154,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 137,
+    "gold": "29",
+    "nll_sum": 153.58123779296875,
+    "n_tok": 162,
+    "entropy_first": 5.983366012573242,
+    "prompt_tokens": 158
+  },
+  {
+    "idx": 138,
+    "gold": "105",
+    "nll_sum": 106.43225860595703,
+    "n_tok": 82,
+    "entropy_first": 3.429027557373047,
+    "prompt_tokens": 159
+  },
+  {
+    "idx": 139,
+    "gold": "70",
+    "nll_sum": 57.79196548461914,
+    "n_tok": 36,
+    "entropy_first": 3.5068206787109375,
+    "prompt_tokens": 133
+  },
+  {
+    "idx": 140,
+    "gold": "20",
+    "nll_sum": 57.56089401245117,
+    "n_tok": 55,
+    "entropy_first": 3.316192388534546,
+    "prompt_tokens": 126
+  },
+  {
+    "idx": 141,
+    "gold": "400",
+    "nll_sum": 130.01492309570312,
+    "n_tok": 59,
+    "entropy_first": 3.2064616680145264,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 142,
+    "gold": "140",
+    "nll_sum": 64.27127075195312,
+    "n_tok": 50,
+    "entropy_first": 3.4458022117614746,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 143,
+    "gold": "16",
+    "nll_sum": 132.73910522460938,
+    "n_tok": 60,
+    "entropy_first": 4.0089216232299805,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 144,
+    "gold": "20",
+    "nll_sum": 187.1505126953125,
+    "n_tok": 172,
+    "entropy_first": 5.85042142868042,
+    "prompt_tokens": 221
+  },
+  {
+    "idx": 145,
+    "gold": "4000",
+    "nll_sum": 98.20380401611328,
+    "n_tok": 61,
+    "entropy_first": 2.674576759338379,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 146,
+    "gold": "2125",
+    "nll_sum": 128.63153076171875,
+    "n_tok": 91,
+    "entropy_first": 5.209765434265137,
+    "prompt_tokens": 167
+  },
+  {
+    "idx": 147,
+    "gold": "75",
+    "nll_sum": 204.03662109375,
+    "n_tok": 144,
+    "entropy_first": 3.521270990371704,
+    "prompt_tokens": 213
+  },
+  {
+    "idx": 148,
+    "gold": "30",
+    "nll_sum": 65.30731201171875,
+    "n_tok": 34,
+    "entropy_first": 4.802238464355469,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 149,
+    "gold": "16",
+    "nll_sum": 37.142723083496094,
+    "n_tok": 29,
+    "entropy_first": 3.6181561946868896,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 150,
+    "gold": "4",
+    "nll_sum": 91.05867767333984,
+    "n_tok": 121,
+    "entropy_first": 4.419116020202637,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 151,
+    "gold": "5",
+    "nll_sum": 111.99991607666016,
+    "n_tok": 97,
+    "entropy_first": 4.044896602630615,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 152,
+    "gold": "4",
+    "nll_sum": 56.087989807128906,
+    "n_tok": 55,
+    "entropy_first": 3.7525765895843506,
+    "prompt_tokens": 128
+  },
+  {
+    "idx": 153,
+    "gold": "48",
+    "nll_sum": 222.92462158203125,
+    "n_tok": 138,
+    "entropy_first": 4.359183311462402,
+    "prompt_tokens": 192
+  },
+  {
+    "idx": 154,
+    "gold": "272",
+    "nll_sum": 127.64976501464844,
+    "n_tok": 159,
+    "entropy_first": 3.7453269958496094,
+    "prompt_tokens": 159
+  },
+  {
+    "idx": 155,
+    "gold": "280",
+    "nll_sum": 140.73684692382812,
+    "n_tok": 175,
+    "entropy_first": 3.3112030029296875,
+    "prompt_tokens": 158
+  },
+  {
+    "idx": 156,
+    "gold": "1400",
+    "nll_sum": 98.59400939941406,
+    "n_tok": 50,
+    "entropy_first": 3.172421932220459,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 157,
+    "gold": "80",
+    "nll_sum": 228.97991943359375,
+    "n_tok": 161,
+    "entropy_first": 5.758327007293701,
+    "prompt_tokens": 186
+  },
+  {
+    "idx": 158,
+    "gold": "34",
+    "nll_sum": 62.98692321777344,
+    "n_tok": 57,
+    "entropy_first": 5.477118492126465,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 159,
+    "gold": "15",
+    "nll_sum": 76.6915512084961,
+    "n_tok": 52,
+    "entropy_first": 5.219175338745117,
+    "prompt_tokens": 146
+  },
+  {
+    "idx": 160,
+    "gold": "16",
+    "nll_sum": 58.8328857421875,
+    "n_tok": 46,
+    "entropy_first": 4.2227783203125,
+    "prompt_tokens": 143
+  },
+  {
+    "idx": 161,
+    "gold": "32",
+    "nll_sum": 136.82821655273438,
+    "n_tok": 117,
+    "entropy_first": 3.8127074241638184,
+    "prompt_tokens": 160
+  },
+  {
+    "idx": 162,
+    "gold": "92",
+    "nll_sum": 197.83602905273438,
+    "n_tok": 122,
+    "entropy_first": 3.6043105125427246,
+    "prompt_tokens": 128
+  },
+  {
+    "idx": 163,
+    "gold": "50",
+    "nll_sum": 84.57374572753906,
+    "n_tok": 54,
+    "entropy_first": 3.595064878463745,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 164,
+    "gold": "15",
+    "nll_sum": 92.9752197265625,
+    "n_tok": 51,
+    "entropy_first": 5.455976963043213,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 165,
+    "gold": "77",
+    "nll_sum": 94.43888092041016,
+    "n_tok": 57,
+    "entropy_first": 5.221189498901367,
+    "prompt_tokens": 196
+  },
+  {
+    "idx": 166,
+    "gold": "5",
+    "nll_sum": 35.414215087890625,
+    "n_tok": 33,
+    "entropy_first": 5.333920955657959,
+    "prompt_tokens": 148
+  },
+  {
+    "idx": 167,
+    "gold": "16",
+    "nll_sum": 212.699462890625,
+    "n_tok": 155,
+    "entropy_first": 6.232823848724365,
+    "prompt_tokens": 117
+  },
+  {
+    "idx": 168,
+    "gold": "18",
+    "nll_sum": 109.19276428222656,
+    "n_tok": 47,
+    "entropy_first": 5.177753448486328,
+    "prompt_tokens": 116
+  },
+  {
+    "idx": 169,
+    "gold": "120",
+    "nll_sum": 81.51936340332031,
+    "n_tok": 55,
+    "entropy_first": 3.788217544555664,
+    "prompt_tokens": 118
+  },
+  {
+    "idx": 170,
+    "gold": "150",
+    "nll_sum": 107.48146057128906,
+    "n_tok": 99,
+    "entropy_first": 4.649460792541504,
+    "prompt_tokens": 143
+  },
+  {
+    "idx": 171,
+    "gold": "1210",
+    "nll_sum": 117.56376647949219,
+    "n_tok": 110,
+    "entropy_first": 4.140904426574707,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 172,
+    "gold": "51",
+    "nll_sum": 194.47152709960938,
+    "n_tok": 121,
+    "entropy_first": 6.307910442352295,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 173,
+    "gold": "18000",
+    "nll_sum": 159.29019165039062,
+    "n_tok": 126,
+    "entropy_first": 4.425573348999023,
+    "prompt_tokens": 160
+  },
+  {
+    "idx": 174,
+    "gold": "95",
+    "nll_sum": 150.23672485351562,
+    "n_tok": 103,
+    "entropy_first": 4.528182506561279,
+    "prompt_tokens": 187
+  },
+  {
+    "idx": 175,
+    "gold": "15",
+    "nll_sum": 140.88687133789062,
+    "n_tok": 90,
+    "entropy_first": 4.228474140167236,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 176,
+    "gold": "100",
+    "nll_sum": 55.09336853027344,
+    "n_tok": 48,
+    "entropy_first": 2.8346638679504395,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 177,
+    "gold": "350",
+    "nll_sum": 231.29830932617188,
+    "n_tok": 151,
+    "entropy_first": 4.057726860046387,
+    "prompt_tokens": 176
+  },
+  {
+    "idx": 178,
+    "gold": "122",
+    "nll_sum": 121.85260009765625,
+    "n_tok": 95,
+    "entropy_first": 3.150625705718994,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 179,
+    "gold": "130",
+    "nll_sum": 54.37833023071289,
+    "n_tok": 39,
+    "entropy_first": 3.884108066558838,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 180,
+    "gold": "20",
+    "nll_sum": 31.547462463378906,
+    "n_tok": 29,
+    "entropy_first": 3.854264259338379,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 181,
+    "gold": "160",
+    "nll_sum": 60.176666259765625,
+    "n_tok": 37,
+    "entropy_first": 5.702340602874756,
+    "prompt_tokens": 181
+  },
+  {
+    "idx": 182,
+    "gold": "23",
+    "nll_sum": 77.00505065917969,
+    "n_tok": 60,
+    "entropy_first": 4.036618232727051,
+    "prompt_tokens": 124
+  },
+  {
+    "idx": 183,
+    "gold": "2",
+    "nll_sum": 146.14877319335938,
+    "n_tok": 141,
+    "entropy_first": 3.854419231414795,
+    "prompt_tokens": 213
+  },
+  {
+    "idx": 184,
+    "gold": "25",
+    "nll_sum": 89.86432647705078,
+    "n_tok": 87,
+    "entropy_first": 4.3003692626953125,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 185,
+    "gold": "30",
+    "nll_sum": 66.91375732421875,
+    "n_tok": 46,
+    "entropy_first": 7.446817398071289,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 186,
+    "gold": "5",
+    "nll_sum": 203.9224395751953,
+    "n_tok": 152,
+    "entropy_first": 3.1398346424102783,
+    "prompt_tokens": 200
+  },
+  {
+    "idx": 187,
+    "gold": "106",
+    "nll_sum": 61.6456298828125,
+    "n_tok": 56,
+    "entropy_first": 4.095577239990234,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 188,
+    "gold": "50",
+    "nll_sum": 155.12716674804688,
+    "n_tok": 72,
+    "entropy_first": 3.7975616455078125,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 189,
+    "gold": "34",
+    "nll_sum": 59.54838943481445,
+    "n_tok": 70,
+    "entropy_first": 3.861274242401123,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 190,
+    "gold": "360",
+    "nll_sum": 51.743953704833984,
+    "n_tok": 32,
+    "entropy_first": 2.5938656330108643,
+    "prompt_tokens": 118
+  },
+  {
+    "idx": 191,
+    "gold": "5",
+    "nll_sum": 49.760799407958984,
+    "n_tok": 40,
+    "entropy_first": 3.9329826831817627,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 192,
+    "gold": "91",
+    "nll_sum": 109.07950592041016,
+    "n_tok": 64,
+    "entropy_first": 3.051971435546875,
+    "prompt_tokens": 140
+  },
+  {
+    "idx": 193,
+    "gold": "24",
+    "nll_sum": 180.77313232421875,
+    "n_tok": 117,
+    "entropy_first": 4.687291145324707,
+    "prompt_tokens": 207
+  },
+  {
+    "idx": 194,
+    "gold": "10",
+    "nll_sum": 71.29769897460938,
+    "n_tok": 44,
+    "entropy_first": 4.470339775085449,
+    "prompt_tokens": 128
+  },
+  {
+    "idx": 195,
+    "gold": "12",
+    "nll_sum": 24.804746627807617,
+    "n_tok": 38,
+    "entropy_first": 4.036017894744873,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 196,
+    "gold": "120",
+    "nll_sum": 48.73152542114258,
+    "n_tok": 37,
+    "entropy_first": 2.540379762649536,
+    "prompt_tokens": 128
+  },
+  {
+    "idx": 197,
+    "gold": "6277",
+    "nll_sum": 54.157203674316406,
+    "n_tok": 40,
+    "entropy_first": 2.704087972640991,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 198,
+    "gold": "320",
+    "nll_sum": 231.8365478515625,
+    "n_tok": 123,
+    "entropy_first": 5.33560848236084,
+    "prompt_tokens": 162
+  },
+  {
+    "idx": 199,
+    "gold": "7500",
+    "nll_sum": 132.87139892578125,
+    "n_tok": 121,
+    "entropy_first": 4.733311176300049,
+    "prompt_tokens": 165
+  },
+  {
+    "idx": 200,
+    "gold": "55",
+    "nll_sum": 45.103240966796875,
+    "n_tok": 59,
+    "entropy_first": 5.070195198059082,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 201,
+    "gold": "114200",
+    "nll_sum": 153.01361083984375,
+    "n_tok": 70,
+    "entropy_first": 3.6706533432006836,
+    "prompt_tokens": 155
+  },
+  {
+    "idx": 202,
+    "gold": "100",
+    "nll_sum": 63.06629943847656,
+    "n_tok": 62,
+    "entropy_first": 3.571035861968994,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 203,
+    "gold": "31",
+    "nll_sum": 161.07147216796875,
+    "n_tok": 114,
+    "entropy_first": 3.2002334594726562,
+    "prompt_tokens": 185
+  },
+  {
+    "idx": 204,
+    "gold": "98",
+    "nll_sum": 55.90755844116211,
+    "n_tok": 63,
+    "entropy_first": 5.763951778411865,
+    "prompt_tokens": 146
+  },
+  {
+    "idx": 205,
+    "gold": "98",
+    "nll_sum": 171.30032348632812,
+    "n_tok": 92,
+    "entropy_first": 4.212222099304199,
+    "prompt_tokens": 169
+  },
+  {
+    "idx": 206,
+    "gold": "860",
+    "nll_sum": 181.19363403320312,
+    "n_tok": 104,
+    "entropy_first": 5.9539289474487305,
+    "prompt_tokens": 164
+  },
+  {
+    "idx": 207,
+    "gold": "2600",
+    "nll_sum": 94.27372741699219,
+    "n_tok": 64,
+    "entropy_first": 3.5244903564453125,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 208,
+    "gold": "76",
+    "nll_sum": 65.46870422363281,
+    "n_tok": 55,
+    "entropy_first": 4.037836074829102,
+    "prompt_tokens": 150
+  },
+  {
+    "idx": 209,
+    "gold": "145",
+    "nll_sum": 194.60360717773438,
+    "n_tok": 125,
+    "entropy_first": 4.490355491638184,
+    "prompt_tokens": 122
+  },
+  {
+    "idx": 210,
+    "gold": "10",
+    "nll_sum": 176.88291931152344,
+    "n_tok": 132,
+    "entropy_first": 5.369748592376709,
+    "prompt_tokens": 186
+  },
+  {
+    "idx": 211,
+    "gold": "4",
+    "nll_sum": 125.49197387695312,
+    "n_tok": 177,
+    "entropy_first": 3.774108409881592,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 212,
+    "gold": "5",
+    "nll_sum": 108.23707580566406,
+    "n_tok": 111,
+    "entropy_first": 4.739897727966309,
+    "prompt_tokens": 135
+  },
+  {
+    "idx": 213,
+    "gold": "250",
+    "nll_sum": 78.21174621582031,
+    "n_tok": 62,
+    "entropy_first": 3.6587677001953125,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 214,
+    "gold": "8",
+    "nll_sum": 137.37548828125,
+    "n_tok": 184,
+    "entropy_first": 4.02477502822876,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 215,
+    "gold": "44",
+    "nll_sum": 109.70008850097656,
+    "n_tok": 73,
+    "entropy_first": 6.558162212371826,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 216,
+    "gold": "220",
+    "nll_sum": 120.6209716796875,
+    "n_tok": 84,
+    "entropy_first": 3.731475353240967,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 217,
+    "gold": "15",
+    "nll_sum": 55.660194396972656,
+    "n_tok": 36,
+    "entropy_first": 1.5536891222000122,
+    "prompt_tokens": 122
+  },
+  {
+    "idx": 218,
+    "gold": "45",
+    "nll_sum": 201.4603271484375,
+    "n_tok": 142,
+    "entropy_first": 7.122819900512695,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 219,
+    "gold": "54",
+    "nll_sum": 112.5762939453125,
+    "n_tok": 85,
+    "entropy_first": 7.91860294342041,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 220,
+    "gold": "70",
+    "nll_sum": 88.02496337890625,
+    "n_tok": 86,
+    "entropy_first": 4.33144474029541,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 221,
+    "gold": "90",
+    "nll_sum": 59.159950256347656,
+    "n_tok": 65,
+    "entropy_first": 3.445394992828369,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 222,
+    "gold": "140",
+    "nll_sum": 82.61553955078125,
+    "n_tok": 54,
+    "entropy_first": 3.730103015899658,
+    "prompt_tokens": 116
+  },
+  {
+    "idx": 223,
+    "gold": "20000",
+    "nll_sum": 79.82530212402344,
+    "n_tok": 44,
+    "entropy_first": 3.7262754440307617,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 224,
+    "gold": "180",
+    "nll_sum": 44.532752990722656,
+    "n_tok": 52,
+    "entropy_first": 4.640573978424072,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 225,
+    "gold": "9",
+    "nll_sum": 47.248085021972656,
+    "n_tok": 41,
+    "entropy_first": 4.012088298797607,
+    "prompt_tokens": 146
+  },
+  {
+    "idx": 226,
+    "gold": "33",
+    "nll_sum": 255.15599060058594,
+    "n_tok": 138,
+    "entropy_first": 3.964674472808838,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 227,
+    "gold": "9",
+    "nll_sum": 259.72296142578125,
+    "n_tok": 157,
+    "entropy_first": 5.739211082458496,
+    "prompt_tokens": 196
+  },
+  {
+    "idx": 228,
+    "gold": "1",
+    "nll_sum": 98.10023498535156,
+    "n_tok": 76,
+    "entropy_first": 4.285147190093994,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 229,
+    "gold": "21",
+    "nll_sum": 125.80653381347656,
+    "n_tok": 95,
+    "entropy_first": 3.519270658493042,
+    "prompt_tokens": 173
+  },
+  {
+    "idx": 230,
+    "gold": "276000",
+    "nll_sum": 151.47933959960938,
+    "n_tok": 83,
+    "entropy_first": 3.515686511993408,
+    "prompt_tokens": 143
+  },
+  {
+    "idx": 231,
+    "gold": "50",
+    "nll_sum": 53.27617645263672,
+    "n_tok": 33,
+    "entropy_first": 5.356610298156738,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 232,
+    "gold": "75",
+    "nll_sum": 84.32648468017578,
+    "n_tok": 55,
+    "entropy_first": 3.1967153549194336,
+    "prompt_tokens": 128
+  },
+  {
+    "idx": 233,
+    "gold": "12",
+    "nll_sum": 71.52104949951172,
+    "n_tok": 79,
+    "entropy_first": 2.685445785522461,
+    "prompt_tokens": 140
+  },
+  {
+    "idx": 234,
+    "gold": "21",
+    "nll_sum": 89.00090789794922,
+    "n_tok": 56,
+    "entropy_first": 3.6200103759765625,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 235,
+    "gold": "10",
+    "nll_sum": 72.64473724365234,
+    "n_tok": 54,
+    "entropy_first": 3.069760799407959,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 236,
+    "gold": "31",
+    "nll_sum": 129.81434631347656,
+    "n_tok": 71,
+    "entropy_first": 3.5017943382263184,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 237,
+    "gold": "90",
+    "nll_sum": 145.5390167236328,
+    "n_tok": 43,
+    "entropy_first": 5.198305130004883,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 238,
+    "gold": "68",
+    "nll_sum": 39.86569595336914,
+    "n_tok": 49,
+    "entropy_first": 6.8804731369018555,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 239,
+    "gold": "280",
+    "nll_sum": 150.56768798828125,
+    "n_tok": 103,
+    "entropy_first": 3.5361509323120117,
+    "prompt_tokens": 174
+  },
+  {
+    "idx": 240,
+    "gold": "21",
+    "nll_sum": 40.706451416015625,
+    "n_tok": 39,
+    "entropy_first": 3.1242501735687256,
+    "prompt_tokens": 124
+  },
+  {
+    "idx": 241,
+    "gold": "6",
+    "nll_sum": 89.90017700195312,
+    "n_tok": 43,
+    "entropy_first": 4.01994514465332,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 242,
+    "gold": "3",
+    "nll_sum": 94.46125793457031,
+    "n_tok": 70,
+    "entropy_first": 3.623657703399658,
+    "prompt_tokens": 156
+  },
+  {
+    "idx": 243,
+    "gold": "250",
+    "nll_sum": 105.14059448242188,
+    "n_tok": 62,
+    "entropy_first": 3.482370376586914,
+    "prompt_tokens": 146
+  },
+  {
+    "idx": 244,
+    "gold": "20",
+    "nll_sum": 168.94158935546875,
+    "n_tok": 99,
+    "entropy_first": 7.362927436828613,
+    "prompt_tokens": 162
+  },
+  {
+    "idx": 245,
+    "gold": "7",
+    "nll_sum": 54.692291259765625,
+    "n_tok": 52,
+    "entropy_first": 3.2566184997558594,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 246,
+    "gold": "27000",
+    "nll_sum": 167.26910400390625,
+    "n_tok": 77,
+    "entropy_first": 4.396782875061035,
+    "prompt_tokens": 173
+  },
+  {
+    "idx": 247,
+    "gold": "32",
+    "nll_sum": 49.500694274902344,
+    "n_tok": 49,
+    "entropy_first": 3.831604480743408,
+    "prompt_tokens": 160
+  },
+  {
+    "idx": 248,
+    "gold": "300",
+    "nll_sum": 54.90119171142578,
+    "n_tok": 39,
+    "entropy_first": 3.167090892791748,
+    "prompt_tokens": 122
+  },
+  {
+    "idx": 249,
+    "gold": "5600",
+    "nll_sum": 131.27462768554688,
+    "n_tok": 90,
+    "entropy_first": 4.4652814865112305,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 250,
+    "gold": "17",
+    "nll_sum": 86.25983428955078,
+    "n_tok": 72,
+    "entropy_first": 2.9487900733947754,
+    "prompt_tokens": 146
+  },
+  {
+    "idx": 251,
+    "gold": "70",
+    "nll_sum": 62.24485397338867,
+    "n_tok": 43,
+    "entropy_first": 6.072880268096924,
+    "prompt_tokens": 123
+  },
+  {
+    "idx": 252,
+    "gold": "73",
+    "nll_sum": 191.21807861328125,
+    "n_tok": 106,
+    "entropy_first": 5.660248756408691,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 253,
+    "gold": "18",
+    "nll_sum": 62.319007873535156,
+    "n_tok": 44,
+    "entropy_first": 3.001915454864502,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 254,
+    "gold": "84",
+    "nll_sum": 125.51864624023438,
+    "n_tok": 98,
+    "entropy_first": 6.33275032043457,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 255,
+    "gold": "192",
+    "nll_sum": 213.73818969726562,
+    "n_tok": 131,
+    "entropy_first": 3.2383484840393066,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 256,
+    "gold": "45",
+    "nll_sum": 146.93453979492188,
+    "n_tok": 150,
+    "entropy_first": 5.471302509307861,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 257,
+    "gold": "5600",
+    "nll_sum": 101.25372314453125,
+    "n_tok": 122,
+    "entropy_first": 3.683135986328125,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 258,
+    "gold": "6",
+    "nll_sum": 108.2996826171875,
+    "n_tok": 69,
+    "entropy_first": 4.567013740539551,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 259,
+    "gold": "168",
+    "nll_sum": 184.95587158203125,
+    "n_tok": 120,
+    "entropy_first": 6.479711532592773,
+    "prompt_tokens": 126
+  },
+  {
+    "idx": 260,
+    "gold": "11",
+    "nll_sum": 92.69230651855469,
+    "n_tok": 67,
+    "entropy_first": 5.4375200271606445,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 261,
+    "gold": "62",
+    "nll_sum": 59.55000305175781,
+    "n_tok": 62,
+    "entropy_first": 3.4434332847595215,
+    "prompt_tokens": 122
+  },
+  {
+    "idx": 262,
+    "gold": "270",
+    "nll_sum": 47.00006103515625,
+    "n_tok": 38,
+    "entropy_first": 6.085760593414307,
+    "prompt_tokens": 124
+  },
+  {
+    "idx": 263,
+    "gold": "8",
+    "nll_sum": 59.867305755615234,
+    "n_tok": 34,
+    "entropy_first": 5.527963161468506,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 264,
+    "gold": "400",
+    "nll_sum": 79.24430084228516,
+    "n_tok": 45,
+    "entropy_first": 7.557097911834717,
+    "prompt_tokens": 120
+  },
+  {
+    "idx": 265,
+    "gold": "9500",
+    "nll_sum": 82.8129653930664,
+    "n_tok": 90,
+    "entropy_first": 4.635340213775635,
+    "prompt_tokens": 179
+  },
+  {
+    "idx": 266,
+    "gold": "118000",
+    "nll_sum": 102.54778289794922,
+    "n_tok": 111,
+    "entropy_first": 3.9257514476776123,
+    "prompt_tokens": 163
+  },
+  {
+    "idx": 267,
+    "gold": "91",
+    "nll_sum": 150.0416259765625,
+    "n_tok": 88,
+    "entropy_first": 3.7730634212493896,
+    "prompt_tokens": 165
+  },
+  {
+    "idx": 268,
+    "gold": "1375",
+    "nll_sum": 47.82676315307617,
+    "n_tok": 64,
+    "entropy_first": 3.5178699493408203,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 269,
+    "gold": "4",
+    "nll_sum": 62.8228645324707,
+    "n_tok": 23,
+    "entropy_first": 3.1011545658111572,
+    "prompt_tokens": 126
+  },
+  {
+    "idx": 270,
+    "gold": "762",
+    "nll_sum": 66.55988311767578,
+    "n_tok": 45,
+    "entropy_first": 3.0551626682281494,
+    "prompt_tokens": 162
+  },
+  {
+    "idx": 271,
+    "gold": "20",
+    "nll_sum": 65.91419219970703,
+    "n_tok": 44,
+    "entropy_first": 2.7164416313171387,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 272,
+    "gold": "5",
+    "nll_sum": 76.17979431152344,
+    "n_tok": 41,
+    "entropy_first": 3.654919147491455,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 273,
+    "gold": "315",
+    "nll_sum": 68.6888656616211,
+    "n_tok": 88,
+    "entropy_first": 3.997511386871338,
+    "prompt_tokens": 165
+  },
+  {
+    "idx": 274,
+    "gold": "3200",
+    "nll_sum": 105.24539184570312,
+    "n_tok": 67,
+    "entropy_first": 3.7414743900299072,
+    "prompt_tokens": 162
+  },
+  {
+    "idx": 275,
+    "gold": "138",
+    "nll_sum": 145.21408081054688,
+    "n_tok": 138,
+    "entropy_first": 4.699560642242432,
+    "prompt_tokens": 180
+  },
+  {
+    "idx": 276,
+    "gold": "9",
+    "nll_sum": 138.51023864746094,
+    "n_tok": 148,
+    "entropy_first": 5.5966386795043945,
+    "prompt_tokens": 155
+  },
+  {
+    "idx": 277,
+    "gold": "4",
+    "nll_sum": 115.31671905517578,
+    "n_tok": 131,
+    "entropy_first": 2.9047651290893555,
+    "prompt_tokens": 135
+  },
+  {
+    "idx": 278,
+    "gold": "40",
+    "nll_sum": 124.11015319824219,
+    "n_tok": 62,
+    "entropy_first": 4.256309509277344,
+    "prompt_tokens": 126
+  },
+  {
+    "idx": 279,
+    "gold": "6",
+    "nll_sum": 231.8533935546875,
+    "n_tok": 199,
+    "entropy_first": 5.231328964233398,
+    "prompt_tokens": 120
+  },
+  {
+    "idx": 280,
+    "gold": "7",
+    "nll_sum": 46.149234771728516,
+    "n_tok": 42,
+    "entropy_first": 3.2694242000579834,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 281,
+    "gold": "2450",
+    "nll_sum": 156.87557983398438,
+    "n_tok": 134,
+    "entropy_first": 3.396851062774658,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 282,
+    "gold": "195",
+    "nll_sum": 91.52740478515625,
+    "n_tok": 51,
+    "entropy_first": 3.2270030975341797,
+    "prompt_tokens": 143
+  },
+  {
+    "idx": 283,
+    "gold": "68",
+    "nll_sum": 157.7301025390625,
+    "n_tok": 93,
+    "entropy_first": 3.509817600250244,
+    "prompt_tokens": 180
+  },
+  {
+    "idx": 284,
+    "gold": "360",
+    "nll_sum": 289.151123046875,
+    "n_tok": 203,
+    "entropy_first": 4.2569260597229,
+    "prompt_tokens": 187
+  },
+  {
+    "idx": 285,
+    "gold": "21",
+    "nll_sum": 49.003665924072266,
+    "n_tok": 42,
+    "entropy_first": 3.451420307159424,
+    "prompt_tokens": 115
+  },
+  {
+    "idx": 286,
+    "gold": "90",
+    "nll_sum": 64.81497955322266,
+    "n_tok": 68,
+    "entropy_first": 3.260037660598755,
+    "prompt_tokens": 120
+  },
+  {
+    "idx": 287,
+    "gold": "8",
+    "nll_sum": 148.26405334472656,
+    "n_tok": 131,
+    "entropy_first": 2.994434118270874,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 288,
+    "gold": "3",
+    "nll_sum": 58.898193359375,
+    "n_tok": 47,
+    "entropy_first": 3.124505043029785,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 289,
+    "gold": "16",
+    "nll_sum": 68.9276123046875,
+    "n_tok": 62,
+    "entropy_first": 3.786066770553589,
+    "prompt_tokens": 149
+  },
+  {
+    "idx": 290,
+    "gold": "390",
+    "nll_sum": 114.62335968017578,
+    "n_tok": 42,
+    "entropy_first": 2.689998149871826,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 291,
+    "gold": "2",
+    "nll_sum": 82.85612487792969,
+    "n_tok": 87,
+    "entropy_first": 2.831691265106201,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 292,
+    "gold": "75",
+    "nll_sum": 126.4346923828125,
+    "n_tok": 76,
+    "entropy_first": 3.8849096298217773,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 293,
+    "gold": "83",
+    "nll_sum": 126.16333770751953,
+    "n_tok": 94,
+    "entropy_first": 3.856421947479248,
+    "prompt_tokens": 168
+  },
+  {
+    "idx": 294,
+    "gold": "3",
+    "nll_sum": 74.35539245605469,
+    "n_tok": 59,
+    "entropy_first": 3.4552249908447266,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 295,
+    "gold": "370",
+    "nll_sum": 157.6052703857422,
+    "n_tok": 126,
+    "entropy_first": 4.805006980895996,
+    "prompt_tokens": 171
+  },
+  {
+    "idx": 296,
+    "gold": "3",
+    "nll_sum": 128.39398193359375,
+    "n_tok": 103,
+    "entropy_first": 3.197359323501587,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 297,
+    "gold": "55",
+    "nll_sum": 59.862754821777344,
+    "n_tok": 41,
+    "entropy_first": 3.2238614559173584,
+    "prompt_tokens": 161
+  },
+  {
+    "idx": 298,
+    "gold": "500",
+    "nll_sum": 236.52728271484375,
+    "n_tok": 113,
+    "entropy_first": 4.831271171569824,
+    "prompt_tokens": 162
+  },
+  {
+    "idx": 299,
+    "gold": "31800",
+    "nll_sum": 187.27978515625,
+    "n_tok": 96,
+    "entropy_first": 3.8903799057006836,
+    "prompt_tokens": 171
+  },
+  {
+    "idx": 300,
+    "gold": "78",
+    "nll_sum": 72.06025695800781,
+    "n_tok": 45,
+    "entropy_first": 4.036968231201172,
+    "prompt_tokens": 143
+  },
+  {
+    "idx": 301,
+    "gold": "8",
+    "nll_sum": 56.86317443847656,
+    "n_tok": 24,
+    "entropy_first": 3.6991021633148193,
+    "prompt_tokens": 174
+  },
+  {
+    "idx": 302,
+    "gold": "15",
+    "nll_sum": 64.75127410888672,
+    "n_tok": 27,
+    "entropy_first": 3.867173194885254,
+    "prompt_tokens": 126
+  },
+  {
+    "idx": 303,
+    "gold": "1300",
+    "nll_sum": 154.1514129638672,
+    "n_tok": 110,
+    "entropy_first": 4.077972888946533,
+    "prompt_tokens": 166
+  },
+  {
+    "idx": 304,
+    "gold": "3200",
+    "nll_sum": 183.3141632080078,
+    "n_tok": 118,
+    "entropy_first": 2.880126476287842,
+    "prompt_tokens": 143
+  },
+  {
+    "idx": 305,
+    "gold": "4",
+    "nll_sum": 61.28460693359375,
+    "n_tok": 25,
+    "entropy_first": 2.865342378616333,
+    "prompt_tokens": 112
+  },
+  {
+    "idx": 306,
+    "gold": "10",
+    "nll_sum": 45.74755096435547,
+    "n_tok": 61,
+    "entropy_first": 3.538663148880005,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 307,
+    "gold": "16",
+    "nll_sum": 118.70970916748047,
+    "n_tok": 83,
+    "entropy_first": 6.050415992736816,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 308,
+    "gold": "6",
+    "nll_sum": 58.26007080078125,
+    "n_tok": 89,
+    "entropy_first": 4.2728681564331055,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 309,
+    "gold": "8",
+    "nll_sum": 105.34983825683594,
+    "n_tok": 92,
+    "entropy_first": 5.413222312927246,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 310,
+    "gold": "2050",
+    "nll_sum": 115.41722869873047,
+    "n_tok": 93,
+    "entropy_first": 5.593193054199219,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 311,
+    "gold": "91",
+    "nll_sum": 110.31289672851562,
+    "n_tok": 95,
+    "entropy_first": 3.239429235458374,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 312,
+    "gold": "32",
+    "nll_sum": 40.91273498535156,
+    "n_tok": 26,
+    "entropy_first": 8.75765609741211,
+    "prompt_tokens": 119
+  },
+  {
+    "idx": 313,
+    "gold": "120000",
+    "nll_sum": 148.2992706298828,
+    "n_tok": 120,
+    "entropy_first": 4.649395942687988,
+    "prompt_tokens": 149
+  },
+  {
+    "idx": 314,
+    "gold": "30",
+    "nll_sum": 98.67047119140625,
+    "n_tok": 60,
+    "entropy_first": 2.791195869445801,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 315,
+    "gold": "14",
+    "nll_sum": 140.34967041015625,
+    "n_tok": 144,
+    "entropy_first": 4.166308403015137,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 316,
+    "gold": "156",
+    "nll_sum": 139.06124877929688,
+    "n_tok": 103,
+    "entropy_first": 3.3243846893310547,
+    "prompt_tokens": 155
+  },
+  {
+    "idx": 317,
+    "gold": "12",
+    "nll_sum": 89.38443756103516,
+    "n_tok": 45,
+    "entropy_first": 4.065552711486816,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 318,
+    "gold": "123",
+    "nll_sum": 82.41645812988281,
+    "n_tok": 65,
+    "entropy_first": 3.6573846340179443,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 319,
+    "gold": "15",
+    "nll_sum": 241.8750457763672,
+    "n_tok": 131,
+    "entropy_first": 3.3362417221069336,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 320,
+    "gold": "8",
+    "nll_sum": 106.6129150390625,
+    "n_tok": 78,
+    "entropy_first": 3.183321237564087,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 321,
+    "gold": "1",
+    "nll_sum": 26.194032669067383,
+    "n_tok": 32,
+    "entropy_first": 3.944054365158081,
+    "prompt_tokens": 121
+  },
+  {
+    "idx": 322,
+    "gold": "9",
+    "nll_sum": 88.50482177734375,
+    "n_tok": 74,
+    "entropy_first": 5.046659469604492,
+    "prompt_tokens": 135
+  },
+  {
+    "idx": 323,
+    "gold": "75",
+    "nll_sum": 87.43901062011719,
+    "n_tok": 63,
+    "entropy_first": 5.056629180908203,
+    "prompt_tokens": 166
+  },
+  {
+    "idx": 324,
+    "gold": "14",
+    "nll_sum": 113.22579956054688,
+    "n_tok": 58,
+    "entropy_first": 3.2924015522003174,
+    "prompt_tokens": 148
+  },
+  {
+    "idx": 325,
+    "gold": "224000",
+    "nll_sum": 207.04629516601562,
+    "n_tok": 119,
+    "entropy_first": 4.469063758850098,
+    "prompt_tokens": 161
+  },
+  {
+    "idx": 326,
+    "gold": "14",
+    "nll_sum": 102.39840698242188,
+    "n_tok": 71,
+    "entropy_first": 3.237694501876831,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 327,
+    "gold": "31",
+    "nll_sum": 147.5515899658203,
+    "n_tok": 123,
+    "entropy_first": 4.458432197570801,
+    "prompt_tokens": 165
+  },
+  {
+    "idx": 328,
+    "gold": "2",
+    "nll_sum": 59.46874237060547,
+    "n_tok": 33,
+    "entropy_first": 3.714387893676758,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 329,
+    "gold": "14",
+    "nll_sum": 51.92919921875,
+    "n_tok": 44,
+    "entropy_first": 7.000628471374512,
+    "prompt_tokens": 135
+  },
+  {
+    "idx": 330,
+    "gold": "31",
+    "nll_sum": 88.93881225585938,
+    "n_tok": 50,
+    "entropy_first": 3.8032097816467285,
+    "prompt_tokens": 164
+  },
+  {
+    "idx": 331,
+    "gold": "8400",
+    "nll_sum": 271.20721435546875,
+    "n_tok": 241,
+    "entropy_first": 5.479365348815918,
+    "prompt_tokens": 185
+  },
+  {
+    "idx": 332,
+    "gold": "44",
+    "nll_sum": 100.87100219726562,
+    "n_tok": 24,
+    "entropy_first": 2.9501216411590576,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 333,
+    "gold": "100",
+    "nll_sum": 85.61968994140625,
+    "n_tok": 63,
+    "entropy_first": 6.6835527420043945,
+    "prompt_tokens": 162
+  },
+  {
+    "idx": 334,
+    "gold": "6",
+    "nll_sum": 42.060672760009766,
+    "n_tok": 33,
+    "entropy_first": 5.772745132446289,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 335,
+    "gold": "310",
+    "nll_sum": 95.07634735107422,
+    "n_tok": 60,
+    "entropy_first": 2.984602928161621,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 336,
+    "gold": "72",
+    "nll_sum": 155.894287109375,
+    "n_tok": 125,
+    "entropy_first": 4.344483852386475,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 337,
+    "gold": "1",
+    "nll_sum": 30.766036987304688,
+    "n_tok": 44,
+    "entropy_first": 4.304147720336914,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 338,
+    "gold": "60",
+    "nll_sum": 155.1344757080078,
+    "n_tok": 71,
+    "entropy_first": 3.3916850090026855,
+    "prompt_tokens": 144
+  },
+  {
+    "idx": 339,
+    "gold": "160",
+    "nll_sum": 68.72844696044922,
+    "n_tok": 58,
+    "entropy_first": 3.983013153076172,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 340,
+    "gold": "4",
+    "nll_sum": 84.7716064453125,
+    "n_tok": 53,
+    "entropy_first": 5.138171672821045,
+    "prompt_tokens": 212
+  },
+  {
+    "idx": 341,
+    "gold": "260",
+    "nll_sum": 248.15318298339844,
+    "n_tok": 198,
+    "entropy_first": 4.24013090133667,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 342,
+    "gold": "87",
+    "nll_sum": 122.25769805908203,
+    "n_tok": 73,
+    "entropy_first": 5.535644054412842,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 343,
+    "gold": "180000",
+    "nll_sum": 169.68399047851562,
+    "n_tok": 85,
+    "entropy_first": 6.168498516082764,
+    "prompt_tokens": 149
+  },
+  {
+    "idx": 344,
+    "gold": "2",
+    "nll_sum": 50.30615234375,
+    "n_tok": 49,
+    "entropy_first": 6.621931076049805,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 345,
+    "gold": "310",
+    "nll_sum": 92.21879577636719,
+    "n_tok": 62,
+    "entropy_first": 3.231640577316284,
+    "prompt_tokens": 120
+  },
+  {
+    "idx": 346,
+    "gold": "9",
+    "nll_sum": 86.44526672363281,
+    "n_tok": 85,
+    "entropy_first": 4.463777542114258,
+    "prompt_tokens": 155
+  },
+  {
+    "idx": 347,
+    "gold": "36",
+    "nll_sum": 49.70809555053711,
+    "n_tok": 64,
+    "entropy_first": 4.632353782653809,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 348,
+    "gold": "10",
+    "nll_sum": 121.86300659179688,
+    "n_tok": 78,
+    "entropy_first": 3.7771899700164795,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 349,
+    "gold": "2640",
+    "nll_sum": 110.47491455078125,
+    "n_tok": 53,
+    "entropy_first": 4.117309093475342,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 350,
+    "gold": "8",
+    "nll_sum": 97.18905639648438,
+    "n_tok": 74,
+    "entropy_first": 4.827807903289795,
+    "prompt_tokens": 165
+  },
+  {
+    "idx": 351,
+    "gold": "10",
+    "nll_sum": 122.57020568847656,
+    "n_tok": 68,
+    "entropy_first": 3.116988182067871,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 352,
+    "gold": "21",
+    "nll_sum": 40.48809814453125,
+    "n_tok": 34,
+    "entropy_first": 5.701336860656738,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 353,
+    "gold": "20",
+    "nll_sum": 116.46429443359375,
+    "n_tok": 69,
+    "entropy_first": 3.8341798782348633,
+    "prompt_tokens": 163
+  },
+  {
+    "idx": 354,
+    "gold": "45",
+    "nll_sum": 102.99046325683594,
+    "n_tok": 78,
+    "entropy_first": 3.844426155090332,
+    "prompt_tokens": 168
+  },
+  {
+    "idx": 355,
+    "gold": "34",
+    "nll_sum": 45.878292083740234,
+    "n_tok": 58,
+    "entropy_first": 3.3370442390441895,
+    "prompt_tokens": 150
+  },
+  {
+    "idx": 356,
+    "gold": "21",
+    "nll_sum": 125.87577819824219,
+    "n_tok": 96,
+    "entropy_first": 4.323730945587158,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 357,
+    "gold": "2",
+    "nll_sum": 145.78326416015625,
+    "n_tok": 71,
+    "entropy_first": 3.7523353099823,
+    "prompt_tokens": 169
+  },
+  {
+    "idx": 358,
+    "gold": "20",
+    "nll_sum": 119.30794525146484,
+    "n_tok": 80,
+    "entropy_first": 3.210160732269287,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 359,
+    "gold": "4",
+    "nll_sum": 88.10318756103516,
+    "n_tok": 72,
+    "entropy_first": 5.182019233703613,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 360,
+    "gold": "25",
+    "nll_sum": 98.04067993164062,
+    "n_tok": 78,
+    "entropy_first": 4.035577774047852,
+    "prompt_tokens": 123
+  },
+  {
+    "idx": 361,
+    "gold": "20",
+    "nll_sum": 107.39375305175781,
+    "n_tok": 74,
+    "entropy_first": 3.5038280487060547,
+    "prompt_tokens": 177
+  },
+  {
+    "idx": 362,
+    "gold": "23",
+    "nll_sum": 164.1802978515625,
+    "n_tok": 149,
+    "entropy_first": 3.55010986328125,
+    "prompt_tokens": 170
+  },
+  {
+    "idx": 363,
+    "gold": "6",
+    "nll_sum": 75.68502807617188,
+    "n_tok": 51,
+    "entropy_first": 3.5631508827209473,
+    "prompt_tokens": 159
+  },
+  {
+    "idx": 364,
+    "gold": "49",
+    "nll_sum": 66.10462951660156,
+    "n_tok": 45,
+    "entropy_first": 1.692931890487671,
+    "prompt_tokens": 140
+  },
+  {
+    "idx": 365,
+    "gold": "18",
+    "nll_sum": 53.33661651611328,
+    "n_tok": 41,
+    "entropy_first": 2.0531725883483887,
+    "prompt_tokens": 118
+  },
+  {
+    "idx": 366,
+    "gold": "9",
+    "nll_sum": 57.45838165283203,
+    "n_tok": 41,
+    "entropy_first": 3.610090494155884,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 367,
+    "gold": "19",
+    "nll_sum": 166.59603881835938,
+    "n_tok": 116,
+    "entropy_first": 3.586512327194214,
+    "prompt_tokens": 165
+  },
+  {
+    "idx": 368,
+    "gold": "18",
+    "nll_sum": 85.83238220214844,
+    "n_tok": 57,
+    "entropy_first": 6.689878940582275,
+    "prompt_tokens": 118
+  },
+  {
+    "idx": 369,
+    "gold": "1198",
+    "nll_sum": 149.5540313720703,
+    "n_tok": 114,
+    "entropy_first": 3.9048919677734375,
+    "prompt_tokens": 180
+  },
+  {
+    "idx": 370,
+    "gold": "320",
+    "nll_sum": 142.69674682617188,
+    "n_tok": 59,
+    "entropy_first": 5.308172225952148,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 371,
+    "gold": "50",
+    "nll_sum": 90.55854034423828,
+    "n_tok": 63,
+    "entropy_first": 3.5113778114318848,
+    "prompt_tokens": 173
+  },
+  {
+    "idx": 372,
+    "gold": "5",
+    "nll_sum": 130.14190673828125,
+    "n_tok": 86,
+    "entropy_first": 4.362598896026611,
+    "prompt_tokens": 140
+  },
+  {
+    "idx": 373,
+    "gold": "240000",
+    "nll_sum": 155.57623291015625,
+    "n_tok": 70,
+    "entropy_first": 3.6905503273010254,
+    "prompt_tokens": 143
+  },
+  {
+    "idx": 374,
+    "gold": "45",
+    "nll_sum": 55.39092254638672,
+    "n_tok": 41,
+    "entropy_first": 3.5173892974853516,
+    "prompt_tokens": 128
+  },
+  {
+    "idx": 375,
+    "gold": "48",
+    "nll_sum": 64.3719482421875,
+    "n_tok": 41,
+    "entropy_first": 3.062262535095215,
+    "prompt_tokens": 140
+  },
+  {
+    "idx": 376,
+    "gold": "15",
+    "nll_sum": 62.176414489746094,
+    "n_tok": 66,
+    "entropy_first": 2.8757379055023193,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 377,
+    "gold": "50",
+    "nll_sum": 96.88202667236328,
+    "n_tok": 75,
+    "entropy_first": 4.575863838195801,
+    "prompt_tokens": 161
+  },
+  {
+    "idx": 378,
+    "gold": "15",
+    "nll_sum": 142.22311401367188,
+    "n_tok": 66,
+    "entropy_first": 4.841947078704834,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 379,
+    "gold": "21",
+    "nll_sum": 81.08365631103516,
+    "n_tok": 40,
+    "entropy_first": 3.1114721298217773,
+    "prompt_tokens": 122
+  },
+  {
+    "idx": 380,
+    "gold": "803",
+    "nll_sum": 82.4284439086914,
+    "n_tok": 55,
+    "entropy_first": 3.7019577026367188,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 381,
+    "gold": "67",
+    "nll_sum": 67.56105041503906,
+    "n_tok": 47,
+    "entropy_first": 6.949575901031494,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 382,
+    "gold": "350",
+    "nll_sum": 136.29312133789062,
+    "n_tok": 78,
+    "entropy_first": 5.903748035430908,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 383,
+    "gold": "2",
+    "nll_sum": 112.05656433105469,
+    "n_tok": 97,
+    "entropy_first": 3.791792392730713,
+    "prompt_tokens": 182
+  },
+  {
+    "idx": 384,
+    "gold": "32",
+    "nll_sum": 66.35323333740234,
+    "n_tok": 85,
+    "entropy_first": 3.729044198989868,
+    "prompt_tokens": 119
+  },
+  {
+    "idx": 385,
+    "gold": "16",
+    "nll_sum": 159.69049072265625,
+    "n_tok": 82,
+    "entropy_first": 3.2801661491394043,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 386,
+    "gold": "80",
+    "nll_sum": 107.61967468261719,
+    "n_tok": 71,
+    "entropy_first": 3.8542847633361816,
+    "prompt_tokens": 162
+  },
+  {
+    "idx": 387,
+    "gold": "36",
+    "nll_sum": 50.39914321899414,
+    "n_tok": 56,
+    "entropy_first": 3.343221664428711,
+    "prompt_tokens": 115
+  },
+  {
+    "idx": 388,
+    "gold": "88",
+    "nll_sum": 66.5068130493164,
+    "n_tok": 54,
+    "entropy_first": 3.594590187072754,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 389,
+    "gold": "6",
+    "nll_sum": 77.04108428955078,
+    "n_tok": 46,
+    "entropy_first": 3.8406291007995605,
+    "prompt_tokens": 165
+  },
+  {
+    "idx": 390,
+    "gold": "12",
+    "nll_sum": 87.32173919677734,
+    "n_tok": 54,
+    "entropy_first": 4.43380069732666,
+    "prompt_tokens": 156
+  },
+  {
+    "idx": 391,
+    "gold": "15",
+    "nll_sum": 112.4434814453125,
+    "n_tok": 85,
+    "entropy_first": 4.326879501342773,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 392,
+    "gold": "34",
+    "nll_sum": 169.7642822265625,
+    "n_tok": 65,
+    "entropy_first": 5.946667671203613,
+    "prompt_tokens": 148
+  },
+  {
+    "idx": 393,
+    "gold": "20",
+    "nll_sum": 139.42335510253906,
+    "n_tok": 120,
+    "entropy_first": 3.8857641220092773,
+    "prompt_tokens": 124
+  },
+  {
+    "idx": 394,
+    "gold": "92",
+    "nll_sum": 110.12247467041016,
+    "n_tok": 83,
+    "entropy_first": 5.71495246887207,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 395,
+    "gold": "38",
+    "nll_sum": 132.0800018310547,
+    "n_tok": 97,
+    "entropy_first": 6.185488700866699,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 396,
+    "gold": "3",
+    "nll_sum": 124.33179473876953,
+    "n_tok": 111,
+    "entropy_first": 5.04116153717041,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 397,
+    "gold": "25",
+    "nll_sum": 100.35356903076172,
+    "n_tok": 53,
+    "entropy_first": 3.1462368965148926,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 398,
+    "gold": "168",
+    "nll_sum": 124.8727035522461,
+    "n_tok": 108,
+    "entropy_first": 4.466226100921631,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 399,
+    "gold": "12",
+    "nll_sum": 43.79214859008789,
+    "n_tok": 46,
+    "entropy_first": 5.903413772583008,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 400,
+    "gold": "48",
+    "nll_sum": 45.93027114868164,
+    "n_tok": 28,
+    "entropy_first": 2.950692653656006,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 401,
+    "gold": "14400",
+    "nll_sum": 113.22809600830078,
+    "n_tok": 92,
+    "entropy_first": 3.786099433898926,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 402,
+    "gold": "4",
+    "nll_sum": 121.35176086425781,
+    "n_tok": 135,
+    "entropy_first": 3.7388694286346436,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 403,
+    "gold": "81",
+    "nll_sum": 120.96891021728516,
+    "n_tok": 124,
+    "entropy_first": 3.5391154289245605,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 404,
+    "gold": "22",
+    "nll_sum": 125.55191040039062,
+    "n_tok": 124,
+    "entropy_first": 3.7078263759613037,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 405,
+    "gold": "50",
+    "nll_sum": 154.34756469726562,
+    "n_tok": 115,
+    "entropy_first": 6.122164726257324,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 406,
+    "gold": "200",
+    "nll_sum": 272.7458801269531,
+    "n_tok": 136,
+    "entropy_first": 4.997732639312744,
+    "prompt_tokens": 159
+  },
+  {
+    "idx": 407,
+    "gold": "2000",
+    "nll_sum": 228.01214599609375,
+    "n_tok": 140,
+    "entropy_first": 7.296803951263428,
+    "prompt_tokens": 174
+  },
+  {
+    "idx": 408,
+    "gold": "20",
+    "nll_sum": 103.77775573730469,
+    "n_tok": 86,
+    "entropy_first": 6.248988151550293,
+    "prompt_tokens": 164
+  },
+  {
+    "idx": 409,
+    "gold": "168000",
+    "nll_sum": 270.7652587890625,
+    "n_tok": 165,
+    "entropy_first": 4.248798847198486,
+    "prompt_tokens": 158
+  },
+  {
+    "idx": 410,
+    "gold": "3",
+    "nll_sum": 184.43405151367188,
+    "n_tok": 117,
+    "entropy_first": 4.144775867462158,
+    "prompt_tokens": 192
+  },
+  {
+    "idx": 411,
+    "gold": "1110",
+    "nll_sum": 137.01889038085938,
+    "n_tok": 71,
+    "entropy_first": 3.558206558227539,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 412,
+    "gold": "5",
+    "nll_sum": 81.96865844726562,
+    "n_tok": 52,
+    "entropy_first": 4.395772933959961,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 413,
+    "gold": "25",
+    "nll_sum": 141.21533203125,
+    "n_tok": 97,
+    "entropy_first": 3.3070168495178223,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 414,
+    "gold": "56",
+    "nll_sum": 64.27381896972656,
+    "n_tok": 54,
+    "entropy_first": 3.3940703868865967,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 415,
+    "gold": "350",
+    "nll_sum": 183.30072021484375,
+    "n_tok": 137,
+    "entropy_first": 4.054102897644043,
+    "prompt_tokens": 200
+  },
+  {
+    "idx": 416,
+    "gold": "56",
+    "nll_sum": 114.24259948730469,
+    "n_tok": 102,
+    "entropy_first": 3.6315970420837402,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 417,
+    "gold": "3140",
+    "nll_sum": 119.39346313476562,
+    "n_tok": 95,
+    "entropy_first": 3.826434373855591,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 418,
+    "gold": "40",
+    "nll_sum": 55.238258361816406,
+    "n_tok": 30,
+    "entropy_first": 7.646588325500488,
+    "prompt_tokens": 136
+  },
+  {
+    "idx": 419,
+    "gold": "3000",
+    "nll_sum": 58.86805725097656,
+    "n_tok": 68,
+    "entropy_first": 4.307175159454346,
+    "prompt_tokens": 194
+  },
+  {
+    "idx": 420,
+    "gold": "17000",
+    "nll_sum": 136.66961669921875,
+    "n_tok": 86,
+    "entropy_first": 3.3801777362823486,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 421,
+    "gold": "12",
+    "nll_sum": 130.56011962890625,
+    "n_tok": 100,
+    "entropy_first": 2.7986600399017334,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 422,
+    "gold": "284",
+    "nll_sum": 193.5054931640625,
+    "n_tok": 187,
+    "entropy_first": 3.7171671390533447,
+    "prompt_tokens": 163
+  },
+  {
+    "idx": 423,
+    "gold": "8",
+    "nll_sum": 123.01191711425781,
+    "n_tok": 110,
+    "entropy_first": 4.381995677947998,
+    "prompt_tokens": 201
+  },
+  {
+    "idx": 424,
+    "gold": "570",
+    "nll_sum": 69.47904968261719,
+    "n_tok": 68,
+    "entropy_first": 2.8810176849365234,
+    "prompt_tokens": 147
+  },
+  {
+    "idx": 425,
+    "gold": "150",
+    "nll_sum": 142.081298828125,
+    "n_tok": 102,
+    "entropy_first": 3.4479775428771973,
+    "prompt_tokens": 187
+  },
+  {
+    "idx": 426,
+    "gold": "11",
+    "nll_sum": 90.37028503417969,
+    "n_tok": 81,
+    "entropy_first": 4.8299760818481445,
+    "prompt_tokens": 155
+  },
+  {
+    "idx": 427,
+    "gold": "150",
+    "nll_sum": 123.68305206298828,
+    "n_tok": 83,
+    "entropy_first": 6.6552581787109375,
+    "prompt_tokens": 158
+  },
+  {
+    "idx": 428,
+    "gold": "26",
+    "nll_sum": 114.50499725341797,
+    "n_tok": 74,
+    "entropy_first": 3.44165301322937,
+    "prompt_tokens": 159
+  },
+  {
+    "idx": 429,
+    "gold": "13",
+    "nll_sum": 76.65306091308594,
+    "n_tok": 45,
+    "entropy_first": 2.720468759536743,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 430,
+    "gold": "132",
+    "nll_sum": 221.74038696289062,
+    "n_tok": 116,
+    "entropy_first": 4.521477222442627,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 431,
+    "gold": "1",
+    "nll_sum": 61.97261047363281,
+    "n_tok": 63,
+    "entropy_first": 2.983459234237671,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 432,
+    "gold": "30",
+    "nll_sum": 83.91870880126953,
+    "n_tok": 71,
+    "entropy_first": 3.750988006591797,
+    "prompt_tokens": 178
+  },
+  {
+    "idx": 433,
+    "gold": "6",
+    "nll_sum": 71.95144653320312,
+    "n_tok": 50,
+    "entropy_first": 3.585449695587158,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 434,
+    "gold": "5",
+    "nll_sum": 130.56832885742188,
+    "n_tok": 100,
+    "entropy_first": 3.374450206756592,
+    "prompt_tokens": 135
+  },
+  {
+    "idx": 435,
+    "gold": "5",
+    "nll_sum": 38.61469268798828,
+    "n_tok": 40,
+    "entropy_first": 3.0491318702697754,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 436,
+    "gold": "15",
+    "nll_sum": 105.68299865722656,
+    "n_tok": 72,
+    "entropy_first": 5.840854644775391,
+    "prompt_tokens": 123
+  },
+  {
+    "idx": 437,
+    "gold": "7",
+    "nll_sum": 118.45431518554688,
+    "n_tok": 68,
+    "entropy_first": 3.6243903636932373,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 438,
+    "gold": "2",
+    "nll_sum": 156.92153930664062,
+    "n_tok": 151,
+    "entropy_first": 5.34965705871582,
+    "prompt_tokens": 169
+  },
+  {
+    "idx": 439,
+    "gold": "17",
+    "nll_sum": 102.40376281738281,
+    "n_tok": 73,
+    "entropy_first": 5.685914993286133,
+    "prompt_tokens": 197
+  },
+  {
+    "idx": 440,
+    "gold": "98",
+    "nll_sum": 64.98056030273438,
+    "n_tok": 61,
+    "entropy_first": 3.2430577278137207,
+    "prompt_tokens": 124
+  },
+  {
+    "idx": 441,
+    "gold": "80",
+    "nll_sum": 64.2371826171875,
+    "n_tok": 77,
+    "entropy_first": 3.237610340118408,
+    "prompt_tokens": 156
+  },
+  {
+    "idx": 442,
+    "gold": "49",
+    "nll_sum": 163.2225799560547,
+    "n_tok": 136,
+    "entropy_first": 4.710123538970947,
+    "prompt_tokens": 163
+  },
+  {
+    "idx": 443,
+    "gold": "59",
+    "nll_sum": 172.68829345703125,
+    "n_tok": 103,
+    "entropy_first": 4.430884838104248,
+    "prompt_tokens": 167
+  },
+  {
+    "idx": 444,
+    "gold": "20",
+    "nll_sum": 64.30305480957031,
+    "n_tok": 53,
+    "entropy_first": 5.855062007904053,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 445,
+    "gold": "6",
+    "nll_sum": 104.82080841064453,
+    "n_tok": 89,
+    "entropy_first": 4.076278209686279,
+    "prompt_tokens": 158
+  },
+  {
+    "idx": 446,
+    "gold": "2",
+    "nll_sum": 141.41656494140625,
+    "n_tok": 101,
+    "entropy_first": 5.394554138183594,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 447,
+    "gold": "5",
+    "nll_sum": 60.859676361083984,
+    "n_tok": 32,
+    "entropy_first": 7.7150559425354,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 448,
+    "gold": "539",
+    "nll_sum": 112.70138549804688,
+    "n_tok": 83,
+    "entropy_first": 3.623671293258667,
+    "prompt_tokens": 151
+  },
+  {
+    "idx": 449,
+    "gold": "112",
+    "nll_sum": 36.131675720214844,
+    "n_tok": 55,
+    "entropy_first": 4.2538323402404785,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 450,
+    "gold": "4",
+    "nll_sum": 233.1609344482422,
+    "n_tok": 101,
+    "entropy_first": 4.0909528732299805,
+    "prompt_tokens": 169
+  },
+  {
+    "idx": 451,
+    "gold": "11050",
+    "nll_sum": 177.44012451171875,
+    "n_tok": 92,
+    "entropy_first": 4.302840232849121,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 452,
+    "gold": "50",
+    "nll_sum": 148.25624084472656,
+    "n_tok": 91,
+    "entropy_first": 3.9429771900177,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 453,
+    "gold": "6400",
+    "nll_sum": 158.52560424804688,
+    "n_tok": 135,
+    "entropy_first": 6.398355960845947,
+    "prompt_tokens": 140
+  },
+  {
+    "idx": 454,
+    "gold": "150",
+    "nll_sum": 44.630069732666016,
+    "n_tok": 38,
+    "entropy_first": 6.035867691040039,
+    "prompt_tokens": 113
+  },
+  {
+    "idx": 455,
+    "gold": "1920",
+    "nll_sum": 119.80165100097656,
+    "n_tok": 116,
+    "entropy_first": 3.3699791431427,
+    "prompt_tokens": 160
+  },
+  {
+    "idx": 456,
+    "gold": "78",
+    "nll_sum": 102.72713470458984,
+    "n_tok": 71,
+    "entropy_first": 3.3275327682495117,
+    "prompt_tokens": 137
+  },
+  {
+    "idx": 457,
+    "gold": "45",
+    "nll_sum": 116.22032928466797,
+    "n_tok": 75,
+    "entropy_first": 3.822181224822998,
+    "prompt_tokens": 164
+  },
+  {
+    "idx": 458,
+    "gold": "35",
+    "nll_sum": 76.05398559570312,
+    "n_tok": 88,
+    "entropy_first": 4.40733003616333,
+    "prompt_tokens": 128
+  },
+  {
+    "idx": 459,
+    "gold": "2",
+    "nll_sum": 95.32862091064453,
+    "n_tok": 122,
+    "entropy_first": 4.2449951171875,
+    "prompt_tokens": 225
+  },
+  {
+    "idx": 460,
+    "gold": "84",
+    "nll_sum": 70.47825622558594,
+    "n_tok": 76,
+    "entropy_first": 4.2792863845825195,
+    "prompt_tokens": 148
+  },
+  {
+    "idx": 461,
+    "gold": "9",
+    "nll_sum": 56.24578857421875,
+    "n_tok": 50,
+    "entropy_first": 6.228676795959473,
+    "prompt_tokens": 126
+  },
+  {
+    "idx": 462,
+    "gold": "71",
+    "nll_sum": 45.01081085205078,
+    "n_tok": 28,
+    "entropy_first": 3.5202271938323975,
+    "prompt_tokens": 111
+  },
+  {
+    "idx": 463,
+    "gold": "18",
+    "nll_sum": 64.2461166381836,
+    "n_tok": 45,
+    "entropy_first": 5.15989875793457,
+    "prompt_tokens": 130
+  },
+  {
+    "idx": 464,
+    "gold": "6",
+    "nll_sum": 138.12620544433594,
+    "n_tok": 97,
+    "entropy_first": 3.6667675971984863,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 465,
+    "gold": "30",
+    "nll_sum": 78.3321762084961,
+    "n_tok": 79,
+    "entropy_first": 3.5731403827667236,
+    "prompt_tokens": 159
+  },
+  {
+    "idx": 466,
+    "gold": "1",
+    "nll_sum": 160.85769653320312,
+    "n_tok": 106,
+    "entropy_first": 7.414449691772461,
+    "prompt_tokens": 133
+  },
+  {
+    "idx": 467,
+    "gold": "1200",
+    "nll_sum": 112.67748260498047,
+    "n_tok": 131,
+    "entropy_first": 3.5924530029296875,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 468,
+    "gold": "120",
+    "nll_sum": 168.29498291015625,
+    "n_tok": 137,
+    "entropy_first": 3.6799843311309814,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 469,
+    "gold": "4",
+    "nll_sum": 48.076316833496094,
+    "n_tok": 37,
+    "entropy_first": 2.945901393890381,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 470,
+    "gold": "3",
+    "nll_sum": 64.2242202758789,
+    "n_tok": 64,
+    "entropy_first": 4.934634208679199,
+    "prompt_tokens": 131
+  },
+  {
+    "idx": 471,
+    "gold": "80",
+    "nll_sum": 78.35958099365234,
+    "n_tok": 82,
+    "entropy_first": 3.3461191654205322,
+    "prompt_tokens": 152
+  },
+  {
+    "idx": 472,
+    "gold": "6",
+    "nll_sum": 94.92764282226562,
+    "n_tok": 58,
+    "entropy_first": 4.130679607391357,
+    "prompt_tokens": 153
+  },
+  {
+    "idx": 473,
+    "gold": "10",
+    "nll_sum": 147.24522399902344,
+    "n_tok": 101,
+    "entropy_first": 4.9585466384887695,
+    "prompt_tokens": 125
+  },
+  {
+    "idx": 474,
+    "gold": "80",
+    "nll_sum": 59.6941032409668,
+    "n_tok": 43,
+    "entropy_first": 3.654221773147583,
+    "prompt_tokens": 127
+  },
+  {
+    "idx": 475,
+    "gold": "20",
+    "nll_sum": 109.50773620605469,
+    "n_tok": 74,
+    "entropy_first": 3.4931273460388184,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 476,
+    "gold": "5",
+    "nll_sum": 91.068603515625,
+    "n_tok": 57,
+    "entropy_first": 3.6843042373657227,
+    "prompt_tokens": 133
+  },
+  {
+    "idx": 477,
+    "gold": "20",
+    "nll_sum": 103.78437805175781,
+    "n_tok": 69,
+    "entropy_first": 3.9636571407318115,
+    "prompt_tokens": 134
+  },
+  {
+    "idx": 478,
+    "gold": "621",
+    "nll_sum": 74.77711486816406,
+    "n_tok": 62,
+    "entropy_first": 2.8350961208343506,
+    "prompt_tokens": 140
+  },
+  {
+    "idx": 479,
+    "gold": "15400",
+    "nll_sum": 169.1231231689453,
+    "n_tok": 80,
+    "entropy_first": 4.344394207000732,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 480,
+    "gold": "11",
+    "nll_sum": 58.49144744873047,
+    "n_tok": 47,
+    "entropy_first": 6.703136444091797,
+    "prompt_tokens": 138
+  },
+  {
+    "idx": 481,
+    "gold": "84",
+    "nll_sum": 54.569541931152344,
+    "n_tok": 52,
+    "entropy_first": 3.292509078979492,
+    "prompt_tokens": 150
+  },
+  {
+    "idx": 482,
+    "gold": "26",
+    "nll_sum": 67.18400573730469,
+    "n_tok": 35,
+    "entropy_first": 2.9684829711914062,
+    "prompt_tokens": 154
+  },
+  {
+    "idx": 483,
+    "gold": "40",
+    "nll_sum": 84.61155700683594,
+    "n_tok": 71,
+    "entropy_first": 3.5040059089660645,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 484,
+    "gold": "240",
+    "nll_sum": 57.845237731933594,
+    "n_tok": 57,
+    "entropy_first": 3.644225597381592,
+    "prompt_tokens": 148
+  },
+  {
+    "idx": 485,
+    "gold": "220",
+    "nll_sum": 50.828121185302734,
+    "n_tok": 42,
+    "entropy_first": 4.377856254577637,
+    "prompt_tokens": 123
+  },
+  {
+    "idx": 486,
+    "gold": "6",
+    "nll_sum": 45.35125732421875,
+    "n_tok": 29,
+    "entropy_first": 3.1542763710021973,
+    "prompt_tokens": 121
+  },
+  {
+    "idx": 487,
+    "gold": "4",
+    "nll_sum": 94.80686950683594,
+    "n_tok": 84,
+    "entropy_first": 4.834036350250244,
+    "prompt_tokens": 142
+  },
+  {
+    "idx": 488,
+    "gold": "6",
+    "nll_sum": 49.841678619384766,
+    "n_tok": 34,
+    "entropy_first": 3.7724390029907227,
+    "prompt_tokens": 132
+  },
+  {
+    "idx": 489,
+    "gold": "10",
+    "nll_sum": 46.628456115722656,
+    "n_tok": 49,
+    "entropy_first": 3.169800281524658,
+    "prompt_tokens": 145
+  },
+  {
+    "idx": 490,
+    "gold": "4",
+    "nll_sum": 56.9123649597168,
+    "n_tok": 44,
+    "entropy_first": 3.3263819217681885,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 491,
+    "gold": "16",
+    "nll_sum": 50.335205078125,
+    "n_tok": 46,
+    "entropy_first": 4.315405368804932,
+    "prompt_tokens": 129
+  },
+  {
+    "idx": 492,
+    "gold": "32",
+    "nll_sum": 31.78825569152832,
+    "n_tok": 35,
+    "entropy_first": 4.308274745941162,
+    "prompt_tokens": 122
+  },
+  {
+    "idx": 493,
+    "gold": "25",
+    "nll_sum": 192.719970703125,
+    "n_tok": 106,
+    "entropy_first": 5.237421035766602,
+    "prompt_tokens": 157
+  },
+  {
+    "idx": 494,
+    "gold": "21",
+    "nll_sum": 183.46548461914062,
+    "n_tok": 109,
+    "entropy_first": 3.239766836166382,
+    "prompt_tokens": 171
+  },
+  {
+    "idx": 495,
+    "gold": "200",
+    "nll_sum": 102.5164794921875,
+    "n_tok": 65,
+    "entropy_first": 3.4924709796905518,
+    "prompt_tokens": 139
+  },
+  {
+    "idx": 496,
+    "gold": "38",
+    "nll_sum": 68.88602447509766,
+    "n_tok": 30,
+    "entropy_first": 7.546178817749023,
+    "prompt_tokens": 120
+  },
+  {
+    "idx": 497,
+    "gold": "112",
+    "nll_sum": 100.17803192138672,
+    "n_tok": 57,
+    "entropy_first": 3.6572327613830566,
+    "prompt_tokens": 148
+  },
+  {
+    "idx": 498,
+    "gold": "40",
+    "nll_sum": 67.77444458007812,
+    "n_tok": 60,
+    "entropy_first": 5.847672462463379,
+    "prompt_tokens": 141
+  },
+  {
+    "idx": 499,
+    "gold": "10",
+    "nll_sum": 206.72955322265625,
+    "n_tok": 131,
+    "entropy_first": 3.876978635787964,
+    "prompt_tokens": 194
+  }
+]

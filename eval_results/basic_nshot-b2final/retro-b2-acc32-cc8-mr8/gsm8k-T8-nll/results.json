@@ -1,0 +1,12 @@
+{
+  "mode": "score",
+  "correct": 0,
+  "total": 500,
+  "accuracy": 0.0,
+  "nll_per_token": 1.3798109152274673,
+  "scored_tokens": 39217,
+  "n_shot": 8,
+  "T": 8,
+  "ccot_passes": 0,
+  "median_prompt_tokens": 685
+}
