@@ -1,0 +1,84 @@
+{
+  "instrument": "influence horizon I(d)",
+  "damage_channel": "e",
+  "dual_channel_carry": true,
+  "when": "2026-09-17T13:34:22",
+  "model_name": "ckpts/olmo-retrofit-cortex",
+  "buffer": {
+    "kind": "append",
+    "class": "PrefixAccumBuffer",
+    "n_vec": 16,
+    "capacity": 128,
+    "damage_applied": "row substitution after the write"
+  },
+  "config": {
+    "n_chunks": 8,
+    "damage": "donor",
+    "T": 8,
+    "dtype": "float32",
+    "samples": 50,
+    "config_overrides": {
+      "use_memory": true,
+      "memory_slots": 0,
+      "prefix_memory": "accum",
+      "accum_vecs": 16,
+      "accum_max": 128,
+      "latent_carry": true,
+      "latent_depth_rule": "absolute",
+      "latent_depth_lo": 2,
+      "latent_depth_hi": 9,
+      "latent_renorm": "none"
+    }
+  },
+  "intact": {
+    "mean_nats": 3.191947569847107,
+    "chance_nats": 11.516439284270025,
+    "margin_below_chance": 8.324491714422917,
+    "at_chance": false,
+    "n": 50
+  },
+  "depths": {
+    "1": {
+      "mean_nats": 0.07064713478088379,
+      "ci_lo": 0.0599307701587677,
+      "ci_hi": 0.08216936016082764,
+      "n": 50
+    },
+    "2": {
+      "mean_nats": 0.005093731880187988,
+      "ci_lo": 0.00212494695186615,
+      "ci_hi": 0.00810952842235565,
+      "n": 50
+    },
+    "3": {
+      "mean_nats": 0.0014002799987792968,
+      "ci_lo": -0.001876441717147827,
+      "ci_hi": 0.004987963080406184,
+      "n": 50
+    },
+    "4": {
+      "mean_nats": 0.0027151775360107423,
+      "ci_lo": -0.0005177719593048095,
+      "ci_hi": 0.006280743837356567,
+      "n": 50
+    },
+    "5": {
+      "mean_nats": 0.0010313701629638672,
+      "ci_lo": -0.0020196807384490964,
+      "ci_hi": 0.00426016044616699,
+      "n": 50
+    },
+    "6": {
+      "mean_nats": 0.002489328384399414,
+      "ci_lo": -0.00030221307277679437,
+      "ci_hi": 0.005397239923477172,
+      "n": 50
+    },
+    "7": {
+      "mean_nats": 0.000543208122253418,
+      "ci_lo": -0.0011774623394012452,
+      "ci_hi": 0.0020863841772079455,
+      "n": 50
+    }
+  }
+}

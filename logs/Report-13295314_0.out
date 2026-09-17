@@ -1,0 +1,104 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 13:20:56
+Job ID:    13295316
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  p21_subst
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== P2.1 substitution sweep | 18 cells | index 0 ===
+    [0] a1 donor both
+    [1] a1 random both
+    [2] a2 donor both
+    [3] a2 donor e
+    [4] a2 donor z
+    [5] a2 random both
+    [6] a2 random e
+    [7] a2 random z
+    [8] a3 donor both
+    [9] a3 random both
+    [10] a3z donor both
+    [11] a3z donor e
+    [12] a3z donor z
+    [13] a3z random both
+    [14] a3z random e
+    [15] a3z random z
+    [16] parent donor both
+    [17] parent random both
+    for THIS cell list:  sbatch --array=0-17
+
+    arm=a1 damage=donor channel=both
+    checkpoint: cortex-retrofit/probe-p1-a1-accum-w16-cc8/checkpoint_91952
+    data:       data/pg19_olmo_val_len4096   (READ THIS LINE -- it is the only proof the pack arrived)
+    geometry:   accum  W=16  latent=0
+    sets:       --set use_memory=true --set memory_slots=0 --set prefix_memory=accum --set accum_vecs=16 --set accum_max=128
+    T=8  n_chunks=8  depths=1 2 3 4 5 6 7  n=100
+    out:        eval_results/p21_substitution-20260917/a1-donor-both
+
+    The [cortex] OVERRIDE lines below are the proof the geometry arrived.
+    A cell that prints none of them is running on a buffer-less graft.
+NVIDIA H200, 143771 MiB
+
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.43s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.34it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/probe-p1-a1-accum-w16-cc8/checkpoint_91952/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+
+==============================================================================
+I(d) -- nats/token that chunk N-d's carry contribution is worth at chunk N
+buffer: PrefixAccumBuffer (append), damage=donor, n=50 paired samples
+==============================================================================
+  intact loss 3.1869 nats/token   chance (ln vocab) 11.5164   margin +8.3295
+
+    d   I(d) nats                    95% CI     n   shape
+    1     0.05953   [  0.04930,   0.07076]    50  *
+    2     0.00664   [  0.00338,   0.01026]    50  *
+    3     0.00341   [ -0.00023,   0.00698]    50
+    4     0.00196   [ -0.00067,   0.00480]    50
+    5    -0.00010   [ -0.00205,   0.00171]    50
+    6     0.00143   [ -0.00045,   0.00344]    50
+    7     0.00161   [  0.00002,   0.00340]    50  *
+
+  * = CI excludes zero, i.e. that depth still measurably matters.
+  This is an APPEND buffer holding 8 chunks: expect I(d) roughly flat to d=7 and then exactly 0.
+
+wrote eval_results/p21_substitution-20260917/a1-donor-both/results.json
+
+cell a1/donor/both DONE -> eval_results/p21_substitution-20260917/a1-donor-both/results.json
+
+This cell is one row of the sweep, not a verdict.  The reading is the
+TABLE -- arms against the parent for question 1, donor against random
+for question 2 -- and the responses to each outcome are pre-registered
+in this file's header and in p2_deciding_measurements_handoff.md.
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 13:31:37
+Job ID:        13295316
+Array Job ID:  13295314_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      p21_subst
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=01:25:52,vmem=0,walltime=00:10:44,mem=15440872K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-11-0
+---------------------------------------

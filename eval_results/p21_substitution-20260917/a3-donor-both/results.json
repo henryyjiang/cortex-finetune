@@ -1,0 +1,83 @@
+{
+  "instrument": "influence horizon I(d)",
+  "damage_channel": "both",
+  "dual_channel_carry": false,
+  "when": "2026-09-17T13:43:36",
+  "model_name": "ckpts/olmo-retrofit-cortex",
+  "buffer": {
+    "kind": "gated",
+    "class": "PrefixGatedBuffer",
+    "n_vec": 16,
+    "capacity": 64,
+    "damage_applied": "pre-merge write, through prefix.merge"
+  },
+  "config": {
+    "n_chunks": 8,
+    "damage": "donor",
+    "T": 8,
+    "dtype": "float32",
+    "samples": 50,
+    "config_overrides": {
+      "use_memory": true,
+      "memory_slots": 0,
+      "prefix_memory": "gated",
+      "accum_vecs": 16,
+      "gate_slots": 64,
+      "gate_route": "ring",
+      "gate_norm": "tanh",
+      "gate_init": "zero",
+      "gate_fill": "grow"
+    }
+  },
+  "intact": {
+    "mean_nats": 3.2113785552978515,
+    "chance_nats": 11.516439284270025,
+    "margin_below_chance": 8.305060728972173,
+    "at_chance": false,
+    "n": 50
+  },
+  "depths": {
+    "1": {
+      "mean_nats": 0.043102841377258304,
+      "ci_lo": 0.035596348285675046,
+      "ci_hi": 0.0515829941034317,
+      "n": 50
+    },
+    "2": {
+      "mean_nats": 0.001208019256591797,
+      "ci_lo": -0.0015517054796218871,
+      "ci_hi": 0.004129044532775879,
+      "n": 50
+    },
+    "3": {
+      "mean_nats": -0.0003292751312255859,
+      "ci_lo": -0.0024467914104461673,
+      "ci_hi": 0.0017983574867248533,
+      "n": 50
+    },
+    "4": {
+      "mean_nats": 0.007437014579772949,
+      "ci_lo": 0.0037358975410461425,
+      "ci_hi": 0.011313808798789978,
+      "n": 50
+    },
+    "5": {
+      "mean_nats": 0.006183285713195801,
+      "ci_lo": 0.0016711183786392212,
+      "ci_hi": 0.011073682308197016,
+      "n": 50
+    },
+    "6": {
+      "mean_nats": -0.00047227382659912107,
+      "ci_lo": -0.0023500807285308837,
+      "ci_hi": 0.0014732623100280756,
+      "n": 50
+    },
+    "7": {
+      "mean_nats": 0.0007747936248779296,
+      "ci_lo": -0.0004986679553985596,
+      "ci_hi": 0.0020930536985397322,
+      "n": 50
+    }
+  }
+}
