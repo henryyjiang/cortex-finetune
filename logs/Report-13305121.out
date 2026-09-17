@@ -166,3 +166,21 @@ wrote eval_results/red10_confirm-20260917/gates_w16.json
 SKIPPED: a walk failed, so there is nothing comparable to compare.
 
 === summary ===
+   walk_w16.json  mean NLL  3.8197  chance 11.5164  margin +7.6967  ok
+   walk_w32.json  MISSING
+
+STILL AT CHANCE.  The label shift was not the whole story: next suspect
+is inner.train() (diag_dual_channel_walk.py:472) against the horizon's
+.eval(), then chunk_len.  Do NOT read the tables above.
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 19:00:53
+Job ID:        13305121
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      red10
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:56:32,vmem=0,walltime=00:07:04,mem=19780844K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------

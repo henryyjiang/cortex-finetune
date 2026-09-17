@@ -1,0 +1,30 @@
+{
+  "parent": {
+    "arm": "parent",
+    "n_vec": 32,
+    "rows": 256,
+    "eff_rank_pr": 2.348193883895874,
+    "eff_rank_entropy": 134.676025390625,
+    "centred_cosine": 0.03949129208922386,
+    "row_norm": 113.31829071044922,
+    "chunks_retained": 8.0
+  },
+  "branch": {
+    "arm": "branch",
+    "n_vec": 16,
+    "rows": 128,
+    "eff_rank_pr": 21.323596954345703,
+    "eff_rank_entropy": 95.84563446044922,
+    "centred_cosine": -0.006352196913212538,
+    "row_norm": 112.21208190917969,
+    "chunks_retained": 8.0
+  },
+  "delivered_retained": 9.080850223052218,
+  "column_fraction": 0.5,
+  "chunks_retained": [
+    8.0,
+    8.0
+  ],
+  "verdict": "INVALID",
+  "why": "delivered rank went UP by 9.08x on half the write columns, which no width effect produces.  Something other than width differs between the two runs -- check accum_max, the prose source, and that both sides loaded their own weights."
+}

@@ -1,0 +1,163 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 19:06:26
+Job ID:    13305310
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  gate_ad
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== gated-ring A(d) | 24 chunks x 512 | T=8 ===
+NVIDIA H200, 143771 MiB
+    checkpoint: cortex-retrofit/retro-b2-heal/checkpoint_91552_w16
+    data:       data/pg19_olmo_val_len4096  (donor = later rows of the same pack)
+    sets:       --set use_memory=true --set memory_slots=0 --set prefix_memory=accum --set accum_vecs=16 --set accum_max=128
+    The [cortex] OVERRIDE lines below are the proof the geometry arrived.
+
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 72.97it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+[tape] main <- data/pg19_olmo_val_len4096
+  chunk 1/24  carry=(1, 16, 2048)
+  chunk 2/24  carry=(1, 32, 2048)
+  chunk 3/24  carry=(1, 48, 2048)
+  chunk 4/24  carry=(1, 64, 2048)
+  chunk 5/24  carry=(1, 80, 2048)
+  chunk 6/24  carry=(1, 96, 2048)
+  chunk 7/24  carry=(1, 112, 2048)
+  chunk 8/24  carry=(1, 128, 2048)
+  chunk 9/24  carry=(1, 128, 2048)
+  chunk 10/24  carry=(1, 128, 2048)
+  chunk 11/24  carry=(1, 128, 2048)
+  chunk 12/24  carry=(1, 128, 2048)
+  chunk 13/24  carry=(1, 128, 2048)
+  chunk 14/24  carry=(1, 128, 2048)
+  chunk 15/24  carry=(1, 128, 2048)
+  chunk 16/24  carry=(1, 128, 2048)
+  chunk 17/24  carry=(1, 128, 2048)
+  chunk 18/24  carry=(1, 128, 2048)
+  chunk 19/24  carry=(1, 128, 2048)
+  chunk 20/24  carry=(1, 128, 2048)
+  chunk 21/24  carry=(1, 128, 2048)
+  chunk 22/24  carry=(1, 128, 2048)
+  chunk 23/24  carry=(1, 128, 2048)
+  chunk 24/24  carry=(1, 128, 2048)
+[tape] donor <- data/pg19_olmo_val_len4096 (from row 3)
+  chunk 1/24  carry=(1, 16, 2048)
+  chunk 2/24  carry=(1, 32, 2048)
+  chunk 3/24  carry=(1, 48, 2048)
+  chunk 4/24  carry=(1, 64, 2048)
+  chunk 5/24  carry=(1, 80, 2048)
+  chunk 6/24  carry=(1, 96, 2048)
+  chunk 7/24  carry=(1, 112, 2048)
+  chunk 8/24  carry=(1, 128, 2048)
+  chunk 9/24  carry=(1, 128, 2048)
+  chunk 10/24  carry=(1, 128, 2048)
+  chunk 11/24  carry=(1, 128, 2048)
+  chunk 12/24  carry=(1, 128, 2048)
+  chunk 13/24  carry=(1, 128, 2048)
+  chunk 14/24  carry=(1, 128, 2048)
+  chunk 15/24  carry=(1, 128, 2048)
+  chunk 16/24  carry=(1, 128, 2048)
+  chunk 17/24  carry=(1, 128, 2048)
+  chunk 18/24  carry=(1, 128, 2048)
+  chunk 19/24  carry=(1, 128, 2048)
+  chunk 20/24  carry=(1, 128, 2048)
+  chunk 21/24  carry=(1, 128, 2048)
+  chunk 22/24  carry=(1, 128, 2048)
+  chunk 23/24  carry=(1, 128, 2048)
+  chunk 24/24  carry=(1, 128, 2048)
+  accum W16 K64              rank  49.80  h10   3  writes-held   2.60
+  gated W16 K64 ring         rank  43.95  h10  20  writes-held   5.13
+  gated W16 K64 ring/rms     rank  43.95  h10  20  writes-held   5.13
+  gated W16 K64 ring/kaiming rank  41.71  h10  20  writes-held   9.41
+  gated W16 K64 ring/slotinit rank  44.09  h10  20  writes-held   4.92
+  gated W16 K64 mix          rank  14.20  h10   8  writes-held   2.44
+  gated W16 K64 mix/tile     rank  13.54  h10   8  writes-held   2.44
+
+====================================================================================================
+F(d) -- fraction of chunk N-d's DISTINGUISHABLE content still in the state.  THE HEADLINE CURVE.
+  1.0 = fully retained, 0 = gone, >1 = DUPLICATED into several rows (read it next to `rank`).
+  accum should CLIFF, dense gates should DECAY, ring should STAIRCASE above dense at equal width.
+====================================================================================================
+  cell                          d=1    d=2    d=3    d=4    d=6    d=8   d=12   d=16   d=20
+  accum W16 K64               1.038  1.035  1.043  0.000  0.000  0.000  0.000  0.000  0.000
+  gated W16 K64 ring          0.519  0.518  0.521  0.372  0.356  0.263  0.194  0.144  0.210
+  gated W16 K64 ring/rms      0.519  0.518  0.521  0.372  0.356  0.263  0.194  0.144  0.210
+  gated W16 K64 ring/kaiming  0.753  0.761  0.691  0.493  0.503  0.471  0.397  0.364  0.689
+  gated W16 K64 ring/slotinit  0.519  0.518  0.521  0.372  0.356  0.263  0.194  0.144  0.105
+  gated W16 K64 mix           0.759  0.554  0.407  0.291  0.148  0.080  0.023  0.007  0.002
+  gated W16 K64 mix/tile      0.759  0.553  0.407  0.290  0.149  0.080  0.023  0.007  0.002
+
+====================================================================================================
+R(d) -- the same displacement as a SHARE of the state norm (what the model actually reads).
+  DILUTED BY WIDTH: a wider buffer scores lower per chunk while holding strictly more.  Compare within K.
+====================================================================================================
+  cell                          d=1    d=2    d=3    d=4    d=6    d=8   d=12   d=16   d=20
+  accum W16 K64               0.154  0.153  0.154  0.000  0.000  0.000  0.000  0.000  0.000
+  gated W16 K64 ring          0.046  0.046  0.047  0.033  0.032  0.023  0.017  0.013  0.019
+  gated W16 K64 ring/rms      0.046  0.046  0.047  0.033  0.032  0.023  0.017  0.013  0.019
+  gated W16 K64 ring/kaiming  0.036  0.036  0.033  0.023  0.024  0.022  0.019  0.017  0.033
+  gated W16 K64 ring/slotinit  0.049  0.049  0.049  0.035  0.033  0.025  0.018  0.013  0.010
+  gated W16 K64 mix           0.062  0.045  0.033  0.024  0.012  0.007  0.002  0.001  0.000
+  gated W16 K64 mix/tile      0.061  0.045  0.033  0.023  0.012  0.006  0.002  0.001  0.000
+
+====================================================================================================
+geometry, cost and capacity
+====================================================================================================
+  cell                         W     K   cmpr  read   pack   rank    cos   h10   wrts    params  flag
+  accum W16 K64               16    64     32    64    592  49.80 -0.014     3   2.60     32768  
+  gated W16 K64 ring          16    64     32    64    592  43.95 -0.007   20+   5.13  16818178  
+  gated W16 K64 ring/rms      16    64     32    64    592  43.95 -0.007   20+   5.13  16818178  
+  gated W16 K64 ring/kaiming  16    64     32    64    592  41.71 -0.012   20+   9.41  16818178  
+  gated W16 K64 ring/slotinit  16    64     32    64    592  44.09 -0.008   20+   4.92  16949250  
+  gated W16 K64 mix           16    64     32    64    592  14.20 -0.011     8   2.44  16819202  RANK-PINNED
+  gated W16 K64 mix/tile      16    64     32    64    592  13.54 -0.006     8   2.44  16819202  RANK-PINNED
+
+  NOTE: `wrts` is gameable by a high-variance gate init -- kaiming
+  leaves a random subset of channels near-frozen, which reads as
+  retention but is not memory design.  Read it next to `rank`, and
+  treat a RANK-PINNED row's mass as duplication, not capacity.
+
+====================================================================================================
+gate at init (untrained -- this is an ARCHITECTURE reading, not a prediction)
+====================================================================================================
+  cell                           ig     fg  fg p10  fg p90  |s|mean  tanh sat  cand/wr
+  gated W16 K64 ring          0.500  0.731   0.731   0.731    2.118     0.422    1.000
+  gated W16 K64 ring/rms      0.500  0.731   0.731   0.731    2.118     0.422    1.000
+  gated W16 K64 ring/kaiming  0.495  0.662   0.271   0.947    2.226     0.355    1.000
+  gated W16 K64 ring/slotinit  0.500  0.731   0.731   0.731    2.008     0.397    1.000
+  gated W16 K64 mix           0.500  0.731   0.731   0.731    2.343     0.466    0.985
+  gated W16 K64 mix/tile      0.500  0.731   0.731   0.731    2.378     0.474    1.000
+
+wrote eval_results/gate_ad-20260917/gate_ad.json/results.json
+
+A(d) -> eval_results/gate_ad-20260917/gate_ad.json
+
+Read the A(d) row for 'gated W16 K64 ring' against F(d) = 0.5 *
+0.731^floor(d/4): 0.500 at d=0-3, 0.366 at d=4-7, 0.267 at d=8-11.
+A STEP at d=4 is the design.  A SPIKE at d=4 is not, and it would make
+the ring's lap a defect rather than its signature.
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 19:07:56
+Job ID:        13305310
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      gate_ad
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:12:00,vmem=0,walltime=00:01:30,mem=19163120K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------
