@@ -1,0 +1,168 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 18:53:50
+Job ID:    13305121
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  red10
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== RED 10 confirmation | 8 x 512 tokens | T=8 ===
+NVIDIA H200, 143771 MiB
+    branch (W=16): cortex-retrofit/retro-b2-heal/checkpoint_91552_w16
+    parent (W=32): cortex-retrofit/retro-b2-heal/checkpoint_91552
+    data:          data/pg19_olmo_val_len4096   <- REAL PROSE.  Random ids score at chance too
+                   (that was RED 3), so the pack line is load-bearing.
+
+######## walk: branch W=16 ########
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.04it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.99it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   289.81      -       -      -   yes           -   4.0144
+ 1    16->32      D        16         -   288.98      -       -      -   yes           -   3.6430
+ 2    32->48      D        16         -   288.80      -       -      -   yes           -   3.6170
+ 3    48->64      D        16         -   288.89      -       -      -   yes           -   3.7473
+ 4    64->80      D        16         -   288.35      -       -      -   yes           -   3.6177
+ 5    80->96      D        16         -   288.86      -       -      -   yes           -   3.4378
+ 6   96->112      D        16         -   288.49      -       -      -   yes           -   3.8834
+ 7  112->128      D        16         -   289.05      -       -      -   yes           -   4.5970
+
+   mean NLL 3.8197   chance (ln vocab) 11.5164   margin +7.6967
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 112.253  centred_cos -0.0065  eff_rank_pr 22.50  entropy 97.78
+
+-- gradient norms (one backward over the summed chain loss) ---------
+   prefix.summary_emb                   1.201489e-01
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/red10_confirm-20260917/walk_w16.json
+
+######## walk: parent W=32 ########
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 32  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 256  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 69.66it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=32 max_vecs=256 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_dual_channel_walk.py", line 514, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_dual_channel_walk.py", line 500, in main
+    rec = walk(inner, cortex, chunks, num_steps=num_steps,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_dual_channel_walk.py", line 245, in walk
+    out = model(input_ids=ids, m_cross_in=carry, return_m_cross=True,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 744, in forward
+    x, num_steps_no_grad, num_steps_with_grad, xk, block_idx = self.iterate_forward(
+                                                               ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 867, in iterate_forward
+    x, block_idx = self.core_block_forward(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 890, in core_block_forward
+    x = block(x, freqs_cis, block_idx, mask, past_key_values)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 492, in forward
+    attn_out = self.norm_1(self.attn(x, freqs_cis, step_idx, mask, past_key_values))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 437, in forward
+    q, k = apply_rotary_pos_emb(q, k, cos, sin)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/transformers/models/olmo2/modeling_olmo2.py", line 95, in apply_rotary_pos_emb
+    k_embed = (k * cos) + (rotate_half(k) * sin)
+                           ~~~~~~~~~~~~~~~^~~~~
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 12.00 MiB. GPU 0 has a total capacity of 139.80 GiB of which 11.12 MiB is free. Including non-PyTorch memory, this process has 139.78 GiB memory in use. Of the allocated memory 136.55 GiB is allocated by PyTorch, and 2.57 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+######## prelaunch gates (gate 4 is the whole-carry donor swap) ########
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 93.05it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+==============================================================================
+CORTEX-FINAL PRE-LAUNCH GATES
+==============================================================================
+[PASS] checkpoint_roundtrip
+       strict load: clean
+       raw saved config is NOT loadable as-is (expected): run tools/prepare_eval_checkpoint.py on every dir the evals read.
+       geometry survived: True  both channels: True  carry width [2048, 2048]
+       max |loss before - after| = 0.000e+00
+[PASS] read_live_fraction
+       at mr=8 depth=8: read_live_frac = 0.534 (4000 samples)
+         mr=  8  live 0.546  no_grad mean 2.39  total steps 8.88
+         mr= 16  live 0.148  no_grad mean 9.21  total steps 16.97
+         mr= 32  live 0.019  no_grad mean 25.63  total steps 33.59
+       MEASURED, not derived.  Write it into the Z pre-registration.
+[PASS] donor_control
+       real=4.5968  none=4.6187  donor_both=4.6674
+       content delta (donor-real, both) = +0.0705
+       column  delta (none -real)       = +0.0218   <- confounded, for contrast only
+
+These gates say the MACHINERY is live and the checkpoint survives a
+round trip.  None of them says whether Z helps or whether the gate beats
+accum -- that needs the full cells, the 2x2 and the influence horizon.
+
+[skip] z_off: skipped automatically: this checkpoint is E-only, so there is no Z read to suppress
+wrote eval_results/red10_confirm-20260917/gates_w16.json
+
+######## width contrast: parent W=32 vs branch W=16 ########
+SKIPPED: a walk failed, so there is nothing comparable to compare.
+
+=== summary ===

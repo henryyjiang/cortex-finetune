@@ -326,7 +326,7 @@
     "at_chance": false
   },
   "grads": {
-    "prefix.summary_emb": 0.12014883756637573
+    "prefix.summary_emb": 0.12014885246753693
   },
   "grad_none": [],
   "grad_zero": [],
@@ -354,5 +354,5 @@
     ],
     "out": "eval_results/red10_confirm-20260917/walk_w16.json"
   },
-  "when": "2026-09-17T18:39:32"
+  "when": "2026-09-17T18:56:56"
 }

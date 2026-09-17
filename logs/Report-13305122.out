@@ -1,0 +1,22 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 18:54:25
+Job ID:    13305122
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  gate_ad
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+ERROR: no prose at ../cortex_next_phase_framework.md
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 18:54:29
+Job ID:        13305122
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      gate_ad
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:00:56,vmem=0,walltime=00:00:07,mem=39000K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------

@@ -1,5 +1,5 @@
 {
-  "when": "2026-09-17T18:43:18",
+  "when": "2026-09-17T19:00:52",
   "args": {
     "model_name": "ckpts/olmo-retrofit-cortex",
     "checkpoint": "cortex-retrofit/retro-b2-heal/checkpoint_91552_w16",
