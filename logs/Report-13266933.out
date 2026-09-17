@@ -1,0 +1,103 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-16-2026 19:17:07
+Job ID:    13266933
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  diag_depth_band.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== P0.7 depth band | cortex-retrofit/retro-b2-heal/model_only_chkpt_90000 | T in 8 16 32 64 ===
+    prose source: data/pg19_fw50_olmo_len4096 (packed; the arms' own corpus and tokenizer)
+NVIDIA A100 80GB PCIe, 81920 MiB
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.01s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.88it/s]
+[cortex] carry buffer: n_vec=32 max_vecs=128 (config.json) -> holds the newest 4 chunks; older writes are dropped by the FIFO
+
+=== P0.7 depth band | model_only_chkpt_90000 | data/pg19_fw50_olmo_len4096 ===
+    D=2048 seq_len=512 batch=2 dtype=float32 prefix=on
+    TRAINED mean_recurrence UNKNOWN.  config.json says 32, but that field is INHERITED -- a B2-family checkpoint carries 32 while its ramp capped max_mean_rec at 8.
+    Pass --trained_depth to mark the OOD rows.  Until then ANY row may be out of distribution, and a band that looks absolute may only be saying that this model stops there.
+  T=8   band edge: magnitude 8+, novelty 8+
+  T=16  band edge: magnitude 10, novelty 16+
+  T=32  band edge: magnitude 21, novelty 26
+  T=64  band edge: magnitude 64+, novelty 26
+
+==============================================================================
+the trajectory, per T
+==============================================================================
+T=8
+  t            1      2      3      4      5      6      7      8
+  d/s0     31.91  15.24   7.94   4.48   2.63   1.66   1.12   0.82
+  cos          -   0.05  -0.19  -0.27  -0.30  -0.32  -0.33  -0.32
+T=16  (first 12 steps)
+  t            1      2      3      4      5      6      7      8      9     10     11     12
+  d/s0     31.92  15.24   7.95   4.48   2.62   1.67   1.12   0.81   0.64   0.57   0.50   0.44
+  cos          -   0.05  -0.19  -0.27  -0.30  -0.32  -0.33  -0.32  -0.29  -0.27  -0.25  -0.24
+T=32  (first 12 steps)
+  t            1      2      3      4      5      6      7      8      9     10     11     12
+  d/s0     31.90  15.23   7.94   4.48   2.63   1.67   1.12   0.81   0.65   0.56   0.50   0.44
+  cos          -   0.05  -0.19  -0.27  -0.30  -0.32  -0.33  -0.32  -0.29  -0.27  -0.25  -0.24
+T=64  (first 12 steps)
+  t            1      2      3      4      5      6      7      8      9     10     11     12
+  d/s0     31.92  15.24   7.94   4.48   2.63   1.67   1.12   0.81   0.64   0.56   0.50   0.44
+  cos          -   0.05  -0.19  -0.27  -0.30  -0.32  -0.33  -0.32  -0.29  -0.26  -0.24  -0.23
+
+==============================================================================
+VERDICT — does the band's upper edge hold at a fixed t, or a fixed t/T?
+==============================================================================
+  magnitude  edges {16: 10, 32: 21}
+             excluded (band still open at T, so the edge is a lower bound): [8, 64]
+             CV(absolute) 0.355   CV(relative) 0.024   -> UNRELIABLE (edge re-crosses the floor)
+             T16 vs T32 (THE row to read): t_hi 10 -> 21; absolute ratio 2.10 (1.0 = absolute), relative ratio 1.05 (1.0 = relative)
+  novelty    edges {32: 26, 64: 26}
+             excluded (band still open at T, so the edge is a lower bound): [8, 16]
+             CV(absolute) 0.000   CV(relative) 0.333   -> ABSOLUTE
+             no T16/T32 pair in the sweep -- the full-sweep CV flatters BOTH rules,
+             because at small T they select nearly the same depths.  EXTEND the sweep upward (--T 8 16 32 64) so a second uncensored point exists.
+
+  THE TWO CRITERIA DO NOT AGREE: magnitude UNRELIABLE (edge re-crosses the floor), novelty ABSOLUTE.
+  magnitude says how much the state still moves; novelty says whether the
+  movement is anywhere NEW.  PREFER NOVELTY when they part -- Z carries the
+  pathway, not the displacement.
+
+  MAGNITUDE IS UNRELIABLE at T=[32]: the series RE-CROSSES its floor, so
+  its edge is a LAST crossing and grows with the OBSERVATION WINDOW rather than
+  with the band.  That defect hands the verdict to RELATIVE by construction:
+  a longer sweep catches one more excursion above the floor and the edge moves
+  with T for a reason that has nothing to do with where the information is.
+  Read the first-run edge instead, or move the floor clear of the oscillation.
+
+==============================================================================
+the slot -> depth map each rule implies (n_slots = 16)
+==============================================================================
+  upper edge taken from: novelty (magnitude is unreliable) -> t_hi = 26
+  T=8   A [2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7, 2, 3, 4, 5]
+        B [1, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 7]
+  T=16  A [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 2, 3]
+        B [1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 10, 11, 12, 13, 14, 15]
+  T=32  A [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+        B [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 21, 23, 25, 27, 29, 31]
+  T=64  A [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+        B [5, 9, 13, 16, 20, 24, 28, 32, 36, 40, 44, 47, 51, 55, 59, 63]
+
+  Rows are COLUMNS of one forward, each with its own trajectory, so a repeated
+  depth is an independent view of it and not a duplicate.  Under the ring,
+  write vector j always lands at rows congruent to j (mod W), so whichever map
+  wins stays addressable and the depth-slice ablation survives.
+
+  wrote eval_results/p07_depth_band_13266933/b2/results.json
+---------------------------------------
+Begin Slurm Epilog: Sep-16-2026 19:17:54
+Job ID:        13266933
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      diag_depth_band.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=48G,node=1
+Rsrc Used:     cput=00:06:24,vmem=0,walltime=00:00:48,mem=3746196K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-10-0
+---------------------------------------
