@@ -95,7 +95,14 @@ def main() -> int:
     args = parse_args()
     probe = _load(args.probe)
     model = probe["model"]
-    parent = _load(args.parent)["model"] if args.parent else None
+    # ONE load of the parent, not two.  This used to read the file again below
+    # just to get `optimizer_step`, which held ~5.5 GB of a second copy of a
+    # 1.4B-parameter fp32 state dict for the length of the call and pushed the
+    # tool over the LOGIN NODE's memory cap -- where it was killed, and the
+    # kill read as the probe failing.  Keep the whole dict; take both things
+    # off it.  See pace/check_p1_probes.sbatch.
+    parent_ckpt = _load(args.parent) if args.parent else None
+    parent = parent_ckpt["model"] if parent_ckpt is not None else None
 
     ok = True
 
@@ -133,8 +140,7 @@ def main() -> int:
           f"{'E+Z' if (want_z or z_params) else 'E only'}"
           + ("  (Z is parameter-free here)" if want_z and not gated else ""))
     if args.parent:
-        pstep = _load(args.parent).get("agg_vars_dict", {}).get(
-            "optimizer_step", 0)
+        pstep = parent_ckpt.get("agg_vars_dict", {}).get("optimizer_step", 0)
         print(f"    parent step {pstep:,} -> +{step - pstep:,} steps")
         check("the probe advanced past its parent", step - pstep >= args.steps_min,
               f"{step - pstep} steps")
