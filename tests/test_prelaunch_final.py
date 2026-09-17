@@ -332,8 +332,11 @@ class TestTheSharedOverrideParser:
                   encoding="utf-8").read()
         # Anchor on the INVOCATION, not the header -- the header names every
         # step in running order before any of them runs.
+        # Step 3 now takes the arm geometry through $SETS, which carries
+        # accum_vecs; 3b sets it per side explicitly.
         i = sb.index('echo "######## 3. the 8-chunk')
-        assert "--set accum_vecs=$ACCUM_VECS" in sb[i:i + 700]
+        assert "$SETS" in sb[i:i + 900]
+        assert "--set accum_vecs=$ACCUM_VECS" in sb
 
     def test_the_width_contrast_reads_both_sides_from_the_same_step(self):
         """model_only_chkpt_90000 is 1,552 steps short of the parent the slice
@@ -341,7 +344,7 @@ class TestTheSharedOverrideParser:
         sb = open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
                   encoding="utf-8").read()
         i = sb.index('echo "######## 3b. THE WIDTH CONTRAST')
-        block = sb[i:i + 1800]
+        block = sb[i:sb.index("--out $OUT/width_contrast.json")]
         assert "$PARENT_PATH/chkpt.pt" in block
         assert "--set accum_vecs=$PARENT_VECS" in block
         assert "compare_width.py" in block
@@ -351,3 +354,77 @@ class TestTheSharedOverrideParser:
                   encoding="utf-8").read()
         assert 'if [ -n "$PARENT_PATH" ]; then' in sb
         assert "PARENT_PATH=${PARENT_PATH:-}" in sb
+
+
+class TestTheWalkRefusesNoise:
+    """REGRESSION from the 2026-09-16 19:09 job: the walk ran on RANDOM IDS
+    because the sbatch passed no prose source and random was the silent default.
+    Its losses sat at 11.6-11.9 against ln(100352) = 11.52 -- the model was
+    seeing noise, so every rank number in that table described noise."""
+
+    def test_a_prose_source_is_required(self):
+        src = open(os.path.join(REPO, "evals", "diag_dual_channel_walk.py"),
+                   encoding="utf-8").read()
+        assert 'p.add_argument("--data"' in src
+        assert 'p.add_argument("--random_ids"' in src
+        i = src.index("no prose source")
+        assert "describe noise" in src[i:i + 400]
+
+    def test_random_ids_is_opt_in_and_says_why_it_is_wrong(self):
+        src = open(os.path.join(REPO, "evals", "diag_dual_channel_walk.py"),
+                   encoding="utf-8").read()
+        i = src.index('p.add_argument("--random_ids"')
+        assert "nothing to converge on" in src[i:i + 900]
+
+    def test_the_prelaunch_job_passes_a_prose_source_to_every_walk(self):
+        sb = open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
+                  encoding="utf-8").read()
+        assert "PROSE=" in sb
+        body = sb[sb.index('echo "######## 3. the 8-chunk'):sb.index("compare_width.py")]
+        assert body.count("$PROSE") == 3, body.count("$PROSE")
+
+    def test_a_missing_prose_source_stops_the_job(self):
+        sb = open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
+                  encoding="utf-8").read()
+        i = sb.index("ERROR: no prose source for the walk")
+        assert "exit 1" in sb[i:i + 400]
+
+
+class TestStepThreeUsesTheArmsGeometry:
+    """The 19:09 job ran step 3 as accum / E-only, so the 'dual-channel walk'
+    exercised neither the gate nor Z and every Z column printed '-'.  Step 3 is
+    the MACHINERY check and must use the arm's geometry; step 3b compares
+    WEIGHTS and must use accum on both sides."""
+
+    @staticmethod
+    def _sb():
+        return open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
+                    encoding="utf-8").read()
+
+    def test_step_three_walks_the_gate_and_z(self):
+        sb = self._sb()
+        body = sb[sb.index('echo "######## 3. the 8-chunk'):
+                  sb.index('echo "######## 3b.')]
+        assert "$SETS" in body, "step 3 must take the arm geometry"
+        assert "--set prefix_memory=accum" not in body
+
+    def test_step_three_b_uses_accum_on_both_sides(self):
+        sb = self._sb()
+        body = sb[sb.index('echo "######## 3b.'):sb.index("compare_width.py")]
+        assert body.count("--set prefix_memory=accum") >= 1
+        assert "$SETS" not in body, "3b compares weights, not the arm geometry"
+
+    def test_accum_max_is_set_per_width_so_the_chunk_count_matches(self):
+        sb = self._sb()
+        assert "BRANCH_MAX=$(( CROSS_CHUNKS * ACCUM_VECS ))" in sb
+        assert "PARENT_MAX=$(( CROSS_CHUNKS * PARENT_VECS ))" in sb
+        body = sb[sb.index('echo "######## 3b.'):sb.index("compare_width.py")]
+        assert "--set accum_max=$BRANCH_MAX" in body
+        assert "--set accum_max=$PARENT_MAX" in body
+
+    def test_the_branch_side_of_the_contrast_is_its_own_file(self):
+        """3b's branch walk is accum, so it cannot reuse step 3's gated walk.json
+        -- that is what made the first contrast compare two different buffers."""
+        sb = self._sb()
+        assert "walk-branch-w$ACCUM_VECS.json" in sb
+        assert "--branch $OUT/walk-branch-w$ACCUM_VECS.json" in sb

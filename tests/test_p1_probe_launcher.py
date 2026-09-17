@@ -229,12 +229,16 @@ class TestUseMemoryIsTheMasterSwitch:
         # Scan from each marker to the END of the invocation it introduces,
         # not a fixed window -- the comment blocks are long and a fixed window
         # would pass or fail on prose length rather than on the flag.
-        for marker in ('echo "######## 3. the 8-chunk',
-                       'echo "######## 3b. THE WIDTH CONTRAST',
-                       'SETS="--set use_memory=true'):
+        # Steps 3 and 3b reach the switch through $SETS / $ACC_SETS, both of
+        # which lead with it; the definitions themselves are checked directly.
+        for marker, want in (('echo "######## 3. the 8-chunk', "$SETS"),
+                             ('echo "######## 3b. THE WIDTH CONTRAST', "$ACC_SETS"),
+                             ('SETS="--set use_memory=true', "--set use_memory=true")):
             i = PRELAUNCH.index(marker)
             j = PRELAUNCH.index("|| RC=1", i) if "########" in marker else i + 400
-            assert "--set use_memory=true" in PRELAUNCH[i:j], marker
+            assert want in PRELAUNCH[i:j], marker
+        assert 'SETS="--set use_memory=true' in PRELAUNCH
+        assert 'ACC_SETS="--set use_memory=true' in PRELAUNCH
 
     def test_the_probe_set_list_turns_memory_on(self):
         assert '--set use_memory=true' in ARMS

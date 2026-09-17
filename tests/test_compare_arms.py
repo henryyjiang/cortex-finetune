@@ -295,7 +295,8 @@ class TestTheWidthContrast:
     """
 
     @staticmethod
-    def _walk(n_vec, pr, rows=64):
+    def _walk(n_vec, pr, rows=None):
+        rows = rows if rows is not None else n_vec * 4
         return {"geometry": {"n_vec": n_vec},
                 "final_carry": {"rows": rows, "e_eff_rank_pr": pr,
                                 "e_eff_rank_entropy": pr * 1.8,
@@ -351,3 +352,38 @@ class TestTheWidthContrast:
         from tools import compare_width
         assert compare_width.DELIVERED_RETAINED_SURVIVES == 0.90
         assert compare_width.DELIVERED_BINDS_MARGIN == 0.10
+
+    def test_a_rank_increase_is_invalid_not_survives(self):
+        """REGRESSION from the 2026-09-16 19:09 job, which printed
+        '897% retained' and scored SURVIVES.
+
+        accum_max defaulted to 128 on BOTH sides, which is 8 chunks at W=16 but
+        only 4 at W=32 -- so the W=32 carry held 128 rows drawn from four
+        forwards (PR 1.64) against W=16's 128 rows from eight (PR 14.72).  The
+        9x gap was an EVICTION artifact with no width content, and the lower
+        bound alone could not see it: halving the write width cannot multiply
+        delivered rank.
+        """
+        from tools.compare_width import score
+        r = score(self._walk(32, 1.641, rows=128), self._walk(16, 14.719, rows=128))
+        assert r["verdict"] == "INVALID"
+
+    def test_a_mismatched_chunk_count_is_caught_before_the_ratio(self):
+        """The cause, not just the symptom: accum_max caps ROWS, so holding it
+        fixed across two widths changes the HORIZON."""
+        from tools.compare_width import score
+        r = score(self._walk(32, 4.0, rows=128),      # 4 chunks
+                  self._walk(16, 4.0, rows=128))      # 8 chunks
+        assert r["verdict"] == "INVALID"
+        assert "different numbers of CHUNKS" in r["why"]
+        # and it says how to fix it, per width
+        assert "accum_max = chunks x W" in r["why"]
+
+    def test_matched_chunk_counts_still_score_normally(self):
+        """The guard must not swallow the comparison it exists to protect:
+        accum_max = chunks x W on each side keeps the chunk count equal."""
+        from tools.compare_width import score
+        r = score(self._walk(32, 4.10, rows=256),     # 8 chunks
+                  self._walk(16, 4.02, rows=128))     # 8 chunks
+        assert r["verdict"] == "SURVIVES"
+        assert r["chunks_retained"] == [8.0, 8.0]

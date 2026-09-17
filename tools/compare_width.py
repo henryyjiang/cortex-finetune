@@ -46,6 +46,15 @@ sys.path.insert(0, REPO)
 #: not the architecture.
 DELIVERED_RETAINED_SURVIVES = 0.90
 
+#: A retained ratio ABOVE this is not a result, it is a broken comparison.
+#: Measured 2026-09-16: the first width contrast printed "897% retained" and
+#: scored SURVIVES, because `accum_max` defaulted to 128 on BOTH sides -- which
+#: is 8 chunks at W=16 but only 4 at W=32.  The W=32 carry therefore held 128
+#: rows drawn from four forwards (highly redundant, PR 1.64) against W=16's 128
+#: rows from eight (PR 14.72), and the 9x gap was an EVICTION artifact with no
+#: width content at all.  Halving the write width cannot multiply delivered rank.
+DELIVERED_RETAINED_MAX = 1.25
+
 #: Within this much of the COLUMN fraction (0.50 at 32 -> 16), width binds on
 #: the delivered side and the horizon argument has to be re-made against a real
 #: cost.  Between the two bands is the honest "partial" verdict.
@@ -86,6 +95,34 @@ def score(parent: dict, branch: dict) -> dict:
     col_frac = b["n_vec"] / a["n_vec"]
     out["delivered_retained"] = retained
     out["column_fraction"] = col_frac
+
+    # THE CONFOUND THAT HAS TO BE RULED OUT FIRST: how many CHUNKS each side's
+    # carry represents.  `accum_max` caps ROWS, not chunks, so holding it fixed
+    # across two widths silently changes the horizon -- 128 rows is 8 chunks at
+    # W=16 and 4 at W=32 -- and a carry built from half as many forwards is far
+    # more redundant for reasons that have nothing to do with the write width.
+    for tag, r in (("parent", a), ("branch", b)):
+        r["chunks_retained"] = (r["rows"] / r["n_vec"]
+                                if r["rows"] and r["n_vec"] else None)
+    ca, cb = a["chunks_retained"], b["chunks_retained"]
+    out["chunks_retained"] = [ca, cb]
+    if ca and cb and abs(ca - cb) > 1e-6:
+        out["verdict"] = "INVALID"
+        out["why"] = (
+            f"the two sides retain different numbers of CHUNKS ({ca:g} vs "
+            f"{cb:g}), so this compares horizon and not width.  accum_max caps "
+            f"ROWS: set it per width to keep the chunk count equal -- "
+            f"accum_max = chunks x W, i.e. {int(ca * a['n_vec'])} at W="
+            f"{a['n_vec']} and {int(ca * b['n_vec'])} at W={b['n_vec']}.")
+        return out
+    if retained > DELIVERED_RETAINED_MAX:
+        out["verdict"] = "INVALID"
+        out["why"] = (
+            f"delivered rank went UP by {retained:.2f}x on half the write "
+            f"columns, which no width effect produces.  Something other than "
+            f"width differs between the two runs -- check accum_max, the "
+            f"prose source, and that both sides loaded their own weights.")
+        return out
     if retained >= DELIVERED_RETAINED_SURVIVES:
         out["verdict"] = "SURVIVES"
         out["why"] = ("the delivered rank is essentially unchanged, so the "
@@ -125,6 +162,9 @@ def print_report(rec, out=sys.stdout) -> None:
         p("")
         p(f"  delivered rank retained: {100 * rec['delivered_retained']:.0f}% "
           f"at {100 * rec['column_fraction']:.0f}% of the write columns")
+        if rec.get("chunks_retained"):
+            p(f"  chunks retained: {rec['chunks_retained']} "
+              f"(these MUST match, or the contrast is horizon and not width)")
     p("")
     p(f"  VERDICT: {rec['verdict']}")
     for line in rec["why"].split(". "):

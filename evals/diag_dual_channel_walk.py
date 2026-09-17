@@ -98,7 +98,22 @@ def parse_args() -> argparse.Namespace:
                         "the split, so read_live varies chunk to chunk the way "
                         "it does in training")
     p.add_argument("--text_file", default=None,
-                   help="real prose to walk over; random ids if omitted")
+                   help="real prose to walk over, re-tokenized with this "
+                        "model's own tokenizer")
+    p.add_argument("--data", default=None,
+                   help="a PACKED dataset to walk over -- preferred, because it "
+                        "is already tokenized with this model's tokenizer and it "
+                        "is the corpus the arms train on.  ONE OF --data OR "
+                        "--text_file IS REQUIRED unless --random_ids is given.")
+    p.add_argument("--random_ids", action="store_true",
+                   help="walk over RANDOM token ids.  Almost never what you "
+                        "want: the loop has nothing to converge on, so the "
+                        "trajectory is not the trained one and neither is the "
+                        "carry built from it.  Measured 2026-09-16: a random-id "
+                        "walk sat at loss 11.6-11.9 against ln(vocab) = 11.52, "
+                        "i.e. the model was seeing noise, and every rank number "
+                        "in that table described noise.  Kept for unit tests "
+                        "and for checking plumbing on a toy model.")
     p.add_argument("--no_backward", action="store_true")
     p.add_argument("--dtype", default="float32",
                    choices=["float32", "bfloat16", "float16"])
@@ -402,7 +417,17 @@ def print_walk(rec, out=sys.stdout) -> None:
 
 def _chunks_from_args(args, model, tok_vocab):
     torch.manual_seed(args.seed)
-    if args.text_file:
+    if args.data:
+        from datasets import load_from_disk
+        ds = load_from_disk(args.data)
+        need = args.chunks * args.chunk_len
+        rows = [ds[i]["input_ids"][:need] for i in range(args.batch)]
+        if min(len(r) for r in rows) < need:
+            raise SystemExit(
+                f"{args.data} rows are shorter than {need} tokens; lower "
+                f"--chunks or --chunk_len.")
+        ids = torch.tensor(rows, dtype=torch.long)
+    elif args.text_file:
         from transformers import AutoTokenizer
         tok = AutoTokenizer.from_pretrained(args.model_name,
                                             trust_remote_code=True)
@@ -413,9 +438,15 @@ def _chunks_from_args(args, model, tok_vocab):
             ids = torch.cat([ids, ids])
         ids = ids[:need - 8].reshape(args.batch, -1)
         ids = ids[:, :args.chunks * args.chunk_len]
-    else:
+    elif args.random_ids:
         ids = torch.randint(0, tok_vocab - 1,
                             (args.batch, args.chunks * args.chunk_len))
+    else:
+        raise SystemExit(
+            "no prose source.  Pass --data <packed dataset> (preferred) or "
+            "--text_file <path>.  --random_ids exists but gives the loop "
+            "nothing to converge on, so every number in the table would "
+            "describe noise rather than the trained trajectory.")
     return [c.contiguous() for c in torch.chunk(ids, args.chunks, dim=1)]
 
 

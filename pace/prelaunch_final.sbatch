@@ -73,10 +73,22 @@ BRANCH_PATH=${BRANCH_PATH:-}
 # is the only way the comparison isolates width from training.
 PARENT_PATH=${PARENT_PATH:-}
 PARENT_VECS=${PARENT_VECS:-32}
-# The PARENT is an accum run; the walk instruments whatever buffer the
-# checkpoint's weights actually belong to, so the width contrast reads both
-# sides as accum.  The gate geometry is exercised in step 4, not here.
-WALK_MODE=${WALK_MODE:-accum}
+# WHAT THE WALK READS.  Random ids are not an option: the loop has nothing to
+# converge on, so the trajectory is not the trained one and every rank number
+# describes noise.  The 19:09 job ran that way and sat at loss 11.6-11.9 against
+# ln(vocab) = 11.52.  DATA is preferred (already tokenized with this model's
+# tokenizer, and it is the corpus the arms train on).
+DATA=${DATA:-data/pg19_fw50_olmo_len4096}
+TEXT=${TEXT:-}
+if [ -n "$DATA" ] && [ -d "$DATA" ]; then
+    PROSE="--data $DATA"
+elif [ -n "$TEXT" ] && [ -f "$TEXT" ]; then
+    PROSE="--text_file $TEXT"
+else
+    echo "ERROR: no prose source for the walk.  DATA=$DATA is not a directory"
+    echo "  and TEXT=$TEXT is not a file.  Set DATA to a packed dataset."
+    exit 1
+fi
 ACCUM_VECS=${ACCUM_VECS:-16}
 GATE_SLOTS=${GATE_SLOTS:-64}
 CROSS_CHUNKS=${CROSS_CHUNKS:-8}
@@ -140,45 +152,51 @@ SETS="--set use_memory=true --set memory_slots=0"
 SETS="$SETS --set latent_carry=true --set prefix_memory=gated"
 SETS="$SETS --set accum_vecs=$ACCUM_VECS --set gate_slots=$GATE_SLOTS"
 SETS="$SETS --set gate_route=ring --set gate_init=zero --set gate_fill=grow"
-
 echo ""
 echo "######## 3. the 8-chunk dual-channel walk ########"
-# --set accum_vecs is NOT optional on a sliced branch: summary_emb is a
-# parameter SHAPE, and the config the base dir carries is the PARENT's (W=32).
-# A [16, D] slice loaded against it is a size mismatch, so the walk would die
-# before printing a single row.
+# AT THE ARM'S GEOMETRY, gate and Z included.  The parent's weights are accum
+# E-only, so the gate and Z parameters come up freshly initialised -- which is
+# the point: this step checks the MACHINERY (does the ring write the rows the
+# rule predicts, does s0's head equal the carried Z, do all nine watched
+# parameters have a gradient path), not this checkpoint's quality.
+# Running it as accum/E-only, as the 2026-09-16 19:09 job did, exercises
+# neither the gate nor Z and the table's Z columns all print "-".
 python evals/diag_dual_channel_walk.py --model_name $MODEL $CKPT_ARG \
-    --set use_memory=true --set memory_slots=0 \
-    --set prefix_memory=$WALK_MODE --set accum_vecs=$ACCUM_VECS \
+    $SETS $PROSE \
     --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
     --out $OUT/walk.json || RC=1
 
 if [ -n "$PARENT_PATH" ]; then
     echo ""
     echo "######## 3b. THE WIDTH CONTRAST: W=$PARENT_VECS vs W=$ACCUM_VECS ########"
-    # WHY THIS EXISTS.  tools/slice_summary_emb.py reported that halving W keeps
-    # 54% of the parent's summary_emb rank at 50% of the columns -- the trained
-    # write basis was NOT redundant, which retires P1.0's at-init "the slots were
-    # never carrying 32 things" argument.
+    # ACCUM ON BOTH SIDES, because this step compares WEIGHTS and the weights
+    # on both sides are accum.  It is the delivered-rank read that p11 section 4
+    # pre-registers, not a machinery check.
     #
-    # But summary_emb is the WRITE BASIS, not what reaches attention.  The number
-    # that decides whether width binds is the DELIVERED rank: the effective rank
-    # of the carried post-ln_f block, ~4 of 32 on B2.  ~4 at both widths means
-    # the basis given up never reached the token stream.  p11_z_probe_prereg.md
-    # section 4 fixes the reading BEFORE this runs.
-    #
-    # BOTH WALKS COME OFF THE SAME STEP.  The newest weights-only dir in the heal
-    # run is model_only_chkpt_90000, 1,552 steps short of the parent the slice
-    # was cut from; using it would confound width with training, so both sides
-    # read the 91552 chkpt.pt.
+    # accum_max MUST BE SET PER WIDTH.  It caps ROWS, not chunks, so leaving it
+    # at one value across two widths silently changes the HORIZON: 128 rows is 8
+    # chunks at W=16 but only 4 at W=32.  The 19:09 job did exactly that and
+    # produced "897% retained", scored SURVIVES -- a carry built from half as
+    # many forwards is far more redundant, and none of that gap is about width.
+    # chunks x W keeps the chunk count equal, which compare_width now enforces.
+    BRANCH_MAX=$(( CROSS_CHUNKS * ACCUM_VECS ))
+    PARENT_MAX=$(( CROSS_CHUNKS * PARENT_VECS ))
+    echo "    accum_max: $PARENT_MAX at W=$PARENT_VECS, $BRANCH_MAX at W=$ACCUM_VECS"
+    echo "    (both retain $CROSS_CHUNKS chunks -- that is what makes it a width contrast)"
+    ACC_SETS="--set use_memory=true --set memory_slots=0 --set prefix_memory=accum"
+    python evals/diag_dual_channel_walk.py --model_name $MODEL $CKPT_ARG \
+        $ACC_SETS --set accum_vecs=$ACCUM_VECS --set accum_max=$BRANCH_MAX $PROSE \
+        --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
+        --no_backward --out $OUT/walk-branch-w$ACCUM_VECS.json || RC=1
     python evals/diag_dual_channel_walk.py --model_name $MODEL \
         --checkpoint $PARENT_PATH/chkpt.pt \
-        --set use_memory=true --set memory_slots=0 \
-        --set prefix_memory=$WALK_MODE --set accum_vecs=$PARENT_VECS \
+        $ACC_SETS --set accum_vecs=$PARENT_VECS --set accum_max=$PARENT_MAX $PROSE \
         --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
         --no_backward --out $OUT/walk-parent-w$PARENT_VECS.json || RC=1
-    python tools/compare_width.py --parent $OUT/walk-parent-w$PARENT_VECS.json \
-        --branch $OUT/walk.json || RC=1
+    python tools/compare_width.py \
+        --parent $OUT/walk-parent-w$PARENT_VECS.json \
+        --branch $OUT/walk-branch-w$ACCUM_VECS.json \
+        --out $OUT/width_contrast.json || RC=1
 fi
 echo ""
 echo "######## 4. the pre-launch gates ########"

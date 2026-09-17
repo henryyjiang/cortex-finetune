@@ -220,6 +220,7 @@ def check_roundtrip(model, chunks, num_steps=None, seed=0,
         rebuilt.load_state_dict(sd, strict=True)
     except Exception as e:                      # noqa: BLE001 -- reported, not raised
         err = f"{type(e).__name__}: {e}"
+    rebuilt = _like(model, rebuilt)
     rebuilt.train(model.training)
     out = {"gate": "checkpoint_roundtrip", "strict_load_error": err,
            "raw_from_dict_error": raw_err,
@@ -483,6 +484,19 @@ def parse_args() -> argparse.Namespace:
 from model_utils import parse_config_overrides as _parse_set  # noqa: E402
 
 
+def _like(model, other):
+    """Put a freshly constructed model on the SOURCE model's device and dtype.
+
+    `type(model)(cfg)` builds on CPU, and `load_state_dict` COPIES INTO the
+    existing parameters, so the rebuild stays on CPU no matter where the weights
+    came from.  Feeding it the CUDA batches everything else uses then dies with
+    "found at least two devices" -- after the gate has already loaded two 1B
+    models.  Cheap to get right, and invisible until it runs on a GPU.
+    """
+    p = next(model.parameters())
+    return other.to(device=p.device, dtype=p.dtype)
+
+
 def build_e_twin(model):
     """An E-only model from the same weights, for gate 1.
 
@@ -509,6 +523,7 @@ def build_e_twin(model):
         raise RuntimeError(
             "an E-only rebuild dropped keys that are not the Z gate: "
             f"{stray[:8]}.  The twin is not comparable to the Z model.")
+    twin = _like(model, twin)
     twin.train(model.training)
     return twin, unexpected
 
