@@ -20,6 +20,17 @@ reveals:
      projections are exactly zero, so any movement at all is proof the gradient
      reached them.  Zero movement after N steps with a finite gradient is not
      possible; zero movement means no gradient path.
+
+     THIS CHECK APPLIES TO THE GATED ARMS ONLY.  Z is PARAMETER-FREE on the
+     accum buffer: PrefixAccumBuffer.merge concatenates E and Z on the last dim
+     and owns no gate, so a2 (accum + Z) has no `_z` tensors to inspect and
+     never will.  Requiring them there fails a healthy arm; requiring them
+     wherever the buffer is merely `gated` fails a healthy E-only a3.  Both are
+     "the instrument disagreed with the architecture", which is the bug class
+     this file exists to catch and is therefore the one it must not commit.
+     For a2, liveness is evals/diag_dual_channel_walk.py's question (2D carry
+     width, |Z|/s0, z-read) plus the ValueError join_channels raises when the
+     in-loop latent write never fired.
   2. did `summary_emb` keep training?  It is the shared write path, and a probe
      that branched at the wrong width would have re-seeded it from wte[eos] --
      which shows up here as the parent-to-probe distance being enormous rather
@@ -99,12 +110,28 @@ def main() -> int:
     latent_keys = [k for k in prefix if k.endswith("_z")
                    or k.endswith("_z.weight") or k.endswith("_z.bias")]
     gated = any("gate_proj_in." in k for k in prefix)
-    dual = bool(latent_keys)
+    z_params = bool(latent_keys)
+
+    # WHAT THE ARM ASKED FOR.  Read here, before any check uses it, because
+    # PARAMETER PRESENCE CANNOT STAND IN FOR IT: Z is parameter-free on the
+    # accum buffer.  PrefixAccumBuffer.merge only join_channels-concatenates E
+    # and Z on the last dim (cortex_memory/buffers.py), so an accum+Z arm owns
+    # no `_z` tensors and never will, while PrefixGatedBuffer allocates a
+    # SECOND GATE (gate_proj_*_z, forget_bias_z, input_bias_z) under the same
+    # flag.  Inferring "is this a Z arm" from `_z` keys therefore fails A2 by
+    # construction, and inferring it from `gated` fails A3 the same way.
+    cfg = probe.get("cfg", {}) or {}
+    cortex_cfg = cfg.get("cortex", {}) if isinstance(cfg, dict) else {}
+    want_z = bool(cortex_cfg.get("latent_carry"))
+    #: Z parameters exist ONLY where a gated arm asked for Z.  That is the only
+    #: configuration in which "config says Z, parameters say no" is a defect.
+    expect_z_params = gated and want_z
 
     print(f"\n=== Z probe | {args.probe} ===")
     print(f"    optimizer_step {step:,}  |  buffer: "
           f"{'gated' if gated else 'accum'}, "
-          f"{'E+Z' if dual else 'E only'}")
+          f"{'E+Z' if (want_z or z_params) else 'E only'}"
+          + ("  (Z is parameter-free here)" if want_z and not gated else ""))
     if args.parent:
         pstep = _load(args.parent).get("agg_vars_dict", {}).get(
             "optimizer_step", 0)
@@ -114,14 +141,28 @@ def main() -> int:
 
     print("\n-- is every block attached to the loss? --")
 
-    if not dual:
-        print("  [SKIP] no Z parameters in this checkpoint.  Either the arm is "
-              "E-only\n         (a1/a3, in which case this tool is the wrong "
-              "one) or --cortex.latent_carry\n         never reached the graft "
-              "-- check the run's [cortex] banner line.")
-        if gated:
-            check("this is not a Z probe", False,
-                  "asked to check Z, found an E-only buffer")
+    if not z_params:
+        if expect_z_params:
+            print("  [SKIP] no Z parameters in this checkpoint, and this arm "
+                  "ASKED for them.")
+            check("the Z gate exists", False,
+                  "gated arm with --cortex.latent_carry true, but no _z "
+                  "parameters -- latent_carry never reached the graft; check "
+                  "the run's [cortex] banner line")
+        elif want_z:
+            print("  [SKIP] no Z parameters, and NONE ARE EXPECTED: this is an "
+                  "accum+Z arm\n         (a2), whose Z channel is parameter-"
+                  "free -- merge concatenates E and Z\n         on the last "
+                  "dim and owns no gate.  Whether Z is LIVE here is a\n"
+                  "         question for evals/diag_dual_channel_walk.py (2D "
+                  "carry width, |Z|/s0,\n         z-read), and for the fact "
+                  "that join_channels RAISES when the latent\n         write "
+                  "never fired.  It is not one this tool can answer.")
+        else:
+            print("  [SKIP] no Z parameters, and the config did not ask for "
+                  "any: an E-only\n         arm (a1/a3).  Every Z check below "
+                  "is correctly skipped, and NONE of\n         this is a "
+                  "failure.")
 
     # 1. THE Z GATE.  At gate_init="zero" the projections start at EXACTLY zero,
     #    so any nonzero weight is proof the gradient arrived.  This is the
@@ -173,12 +214,15 @@ def main() -> int:
     check("every parameter is finite", not bad, f"{bad[:6]}" if bad else "")
 
     # 5. THE SHAPES THE CONFIG ASKED FOR.
-    cfg = probe.get("cfg", {}) or {}
-    cortex_cfg = cfg.get("cortex", {}) if isinstance(cfg, dict) else {}
     if cortex_cfg:
-        want_z = bool(cortex_cfg.get("latent_carry"))
-        check("latent_carry in the config matches the parameters found",
-              want_z == dual, f"config {want_z}, parameters {dual}")
+        if gated:
+            check("latent_carry in the config matches the parameters found",
+                  want_z == z_params,
+                  f"config {want_z}, parameters {z_params}")
+        elif z_params:
+            # The reverse mismatch, and the only one an accum arm can show.
+            check("an accum buffer owns no _z parameters", False,
+                  f"config {want_z}, found {sorted(latent_keys)}")
         w_cfg = int(cortex_cfg.get("accum_vecs", 0) or 0)
         if w_cfg and "cortex.prefix.summary_emb" in model:
             got = int(model["cortex.prefix.summary_emb"].shape[0])

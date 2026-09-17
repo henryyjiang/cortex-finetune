@@ -94,12 +94,45 @@
 #
 # TWO THINGS TO SETTLE BEFORE A FULL Z LAUNCH, both cheap and both upstream:
 #
-#   1. P0.7, `pace/diag_depth_band.sbatch`.  latent_depth_rule defaults to
-#      "absolute" because that is what P0.1 measured -- at a SINGLE T, which
-#      cannot distinguish "steps 2..9 whatever T is" from "the first quarter of
-#      the loop".  The two diverge sharply at T=32.  The flag exists so the
-#      answer is a config change; running before P0.7 reports means asserting an
-#      answer you do not have, and train.py prints a banner saying so.
+#   1. P0.7, `pace/diag_depth_band.sbatch`.  REPORTED -- 2026-09-16, job
+#      13266933, T in 8 16 32 64, eval_results/p07_depth_band_13266933.  This
+#      is the record train.py's banner asks for, so read it before treating
+#      that banner as an open question.
+#
+#      THE ANSWER IS ABSOLUTE, on the criterion that gets to decide.  Novelty:
+#      edges {T32: 26, T64: 26}, CV(absolute) 0.000 against CV(relative) 0.333.
+#      Magnitude disagreed -- edges {T16: 10, T32: 21}, absolute ratio 2.10 vs
+#      relative 1.05 -- but came back UNRELIABLE and does not get a vote: its
+#      series RE-CROSSES its floor, so the "edge" it reports is a LAST crossing
+#      that grows with the OBSERVATION WINDOW rather than with the band, which
+#      hands the verdict to relative by construction.  Prefer novelty when the
+#      two part: Z carries the pathway, not the displacement.
+#
+#      SO latent_depth_rule="absolute" below has a measurement behind it now
+#      rather than an assumption.  It is NOT yet the settled answer, and these
+#      arms do not need it to be -- at mr8 the rules coincide.  THREE CAVEATS
+#      ride with it, in descending order of how much they could still bite:
+#
+#        - THE OOD CONFOUND IS NOT REMOVED, and this job's own header (item
+#          "THE CONFOUND THIS JOB CANNOT REMOVE ON ITS OWN") says so.  The
+#          sweep ran on ONE model, a B2-family checkpoint whose ramp capped
+#          max_mean_rec at 8 while its config.json still says 32, so T=16, 32
+#          and 64 may all be out of distribution and an "absolute" band may be
+#          reporting where THIS MODEL stops rather than where the information
+#          is.  Two things would close it and neither has run: --trained_depth
+#          to mark the OOD rows (wired at 21:54, AFTER the 19:17 sweep, so that
+#          run printed "TRAINED mean_recurrence UNKNOWN"), and HUGINN=1 for the
+#          mr32 generalisation where t=2..32 is all in distribution.  Re-run
+#          both before any arm trains at mr>=16.
+#        - the measured upper edge is t_hi=26 and LATENT_HI defaults to 9.
+#          Deliberate, not a contradiction: at mr8 the loop is 8 steps long, so
+#          2..9 IS the whole loop and 26 is unreachable.  The gap only becomes
+#          a decision at mr>=16 -- revisit LATENT_HI there, with item 2 below,
+#          which bites at exactly the same place and for a related reason.
+#        - the sweep ran on model_only_chkpt_90000 at n_vec=32, the B2-width
+#          parent, not the w16 branch these arms take.  The rule is a property
+#          of the recurrence and not of the buffer width, so it carries; the
+#          EDGE is the part to re-measure if it ever stops being unreachable.
 #   2. THE GRADIENT WINDOW.  The no-grad loop runs FIRST, so the trainable
 #      region is always the LAST mean_backprop_depth (8) iterations.  At mr8 --
 #      these checkpoints -- the whole loop is in the gradient and the write band
@@ -354,7 +387,12 @@ if [ "$LATENT" = "1" ]; then
     echo "    Z channel ON: carry widens to 2D, rows and read cost UNCHANGED."
     echo "      depth rule=${LATENT_RULE:-absolute} band=${LATENT_LO:-2}..${LATENT_HI:-9}" \
          "renorm=${LATENT_RENORM:-none}"
-    echo "      the rule is P0.7's question (pace/diag_depth_band.sbatch)."
+    echo "      rule=absolute now has P0.7 behind it (job 13266933): novelty"
+    echo "      edges {T32: 26, T64: 26}, CV 0.000 absolute vs 0.333 relative."
+    echo "      Magnitude disagreed and was ruled unreliable (its edge"
+    echo "      re-crosses its floor).  NOT settled: the OOD confound is open"
+    echo "      (one model, trained depth unmarked, no HUGINN row) and t_hi=26"
+    echo "      is unreachable at mr8, so the rules coincide here.  Header."
     echo "      mr=$MAX_MEAN_REC with mean_backprop_depth 8: the trainable region"
     echo "      is the LAST 8 loop steps, so at mr8 the whole write band trains."
 fi

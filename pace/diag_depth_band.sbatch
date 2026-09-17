@@ -33,6 +33,33 @@
 # relative to the arm's own trained depth rather than in absolute steps.
 # Do not generalise off the B2 row alone.
 #
+# WHAT IT HAS REPORTED SO FAR -- 2026-09-16, job 13266933, T in 8 16 32 64,
+# eval_results/p07_depth_band_13266933 (an earlier attempt, 13266802, swept
+# T in 4 8 16 32 and returned NO VERDICT: too few uncensored T, both CVs inf).
+#
+#   novelty    ABSOLUTE.  edges {T32: 26, T64: 26}; CV(absolute) 0.000 against
+#              CV(relative) 0.333.  T=8 and T=16 are censored -- the band is
+#              still open at T, so their edges are lower bounds only.
+#   magnitude  UNRELIABLE, and it does not get a vote.  edges {T16: 10,
+#              T32: 21}, which reads as absolute ratio 2.10 vs relative 1.05 --
+#              but the series RE-CROSSES its floor, so that edge is a LAST
+#              crossing and grows with the OBSERVATION WINDOW, not with the
+#              band.  That defect hands the verdict to relative by
+#              construction.  Either read the FIRST crossing or move the floor
+#              clear of the oscillation before quoting this row.
+#   the trajectory is T-INVARIANT to 2 decimals: d/s0 at t=1..12 is the same
+#   series at T=8, 16, 32 and 64 (31.9, 15.2, 7.94, 4.48, 2.63, 1.67, 1.12,
+#   0.81, 0.64, 0.56, 0.50, 0.44), which is itself the cleanest evidence for
+#   absolute -- a relative band would have to stretch with T and it does not.
+#
+# STILL OPEN, and BOTH are re-runs of this same job:
+#   - the OOD confound above.  13266933 ran BEFORE --trained_depth was wired
+#     (21:54 that evening), so it printed "TRAINED mean_recurrence UNKNOWN" and
+#     marked nothing.  Re-run with TRAINED_DEPTH set.
+#   - HUGINN=1 has never run.  Until it does, "absolute" rests on one model.
+# Neither blocks the P1 arms: they train at mr8, where the loop is 8 steps and
+# the two rules select the same depths.  Both block any arm at mr>=16.
+#
 # REAL PROSE, NOT RANDOM IDS.  Random ids give the loop nothing to converge ON,
 # so the trajectory shape is not the trained one and the band is not the trained
 # band.  The repo's own planning docs are the same text the other probes in this
