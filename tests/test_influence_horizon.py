@@ -225,3 +225,45 @@ class TestChannelSplit:
             damage_pair(torch.randn(1, 2, 3), None, None, None, "random", "e")
         with pytest.raises(ValueError, match="generator"):
             damage_write(torch.randn(1, 2, 3), None, "random", "both", 3)
+
+
+class TestTheGeometryReachesTheGraft:
+    """The first real launch of pace/eval_deciding.sbatch died here.
+
+    `--model_name` loads the BASE dir's config, and ckpts/olmo-retrofit-cortex
+    carries no cortex flags at all -- `use_memory` is '<absent>' there, which is
+    why every p1_arms probe log opens with a block of "[cortex] OVERRIDE" lines.
+    An eval that cannot force them builds a graft with no prefix buffer and
+    exits 2.  Both deciding evals now take --set; these pin it, because the
+    failure only shows up against a real 1.4B checkpoint that no unit test can
+    load.
+    """
+
+    @pytest.mark.parametrize("mod", ["eval_influence_horizon", "eval_carry_2x2"])
+    def test_the_eval_takes_set_and_parses_it(self, mod, monkeypatch):
+        import importlib
+        m = importlib.import_module(f"evals.{mod}")
+        from model_utils import parse_config_overrides
+        monkeypatch.setattr(
+            sys, "argv",
+            [mod, "--model_name", "x", "--data", "d",
+             "--set", "use_memory=true", "--set", "accum_vecs=16"])
+        args = m.parse_args()
+        assert args.set == ["use_memory=true", "accum_vecs=16"]
+        ov = parse_config_overrides(args.set)
+        assert ov["use_memory"] is True and ov["accum_vecs"] == 16
+
+    @pytest.mark.parametrize("mod", ["eval_influence_horizon", "eval_carry_2x2"])
+    def test_it_actually_forwards_them_to_the_loader(self, mod):
+        """Parsing the flag and dropping it would look identical from the CLI
+        and identical in the log, right up to the empty buffer."""
+        import ast
+        src = open(os.path.join(REPO, "evals", f"{mod}.py"),
+                   encoding="utf-8").read()
+        calls = [n for n in ast.walk(ast.parse(src))
+                 if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", None) == "load_checkpoint"]
+        assert calls, f"{mod} does not call load_checkpoint at all"
+        assert all(any(k.arg == "config_overrides" for k in c.keywords)
+                   for c in calls), (
+            f"{mod} parses --set but never hands it to load_checkpoint")

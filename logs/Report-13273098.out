@@ -1,0 +1,93 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 00:20:42
+Job ID:    13273098
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  diag_depth_band.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== P0.7 depth band | cortex-retrofit/retro-b2-heal/model_only_chkpt_90000 | T in 8 16 32 64 ===
+    trained depth: 8
+    prose source: data/pg19_fw50_olmo_len4096 (packed; the arms' own corpus and tokenizer)
+NVIDIA A100-PCIE-40GB, 40960 MiB
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.01s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.83it/s]
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[cortex] carry buffer: n_vec=32 max_vecs=128 (config.json) -> holds the newest 4 chunks; older writes are dropped by the FIFO
+
+=== P0.7 depth band | model_only_chkpt_90000 | data/pg19_fw50_olmo_len4096 ===
+    D=2048 seq_len=512 batch=2 dtype=float32 prefix=on
+    TRAINED mean_recurrence = 8 (given); config.json says 32, which is INHERITED from the base recipe.
+    Any T above 8 is OUT OF DISTRIBUTION, and a band that looks absolute there may only be saying that this model stops at 8.
+  T=8   band edge: magnitude 8+, novelty 8+
+  T=16  band edge: magnitude 8, novelty 16+   [OOD]
+  T=32  band edge: magnitude 8, novelty 25   [OOD]
+  T=64  band edge: magnitude 8, novelty 25   [OOD]
+
+==============================================================================
+the trajectory, per T
+==============================================================================
+T=8
+  t            1      2      3      4      5      6      7      8
+  d/s0     31.58  15.09   7.73   4.29   2.44   1.46   0.91   0.59
+  cos          -   0.05  -0.21  -0.29  -0.32  -0.36  -0.37  -0.36
+T=16  (first 12 steps)
+  t            1      2      3      4      5      6      7      8      9     10     11     12
+  d/s0     31.59  15.09   7.74   4.30   2.44   1.46   0.91   0.59   0.39   0.27   0.19   0.14
+  cos          -   0.05  -0.21  -0.29  -0.32  -0.36  -0.37  -0.36  -0.33  -0.30  -0.27  -0.26
+T=32  (first 12 steps)
+  t            1      2      3      4      5      6      7      8      9     10     11     12
+  d/s0     31.57  15.08   7.74   4.29   2.44   1.46   0.91   0.59   0.39   0.27   0.19   0.14
+  cos          -   0.05  -0.21  -0.29  -0.32  -0.36  -0.37  -0.36  -0.33  -0.30  -0.27  -0.26
+T=64  (first 12 steps)
+  t            1      2      3      4      5      6      7      8      9     10     11     12
+  d/s0     31.60  15.09   7.73   4.30   2.44   1.46   0.91   0.59   0.39   0.27   0.19   0.14
+  cos          -   0.05  -0.21  -0.29  -0.32  -0.36  -0.37  -0.36  -0.33  -0.30  -0.27  -0.25
+
+==============================================================================
+VERDICT — does the band's upper edge hold at a fixed t, or a fixed t/T?
+==============================================================================
+  magnitude  edges {16: 8, 32: 8, 64: 8}
+             excluded (band still open at T, so the edge is a lower bound): [8]
+             CV(absolute) 0.000   CV(relative) 0.535   -> ABSOLUTE
+             T16 vs T32 (THE row to read): t_hi 8 -> 8; absolute ratio 1.00 (1.0 = absolute), relative ratio 0.50 (1.0 = relative)
+  novelty    edges {32: 25, 64: 25}
+             excluded (band still open at T, so the edge is a lower bound): [8, 16]
+             CV(absolute) 0.000   CV(relative) 0.333   -> ABSOLUTE
+             no T16/T32 pair in the sweep -- the full-sweep CV flatters BOTH rules,
+             because at small T they select nearly the same depths.  EXTEND the sweep upward (--T 8 16 32 64) so a second uncensored point exists.
+
+==============================================================================
+the slot -> depth map each rule implies (n_slots = 16)
+==============================================================================
+  upper edge taken from: magnitude -> t_hi = 8
+  T=8   A [2, 3, 4, 5, 6, 7, 2, 3, 4, 5, 6, 7, 2, 3, 4, 5]
+        B [2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7]
+  T=16  A [2, 3, 4, 5, 6, 7, 8, 2, 3, 4, 5, 6, 7, 8, 2, 3]
+        B [4, 4, 5, 6, 7, 8, 8, 9, 10, 10, 11, 12, 13, 14, 14, 15]
+  T=32  A [2, 3, 4, 5, 6, 7, 8, 2, 3, 4, 5, 6, 7, 8, 2, 3]
+        B [8, 9, 11, 12, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31]
+  T=64  A [2, 3, 4, 5, 6, 7, 8, 2, 3, 4, 5, 6, 7, 8, 2, 3]
+        B [16, 19, 22, 25, 28, 32, 35, 38, 41, 44, 47, 50, 54, 57, 60, 63]
+
+  Rows are COLUMNS of one forward, each with its own trajectory, so a repeated
+  depth is an independent view of it and not a duplicate.  Under the ring,
+  write vector j always lands at rows congruent to j (mod W), so whichever map
+  wins stays addressable and the depth-slice ablation survives.
+
+  wrote eval_results/p07_depth_band_13273098/b2/results.json
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 00:21:33
+Job ID:        13273098
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      diag_depth_band.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=48G,node=1
+Rsrc Used:     cput=00:06:56,vmem=0,walltime=00:00:52,mem=3497008K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-35-0
+---------------------------------------

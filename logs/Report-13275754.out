@@ -1,0 +1,146 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-16-2026 23:45:30
+Job ID:    13275754
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  check_p1_probes.sbatch
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== P1 probe re-check | parent cortex-retrofit/retro-b2-heal/checkpoint_91552_w16 ===
+    arms: a1 a2 a3 a3z
+    geometry: W=16 K=64 cc=8
+    read-only: no checkpoint is written or modified
+
+
+######## a1 | probe-p1-a1-accum-w16-cc8 ########
+
+=== Z probe | cortex-retrofit/probe-p1-a1-accum-w16-cc8/checkpoint_91952 ===
+    optimizer_step 91,952  |  buffer: accum, E only
+    parent step 91,552 -> +400 steps
+  [PASS] the probe advanced past its parent  400 steps
+
+-- is every block attached to the loss? --
+  [SKIP] no Z parameters, and the config did not ask for any: an E-only
+         arm (a1/a3).  Every Z check below is correctly skipped, and NONE of
+         this is a failure.
+  [PASS] summary_emb moved  rel change 4.285e-02
+  [PASS] every parameter is finite
+  [PASS] summary_emb width matches accum_vecs  16 vs 16
+
+========================================================================
+PROBE PASSED — the architecture is LIVE: every block that should
+be attached to the loss is attached to it.
+
+THIS IS NOT A RESULT ABOUT Z.  A few hundred steps cannot say whether
+the channel helps; that is what the full cell, evals/eval_carry_2x2.py
+and evals/eval_influence_horizon.py are for.  Do not quote this run.
+========================================================================
+
+######## a2 | probe-p1-a2-accum-w16-cc8-z ########
+
+=== Z probe | cortex-retrofit/probe-p1-a2-accum-w16-cc8-z/checkpoint_91952 ===
+    optimizer_step 91,952  |  buffer: accum, E+Z  (Z is parameter-free here)
+    parent step 91,552 -> +400 steps
+  [PASS] the probe advanced past its parent  400 steps
+
+-- is every block attached to the loss? --
+  [SKIP] no Z parameters, and NONE ARE EXPECTED: this is an accum+Z arm
+         (a2), whose Z channel is parameter-free -- merge concatenates E and Z
+         on the last dim and owns no gate.  Whether Z is LIVE here is a
+         question for evals/diag_dual_channel_walk.py (2D carry width, |Z|/s0,
+         z-read), and for the fact that join_channels RAISES when the latent
+         write never fired.  It is not one this tool can answer.
+  [PASS] summary_emb moved  rel change 4.490e-02
+  [PASS] every parameter is finite
+  [PASS] summary_emb width matches accum_vecs  16 vs 16
+
+========================================================================
+PROBE PASSED — the architecture is LIVE: every block that should
+be attached to the loss is attached to it.
+
+THIS IS NOT A RESULT ABOUT Z.  A few hundred steps cannot say whether
+the channel helps; that is what the full cell, evals/eval_carry_2x2.py
+and evals/eval_influence_horizon.py are for.  Do not quote this run.
+========================================================================
+
+######## a3 | probe-p1-a3-gated-w16k64-cc8 ########
+
+=== Z probe | cortex-retrofit/probe-p1-a3-gated-w16k64-cc8/checkpoint_91952 ===
+    optimizer_step 91,952  |  buffer: gated, E only
+    parent step 91,552 -> +400 steps
+  [PASS] the probe advanced past its parent  400 steps
+
+-- is every block attached to the loss? --
+  [SKIP] no Z parameters, and the config did not ask for any: an E-only
+         arm (a1/a3).  Every Z check below is correctly skipped, and NONE of
+         this is a failure.
+  [PASS] summary_emb moved  rel change 4.361e-02
+  [PASS] every parameter is finite
+  [PASS] latent_carry in the config matches the parameters found  config False, parameters False
+  [PASS] summary_emb width matches accum_vecs  16 vs 16
+
+========================================================================
+PROBE PASSED — the architecture is LIVE: every block that should
+be attached to the loss is attached to it.
+
+THIS IS NOT A RESULT ABOUT Z.  A few hundred steps cannot say whether
+the channel helps; that is what the full cell, evals/eval_carry_2x2.py
+and evals/eval_influence_horizon.py are for.  Do not quote this run.
+========================================================================
+
+######## a3z | probe-p1-a3z-gated-w16k64-cc8-z ########
+
+=== Z probe | cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952 ===
+    optimizer_step 91,952  |  buffer: gated, E+Z
+    parent step 91,552 -> +400 steps
+  [PASS] the probe advanced past its parent  400 steps
+
+-- is every block attached to the loss? --
+  [PASS] gate_proj_in_z left its zero init  |W|_1 = 2.9618e+04
+  [PASS] gate_proj_mem_z left its zero init  |W|_1 = 2.7693e+04
+    forget_bias_z = +0.97044  (init +1.0)
+    input_bias_z = +0.04892  (init 0.0)
+  [PASS] summary_emb moved  rel change 4.496e-02
+  [PASS] every parameter is finite
+  [PASS] latent_carry in the config matches the parameters found  config True, parameters True
+  [PASS] summary_emb width matches accum_vecs  16 vs 16
+
+========================================================================
+PROBE PASSED — the architecture is LIVE: every block that should
+be attached to the loss is attached to it.
+
+THIS IS NOT A RESULT ABOUT Z.  A few hundred steps cannot say whether
+the channel helps; that is what the full cell, evals/eval_carry_2x2.py
+and evals/eval_influence_horizon.py are for.  Do not quote this run.
+========================================================================
+
+==============================================================
+P1 PROBE RE-CHECK SUMMARY
+==============================================================
+
+  a1  PASS      checkpoint_91952
+  a2  PASS      checkpoint_91952
+  a3  PASS      checkpoint_91952
+  a3z  PASS      checkpoint_91952
+
+Every arm is LIVE.  This says the machinery is attached to the loss.
+It says NOTHING about whether Z helps or whether the gate beats
+accum -- that is the full cell, the 2x2 and the influence horizon.
+
+Next: bash pace/submit_p1_probes.sh --compare   (if you did not set COMPARE=1)
+---------------------------------------
+Begin Slurm Epilog: Sep-16-2026 23:50:51
+Job ID:        13275754
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      check_p1_probes.sbatch
+Resources:     cpu=4,mem=32G,node=1
+Rsrc Used:     cput=00:21:28,vmem=0,walltime=00:05:22,mem=33554200K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-002-25-1
+---------------------------------------

@@ -65,6 +65,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from model_utils import load_checkpoint, to_num_steps, _unwrap  # noqa: E402
+from model_utils import parse_config_overrides  # noqa: E402
 
 CELLS = (("E1Z1", True, True), ("E1Z0", True, False),
          ("E0Z1", False, True), ("E0Z0", False, False))
@@ -88,6 +89,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--allow_missing_z", action="store_true",
                    help="run the E axis alone and report the Z rows as "
                         "unavailable, instead of failing.")
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="force a graft-building config flag, e.g. "
+                        "--set use_memory=true --set prefix_memory=gated.  "
+                        "REQUIRED on any arm checkpoint: --model_name loads the "
+                        "BASE dir's config, which carries no cortex flags at "
+                        "all (use_memory is '<absent>' on "
+                        "ckpts/olmo-retrofit-cortex), so without these the "
+                        "graft builds with NO prefix buffer and the run dies "
+                        "with 'this checkpoint has no prefix buffer'.  Mirror "
+                        "pace/p1_arms.sbatch's PROBE_SETS for the arm.")
     p.add_argument("--out_dir", default="eval_results/carry_2x2")
     return p.parse_args()
 
@@ -210,8 +221,10 @@ def main() -> int:
               "P0.1.  Do not quote these.", flush=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
-                                 getattr(torch, args.dtype), device)
+                                 getattr(torch, args.dtype), device,
+                                 config_overrides=overrides or None)
     inner = _unwrap(model)
     cortex = getattr(inner, "cortex", None)
     if cortex is None or getattr(cortex, "prefix", None) is None:
