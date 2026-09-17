@@ -27,6 +27,31 @@
 #   PROBE=1 ARM=a2  BRANCH_PATH=<sliced heal ckpt> sbatch pace/p1_arms.sbatch
 #   PROBE=1 ARM=a3z BRANCH_PATH=<sliced heal ckpt> sbatch pace/p1_arms.sbatch
 #
+# P2.3 STOPPING RULE -- PRE-REGISTERED 2026-09-17 in p23_cells_prereg.md
+# section 1, and binding on the a1/a3 cells this script launches:
+#
+#   Run until the paired delta's 95% bootstrap CI over the LAST 500 STEPS
+#   stays on ONE SIDE of zero across TWO CONSECUTIVE NON-OVERLAPPING 500-step
+#   windows -- or until CELL_STEPS is spent, whichever comes first.
+#
+# Windows are [N-999, N-500] and [N-499, N]; an overlapping pair shares samples
+# and is not two pieces of evidence.  A CI spanning zero in EITHER window is
+# CONTINUE, not "converged at zero".  Hitting the cap unsatisfied is a
+# reportable outcome -- "not separated within 400M tokens" -- and is NOT
+# grounds for extending one arm.  BOTH ARMS RUN THE FULL BUDGET REGARDLESS:
+# the rule decides when the comparison is READ, not when a job is killed, and
+# killing the leader early would bias every downstream eval.
+#
+# Report the paired delta and tokens_per_second in the SAME table.  A3 is ~6%
+# faster per step on 64 read columns against A1's 128, so the honest claim is
+# "cheaper AND?", never "equal cost AND?".
+#
+# Z IS NOT IN THESE CELLS.  P2.1 (job 13295314) put donor-Z and random-Z at
+# 0.0000 on both dual arms, 24 numbers all |.| <= 0.0014, and the z limb of
+# the damage path is pinned as landing (a091813) -- so the null is about the
+# trained checkpoints, not plumbing, and Z is a SCALE question now.  a2 and
+# a3z are not run here.
+
 # THE PAIR
 # --------
 #   A1   accum,      W 16, accum_max 128  ->  128 read cols, 656 packed
