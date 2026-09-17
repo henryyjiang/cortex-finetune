@@ -496,3 +496,41 @@ class TestGateThreeUsesTheTrainedDepth:
         sb = open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
                   encoding="utf-8").read()
         assert "--trained_depth $MAX_MEAN_REC" in sb
+
+
+class TestTheWidthContrastIsReportedNotGated:
+    """It measures W=32 vs W=16 for the P1.0 decision, and p11 section 4 fixes
+    the response to every verdict -- none of which changes this round's arms,
+    since A1 and A3' both run W=16.  Folding it into RC turns an unresolved
+    MEASUREMENT into "the pre-launch failed", which is the same confusion the
+    gate-1 NaN caused: an exit code that cannot tell "the claim failed" from
+    "this is not the claim being gated"."""
+
+    @staticmethod
+    def _sb():
+        return open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
+                    encoding="utf-8").read()
+
+    def test_it_has_its_own_status_variable(self):
+        sb = self._sb()
+        assert "WIDTH_RC=0" in sb
+        assert "--out $OUT/width_contrast.json || WIDTH_RC=1" in sb
+
+    def test_it_does_not_set_the_gate_status(self):
+        sb = self._sb()
+        i = sb.index("compare_width.py")
+        assert "|| RC=1" not in sb[i:i + 400]
+
+    def test_the_four_real_gates_still_gate(self):
+        """The distinction has to be narrow: everything else still fails loudly."""
+        sb = self._sb()
+        for tool in ("python -m pytest tests/", "smoke_prefix_real.py",
+                     "diag_dual_channel_walk.py", "prelaunch_final.py"):
+            i = sb.index(tool)
+            assert "|| RC=1" in sb[i:i + 700], tool
+
+    def test_an_unresolved_contrast_is_surfaced_and_not_swallowed(self):
+        sb = self._sb()
+        i = sb.index("width contrast (3b) did not produce a usable verdict")
+        assert "REPORTED, not gating" in sb[i:i + 400]
+        assert "Read it, do not block on it" in sb[i:i + 500]

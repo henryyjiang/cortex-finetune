@@ -99,6 +99,15 @@ SKIP_SMOKE=${SKIP_SMOKE:-}
 
 mkdir -p $OUT logs
 RC=0
+# The width contrast is REPORTED, not gated, and the distinction is deliberate.
+# It measures W=32 vs W=16 for the P1.0 decision, and p11_z_probe_prereg.md S4
+# already fixes the response to every one of its verdicts: NONE of them changes
+# this round's arms, because A1 and A3' both run W=16 and width is held constant
+# across the comparison the probes exist to make.  Folding it into RC would turn
+# an unresolved measurement into "the pre-launch failed", which is the same
+# confusion the gate-1 NaN caused -- an exit code that cannot tell "the claim
+# failed" from "this is not the claim being gated".
+WIDTH_RC=0
 
 echo "=== cortex-final pre-launch | model=$MODEL branch=${BRANCH_PATH:-<base>} ==="
 echo "    gating the ARM's geometry: W=$ACCUM_VECS K=$GATE_SLOTS route=ring"
@@ -208,6 +217,13 @@ python tools/prelaunch_final.py --model_name $MODEL $CKPT_ARG $SETS \
 echo ""
 if [ $RC -eq 0 ]; then
     echo "ALL PRE-LAUNCH GATES PASSED.  Results in $OUT."
+    if [ $WIDTH_RC -ne 0 ]; then
+        echo ""
+        echo "NOTE: the width contrast (3b) did not produce a usable verdict."
+        echo "  That is REPORTED, not gating: p11 section 4 fixes the response to"
+        echo "  every width verdict and none of them changes this round's arms,"
+        echo "  because A1 and A3' both run W=16.  Read it, do not block on it."
+    fi
     echo "Next: bash pace/submit_p1_probes.sh   (the four architecture probes)"
 else
     echo "PRE-LAUNCH FAILED (rc=$RC).  Do NOT launch on this.  Read the step"
