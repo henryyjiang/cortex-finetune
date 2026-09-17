@@ -1,0 +1,59 @@
+{
+  "instrument": "s0 read-site sensitivity",
+  "when": "2026-09-17T14:21:16",
+  "model_name": "ckpts/olmo-retrofit-cortex",
+  "checkpoint": "cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952",
+  "config": {
+    "n_chunks": 8,
+    "T": 8,
+    "samples": 50,
+    "dtype": "float32",
+    "scales": [
+      0.0,
+      0.1,
+      1.0,
+      10.0,
+      100.0
+    ],
+    "config_overrides": {
+      "use_memory": true,
+      "memory_slots": 0,
+      "prefix_memory": "gated",
+      "accum_vecs": 16,
+      "gate_slots": 64,
+      "gate_route": "ring",
+      "gate_norm": "tanh",
+      "gate_init": "zero",
+      "gate_fill": "grow",
+      "latent_carry": true,
+      "latent_depth_rule": "absolute",
+      "latent_depth_lo": 2,
+      "latent_depth_hi": 9,
+      "latent_renorm": "none"
+    }
+  },
+  "s0_norm": 0.3885498744249344,
+  "cells": {
+    "real": 3.23400803565979,
+    "noise@0": 3.233982734680176,
+    "noise@0.1": 3.2339836072921755,
+    "noise@1": 3.234009666442871,
+    "noise@10": 3.2398697185516356,
+    "noise@100": 3.9833409452438353
+  },
+  "delta_from_real": {
+    "noise@0": -2.5300979614062413e-05,
+    "noise@0.1": -2.4428367614515167e-05,
+    "noise@1": 1.6307830810191604e-06,
+    "noise@10": 0.005861682891845632,
+    "noise@100": 0.7493329095840453
+  },
+  "span_nats": 0.7493582105636594,
+  "reading": "B_s0_live",
+  "intact": {
+    "mean_nats": 3.23400803565979,
+    "chance_nats": 11.516439284270025,
+    "margin_below_chance": 8.282431248610234,
+    "at_chance": false
+  }
+}

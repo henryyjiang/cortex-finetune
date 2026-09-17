@@ -1,0 +1,96 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 14:17:51
+Job ID:    13297293
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  s0_sens
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== s0 read-site sweep | 2 cells | index 1 ===
+    [0] a2
+    [1] a3z
+    for THIS cell list:  sbatch --array=0-1
+
+    arm=a3z   checkpoint: cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952
+    data:       data/pg19_olmo_val_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:   gated  W=16  latent=ON
+    T=8  n_chunks=8  n=50
+    scales:     0 0.1 1 10 100  (x the measured ||s0||)
+    out:        eval_results/s0_sensitivity-20260917/a3z
+
+NVIDIA H200, 143771 MiB
+
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 68.80it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952/chkpt.pt: 0 missing / 0 unexpected keys
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+
+==============================================================================
+s0 READ-SITE SENSITIVITY -- what does the loop care about in s0?
+n=50 paired samples   ||s0|| = 0.3885
+intact (real Z) 3.2340 nats/token   chance 11.5164   margin +8.2824
+==============================================================================
+  substituted into s0             loss       delta
+  real carried Z                3.2340      0.0000
+  noise @ 0 x ||s0||            3.2340     -0.0000
+  noise @ 0.1 x ||s0||          3.2340     -0.0000
+  noise @ 1 x ||s0||            3.2340     +0.0000
+  noise @ 10 x ||s0||           3.2399     +0.0059
+  noise @ 100 x ||s0||          3.9833     +0.7493
+
+  span across the whole sweep: 0.7494 nats
+  READS AS (B): s0 is LIVE -- the loss moves with what is in it.
+  Z is then too quiet rather than mis-sited; try latent_renorm=s0
+  and a scale before building any new module.
+
+wrote eval_results/s0_sensitivity-20260917/a3z/results.json
+
+cell a3z DONE -> eval_results/s0_sensitivity-20260917/a3z/results.json
+
+(A) and (B) send the Z work in opposite directions.  Read BOTH arms
+before choosing: a2 is accum and a3z is the gated ring, and only a
+reading that holds on both is about s0 rather than about a buffer.
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 14:21:19
+Job ID:        13297293
+Array Job ID:  13297293_1
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      s0_sens
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:36:24,vmem=0,walltime=00:04:33,mem=19367492K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------
