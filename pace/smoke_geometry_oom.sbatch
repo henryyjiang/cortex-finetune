@@ -25,6 +25,31 @@
 #   P1=1 GEOMETRIES= sbatch pace/smoke_geometry_oom.sbatch   # A1 + A3' ONLY
 #   P1=1 P1_Z=1 GEOMETRIES= sbatch pace/smoke_geometry_oom.sbatch  # + A2/A3z
 #
+# THE cc16 REPRICING, 2026-09-17 (pass 1, job 2).  cc16 was measured OOM on
+# 2026-09-16 (job 13273099) at 138.7 of 139.8 GiB -- 99%, a ~1 GiB miss -- and
+# three levers were never priced.  batch_size is NOT one of them: it is pure
+# gradient accumulation at micro_batch_size 1 and costs no memory.  What is
+# left is carry_grad_chunks (the retained-chunk-graph count, which this script
+# already showed is a FIRST-ORDER cost) and, if that is not enough, activation
+# checkpointing across chunks, which does not exist yet.
+#
+#   GEOMETRIES= P1=1 P1_CC=16 P1_K=128 P1_AMAX=256 P1_GRAD=2 sbatch pace/smoke_geometry_oom.sbatch
+#   GEOMETRIES= P1=1 P1_CC=16 P1_K=128 P1_AMAX=256 P1_GRAD=1 sbatch pace/smoke_geometry_oom.sbatch   (if GRAD=2 still OOMs)
+#
+# WHAT IT DECIDES, and it is more than a row length.  cc16 is the ONLY geometry
+# that buys all four of: K=128 (the two-lap constraint caps K at 64 for cc8),
+# eviction in-distribution for BOTH buffers (at cc8 accum never trims, so the
+# A1-vs-A3 contrast bundles "no eviction vs eviction" into "accum vs gate"),
+# gradient pressure on fg past 8 chunks (at cc8 the gate never SEES older
+# content, so the cells can only show "no cliff", never a longer horizon), and
+# BABILong's 16k bucket in distribution.
+#
+#   FITS at GRAD 2 or 1 -> re-open the geometry for the full run, and price what
+#       the shorter TBPTT window costs before spending it: it is a real change
+#       to both arms, not a free lever.
+#   OOM at GRAD 1       -> cc8 is forced.  Stop carrying the geometry as open,
+#       and state in the writeup that the gate ships without a trained horizon.
+#
 # P1_Z=1 adds the two Z arms.  Their memory has NEVER been priced -- every
 # number in this gate's history is from an E-only run -- and the second gate
 # is ~33.5M more parameters with optimizer state, which is not a rounding
@@ -187,26 +212,33 @@ if [ -n "$P1" ]; then
     P1_LEN=${P1_LEN:-4096}; P1_CC=${P1_CC:-8}; P1_BS=${P1_BS:-32}
     P1_W=${P1_W:-16}                      # sliced summary_emb width, both arms
     P1_GRAD=${P1_GRAD:-4}                 # 4 of 8, B2's 50% convention
+    # K and the accum cap, so this block can price a geometry OTHER than the
+    # locked one.  Defaults are the locked cell, so every previous invocation
+    # measures exactly what it measured before.  They exist for the cc16
+    # repricing (2026-09-17): the two-lap constraint cross_chunks >= 2*K/W puts
+    # the K ceiling at 64 for cc8, and K=128 is only expressible at cc16.
+    P1_K=${P1_K:-64}                      # gated ring slots
+    P1_AMAX=${P1_AMAX:-128}               # accum cap = cross_chunks * W, no trim
     echo ""
-    echo "######## A1: accum, W ${P1_W}, accum_max 128 (${P1_LEN} x cc${P1_CC}) ########"
+    echo "######## A1: accum, W ${P1_W}, accum_max ${P1_AMAX} (${P1_LEN} x cc${P1_CC}) ########"
     python tools/smoke_geometry_oom.py \
         --model_name "$MODEL" \
         --max_length "$P1_LEN" --cross_chunks "$P1_CC" --batch_size "$P1_BS" \
         --max_steps "$MAX_STEPS" --micro_batch_size 1 \
         --mean_recurrence "$MAX_MEAN_REC" \
-        --prefix_memory accum --accum_vecs "$P1_W" --accum_max 128 \
+        --prefix_memory accum --accum_vecs "$P1_W" --accum_max "$P1_AMAX" \
         --carry_grad_chunks "$P1_GRAD" \
         --use_memory true --with_optimizer true \
         --json_out "$JSON" || BROKEN=1
     echo ""
-    echo "######## A3': gated ring, W ${P1_W}, K 64 (${P1_LEN} x cc${P1_CC}) ########"
+    echo "######## A3': gated ring, W ${P1_W}, K ${P1_K} (${P1_LEN} x cc${P1_CC}) ########"
     python tools/smoke_geometry_oom.py \
         --model_name "$MODEL" \
         --max_length "$P1_LEN" --cross_chunks "$P1_CC" --batch_size "$P1_BS" \
         --max_steps "$MAX_STEPS" --micro_batch_size 1 \
         --mean_recurrence "$MAX_MEAN_REC" \
         --prefix_memory gated --accum_vecs "$P1_W" \
-        --gate_slots 64 --gate_route ring --gate_norm tanh \
+        --gate_slots "$P1_K" --gate_route ring --gate_norm tanh \
         --gate_init zero --gate_fill grow \
         --carry_grad_chunks "$P1_GRAD" \
         --use_memory true --with_optimizer true \
@@ -218,26 +250,26 @@ if [ -n "$P1" ]; then
         # [D, 2D] Linears -- about 33.5M parameters WITH optimizer state -- and
         # a Z arm priced on an E-only row was not priced.
         echo ""
-        echo "######## A2: accum + Z, W ${P1_W}, accum_max 128 ########"
+        echo "######## A2: accum + Z, W ${P1_W}, accum_max ${P1_AMAX} ########"
         python tools/smoke_geometry_oom.py \
             --model_name "$MODEL" \
             --max_length "$P1_LEN" --cross_chunks "$P1_CC" --batch_size "$P1_BS" \
             --max_steps "$MAX_STEPS" --micro_batch_size 1 \
             --mean_recurrence "$MAX_MEAN_REC" \
-            --prefix_memory accum --accum_vecs "$P1_W" --accum_max 128 \
+            --prefix_memory accum --accum_vecs "$P1_W" --accum_max "$P1_AMAX" \
             --latent_carry \
             --carry_grad_chunks "$P1_GRAD" \
             --use_memory true --with_optimizer true \
             --json_out "$JSON" || BROKEN=1
         echo ""
-        echo "######## A3z: gated ring + Z, W ${P1_W}, K 64 ########"
+        echo "######## A3z: gated ring + Z, W ${P1_W}, K ${P1_K} ########"
         python tools/smoke_geometry_oom.py \
             --model_name "$MODEL" \
             --max_length "$P1_LEN" --cross_chunks "$P1_CC" --batch_size "$P1_BS" \
             --max_steps "$MAX_STEPS" --micro_batch_size 1 \
             --mean_recurrence "$MAX_MEAN_REC" \
             --prefix_memory gated --accum_vecs "$P1_W" \
-            --gate_slots 64 --gate_route ring --gate_norm tanh \
+            --gate_slots "$P1_K" --gate_route ring --gate_norm tanh \
             --gate_init zero --gate_fill grow \
             --latent_carry \
             --carry_grad_chunks "$P1_GRAD" \

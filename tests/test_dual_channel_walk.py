@@ -13,6 +13,7 @@ Run: /c/Users/henry/miniconda3/envs/cortex-retro/python.exe -m pytest tests/test
 from __future__ import annotations
 
 import io
+import math
 import os
 import sys
 
@@ -243,3 +244,59 @@ class TestThePrintedTable:
         body = [ln for ln in buf.getvalue().splitlines()
                 if ln.strip().startswith("0 ")]
         assert body and "-" in body[0]
+
+
+class TestRed10TheLabelsAreShifted:
+    """RED 10.  The walk passed `labels=ids`, which asks a causal LM to predict
+    token t AT position t -- impossible by construction, so the loss pins to
+    ln(vocab).  Every walk and every gate-4 run in the 2026-09-16 probe batch
+    scored 11.4-11.97 against ln(100352) = 11.5157 in jobs whose training loss
+    was 2.78, and nothing caught it because the readings downstream were all
+    DIFFERENCES, which stay well-formed when both sides are noise.
+
+    Two tests, because the fix has two halves: the labels that go IN, and the
+    at-chance veto that would have caught it going out.
+    """
+
+    def _spy(self, m, seen):
+        class Spy:
+            def __getattr__(inner_self, k):
+                return getattr(m, k)
+
+            def __call__(inner_self, *a, **kw):
+                seen.append(kw.get("labels"))
+                return m(*a, **kw)
+        return Spy()
+
+    def test_the_model_receives_next_token_labels_not_the_input_ids(self):
+        m = _model()
+        seen, chunks = [], _chunks()
+        walk(self._spy(m, seen), m.cortex, chunks,
+             num_steps=torch.tensor([0, T]), backward=False)
+        assert len(seen) == len(chunks)
+        for ids, y in zip(chunks, seen):
+            assert y is not None
+            assert not torch.equal(y, ids), (
+                "labels == input_ids: this is RED 10, the walk is scoring at "
+                "chance and every column beside the loss is a statistic of noise")
+            assert torch.equal(y[:, :-1], ids[:, 1:])
+            assert (y[:, -1] == -100).all(), "the last column has no successor"
+
+    def test_the_record_carries_the_level_and_vetoes_at_chance(self):
+        """The margin is the check that was missing, so it is pinned here on
+        BOTH sides: a real (untrained, hence at-chance) toy model must trip the
+        veto, and a hand-built healthy record must not."""
+        from cortex_memory.health import chance_margin
+        m = _model()
+        rec = _walk(m, backward=False)
+        h = rec["health"]
+        assert h["chance"] == pytest.approx(math.log(VOCAB), abs=1e-6)
+        assert h["at_chance"] is True          # a toy model IS at chance
+        out = io.StringIO()
+        print_walk(rec, out=out)
+        assert "AT CHANCE" in out.getvalue()
+        # The real numbers: the clean horizon path's intact NLL against the
+        # real 100,352-token vocabulary, i.e. what a walk SHOULD look like.
+        healthy = chance_margin([3.19, 3.23], 100352)
+        assert healthy["at_chance"] is False
+        assert healthy["margin"] == pytest.approx(8.30, abs=0.02)

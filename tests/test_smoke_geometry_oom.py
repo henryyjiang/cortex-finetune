@@ -400,3 +400,45 @@ class TestTheZChannelIsPriced:
                    2, NV, 1, CPU_AMP, True, write_once=False)
         g = dual.cortex.prefix.gate_proj_in_z.weight.grad
         assert g is not None and float(g.norm()) > 0
+
+
+class TestPass1Cc16Repricing:
+    """P1_K / P1_AMAX exist so the OOM gate can price a geometry OTHER than the
+    locked one -- specifically K=128 at cc16, which the two-lap constraint
+    (cross_chunks >= 2*K/W) makes inexpressible at cc8.  The risk is the usual
+    one for this file: a knob that silently keeps its old value and reports the
+    locked cell's footprint under a new label.  So both halves are pinned --
+    the default must not move, and the override must reach the command."""
+
+    def _p1_block(self):
+        import io as _io
+        import os as _os
+        path = _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+            "pace", "smoke_geometry_oom.sbatch")
+        text = _io.open(path, encoding="utf-8").read()
+        # The P1 block ONLY.  The CAPPED block's accum_max 128 is a different
+        # row on purpose -- config D with the buffer capped -- and folding it
+        # into this check would make the test fail for a correct file.
+        start = text.index('if [ -n "$P1" ]')
+        end = text.index('if [ -n "$CAPPED" ]')
+        return text[start:end]
+
+    def test_the_defaults_are_still_the_locked_cell(self):
+        s = self._p1_block()
+        assert "P1_K=${P1_K:-64}" in s
+        assert "P1_AMAX=${P1_AMAX:-128}" in s
+
+    def test_both_knobs_reach_the_command_line(self):
+        s = self._p1_block()
+        assert '--gate_slots "$P1_K"' in s
+        assert '--accum_max "$P1_AMAX"' in s
+        assert "--gate_slots 64" not in s, "a hardcoded K survives the knob"
+        assert "--accum_max 128" not in s, "a hardcoded cap survives the knob"
+
+    def test_the_two_lap_constraint_is_why_k128_needs_cc16(self):
+        """Not a test of the script: a test of the arithmetic the script's
+        header now asserts, so that the header cannot drift away from it."""
+        W = 16
+        for K, cc_min in ((64, 8), (128, 16)):
+            assert 2 * K // W == cc_min

@@ -35,9 +35,42 @@
 #      at 0.90x the noise it displaces.  Then the fix is latent_renorm=s0 plus
 #      a scale: one config flag, no parameters, no new module.
 #
-# The sweep substitutes noise into s0's carried columns at 0, 0.1, 1, 10 and
-# 100 x the MEASURED ||s0||, and reads the span.  Flat across three orders of
-# magnitude is (A).  Anything else is (B).
+# The sweep substitutes noise into s0's carried columns at 0, 0.1, 1, 10, 100
+# and 1000 x the MEASURED ||s0|| (a per-token ROW NORM), and reads the span
+# across the cells the model actually runs at.  Flat across four orders of
+# magnitude is (A).  A response inside that window is (B).
+#
+# RED 11, 2026-09-17 -- THE FIRST RUN OF THIS SWEEP (job 13297293) WAS SCORED
+# THROUGH TWO BUGS AND ITS PRINTED (B) IS RETIRED.
+#
+#   1. UNITS.  The tool asked for `base * s` with base = cortex._z_s0_scale, a
+#      per-token L2 ROW NORM, and handed it to _null_latent as the PER-ELEMENT
+#      std of normal_(0, std).  Those differ by sqrt(D) = 45.25 at D=2048, so
+#      the row labelled "1x ||s0||" injected a row of norm 17.6 -- 45x ||s0||
+#      and 1.8x the loop's own working state ||s_t|| ~ 10 (P0.1 fp32).  The
+#      cells that moved, 10x and 100x, were really 452x and 4525x.
+#   2. THE VERDICT COUNTED CELLS THAT ONLY BREAK THE MODEL.  The span ran over
+#      the whole sweep including injections whose row norm exceeds the carried
+#      E row (||E|| = 171.0, P0.1).  core_block_forward runs
+#      adapter(cat([x, input_embeds])) and the E carried row lives in the
+#      input_embeds half of the very columns Z substitutes into, so above that
+#      norm the injection is DROWNING E, not being read at s0.  The response
+#      turning on at an injected norm of 175.8 is that threshold, not a read.
+#
+#   Fixed 2026-09-17: the axis is scaled by cortex._z_s0_rms, every cell prints
+#   the row norm it actually injected, the graft records ||E|| on the forward,
+#   and cells above it are marked (ood) and excluded from the verdict.
+#   Re-read through the fixed axis, job 13297293 is FLAT to 4e-5 nats out to
+#   45x ||s0|| on both arms -- including at exactly 0, where the carried
+#   columns are deleted outright -- which is (A).
+#
+# THE THIRD OUTCOME, and it is the one this project keeps earning:
+#   INVALID_knob_unproven -- nothing moved anywhere, not even the oversized
+#   cell.  That is what a latent_read_null which never reached latent_init
+#   looks like and it is indistinguishable from (A), which is the reading that
+#   commits weeks of work.  The tool now refuses instead of reading it as (A).
+#   Reds 8, 9 and 10 were all instruments returning a confident wrong number;
+#   11 makes four.
 #
 # THE NO-PARAMETERS RULE IS NOT AT STAKE HERE, and it is worth saying so in the
 # file that tests it.  The +0.0044 latent arm that rule comes from ran K=4 AND
@@ -80,7 +113,12 @@ GATE_SLOTS=${GATE_SLOTS:-64}
 CROSS_CHUNKS=${CROSS_CHUNKS:-8}
 MAX_MEAN_REC=${MAX_MEAN_REC:-8}
 MAX_EXAMPLES=${MAX_EXAMPLES:-50}
-SCALES=${SCALES:-"0 0.1 1 10 100"}
+# In ROW-NORM multiples of ||s0|| since the RED 11 fix.  Four orders inside
+# the window the model runs in, plus 1000x -- which is ~389 against ||E|| =
+# 171, i.e. deliberately past the swamp threshold so the run carries its own
+# proof that the substitution reaches the model.  Keep at least one cell above
+# ||E||/||s0|| ~ 440 x 0.9 or the verdict can only ever be INVALID.
+SCALES=${SCALES:-"0 0.1 1 10 100 1000"}
 
 # Only the DUAL arms have a Z to read.  The tool refuses an E-only arm rather
 # than printing a flat table that would read as (A) by construction.
@@ -134,7 +172,7 @@ echo "    arm=$ARM   checkpoint: $CKPT"
 echo "    data:       $DATA   (READ THIS LINE -- the only proof the pack arrived)"
 echo "    geometry:   $PREFIX_MODE  W=$ACCUM_VECS  latent=ON"
 echo "    T=$MAX_MEAN_REC  n_chunks=$CROSS_CHUNKS  n=$MAX_EXAMPLES"
-echo "    scales:     $SCALES  (x the measured ||s0||)"
+echo "    scales:     $SCALES  (x the measured ||s0|| ROW NORM -- see RED 11)"
 echo "    out:        $OUT"
 echo ""
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader

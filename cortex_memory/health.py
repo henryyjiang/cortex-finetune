@@ -21,6 +21,7 @@ second one is evidence.
 """
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 import torch
@@ -361,3 +362,26 @@ def expected_ring_rows(chunk_index: int, n_vec: int, n_slots: int) -> list:
     """
     return [((chunk_index * n_vec) % n_slots + j) % n_slots
             for j in range(n_vec)]
+
+
+def chance_margin(losses, vocab_size: int) -> dict:
+    """Is this probe scoring a MODEL, or is it scoring noise?
+
+    Returns the mean NLL, the chance level ln(vocab) and the margin between
+    them.  `at_chance` is the veto: a probe within 0.25 nats of ln(vocab) is
+    measuring nothing, and every delta computed from it -- carry vs none, donor
+    vs real, parent vs branch -- is a difference of two noise levels.
+
+    Added after RED 10, where the walk and gate 4 ran at 11.4-11.97 against
+    ln(100352) = 11.5157 and nothing noticed, because no instrument on that
+    path ever checked the LEVEL.  `evals/eval_influence_horizon.intact_health`
+    is the same check on the clean path; keep the two in step.
+    """
+    vals = [float(x) for x in losses if x is not None]
+    if not vals or not vocab_size:
+        return {"mean_nll": None, "chance": None, "margin": None,
+                "at_chance": None}
+    chance = math.log(float(vocab_size))
+    mean = sum(vals) / len(vals)
+    return {"mean_nll": mean, "chance": chance, "margin": chance - mean,
+            "at_chance": bool(chance - mean < 0.25)}

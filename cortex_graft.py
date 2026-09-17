@@ -537,6 +537,17 @@ class CortexMemory(nn.Module):
                 e_state, _ = self.prefix.split_channels(state)
                 parts.append(e_state)
                 n_pre = e_state.shape[1]
+                # THE SCALE THE s0 SUBSTITUTION COMPETES WITH.  RED 11: the
+                # s0 sweep's response turns on where a substituted row's norm
+                # reaches THIS number, because `core_block_forward` runs
+                # `adapter(cat([x, input_embeds]))` and the carried E row
+                # lives in the `input_embeds` half of the very same columns
+                # the Z read substitutes into.  Above it the injection is
+                # drowning E, not being read at s0, and the instrument cannot
+                # tell those apart without the number.  Diagnostic only --
+                # nothing branches on it.
+                self._e_carried_norm = float(
+                    e_state.detach().float().flatten(0, -2).norm(dim=-1).mean())
         parts.append(input_embeds)
 
         if write:
@@ -657,7 +668,9 @@ class CortexMemory(nn.Module):
         self._z_prev:  Optional[torch.Tensor] = None   # [B,n_sum,D], s_{t-1}
         self._z_tape:  list = []          # index t-1 -> d_t at the summary cols
         self._z_grad:  list = []          # was step t inside the gradient window
-        self._z_s0_scale: Optional[float] = None       # ||s0|| per token, fp32
+        self._z_s0_scale: Optional[float] = None       # ||s0|| per TOKEN (row L2), fp32
+        self._z_s0_rms:   Optional[float] = None       # s0 per-ELEMENT rms, fp32
+        self._e_carried_norm: Optional[float] = None   # ||E carried row||, fp32
 
     def begin(
         self,
@@ -830,8 +843,17 @@ class CortexMemory(nn.Module):
             # s0 at the summary columns -- the tape's starting point.  Taken
             # before any substitution so that d_1 is a real first step.
             self._z_prev = s0[:, -self._n_sum:]
-            self._z_s0_scale = float(
-                s0.detach().float().flatten(0, -2).norm(dim=-1).mean())
+            # TWO SCALES, TWO UNITS, AND THEY DIFFER BY sqrt(D) = 45.25 AT
+            # D=2048.  `_z_s0_scale` is a per-token L2 ROW NORM (what a reader
+            # means by "the size of s0"); `_z_s0_rms` is the PER-ELEMENT rms,
+            # which is what `normal_(0, std)` in `_null_latent` takes.  RED 11
+            # was `diag_s0_sensitivity.py` feeding the first into the second,
+            # so every row of its sweep injected 45x the norm it claimed and
+            # the flat region looked far narrower than it is.  Both are
+            # recorded here, suffixed, so the next consumer has to pick.
+            f32 = s0.detach().float()
+            self._z_s0_scale = float(f32.flatten(0, -2).norm(dim=-1).mean())
+            self._z_s0_rms = float(f32.pow(2).mean().sqrt())
         n_pre = self._n_pre
         if not self.latent_carry or not n_pre:
             return s0

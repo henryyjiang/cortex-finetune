@@ -575,3 +575,58 @@ class TestGate4RefusesRandomIds:
         g = check_donor_control(m, m.cortex, _chunks(seed=1), _chunks(seed=2),
                                 NUM_STEPS)
         assert g["passed"] is True and "loss" in g
+
+
+class TestRed10TheGateChainIsShifted:
+    """RED 10, the other half.  `_chain_losses` feeds every loss-based gate in
+    this file, and gate 4's donor swap scores its own final chunk the same way.
+    Both passed `labels=ids`, so the -0.1234 content delta that reordered the
+    whole P2 program was a ranking of three chance-level numbers
+    (none 11.4277 < donor 11.5455 < real 11.6689, all inside 0.25 nats of
+    ln(vocab) = 11.5157).  A gate that scores noise cannot fail loudly -- it
+    returns a tidy number -- so this is pinned at the call site."""
+
+    def test_chain_losses_passes_next_token_labels(self):
+        from tools.prelaunch_final import _chain_losses
+        m = _model()
+        seen, chunks = [], _chunks()
+
+        class Spy:
+            def __getattr__(inner_self, k):
+                return getattr(m, k)
+
+            def __call__(inner_self, *a, **kw):
+                seen.append((kw.get("input_ids"), kw.get("labels")))
+                return m(*a, **kw)
+
+        _chain_losses(Spy(), chunks, torch.tensor([0, T]), seed=0)
+        assert len(seen) == len(chunks)
+        for ids, y in seen:
+            assert not torch.equal(y, ids), (
+                "labels == input_ids in the gate chain: RED 10")
+            assert torch.equal(y[:, :-1], ids[:, 1:])
+            assert (y[:, -1] == -100).all()
+
+    def test_the_donor_gate_scores_its_last_chunk_shifted_too(self):
+        """Gate 4 builds its own forward rather than going through
+        `_chain_losses`, which is exactly how one call site gets fixed and the
+        other does not."""
+        m = _model()
+        seen = []
+
+        class Spy:
+            def __getattr__(inner_self, k):
+                return getattr(m, k)
+
+            def __call__(inner_self, *a, **kw):
+                seen.append((kw.get("input_ids"), kw.get("labels")))
+                return m(*a, **kw)
+
+        chunks_a, chunks_b = _chunks(), _chunks(seed=7)
+        check_donor_control(Spy(), m.cortex, chunks_a, chunks_b,
+                            num_steps=torch.tensor([0, T]), seed=0)
+        scored = [(x, y) for x, y in seen if y is not None]
+        assert scored, "gate 4 scored nothing"
+        for ids, y in scored:
+            assert not torch.equal(y, ids)
+            assert torch.equal(y[:, :-1], ids[:, 1:])

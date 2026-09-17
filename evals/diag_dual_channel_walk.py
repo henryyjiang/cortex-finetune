@@ -66,9 +66,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cortex_memory.health import (  # noqa: E402
-    carry_health, expected_ring_rows, gate_param_health, grad_norms,
-    latent_runtime, split_carry,
+    carry_health, chance_margin, expected_ring_rows, gate_param_health,
+    grad_norms, latent_runtime, split_carry,
 )
+from model_utils import shift_labels  # noqa: E402
 
 #: Parameters the closing block reports a gradient norm for, by suffix.  The
 #: list is the architecture's load-bearing set: the shared write path, both E
@@ -238,7 +239,7 @@ def walk(model, cortex, chunks, num_steps=None, backward: bool = True,
     prev_z = None
     with _Tap(cortex) as tap:
         for i, ids in enumerate(chunks):
-            kw = {"labels": ids} if labels else {}
+            kw = {"labels": shift_labels(ids)} if labels else {}
             if num_steps is not None:
                 kw["num_steps"] = num_steps
             out = model(input_ids=ids, m_cross_in=carry, return_m_cross=True,
@@ -306,6 +307,13 @@ def walk(model, cortex, chunks, num_steps=None, backward: bool = True,
         "final_carry": carry_health(carry, D),
         "gate_params": gate_param_health(buf),
         "latent": latent_runtime(cortex),
+        # RED 10: the level, not only the deltas.  Every reading this
+        # table feeds -- the width contrast, gate 4, the rank columns --
+        # is a comparison, and a comparison of two chance-level losses
+        # still looks like a result.
+        "health": chance_margin(
+            [r.get("loss") for r in rows],
+            int(getattr(getattr(model, "config", None), "vocab_size", 0) or 0)),
     }
     if backward and losses:
         # ONE backward over the SUMMED chain loss.  Stronger than a per-chunk
@@ -358,6 +366,17 @@ def print_walk(rec, out=sys.stdout) -> None:
           f"{('yes' if r['read_live'] else ('no' if r['read_live'] is False else '-')):>5} "
           f"{_f(r.get('z_read_max_abs_err'), '11.2e', '          -')} "
           f"{_f(r['loss'], '8.4f')}")
+    h = rec.get("health") or {}
+    if h.get("margin") is not None:
+        p("")
+        p(f"   mean NLL {h['mean_nll']:.4f}   chance (ln vocab) {h['chance']:.4f}"
+          f"   margin {h['margin']:+.4f}")
+        if h.get("at_chance"):
+            # RED 10.  Printed four times so it cannot be scrolled past: every
+            # number in this table is a statistic OF NOISE when this fires.
+            for _ in range(4):
+                p("   *** AT CHANCE -- this walk scored nothing.  Every rank, "
+                  "norm and delta below is noise. ***")
     c = rec["final_carry"]
     p("")
     p("-- final carry ------------------------------------------------------")

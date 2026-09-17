@@ -82,6 +82,33 @@ def to_num_steps(T: Optional[int]):
     return torch.tensor([int(T), 0])
 
 
+def shift_labels(ids, ignore_index: int = -100):
+    """Next-token labels for a [B, S] block of input ids.
+
+    THE MODELING FILE DOES NOT SHIFT.  `RavenForCausalLM.forward` computes
+    `cross_entropy(logits.view(-1, V), labels.view(-1))` on the unpacked real
+    tokens and says so in its own comment -- "assuming labels really are labels
+    and not equal to input_ids".  train.py builds them shifted
+    (`inputs[:, 1:]` against the inputs' own `[:, :-1]`, train.py:1812) and
+    every eval that scores its own CE shifts too.  A probe that passes
+    `labels=ids` therefore asks the model to predict token t AT position t,
+    which a causal LM cannot do at all: the loss goes to ln(vocab) and stays.
+
+    That is RED 10.  Two instruments did it -- the dual-channel walk and
+    prelaunch_final's gate chain -- and both reported chance (11.4-11.97 nats
+    against ln(100352) = 11.5157) in jobs whose training loss was 2.78.  Nothing
+    caught it because every reading downstream was a DIFFERENCE of two losses,
+    and a difference of two chance-level losses still prints a tidy CI.
+
+    Length is preserved, so the packed geometry and the ranks and norms a probe
+    measures alongside the loss are unchanged; the last column has no successor
+    and is masked out.
+    """
+    y = torch.full_like(ids, ignore_index)
+    y[:, :-1] = ids[:, 1:]
+    return y
+
+
 def parse_config_overrides(items) -> dict:
     """["KEY=VALUE", ...] -> a TYPED dict for `load_checkpoint(config_overrides=)`.
 

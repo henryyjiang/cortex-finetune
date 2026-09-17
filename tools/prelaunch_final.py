@@ -67,6 +67,7 @@ sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, "evals"))
 sys.path.insert(0, os.path.join(REPO, "tools"))
 
+from model_utils import shift_labels  # noqa: E402
 from cortex_memory.health import (  # noqa: E402
     carry_health, latent_runtime, read_live_fraction, split_carry,
 )
@@ -134,7 +135,8 @@ def _chain_losses(model, chunks, num_steps, seed=0):
         for i, ids in enumerate(chunks):
             torch.manual_seed(seed + i)
             kw = {} if num_steps is None else {"num_steps": num_steps}
-            out = model(input_ids=ids, labels=ids, m_cross_in=carry,
+            out = model(input_ids=ids, labels=shift_labels(ids),
+                        m_cross_in=carry,
                         return_m_cross=True, **kw)
             carry = out["m_cross"] if isinstance(out, dict) else out.m_cross
             loss = out["loss"] if isinstance(out, dict) else out.loss
@@ -362,7 +364,8 @@ def check_donor_control(model, cortex, chunks_a, chunks_b, num_steps=None,
         torch.manual_seed(seed + len(chunks_a))
         with torch.no_grad():
             kw = {} if num_steps is None else {"num_steps": num_steps}
-            out = model(input_ids=last, labels=last, m_cross_in=state,
+            out = model(input_ids=last, labels=shift_labels(last),
+                        m_cross_in=state,
                         return_m_cross=False, **kw)
         return float(out["loss"] if isinstance(out, dict) else out.loss)
 
