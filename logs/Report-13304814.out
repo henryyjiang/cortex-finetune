@@ -1,0 +1,85 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 18:40:06
+Job ID:    13304814
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  smoke_geometry_oom.sbatch
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== geometry OOM gate | model=ckpts/olmo-retrofit-cortex | mean_rec=8 ===
+    geometries: 
+    json: logs/oom_smoke_13304814.jsonl
+NVIDIA H200, 143771 MiB
+prefix_pack occurrences in the checkpoint's modeling file:
+7
+
+######## A1: accum, W 16, accum_max 256 (4096 x cc16) ########
+=== geometry gate: 4096 tok x cc16 (256-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 71.93it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W917 18:40:25.576629055 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 12.3s (1.36B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: accum_vecs 16, accum_max 256, carry_grad_chunks 1 of 16
+  max packed sequence: 256 + 240 carry rows = 496 (max_position_embeddings=4096)
+  note: the FIFO never trims at this setting (16 x 16 <= accum_max 256) — B2's convention, the larger footprint, and the reason eviction was out-of-distribution at eval. Pass --accum_max 128 to price the capped alternative.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 1a)
+  OOM: CUDA out of memory. Tried to allocate 24.00 MiB. GPU 0 has a total capacity of 139.80 GiB of which 19.12 MiB is free. Including non-PyTorch memory, this process has 139.78 GiB memory in use. Of the allocated memory 138.57 GiB is allocated by PyTorch, and 148.92 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+-- result --
+  peak reserved before OOM: 138.71 GiB of 139.80 GiB
+
+RESULT OOM max_length=4096 cross_chunks=16 chunk_len=256 memory=True optimizer=True peak_alloc_gib=0.00 peak_res_gib=138.71 step_s=0.0
+[rank0]:[W917 18:40:27.778322949 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+######## A3': gated ring, W 16, K 128 (4096 x cc16) ########
+=== geometry gate: 4096 tok x cc16 (256-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 194.65it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W917 18:40:50.406245212 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 20.2s (1.38B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: GATED ring, W 16, K 128, route ring, norm tanh, init zero, fill grow, carry_grad_chunks 1 of 16
+  max packed sequence: 256 + 128 carry rows = 384 (max_position_embeddings=4096)
+  note: lap is 8 chunks; the gate fires from chunk 8 on, and the read block is PINNED at 128 columns from there. Against a no-trim accum on the same chain (256 columns) this is 50% of the read cost -- the pair is 'cheaper AND?', never 'equal cost AND?'.
+  note: +16.8M buffer parameters, which the optimizer holds two moments for. That is the one axis on which the gated arm is the LARGER of the two, and the reason this gate is not a formality.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 7a)
+  OOM: CUDA out of memory. Tried to allocate 24.00 MiB. GPU 0 has a total capacity of 139.80 GiB of which 39.12 MiB is free. Including non-PyTorch memory, this process has 139.76 GiB memory in use. Of the allocated memory 138.60 GiB is allocated by PyTorch, and 96.48 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+-- result --
+  peak reserved before OOM: 138.69 GiB of 139.80 GiB
+
+RESULT OOM max_length=4096 cross_chunks=16 chunk_len=256 memory=True optimizer=True peak_alloc_gib=0.00 peak_res_gib=138.69 step_s=0.0
+[rank0]:[W917 18:40:53.802807143 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+=== summary ===
+    row  cc  chunk buffer   W  cols status    alloc  reserved  %dev  s/step
+   4096  16    256  accum  16   256    OOM     0.00    138.71    99     0.0
+   4096  16    256  gated  16   128    OOM     0.00    138.69    99     0.0
+
+(no 8192 x cc16 memory row in the json — the decision row did not run)
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 18:40:54
+Job ID:        13304814
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      smoke_geometry_oom.sbatch
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=00:06:56,vmem=0,walltime=00:00:52,mem=2833904K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------
