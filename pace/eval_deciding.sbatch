@@ -17,8 +17,14 @@
 # Plan of record: p2_deciding_measurements_handoff.md section 2.
 #
 #   sbatch pace/eval_deciding.sbatch                      # all 18 cells
-#   ARMS="a1 parent" DAMAGES=donor sbatch pace/eval_deciding.sbatch
 #   MAX_EXAMPLES=20 sbatch pace/eval_deciding.sbatch      # a fast shakedown
+#
+#   PASS --array WHENEVER YOU SUBSET.  The #SBATCH line says 0-17 because that
+#   is the full sweep; ARMS/DAMAGES only shorten the CELL LIST, not the array,
+#   so the surplus tasks each take an H200 allocation to print "nothing to do"
+#   and exit.  Harmless, and 16 wasted slots on a busy partition:
+#     ARMS="a1 parent" DAMAGES=donor sbatch --array=0-1 pace/eval_deciding.sbatch
+#   The job prints the right --array for your override before it runs anything.
 #
 # WHAT THIS DECIDES, AND WHY IT RUNS BEFORE ANY CELL.  Two questions, one job:
 #
@@ -134,9 +140,11 @@ done
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 echo "=== P2.1 substitution sweep | ${#CELLS[@]} cells | index $IDX ==="
 for i in "${!CELLS[@]}"; do echo "    [$i] ${CELLS[$i]}"; done
+echo "    for THIS cell list:  sbatch --array=0-$(( ${#CELLS[@]} - 1 ))"
 if [ "$IDX" -ge "${#CELLS[@]}" ]; then
     echo "no cell at index $IDX (the array is wider than the cell list, which is"
-    echo "what an ARMS/DAMAGES override does).  Nothing to do."
+    echo "what an ARMS/DAMAGES override does).  Nothing to do -- but this task"
+    echo "still took a GPU allocation to say so.  Pass --array=0-$(( ${#CELLS[@]} - 1 )) next time."
     exit 0
 fi
 
