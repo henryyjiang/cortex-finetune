@@ -205,7 +205,7 @@ if [ -n "$PARENT_PATH" ]; then
     python tools/compare_width.py \
         --parent $OUT/walk-parent-w$PARENT_VECS.json \
         --branch $OUT/walk-branch-w$ACCUM_VECS.json \
-        --out $OUT/width_contrast.json || RC=1
+        --out $OUT/width_contrast.json || WIDTH_RC=1
 fi
 echo ""
 echo "######## 4. the pre-launch gates ########"

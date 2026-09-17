@@ -518,14 +518,17 @@ class TestTheWidthContrastIsReportedNotGated:
 
     def test_it_does_not_set_the_gate_status(self):
         sb = self._sb()
-        i = sb.index("compare_width.py")
+        i = sb.index("python tools/compare_width.py")
         assert "|| RC=1" not in sb[i:i + 400]
 
     def test_the_four_real_gates_still_gate(self):
         """The distinction has to be narrow: everything else still fails loudly."""
         sb = self._sb()
-        for tool in ("python -m pytest tests/", "smoke_prefix_real.py",
-                     "diag_dual_channel_walk.py", "prelaunch_final.py"):
+        # Anchor on the INVOCATIONS -- the header names every tool first.
+        for tool in ("python -m pytest tests/",
+                     "python tools/smoke_prefix_real.py",
+                     "python evals/diag_dual_channel_walk.py",
+                     "python tools/prelaunch_final.py"):
             i = sb.index(tool)
             assert "|| RC=1" in sb[i:i + 700], tool
 
