@@ -80,6 +80,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from datetime import datetime
@@ -346,6 +347,29 @@ def run_chain(model, buf, chunks, labels, masks, num_steps, device,
     return rows, writes
 
 
+def intact_health(nll: list[float], vocab: int) -> dict:
+    """The absolute loss the whole I(d) table is a DIFFERENCE OF.
+
+    I(d) prints a tidy CI whether the model underneath predicts or not, and the
+    2026-09-16 probe batch is the record of what that costs: the prelaunch
+    walks and gate 4 scored these checkpoints at 11.4-11.97 nats -- ln(vocab)
+    is 11.52, i.e. CHANCE -- in the same job whose training loss was 2.78.
+    Nothing gated on the absolute level, so a ranking of three chance-level
+    losses read as "the carry is anti-informative" and ordered a program.
+
+    This is that gate.  It does not fail the run: a level is a measurement, and
+    a tool that went red on it would teach people to skip it.  It says the
+    number and, when the model is at chance, says the table is unreadable.
+    """
+    if not nll:
+        return {"mean_nats": None, "chance_nats": None, "at_chance": None}
+    mean = sum(nll) / len(nll)
+    chance = math.log(max(int(vocab), 2))
+    return {"mean_nats": mean, "chance_nats": chance,
+            "margin_below_chance": chance - mean,
+            "at_chance": bool(chance - mean < 1.0), "n": len(nll)}
+
+
 def paired_ci(deltas, n_boot: int, seed: int = 0):
     """Bootstrap CI on the paired mean.  Paired by construction: every entry is
     one sample's (damaged - intact), so per-sample variance is already gone."""
@@ -408,6 +432,7 @@ def main() -> int:
     n = len(ds) if args.max_examples == 0 else min(args.max_examples, len(ds))
 
     per_depth: dict[int, list[float]] = {d: [] for d in args.depths}
+    intact_nll: list[float] = []
     n_used = 0
     for si in range(n):
         ids = torch.tensor(ds[si]["input_ids"], dtype=torch.long)
@@ -426,6 +451,7 @@ def main() -> int:
                                    seed, None, None, args.damage)
         if intact[-1][0] is None:
             continue
+        intact_nll.append(float(intact[-1][0]))
 
         # The donor is another ROW's write at the same chunk index: matched
         # register, matched norms, matched column count, different content.
@@ -482,6 +508,8 @@ def main() -> int:
         "config": {"n_chunks": args.n_chunks, "damage": args.damage,
                    "T": args.T, "dtype": args.dtype, "samples": n_used,
                    "config_overrides": overrides},
+        "intact": intact_health(intact_nll,
+                                getattr(inner.config, "vocab_size", 0)),
         "depths": {},
     }
     for d in args.depths:
@@ -495,6 +523,21 @@ def main() -> int:
     print(f"buffer: {type(buf).__name__} ({kind}), damage={args.damage}, "
           f"n={n_used} paired samples")
     print("=" * 78)
+    _ih = report["intact"]
+    if _ih["mean_nats"] is not None:
+        print(f"  intact loss {_ih['mean_nats']:.4f} nats/token   chance "
+              f"(ln vocab) {_ih['chance_nats']:.4f}   margin "
+              f"{_ih['margin_below_chance']:+.4f}")
+        if _ih["at_chance"]:
+            print("  *** THE MODEL IS AT CHANCE.  Every I(d) below is a "
+                  "difference of two")
+            print("  *** chance-level losses and is NOT readable as a result.  "
+                  "These checkpoints")
+            print("  *** train at ~2.8 nats; an eval path that scores them at "
+                  "~11.5 is broken,")
+            print("  *** and the carry is not what it is measuring.  Fix the "
+                  "load, then re-run.")
+        print("")
     print(f"  {'d':>3}{'I(d) nats':>12}{'95% CI':>26}{'n':>6}   shape")
     for d in args.depths:
         r = report["depths"][str(d)]

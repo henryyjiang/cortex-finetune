@@ -30,8 +30,8 @@ sys.path.insert(0, os.path.join(REPO, "evals"))
 from test_cortex_eval import VOCAB, _build_raven  # noqa: E402
 
 from evals.eval_influence_horizon import (  # noqa: E402
-    _patched_merge, capture_write, damage_pair, damage_write, run_chain,
-    scaled_noise,
+    _patched_merge, capture_write, damage_pair, damage_write, intact_health,
+    run_chain, scaled_noise,
 )
 
 NV, K, CL, EOS = 4, 16, 16, VOCAB - 1
@@ -267,3 +267,31 @@ class TestTheGeometryReachesTheGraft:
         assert all(any(k.arg == "config_overrides" for k in c.keywords)
                    for c in calls), (
             f"{mod} parses --set but never hands it to load_checkpoint")
+
+
+class TestTheIntactLossIsReported:
+    """I(d) is a DIFFERENCE, and a difference of two chance-level losses still
+    prints a tidy CI.  On 2026-09-16 the prelaunch walks and gate 4 scored these
+    checkpoints at 11.4-11.97 nats -- ln(vocab) is 11.52 -- in the same job
+    whose training loss was 2.78, and nothing in the pipeline looked at the
+    level.  A ranking of three chance-level numbers became "the carry is
+    anti-informative" and ordered a program.  So the level ships with the table.
+    """
+
+    def test_a_chance_level_model_is_named_as_one(self):
+        vocab = 100278
+        h = intact_health([11.67, 11.62, 11.55], vocab)
+        assert h["at_chance"] is True
+        assert h["margin_below_chance"] < 0
+        assert h["n"] == 3
+
+    def test_a_trained_model_is_not(self):
+        h = intact_health([2.78, 2.81, 2.75], 100278)
+        assert h["at_chance"] is False
+        assert h["margin_below_chance"] > 8
+
+    def test_no_samples_reports_nothing_rather_than_zero(self):
+        """An empty run must not report 0.0 nats, which reads as a perfect
+        model rather than as no measurement."""
+        h = intact_health([], 100278)
+        assert h["mean_nats"] is None and h["at_chance"] is None

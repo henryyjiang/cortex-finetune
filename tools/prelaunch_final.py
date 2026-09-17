@@ -330,7 +330,7 @@ def _swap(real, donor, D, channel: str):
 
 
 def check_donor_control(model, cortex, chunks_a, chunks_b, num_steps=None,
-                        seed=0) -> dict:
+                        seed=0, real_data: bool = True) -> dict:
     """Gate 4 (P0.6).  Does the carry's CONTENT matter, channel by channel?
 
     Prime two independent chains, then score the SAME final chunk under its own
@@ -340,6 +340,15 @@ def check_donor_control(model, cortex, chunks_a, chunks_b, num_steps=None,
     sink effect and `real - donor` does not.  That gap is the whole reason this
     control exists.
     """
+    if not real_data:
+        return {"gate": "donor_control", "passed": False,
+                "why": "ran on RANDOM IDS, so there is no content to transfer "
+                       "and the deltas are ~0 BY CONSTRUCTION.  That is an "
+                       "INVALID measurement, not a negative result, and it "
+                       "used to be a WARNING: the 2026-09-16 parent record "
+                       "(+0.0186, job 13272609) is one of these and it was "
+                       "read as a number against the arms' real-data -0.12.  "
+                       "Pass --data or --text_file."}
     D = cortex.prefix.hidden_size
     _, carry_a = _chain_losses(model, chunks_a[:-1], num_steps, seed)
     _, carry_b = _chain_losses(model, chunks_b[:-1], num_steps, seed + 500)
@@ -638,7 +647,8 @@ def main() -> int:
                                      n_samples=args.samples))
     if "donor" not in args.skip:
         gates.append(check_donor_control(inner, cortex, chunks_a, chunks_b,
-                                         num_steps, args.seed))
+                                         num_steps, args.seed,
+                                         bool(args.data or args.text_file)))
 
     ok = print_report(gates)
     for k, v in notes.items():

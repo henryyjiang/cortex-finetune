@@ -209,7 +209,13 @@ if [ -n "$PARENT_PATH" ]; then
 fi
 echo ""
 echo "######## 4. the pre-launch gates ########"
-python tools/prelaunch_final.py --model_name $MODEL $CKPT_ARG $SETS \
+# $PROSE IS NOT OPTIONAL HERE.  Step 3 passed it and this line did not, so
+# GATE 4 ran on RANDOM IDS while the arms' own copy (pace/p1_arms.sbatch) ran
+# on prose -- and the two numbers went into the same table.  The parent's
+# +0.0186 donor delta, the row the whole "the arms drifted, the parent did
+# not" reading rests on, is a random-ids number the tool itself calls
+# meaningless by construction.  See job 13272609.
+python tools/prelaunch_final.py --model_name $MODEL $CKPT_ARG $SETS $PROSE \
     --trained_depth $MAX_MEAN_REC \
     --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
     --out $OUT/prelaunch.json || RC=1

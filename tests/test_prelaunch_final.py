@@ -553,3 +553,25 @@ class TestTheWidthContrastIsReportedNotGated:
         i = sb.index("width contrast (3b) did not produce a usable verdict")
         assert "REPORTED, not gating" in sb[i:i + 400]
         assert "Read it, do not block on it" in sb[i:i + 500]
+
+
+class TestGate4RefusesRandomIds:
+    """It used to WARN.  The warning printed, the run passed, and the parent's
+    +0.0186 (job 13272609) went into the P1 donor table beside the arms'
+    real-data -0.12 as though the two were comparable.  A measurement that is
+    ~0 by construction is INVALID, not negative, and a gate is where that gets
+    said."""
+
+    def test_it_returns_invalid_without_a_prose_source(self):
+        m = _model(latent=True)
+        g = check_donor_control(m, m.cortex, _chunks(seed=1), _chunks(seed=2),
+                                NUM_STEPS, real_data=False)
+        assert g["passed"] is False
+        assert "loss" not in g
+        assert "RANDOM IDS" in g["why"]
+
+    def test_the_default_is_still_a_real_measurement(self):
+        m = _model(latent=True)
+        g = check_donor_control(m, m.cortex, _chunks(seed=1), _chunks(seed=2),
+                                NUM_STEPS)
+        assert g["passed"] is True and "loss" in g
