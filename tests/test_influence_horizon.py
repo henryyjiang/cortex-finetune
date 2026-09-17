@@ -295,3 +295,52 @@ class TestTheIntactLossIsReported:
         model rather than as no measurement."""
         h = intact_health([], 100278)
         assert h["mean_nats"] is None and h["at_chance"] is None
+
+
+class TestTheZChannelDamageLands:
+    """P2.1 came back with donor-Z and random-Z BOTH at 0.0000 on both dual
+    arms -- 24 numbers, all |.| <= 0.0014, while random-E on the same rows moved
+    0.66-1.9 nats.  The pre-registered reading of that is "the instrument is
+    blind at Z's scale", but there is a second explanation with the shape of
+    reds 8 and 9: the z limb of the damage path never lands, and an exact zero
+    reads as a result.  These pin the limb itself, so the P2.1 Z null can be
+    quoted as a statement about SCALE rather than about plumbing.
+
+    The model side is not in doubt: cortex_graft.latent_init substitutes the
+    carried Z into s0 on every forward, and the no-grad asymmetry costs
+    GRADIENT, not the read.  So if a channel is dead it is dead here.
+    """
+
+    @pytest.mark.parametrize("gated", [True, False])
+    @pytest.mark.parametrize("mode", ["donor", "random"])
+    def test_damaging_only_z_moves_the_loss(self, gated, mode):
+        m = _model(latent=True, gated=gated)
+        _, intact, writes = _replay(m, cached=m)
+        at = NC - 1 - 2
+        donor_e, donor_z = _donors(m, writes, at)
+        gen = torch.Generator().manual_seed(11)
+        _, damaged, _ = _replay(m, damage_at=at, donor=donor_e,
+                                donor_z=donor_z, mode=mode, channel="z",
+                                gen=gen, cached=m)
+        moved = abs(_last_loss(damaged) - _last_loss(intact))
+        assert moved > 1e-6, (
+            f"--damage_channel z on a {'gated' if gated else 'append'} buffer "
+            f"moved the loss by {moved:.3e} in mode {mode}.  Exactly zero here "
+            f"means the z limb is a no-op and every P2.1 Z cell measured "
+            f"nothing rather than measuring Z.")
+
+    def test_damaging_only_e_leaves_the_carried_z_alone(self):
+        """The other side of the 1x2: channel='e' must not perturb Z, or
+        'donor e' and 'donor both' agreeing says nothing.  Gated only --
+        damage_pair is the pre-merge path, and an append buffer damages the
+        joined row through damage_write instead."""
+        m = _model(latent=True, gated=True)
+        _, _, writes = _replay(m, cached=m)
+        at = NC - 1 - 2
+        donor_e, donor_z = _donors(m, writes, at)
+        e, z = writes[at]
+        from evals.eval_influence_horizon import damage_pair
+        assert z is not None, "the dual-channel fixture stopped carrying Z"
+        out_e, out_z = damage_pair(e, z, donor_e, donor_z, "donor", "e")
+        assert torch.equal(out_z, z)
+        assert not torch.equal(out_e, e)
