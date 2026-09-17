@@ -1,0 +1,242 @@
+{
+  "when": "2026-09-16T23:10:58",
+  "args": {
+    "model_name": "ckpts/olmo-retrofit-cortex",
+    "checkpoint": "cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952",
+    "chunks": 8,
+    "chunk_len": 256,
+    "batch": 2,
+    "T": 8,
+    "trained_depth": 0,
+    "samples": 4000,
+    "dtype": "float32",
+    "device": "cuda",
+    "data": "data/pg19_fw50_olmo_len4096",
+    "text_file": null,
+    "seed": 0,
+    "skip": [],
+    "set": [
+      "use_memory=true",
+      "memory_slots=0",
+      "prefix_memory=gated",
+      "accum_vecs=16",
+      "gate_slots=64",
+      "gate_route=ring",
+      "gate_norm=tanh",
+      "gate_init=zero",
+      "gate_fill=grow",
+      "latent_carry=true",
+      "latent_depth_rule=absolute",
+      "latent_depth_lo=2",
+      "latent_depth_hi=9",
+      "latent_renorm=none"
+    ],
+    "out": "eval_results/probe-probe-p1-a3z-gated-w16k64-cc8-z/prelaunch.json"
+  },
+  "config_overrides": {
+    "use_memory": true,
+    "memory_slots": 0,
+    "prefix_memory": "gated",
+    "accum_vecs": 16,
+    "gate_slots": 64,
+    "gate_route": "ring",
+    "gate_norm": "tanh",
+    "gate_init": "zero",
+    "gate_fill": "grow",
+    "latent_carry": true,
+    "latent_depth_rule": "absolute",
+    "latent_depth_lo": 2,
+    "latent_depth_hi": 9,
+    "latent_renorm": "none"
+  },
+  "skipped": [],
+  "auto_skipped": {},
+  "gates": [
+    {
+      "gate": "z_off_equivalence",
+      "loss_z_suppressed": [
+        11.867091178894043,
+        11.328935623168945,
+        11.415206909179688,
+        11.701733589172363,
+        11.662246704101562,
+        11.675174713134766,
+        11.838238716125488,
+        11.579099655151367
+      ],
+      "loss_e_only": [
+        11.867091178894043,
+        11.328935623168945,
+        11.415206909179688,
+        11.701733589172363,
+        11.662246704101562,
+        11.675174713134766,
+        11.838238716125488,
+        11.579099655151367
+      ],
+      "max_abs_delta": 0.0,
+      "threshold": 1e-05,
+      "e_carry_max_abs_delta": 0.0,
+      "passed": true,
+      "e_twin_unexpected_keys": [
+        "cortex.prefix.forget_bias_z",
+        "cortex.prefix.input_bias_z",
+        "cortex.prefix.gate_proj_in_z.weight",
+        "cortex.prefix.gate_proj_in_z.bias",
+        "cortex.prefix.gate_proj_mem_z.weight",
+        "cortex.prefix.gate_proj_mem_z.bias"
+      ]
+    },
+    {
+      "gate": "checkpoint_roundtrip",
+      "strict_load_error": null,
+      "raw_from_dict_error": "TypeError: transformers.configuration_utils.PretrainedConfig.__init__() got multiple values for keyword argument 'tie_word_embeddings'",
+      "needs_prepare_eval_checkpoint": true,
+      "flags_missing_from_json": [],
+      "flags_in_json": {
+        "use_memory": true,
+        "memory_slots": 0,
+        "prefix_memory": "gated",
+        "accum_vecs": 16,
+        "gate_slots": 64,
+        "gate_route": "ring",
+        "gate_norm": "tanh",
+        "gate_init": "zero",
+        "gate_fill": "grow",
+        "latent_carry": true,
+        "latent_depth_rule": "absolute",
+        "latent_depth_lo": 2,
+        "latent_depth_hi": 9,
+        "latent_renorm": "none",
+        "mean_recurrence": 32,
+        "mean_backprop_depth": 8
+      },
+      "buffer_rebuilt": true,
+      "geom_n_vec": [
+        16,
+        16
+      ],
+      "geom_n_slots": [
+        64,
+        64
+      ],
+      "geom_route": [
+        "ring",
+        "ring"
+      ],
+      "geom_gate_norm": [
+        "tanh",
+        "tanh"
+      ],
+      "geom_gate_init": [
+        "zero",
+        "zero"
+      ],
+      "geom_fill": [
+        "grow",
+        "grow"
+      ],
+      "geom_carries_latent": [
+        true,
+        true
+      ],
+      "geometry_survived": true,
+      "z_gate_present": true,
+      "loss_before": [
+        11.867091178894043,
+        11.32892894744873
+      ],
+      "loss_after": [
+        11.867091178894043,
+        11.32892894744873
+      ],
+      "max_abs_delta": 0.0,
+      "carry_width": [
+        4096,
+        4096
+      ],
+      "carry_max_abs_delta": 0.0,
+      "both_channels_survived": true,
+      "passed": true
+    },
+    {
+      "gate": "read_live_fraction",
+      "at_run_config": {
+        "samples": 4000,
+        "mean_recurrence": 32,
+        "mean_backprop_depth": 8,
+        "read_live_frac": 0.0195,
+        "no_grad_mean": 24.85474967956543,
+        "no_grad_p50": 21.0,
+        "with_grad_mean": 7.97475004196167,
+        "total_steps_mean": 32.829498291015625
+      },
+      "sweep_mean_recurrence": [
+        {
+          "samples": 1000,
+          "mean_recurrence": 8,
+          "mean_backprop_depth": 8,
+          "read_live_frac": 0.546,
+          "no_grad_mean": 2.385999917984009,
+          "no_grad_p50": 0.0,
+          "with_grad_mean": 6.488999843597412,
+          "total_steps_mean": 8.875
+        },
+        {
+          "samples": 1000,
+          "mean_recurrence": 16,
+          "mean_backprop_depth": 8,
+          "read_live_frac": 0.148,
+          "no_grad_mean": 9.210000038146973,
+          "no_grad_p50": 7.0,
+          "with_grad_mean": 7.761000156402588,
+          "total_steps_mean": 16.97100067138672
+        },
+        {
+          "samples": 1000,
+          "mean_recurrence": 32,
+          "mean_backprop_depth": 8,
+          "read_live_frac": 0.019,
+          "no_grad_mean": 25.625999450683594,
+          "no_grad_p50": 21.0,
+          "with_grad_mean": 7.9670000076293945,
+          "total_steps_mean": 33.59299850463867
+        }
+      ],
+      "passed": true,
+      "note": "put read_live_frac in the Z pre-registration: it changes what a null result for Z means."
+    },
+    {
+      "gate": "donor_control",
+      "dual_channel": true,
+      "loss": {
+        "real": 11.578893661499023,
+        "none": 11.40436840057373,
+        "donor_both": 11.524938583374023,
+        "donor_e": 11.524832725524902,
+        "donor_z": 11.57895565032959
+      },
+      "content_delta_both": -0.053955078125,
+      "column_delta": -0.17452526092529297,
+      "content_delta_e": -0.054060935974121094,
+      "content_delta_z": 6.198883056640625e-05,
+      "passed": true,
+      "note": "content_delta > 0 means the carry's CONTENT helps; content_delta ~ 0 with column_delta > 0 means the columns help and the content does not -- the register effect this control exists to expose."
+    }
+  ],
+  "carry": {
+    "rows": 0,
+    "channels": 0
+  },
+  "latent": {
+    "latent_carry": true,
+    "read_measured": true,
+    "read_grad_frac": 1.0,
+    "write_grad_frac": 0.0,
+    "tape_len": 8,
+    "n_pre": 64,
+    "n_sum": 16,
+    "s0_scale": 0.3884560465812683
+  },
+  "all_passed": true
+}

@@ -1,0 +1,589 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-16-2026 22:36:28
+Job ID:    13272609
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  prelaunch_final.sbatch
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== cortex-final pre-launch | model=ckpts/olmo-retrofit-cortex branch=cortex-retrofit/retro-b2-heal/checkpoint_91552_w16 ===
+    gating the ARM's geometry: W=16 K=64 route=ring
+    cross_chunks=8 chunk_len=256 T=8
+NVIDIA H200, 143771 MiB
+
+######## 0. unit suite ########
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+........................................................................ [ 31%]
+........................................................................ [ 41%]
+................s....................................................... [ 52%]
+........................................................................ [ 62%]
+........................................................................ [ 73%]
+........................................................................ [ 83%]
+........................................................................ [ 94%]
+......................................                                   [100%]
+685 passed, 1 skipped in 60.92s (0:01:00)
+
+######## 1. real-checkpoint smoke: accum, gated, latent ########
+loading ckpts/olmo-retrofit-cortex (bfloat16, cuda) ...
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:32<00:32, 32.20s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:36<00:00, 15.51s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:36<00:00, 18.02s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+  loaded in 42.1s
+
+-- graft --
+  [PASS] cortex built (not a silent no-memory run)
+  [PASS] prefix buffer active  PrefixAccumBuffer
+  [PASS] cortex parameters are at their designed init (not post_init's)
+  [PASS] prefix_pos == 'tail' (2026-08-04)  got 'tail'
+  [PASS] prefix_eos_reset is off (2026-08-04)  got False
+  [PASS] loaded modeling file splices the prefix  raven_modeling_minimal_cortex.py
+
+-- geometry --
+  n_embd=2048 vocab=100352 eos=100257
+  8 chunks x 256 tok, n_vec=16, T=2
+  max packed position = 272 (block_size=1024, max_position_embeddings=4096)
+
+-- forward/backward chain (num_steps=[1, 1]) --
+  chunk 1/8 (256 tok, carry 0) ... loss 14.7892  [0.2s]
+  chunk 2/8 (256 tok, carry 16) ... loss 15.6665  [0.0s]
+  chunk 3/8 (256 tok, carry 32) ... loss 14.8033  [0.0s]
+  chunk 4/8 (256 tok, carry 48) ... loss 14.7253  [0.0s]
+  chunk 5/8 (256 tok, carry 64) ... loss 14.6932  [0.0s]
+  chunk 6/8 (256 tok, carry 80) ... loss 14.3880  [0.0s]
+  chunk 7/8 (256 tok, carry 96) ... loss 14.4223  [0.0s]
+  chunk 8/8 (256 tok, carry 112) ... loss 14.6411  [0.0s]
+  backward (one pass over the whole chain) ... [0.2s]
+  0.5s
+
+-- checks --
+  [PASS] summary_emb seeded on first forward
+  [PASS] summary_emb == wte[eos] (AutoCompressor init)
+  [PASS] carry accumulates one write per chunk  [(1, 16, 2048), (1, 32, 2048), (1, 48, 2048), (1, 64, 2048), (1, 80, 2048), (1, 96, 2048), (1, 112, 2048), (1, 128, 2048)]
+  [PASS] carry survives document boundaries (Fix A)  [True, True, True, True, True, True, True]
+  [PASS] all chunk losses finite  14.789 15.666 14.803 14.725 14.693 14.388 14.422 14.641
+  [PASS] summary_emb has gradient (write is on the loss)  |g|=8.047e-01
+  [PASS] loop params have gradient (freeze_loop=false)  48 tensors
+  [PASS] no NaN/Inf in any gradient
+
+  peak VRAM: 10.93 GiB
+
+SMOKE PASSED  (mean loss 14.7661; a fresh conversion starts ~10.3)
+loading ckpts/olmo-retrofit-cortex (bfloat16, cuda) ...
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:08<00:08,  8.59s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:12<00:00,  5.85s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:12<00:00,  6.26s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 2 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero]'] (undo post_init clobber)
+  loaded in 18.3s
+
+-- graft --
+  [PASS] cortex built (not a silent no-memory run)
+  [PASS] prefix buffer active  PrefixGatedBuffer
+  [PASS] cortex parameters are at their designed init (not post_init's)
+  [PASS] prefix_pos == 'tail' (2026-08-04)  got 'tail'
+  [PASS] prefix_eos_reset is off (2026-08-04)  got False
+  [PASS] loaded modeling file splices the prefix  raven_modeling_minimal_cortex.py
+
+-- geometry --
+  n_embd=2048 vocab=100352 eos=100257
+  8 chunks x 256 tok, n_vec=16, T=2
+  max packed position = 272 (block_size=1024, max_position_embeddings=4096)
+  n_vec=16  n_slots=64  route=ring  gate_norm=tanh  gate_init=zero  fill=grow  carries_latent=False  compression=16.0  read_cols_per_chunk=64  write_cols_per_chunk=16  packed_cols=336  lap_chunks=4  min_cross_chunks=8  params=16818178
+
+-- forward/backward chain (num_steps=[1, 1]) --
+  chunk 1/8 (256 tok, carry 0) ... loss 14.9334  [0.2s]
+  chunk 2/8 (256 tok, carry 16) ... loss 14.5994  [0.1s]
+  chunk 3/8 (256 tok, carry 32) ... loss 14.2754  [0.0s]
+  chunk 4/8 (256 tok, carry 48) ... loss 14.1185  [0.0s]
+  chunk 5/8 (256 tok, carry 64) ... loss 14.4287  [0.0s]
+  chunk 6/8 (256 tok, carry 64) ... loss 14.2425  [0.0s]
+  chunk 7/8 (256 tok, carry 64) ... loss 14.3723  [0.0s]
+  chunk 8/8 (256 tok, carry 64) ... loss 14.3116  [0.0s]
+  backward (one pass over the whole chain) ... [0.2s]
+  0.6s
+
+-- checks --
+  [PASS] summary_emb seeded on first forward
+  [PASS] summary_emb == wte[eos] (AutoCompressor init)
+  [PASS] carry grows by W per chunk and stops at K  [(1, 16, 2048), (1, 32, 2048), (1, 48, 2048), (1, 64, 2048), (1, 64, 2048), (1, 64, 2048), (1, 64, 2048), (1, 64, 2048)]
+  [PASS] ring gates exactly its own W rows, passes the other K-W through  4 gated chunks
+  [PASS] the gate actually fired at least once  4 of 7 carried chunks
+  [PASS] depth_rows(j) == rows congruent to j (mod W)
+  [PASS] gate_proj_in has gradient  |g|=9.023e-01
+  [PASS] gate_proj_mem has gradient  |g|=3.203e-01
+  [PASS] forget_bias has gradient (the horizon is trainable)  |g|=4.120e-03
+  [PASS] all chunk losses finite  14.933 14.599 14.275 14.118 14.429 14.242 14.372 14.312
+  [PASS] summary_emb has gradient (write is on the loss)  |g|=9.424e-02
+  [PASS] loop params have gradient (freeze_loop=false)  48 tensors
+  [PASS] no NaN/Inf in any gradient
+
+  peak VRAM: 10.87 GiB
+
+SMOKE PASSED  (mean loss 14.4102; a fresh conversion starts ~10.3)
+loading ckpts/olmo-retrofit-cortex (bfloat16, cuda) ...
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:09<00:09,  9.52s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:13<00:00,  6.16s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:13<00:00,  6.66s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+  loaded in 19.4s
+
+-- graft --
+  [PASS] cortex built (not a silent no-memory run)
+  [PASS] prefix buffer active  PrefixGatedBuffer
+  [PASS] cortex parameters are at their designed init (not post_init's)
+  [PASS] prefix_pos == 'tail' (2026-08-04)  got 'tail'
+  [PASS] prefix_eos_reset is off (2026-08-04)  got False
+  [PASS] loaded modeling file splices the prefix  raven_modeling_minimal_cortex.py
+  [PASS] loaded modeling file substitutes Z into s0 (latent_init)
+  [PASS] ...and passes the no-grad split, so the read can be measured
+  [PASS] loaded modeling file tapes the trajectory (iter_write with current_step)
+
+-- geometry --
+  n_embd=2048 vocab=100352 eos=100257
+  8 chunks x 256 tok, n_vec=16, T=2
+  max packed position = 272 (block_size=1024, max_position_embeddings=4096)
+  n_vec=16  n_slots=64  route=ring  gate_norm=tanh  gate_init=zero  fill=grow  carries_latent=True  compression=16.0  read_cols_per_chunk=64  write_cols_per_chunk=16  packed_cols=336  lap_chunks=4  min_cross_chunks=8  params=33603588
+
+-- forward/backward chain (num_steps=[1, 1]) --
+  chunk 1/8 (256 tok, carry 0) ... loss 14.9116  [0.2s]
+  chunk 2/8 (256 tok, carry 16) ... loss 15.2302  [0.0s]
+  chunk 3/8 (256 tok, carry 32) ... loss 14.9558  [0.0s]
+  chunk 4/8 (256 tok, carry 48) ... loss 14.6612  [0.0s]
+  chunk 5/8 (256 tok, carry 64) ... loss 14.9600  [0.0s]
+  chunk 6/8 (256 tok, carry 64) ... loss 14.6957  [0.0s]
+  chunk 7/8 (256 tok, carry 64) ... loss 14.6153  [0.0s]
+  chunk 8/8 (256 tok, carry 64) ... loss 14.9671  [0.0s]
+  backward (one pass over the whole chain) ... [0.2s]
+  0.5s
+
+-- checks --
+  [PASS] summary_emb seeded on first forward
+  [PASS] summary_emb == wte[eos] (AutoCompressor init)
+  [PASS] carry grows by W per chunk and stops at K  [(1, 16, 4096), (1, 32, 4096), (1, 48, 4096), (1, 64, 4096), (1, 64, 4096), (1, 64, 4096), (1, 64, 4096), (1, 64, 4096)]
+  [PASS] ring gates exactly its own W rows, passes the other K-W through  4 gated chunks
+  [PASS] the gate actually fired at least once  4 of 7 carried chunks
+  [PASS] depth_rows(j) == rows congruent to j (mod W)
+  [PASS] gate_proj_in has gradient  |g|=1.133e+00
+  [PASS] gate_proj_mem has gradient  |g|=3.984e-01
+  [PASS] forget_bias has gradient (the horizon is trainable)  |g|=3.281e-03
+  [PASS] all chunk losses finite  14.912 15.230 14.956 14.661 14.960 14.696 14.615 14.967
+  [PASS] carry is 2D wide and the read block is unchanged  last dim 4096 vs 2 x 2048
+  [PASS] the Z write is inside the gradient window  grad_frac 0.50 of taped steps
+       note: 50% of the write band is frozen at this num_steps split.
+  [PASS] every written depth exists in the loop  depths [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] over 2 taped steps
+  [INFO] Z read gradient live on 0% of forwards (num_steps=[1, 1])
+         A SINGLE no-grad step zeroes it: Z enters at s0 and the no-grad
+         iterations run FIRST, so everything downstream is detached.  E re-enters
+         through input_embeds every iteration and is unaffected.  In training n=0
+         only when the sampled p <= mean_backprop_depth, so this fraction is a
+         TRAINING-RUN AVERAGE that belongs in the pre-registration.
+  [INFO] the default split has no live Z read, so the Z gate cannot be judged
+         from it.  Re-running one chain at num_steps=[0, T] to answer the
+         ARCHITECTURE question (is the gate wired?) separately from the
+         SCHEDULE question (how often is it live?).
+  [PASS] all chunk losses finite at num_steps=[0, T]
+  [PASS] gate_proj_in_z is wired (gradient at num_steps=[0, T])  |g|=2.063e-02
+  [PASS] gate_proj_mem_z is wired (gradient at num_steps=[0, T])  |g|=1.697e-02
+       (Z read was live on 50% of all forwards including this pass)
+  [PASS] summary_emb has gradient (write is on the loss)  |g|=6.016e-01
+  [PASS] loop params have gradient (freeze_loop=false)  48 tensors
+  [PASS] no NaN/Inf in any gradient
+
+  peak VRAM: 12.74 GiB
+
+SMOKE PASSED  (mean loss 14.8746; a fresh conversion starts ~10.3)
+
+######## 2. OOM geometry gate, INCLUDING the Z arms ########
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== geometry OOM gate | model=ckpts/olmo-retrofit-cortex | mean_rec=8 ===
+    geometries: 
+    json: logs/oom_smoke_13272609.jsonl
+NVIDIA H200, 143771 MiB
+prefix_pack occurrences in the checkpoint's modeling file:
+7
+
+######## A1: accum, W 16, accum_max 128 (4096 x cc8) ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 122.77it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W916 22:39:17.883907102 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 7.4s (1.36B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: accum_vecs 16, accum_max 128, carry_grad_chunks 4 of 8
+  max packed sequence: 512 + 112 carry rows = 624 (max_position_embeddings=4096)
+  note: the FIFO never trims at this setting (8 x 16 <= accum_max 128) — B2's convention, the larger footprint, and the reason eviction was out-of-distribution at eval. Pass --accum_max 128 to price the capped alternative.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 1a)
+  warmup 1/1: loss 14.7390  1.9s  peak 103.67 GiB
+  measured: loss 14.4476  1.2s  peak 110.27 GiB
+
+-- result --
+  peak allocated : 110.27 GiB
+  peak reserved  : 110.87 GiB  (79% of 139.80 GiB, 28.93 GiB headroom)
+  micro-step     : 1.2s  -> 0.7 min per optimizer step at batch_size 32 (upper bound: the optimizer step is counted once per micro-step)
+  projection     : 17.3 days for 38,147 steps = 8.6 links of 48h
+
+RESULT FITS max_length=4096 cross_chunks=8 chunk_len=512 memory=True optimizer=True peak_alloc_gib=110.27 peak_res_gib=110.87 step_s=1.2
+[rank0]:[W916 22:39:21.519265320 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+######## A3': gated ring, W 16, K 64 (4096 x cc8) ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 125.81it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W916 22:39:31.754615394 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 7.1s (1.38B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: GATED ring, W 16, K 64, route ring, norm tanh, init zero, fill grow, carry_grad_chunks 4 of 8
+  max packed sequence: 512 + 64 carry rows = 576 (max_position_embeddings=4096)
+  note: lap is 4 chunks; the gate fires from chunk 4 on, and the read block is PINNED at 64 columns from there. Against a no-trim accum on the same chain (128 columns) this is 50% of the read cost -- the pair is 'cheaper AND?', never 'equal cost AND?'.
+  note: +16.8M buffer parameters, which the optimizer holds two moments for. That is the one axis on which the gated arm is the LARGER of the two, and the reason this gate is not a formality.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 7a)
+  warmup 1/1: loss nan  2.0s  peak 103.19 GiB
+  measured: loss nan  1.2s  peak 109.91 GiB
+
+-- result --
+  peak allocated : 109.91 GiB
+  peak reserved  : 110.40 GiB  (79% of 139.80 GiB, 29.40 GiB headroom)
+  micro-step     : 1.2s  -> 0.6 min per optimizer step at batch_size 32 (upper bound: the optimizer step is counted once per micro-step)
+  projection     : 17.0 days for 38,147 steps = 8.5 links of 48h
+
+RESULT FITS max_length=4096 cross_chunks=8 chunk_len=512 memory=True optimizer=True peak_alloc_gib=109.91 peak_res_gib=110.40 step_s=1.2
+[rank0]:[W916 22:39:35.395019979 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+######## A2: accum + Z, W 16, accum_max 128 ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 177.68it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W916 22:39:45.346564624 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 6.8s (1.36B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: accum_vecs 16, accum_max 128, carry_grad_chunks 4 of 8
+  max packed sequence: 512 + 112 carry rows = 624 (max_position_embeddings=4096)
+  note: the FIFO never trims at this setting (8 x 16 <= accum_max 128) — B2's convention, the larger footprint, and the reason eviction was out-of-distribution at eval. Pass --accum_max 128 to price the capped alternative.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 1a)
+  warmup 1/1: loss 14.7220  2.0s  peak 103.68 GiB
+  measured: loss 14.3619  1.2s  peak 110.28 GiB
+
+-- result --
+  peak allocated : 110.28 GiB
+  peak reserved  : 110.89 GiB  (79% of 139.80 GiB, 28.91 GiB headroom)
+  micro-step     : 1.2s  -> 0.7 min per optimizer step at batch_size 32 (upper bound: the optimizer step is counted once per micro-step)
+  projection     : 17.4 days for 38,147 steps = 8.7 links of 48h
+
+RESULT FITS max_length=4096 cross_chunks=8 chunk_len=512 memory=True optimizer=True peak_alloc_gib=110.28 peak_res_gib=110.89 step_s=1.2
+[rank0]:[W916 22:39:49.001124105 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+######## A3z: gated ring + Z, W 16, K 64 ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 124.28it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W916 22:40:00.637700253 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 7.8s (1.39B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: GATED ring, W 16, K 64, route ring, norm tanh, init zero, fill grow, carry_grad_chunks 4 of 8
+  max packed sequence: 512 + 64 carry rows = 576 (max_position_embeddings=4096)
+  note: lap is 4 chunks; the gate fires from chunk 4 on, and the read block is PINNED at 64 columns from there. Against a no-trim accum on the same chain (128 columns) this is 50% of the read cost -- the pair is 'cheaper AND?', never 'equal cost AND?'.
+  note: +33.6M buffer parameters, which the optimizer holds two moments for. That is the one axis on which the gated arm is the LARGER of the two, and the reason this gate is not a formality.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 13a)
+  warmup 1/1: loss nan  2.0s  peak 103.35 GiB
+  measured: loss nan  1.2s  peak 110.20 GiB
+
+-- result --
+  peak allocated : 110.20 GiB
+  peak reserved  : 110.68 GiB  (79% of 139.80 GiB, 29.12 GiB headroom)
+  micro-step     : 1.2s  -> 0.7 min per optimizer step at batch_size 32 (upper bound: the optimizer step is counted once per micro-step)
+  projection     : 17.4 days for 38,147 steps = 8.7 links of 48h
+
+RESULT FITS max_length=4096 cross_chunks=8 chunk_len=512 memory=True optimizer=True peak_alloc_gib=110.20 peak_res_gib=110.68 step_s=1.2
+[rank0]:[W916 22:40:04.337432310 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+=== summary ===
+    row  cc  chunk buffer   W  cols status    alloc  reserved  %dev  s/step
+   4096   8    512  accum  16   128   FITS   110.27    110.87    79     1.2
+   4096   8    512  gated  16    64   FITS   109.91    110.40    79     1.2
+   4096   8    512  accum  16   128   FITS   110.28    110.89    79     1.2
+   4096   8    512  gated  16    64   FITS   110.20    110.68    79     1.2
+
+(no 8192 x cc16 memory row in the json — the decision row did not run)
+
+######## 3. the 8-chunk dual-channel walk ########
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 11.32it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 11.31it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt: 12 missing / 0 unexpected keys
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=on  8 chunks x 256 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16     2D        16         -   289.40     8.81     8   1.00   yes           -  11.8973
+ 1    16->32     2D        16         -   288.81    10.54     8   1.00   yes    0.00e+00  11.4026
+ 2    32->48     2D        16         -   288.79    10.20     8   1.00   yes    0.00e+00  11.3537
+ 3    48->64     2D        16         -   288.66    10.76     8   1.00   yes    0.00e+00  11.7427
+ 4    64->64     2D        16       yes   288.55     9.59     8   1.00   yes    0.00e+00  11.5931
+ 5    64->64     2D        16       yes   288.44    10.71     8   1.00   yes    0.00e+00  11.7177
+ 6    64->64     2D        16       yes   288.25     9.61     8   1.00   yes    0.00e+00  11.8156
+ 7    64->64     2D        16       yes   287.95     9.66     8   1.00   yes    0.00e+00  11.5075
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 2
+   E: row_norm 136.746  centred_cos -0.0129  eff_rank_pr 14.29  entropy 50.37
+   Z: row_norm 3.847  centred_cos 0.0526  eff_rank_pr 9.74  entropy 45.13
+   Z/E norm ratio 0.0281  unwritten Z rows 0
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.7311  ig(bias) 0.5000  |W_in| 0.000e+00  |W_mem| 0.000e+00  left init: False
+   Z  fg(bias) 0.7311  ig(bias) 0.5000  |W_in| 0.000e+00  |W_mem| 0.000e+00  left init: False
+
+-- gradient norms (one backward over the summed chain loss) ---------
+   prefix.forget_bias                   8.144262e-02
+   prefix.forget_bias_z                 1.036461e-04
+   prefix.gate_proj_in.weight           9.228385e+00
+   prefix.gate_proj_in_z.weight         1.003889e-03
+   prefix.gate_proj_mem.weight          2.718168e+00
+   prefix.gate_proj_mem_z.weight        1.002788e-03
+   prefix.input_bias                    9.030756e-03
+   prefix.input_bias_z                  4.723959e-06
+   prefix.summary_emb                   5.724045e-01
+
+   Z read grad frac over this walk: 1.00 (measured=True)  write grad frac 1.00
+   read_grad_frac is a property of the SAMPLER, not of the walk: one
+   no-grad step cuts Z's read gradient to exactly zero, and E's is
+   unaffected because E re-enters through input_embeds every step.
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/prelaunch-20260916-2236/walk.json
+
+######## 3b. THE WIDTH CONTRAST: W=32 vs W=16 ########
+    accum_max: 256 at W=32, 128 at W=16
+    (both retain 8 chunks -- that is what makes it a width contrast)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 85.24it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 256 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   289.40      -       -      -   yes           -  11.8973
+ 1    16->32      D        16         -   288.81      -       -      -   yes           -  11.4023
+ 2    32->48      D        16         -   288.79      -       -      -   yes           -  11.3616
+ 3    48->64      D        16         -   288.66      -       -      -   yes           -  11.7398
+ 4    64->80      D        16         -   288.55      -       -      -   yes           -  11.5919
+ 5    80->96      D        16         -   288.29      -       -      -   yes           -  11.6827
+ 6   96->112      D        16         -   288.54      -       -      -   yes           -  11.9517
+ 7  112->128      D        16         -   288.12      -       -      -   yes           -  11.6147
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 112.184  centred_cos -0.0071  eff_rank_pr 26.22  entropy 98.49
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/prelaunch-20260916-2236/walk-branch-w16.json
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 32  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 256  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 125.92it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=32 max_vecs=256 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=32 K=None route=accum  Z=OFF  8 chunks x 256 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->32      D        32         -   292.57      -       -      -   yes           -  11.8973
+ 1    32->64      D        32         -   291.69      -       -      -   yes           -  11.4834
+ 2    64->96      D        32         -   291.63      -       -      -   yes           -  11.4206
+ 3   96->128      D        32         -   291.21      -       -      -   yes           -  11.7758
+ 4  128->160      D        32         -   291.05      -       -      -   yes           -  11.6297
+ 5  160->192      D        32         -   291.11      -       -      -   yes           -  11.7241
+ 6  192->224      D        32         -   291.08      -       -      -   yes           -  11.9672
+ 7  224->256      D        32         -   290.72      -       -      -   yes           -  11.6703
+
+-- final carry ------------------------------------------------------
+   rows 256  channels 1
+   E: row_norm 113.223  centred_cos 0.0365  eff_rank_pr 2.42  entropy 139.44
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/prelaunch-20260916-2236/walk-parent-w32.json
+
+  DELIVERED rank of the carried block -- the number that decides width
+  arm        W  rows  eff_rank_pr   entropy       cos     |row|
+  parent    32   256        2.415   139.440     0.036   113.223
+  branch    16   128       26.222    98.490    -0.007   112.184
+
+  delivered rank retained: 1086% at 50% of the write columns
+  chunks retained: [8.0, 8.0] (these MUST match, or the contrast is horizon and not width)
+
+  VERDICT: INVALID
+    delivered rank went UP by 10.86x on half the write columns, which no width effect produces.
+    Something other than width differs between the two runs -- check accum_max, the prose source, and that both sides loaded their own weights.
+
+  This is a rank measurement, not a benchmark.  It says whether the
+  carry's BASIS narrowed, not whether the arm is worse -- that is the
+  cells' job (p11_z_probe_prereg.md).
+
+wrote eval_results/prelaunch-20260916-2236/width_contrast.json
+
+######## 4. the pre-launch gates ########
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 98.05it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt: 12 missing / 0 unexpected keys
+[gates] WARNING: no --data/--text_file, so the gates run on RANDOM IDS.  Gates 1 and 2 are exact-equality checks and stay valid; GATE 4's content deltas are ~0 BY CONSTRUCTION and mean nothing -- a carry built from noise has no content to transfer.
+[gates] WARNING: no --data/--text_file, so the gates run on RANDOM IDS.  Gates 1 and 2 are exact-equality checks and stay valid; GATE 4's content deltas are ~0 BY CONSTRUCTION and mean nothing -- a carry built from noise has no content to transfer.
+
+==============================================================================
+CORTEX-FINAL PRE-LAUNCH GATES
+==============================================================================
+[PASS] z_off_equivalence
+       max |loss(Z suppressed) - loss(E only)| = 0.000e+00  (bar 1e-05)
+       max |E carry difference|             = 0.000e+00
+[PASS] checkpoint_roundtrip
+       strict load: clean
+       raw saved config is NOT loadable as-is (expected): run tools/prepare_eval_checkpoint.py on every dir the evals read.
+       geometry survived: True  both channels: True  carry width [4096, 4096]
+       max |loss before - after| = 0.000e+00
+[PASS] read_live_fraction
+       at mr=8 depth=8: read_live_frac = 0.534 (4000 samples)
+         mr=  8  live 0.546  no_grad mean 2.39  total steps 8.88
+         mr= 16  live 0.148  no_grad mean 9.21  total steps 16.97
+         mr= 32  live 0.019  no_grad mean 25.63  total steps 33.59
+       MEASURED, not derived.  Write it into the Z pre-registration.
+[PASS] donor_control
+       real=11.6227  none=11.5541  donor_both=11.6412  donor_e=11.6412  donor_z=11.6227
+       content delta (donor-real, both) = +0.0186
+       content delta E = +0.0186   content delta Z = -0.0000
+       column  delta (none -real)       = -0.0686   <- confounded, for contrast only
+
+These gates say the MACHINERY is live and the checkpoint survives a
+round trip.  None of them says whether Z helps or whether the gate beats
+accum -- that needs the full cells, the 2x2 and the influence horizon.
+
+wrote eval_results/prelaunch-20260916-2236/prelaunch.json
+
+ALL PRE-LAUNCH GATES PASSED.  Results in eval_results/prelaunch-20260916-2236.
+
+NOTE: the width contrast (3b) did not produce a usable verdict.
+  That is REPORTED, not gating: p11 section 4 fixes the response to
+  every width verdict and none of them changes this round's arms,
+  because A1 and A3' both run W=16.  Read it, do not block on it.
+Next: bash pace/submit_p1_probes.sh   (the four architecture probes)
+---------------------------------------
+Begin Slurm Epilog: Sep-16-2026 22:44:13
+Job ID:        13272609
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      prelaunch_final.sbatch
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=01:02:08,vmem=0,walltime=00:07:46,mem=23749192K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-2-0
+---------------------------------------
