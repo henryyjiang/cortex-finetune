@@ -38,6 +38,14 @@ TWO WAYS TO DAMAGE IT, and they answer different questions.
                     key: it scores a mid-range logit rather than -inf and goes
                     on absorbing a few percent of the softmax mass, so a null
                     result here is ambiguous in a way the donor is not.
+  --damage random   replace it with Gaussian noise carrying the SAME per-row
+                    norm.  This is a SENSITIVITY CONTROL ON THE INSTRUMENT, not
+                    a third result: Z is read by substitution into `s0`, where
+                    P0.1 put the staggered delta at 0.90x the trunc_normal_
+                    noise it replaces, so "Z moved nothing" and "nothing could
+                    move anything at this scale" are the same picture until
+                    donor and random are shown to separate.  Read it first, and
+                    read a Z ablation only through it.
 
 HOW THE DAMAGE IS APPLIED WITHOUT CONTAMINATING LATER WRITES.  The true carry is
 maintained outside the model.  At chunk n-d the damaged write is substituted
@@ -98,7 +106,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--depths", type=int, nargs="+",
                    default=[1, 2, 3, 4, 6],
                    help="d values to probe.  Every d must be < n_chunks.")
-    p.add_argument("--damage", default="donor", choices=["donor", "zero"])
+    p.add_argument("--damage", default="donor",
+                   choices=["donor", "zero", "random"])
     p.add_argument("--damage_channel", default="both",
                    choices=["both", "e", "z"],
                    help="WHICH CHANNEL to damage on a dual-channel carry.  "
@@ -129,16 +138,49 @@ def _is_append(buf) -> bool:
     return buf is not None and hasattr(buf, "max_vecs")
 
 
-def damage_write(w, donor_write, mode: str, channel: str, hidden_size: int):
+def scaled_noise(ref, gen: torch.Generator):
+    """Gaussian noise carrying the SAME per-row norm as `ref`.
+
+    The scale is the whole point.  Z is read by SUBSTITUTION into `s0`, where
+    P0.1 measured the staggered delta at 0.90x the `trunc_normal_` noise it
+    replaces -- so "Z moved nothing" and "nothing could move anything at this
+    scale" are the same picture, and only a control that swaps in noise AT Z'S
+    OWN SCALE can tell them apart.  Per ROW, not per tensor: the rows are
+    separately addressable keys and a global rescale would let one row's norm
+    set every other row's.
+
+    Drawn from an EXPLICIT generator on the CPU, never the global RNG.  Both
+    chains call `torch.manual_seed(seed)` so their `initialize_state` draws
+    line up; a `randn_like` here would consume from that stream in the damaged
+    chain only, shift every later s0, and quietly break the pairing that the
+    whole instrument's power rests on.
+    """
+    z = torch.randn(tuple(ref.shape), generator=gen, dtype=torch.float32)
+    z = z.to(ref.device, ref.dtype)
+    rn = ref.norm(dim=-1, keepdim=True)
+    zn = z.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    return z * (rn / zn)
+
+
+def damage_write(w, donor_write, mode: str, channel: str, hidden_size: int,
+                 gen: torch.Generator | None = None):
     """Apply the damage to one channel of a write, leaving the other intact.
 
-    Splitting here rather than at the call site because BOTH damage modes need
+    Splitting here rather than at the call site because EVERY damage mode needs
     it and a `zeros_like` on a 2D-wide write nulls Z as well -- the same defect
     eval_carry_2x2's `null_e` was fixed for, which reported an E0Z1 cell as
     E0Z0 under the wrong label.
     """
-    dst = (torch.zeros_like(w) if mode == "zero"
-           else donor_write.to(w.device, w.dtype))
+    if mode == "zero":
+        dst = torch.zeros_like(w)
+    elif mode == "random":
+        if gen is None:
+            raise ValueError("--damage random needs an explicit generator; see "
+                             "scaled_noise for why it must not use the global "
+                             "RNG")
+        dst = scaled_noise(w, gen)
+    else:
+        dst = donor_write.to(w.device, w.dtype)
     if channel == "both" or w.shape[-1] == hidden_size:
         return dst
     D = hidden_size
@@ -147,39 +189,139 @@ def damage_write(w, donor_write, mode: str, channel: str, hidden_size: int):
     return torch.cat([w[..., :D], dst[..., D:]], dim=-1)
 
 
+def damage_pair(e, z, donor_e, donor_z, mode: str, channel: str,
+                gen: torch.Generator | None = None):
+    """Damage a PRE-merge write pair (E, Z), channel by channel.
+
+    The gated buffer's rows are mixed by the gate, so there is no post-hoc row
+    to substitute -- the damage has to go in before `merge`, where E and Z are
+    still two separate tensors.  Returns (e', z').
+    """
+    def one(t, donor):
+        if t is None:
+            return None
+        if mode == "zero":
+            return torch.zeros_like(t)
+        if mode == "random":
+            if gen is None:
+                raise ValueError("--damage random needs an explicit generator")
+            return scaled_noise(t, gen)
+        if donor is None:
+            raise ValueError("donor damage needs the donor's own pre-merge "
+                             "write for this channel")
+        return donor.to(t.device, t.dtype)
+
+    return (one(e, donor_e) if channel in ("both", "e") else e,
+            one(z, donor_z) if channel in ("both", "z") else z)
+
+
+class _patched_merge:
+    """Swap `buf.merge` for the duration of one forward, then put it back.
+
+    Restores the EXACT prior state -- an instance attribute if there was one,
+    otherwise none at all, so the class's bound method takes over again.  The
+    buffer carries a ring pointer (`_chunk`) that the real merge advances, so
+    every wrapper here has to call through rather than reimplement.
+    """
+
+    _MISSING = object()
+
+    def __init__(self, buf, fn):
+        self.buf, self.fn = buf, fn
+
+    def __enter__(self):
+        self.prev = self.buf.__dict__.get("merge", self._MISSING)
+        self.buf.merge = self.fn
+        return self
+
+    def __exit__(self, *exc):
+        if self.prev is self._MISSING:
+            self.buf.__dict__.pop("merge", None)
+        else:
+            self.buf.merge = self.prev
+        return False
+
+
+def capture_write(model, buf, ids, num_steps, device):
+    """One chunk, no carry -> the (E, Z) pair the buffer WOULD have merged.
+
+    The pre-merge write is the only thing a gated donor swap can be built from:
+    what the model returns is the post-gate ring, which is a mixture of this
+    chunk's write and everything still in the slots.
+    """
+    grabbed = {}
+
+    real = type(buf).merge.__get__(buf, type(buf))
+
+    def spy(state, new_vecs, new_latent=None):
+        grabbed["e"], grabbed["z"] = new_vecs, new_latent
+        return real(state, new_vecs, new_latent)
+
+    with _patched_merge(buf, spy), torch.no_grad():
+        model(input_ids=ids.unsqueeze(0).to(device), num_steps=num_steps,
+              m_cross_in=None, return_m_cross=True)
+    return grabbed.get("e"), grabbed.get("z")
+
+
 def run_chain(model, buf, chunks, labels, masks, num_steps, device,
               seed: int, damage_at: int | None, donor_write, mode: str,
-              channel: str = "both", hidden_size: int = 0):
+              channel: str = "both", hidden_size: int = 0,
+              gen: torch.Generator | None = None, donor_latent=None):
     """Replay one row's chunk chain, optionally damaging one chunk's write.
 
-    Returns per-chunk (loss, n_tokens).  `damage_at` is a CHUNK INDEX, not a
-    depth; the caller converts.
+    Returns (per-chunk (loss, n_tokens), per-chunk PRE-merge (E, Z) writes).
+    `damage_at` is a CHUNK INDEX, not a depth; the caller converts.
+
+    THE GATED PATH USED TO BE A SILENT NO-OP.  Until 2026-09-17 the `else`
+    branch below appended the merged state and assigned it, and never looked at
+    `damage_at` -- so on A3/A3' every damage mode did nothing, I(d) came back
+    exactly 0.0 at every depth, and the table read "the gated carry does not
+    matter anywhere", which is the most expensive false negative this instrument
+    could produce.  The header already described the intended treatment
+    ("applied to the write BEFORE the merge"); only the code disagreed.  It is
+    now applied where the header says, through the single `prefix.merge` call
+    site in cortex_graft.py.
     """
     torch.manual_seed(seed)                 # identical s0 draws across arms
     state, rows, writes = None, [], []
+    real_merge = type(buf).merge.__get__(buf, type(buf))
     for i, (xc, yc, mc) in enumerate(zip(chunks, labels, masks)):
-        out = model(input_ids=xc.unsqueeze(0).to(device),
-                    num_steps=num_steps, m_cross_in=state,
-                    return_m_cross=True)
+        seen = {}
+
+        def merge_hook(st, new_vecs, new_latent=None, _i=i):
+            seen["e"], seen["z"] = new_vecs, new_latent
+            if _i == damage_at and not _is_append(buf):
+                new_vecs, new_latent = damage_pair(
+                    new_vecs, new_latent, donor_write, donor_latent,
+                    mode, channel, gen)
+            return real_merge(st, new_vecs, new_latent)
+
+        with _patched_merge(buf, merge_hook):
+            out = model(input_ids=xc.unsqueeze(0).to(device),
+                        num_steps=num_steps, m_cross_in=state,
+                        return_m_cross=True)
         new_state = out.get("m_cross") if isinstance(out, dict) \
             else getattr(out, "m_cross", None)
+        writes.append((seen.get("e"), seen.get("z")))
 
         if _is_append(buf):
             # Rows are separable: take this chunk's own write off the end and
             # rebuild the state, substituting the damaged write if this is the
             # damaged chunk.  The forward above already ran on the TRUE carry,
-            # so damage never reaches a later chunk's write.
+            # so damage never reaches a later chunk's write.  Left as row
+            # surgery rather than folded into the hook: it is the tested path,
+            # and the two are equivalent for a write-once FIFO.
             w = new_state[:, -buf.n_vec:]
-            writes.append(w)
             if i == damage_at:
-                w = damage_write(w, donor_write, mode, channel, hidden_size)
+                w = damage_write(w, donor_write, mode, channel, hidden_size,
+                                 gen)
             state = w if state is None else torch.cat([state, w], dim=1)
             if state.shape[1] > buf.max_vecs:
                 state = state[:, -buf.max_vecs:]
         else:
-            # Gated: rows are mixed, so substitute the write and let the merge
-            # carry the consequence forward.  Documented in the header.
-            writes.append(new_state)
+            # Gated: the rows are mixed by the gate, so the damage went in
+            # above, before the merge, and the merge carries the consequence
+            # forward.  Documented in the header.
             state = new_state
 
         n_tok = int(mc.sum())
@@ -273,18 +415,30 @@ def main() -> int:
 
         for d in args.depths:
             at = args.n_chunks - 1 - d
-            donor_w = None
+            donor_w = donor_z = None
             if args.damage == "donor":
-                with torch.no_grad():
-                    dout = model(input_ids=donor_xs[at].unsqueeze(0).to(device),
-                                 num_steps=num_steps, m_cross_in=None,
-                                 return_m_cross=True)
-                dstate = (dout.get("m_cross") if isinstance(dout, dict)
-                          else getattr(dout, "m_cross", None))
-                donor_w = (dstate[:, -buf.n_vec:] if _is_append(buf) else dstate)
+                if _is_append(buf):
+                    with torch.no_grad():
+                        dout = model(
+                            input_ids=donor_xs[at].unsqueeze(0).to(device),
+                            num_steps=num_steps, m_cross_in=None,
+                            return_m_cross=True)
+                    dstate = (dout.get("m_cross") if isinstance(dout, dict)
+                              else getattr(dout, "m_cross", None))
+                    donor_w = dstate[:, -buf.n_vec:]
+                else:
+                    # A gated donor cannot be a slice of the returned state:
+                    # that state is the post-gate ring, i.e. a MIXTURE.  Take
+                    # the donor's pre-merge write instead.
+                    donor_w, donor_z = capture_write(model, buf, donor_xs[at],
+                                                     num_steps, device)
+            # One generator per (sample, depth), so the noise is reproducible
+            # from --seed and independent of the chain RNG the pairing needs.
+            gen = (torch.Generator().manual_seed(args.seed + 7919 * si + d)
+                   if args.damage == "random" else None)
             damaged, _ = run_chain(model, buf, xs, ys, ms, num_steps, device,
                                    seed, at, donor_w, args.damage,
-                                   args.damage_channel, D_HIDDEN)
+                                   args.damage_channel, D_HIDDEN, gen, donor_z)
             if damaged[-1][0] is None:
                 continue
             per_depth[d].append(damaged[-1][0] - intact[-1][0])
@@ -301,7 +455,10 @@ def main() -> int:
         "buffer": {"kind": kind, "class": type(buf).__name__,
                    "n_vec": int(buf.n_vec),
                    "capacity": int(getattr(buf, "max_vecs",
-                                           getattr(buf, "n_slots", 0)))},
+                                           getattr(buf, "n_slots", 0))),
+                   "damage_applied": ("row substitution after the write"
+                                      if kind == "append" else
+                                      "pre-merge write, through prefix.merge")},
         "config": {"n_chunks": args.n_chunks, "damage": args.damage,
                    "T": args.T, "dtype": args.dtype, "samples": n_used},
         "depths": {},
