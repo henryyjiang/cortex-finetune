@@ -183,6 +183,22 @@ class TestGate3TheNoGradSplit:
         assert a["mean_recurrence"] == 8 and a["mean_backprop_depth"] == 8
         assert g["passed"]
 
+    def test_the_record_says_which_depth_it_is_anchored_on(self):
+        """Without --trained_depth the gate falls back to
+        config.mean_recurrence, which on a B2-family checkpoint is the base
+        recipe's 32 while the arm trained at 8 -- a 28x swing in the number that
+        decides what a null result for Z means.  A downstream reader cannot tell
+        the two cases apart from the fraction alone, so the anchor is written
+        into the record instead of being left to be inferred."""
+        m = _model()
+        given = check_read_live(m, mean_recurrence=8, mean_backprop_depth=8,
+                                n_samples=500)
+        fell_back = check_read_live(m, mean_backprop_depth=8, n_samples=500)
+        assert given["anchor"] == "trained_depth"
+        assert fell_back["anchor"] == "config.mean_recurrence"
+        assert fell_back["at_run_config"]["mean_recurrence"] == \
+            m.config.mean_recurrence
+
     def test_deep_recurrence_starves_the_z_read(self):
         """At mr32 / depth 8 essentially no batch carries a Z read gradient --
         the structural fact that decides how the Z arm must be configured, and

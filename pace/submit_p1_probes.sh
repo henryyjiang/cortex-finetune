@@ -43,6 +43,11 @@ ACCUM_VECS=${ACCUM_VECS:-16}
 GATE_SLOTS=${GATE_SLOTS:-64}
 CROSS_CHUNKS=${CROSS_CHUNKS:-8}
 CELL_STEPS=${CELL_STEPS:-400}
+# Read by --compare only, and it has to MATCH p1_arms.sbatch's MAX_MEAN_REC:
+# it re-anchors read_live_frac onto the sweep row for the depth the arms really
+# trained at.  Wrong here does not mis-scale the number, it reports one from an
+# operating point no arm ran.
+MAX_MEAN_REC=${MAX_MEAN_REC:-8}
 DIAG_INTERVAL=${DIAG_INTERVAL:-10}
 OUT_ROOT=${OUT_ROOT:-cortex-retrofit}
 
@@ -55,13 +60,23 @@ if [ "${1:-}" = "--compare" ]; then
     # Missing arms are reported by compare_arms rather than guessed at; an arm
     # whose step window does not overlap the reference's gets NO delta, because
     # an unpaired one at this horizon is worse than none.
+    # ALL FOUR prelaunch records go in, not just the Z arms.  content_delta_e/z
+    # only exist on a dual-channel carry, but content_delta_both and
+    # column_delta are written for every arm, and the donor control is only
+    # readable as a CONTRAST: on 2026-09-16 the two Z arms were passed in alone
+    # and the table could not show that all four had gone negative together
+    # (a1 -0.1234, a3 -0.0758) against +0.0186 on the parent.  read_eval skips
+    # the keys an E-only record does not have.
     python tools/compare_arms.py \
         --arm a1=$OUT_ROOT/$A1_RUN \
         --arm a2=$OUT_ROOT/$A2_RUN \
         --arm a3=$OUT_ROOT/$A3_RUN \
         --arm a3z=$OUT_ROOT/$A3Z_RUN \
-        --eval a3z=eval_results/probe-$A3Z_RUN/prelaunch.json \
+        --eval a1=eval_results/probe-$A1_RUN/prelaunch.json \
         --eval a2=eval_results/probe-$A2_RUN/prelaunch.json \
+        --eval a3=eval_results/probe-$A3_RUN/prelaunch.json \
+        --eval a3z=eval_results/probe-$A3Z_RUN/prelaunch.json \
+        --trained_depth $MAX_MEAN_REC \
         --reference a1 \
         --out eval_results/p1_probe_compare.json
     exit $?

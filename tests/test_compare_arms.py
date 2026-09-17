@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(REPO, "evals"))
 
 from tools.compare_arms import (  # noqa: E402
     build, compare_losses, health_summary, paired_ci, print_comparison,
-    read_diag, read_eval,
+    read_diag, read_eval, read_live_from_gate,
 )
 
 
@@ -230,6 +230,79 @@ class TestReadingEvalJsons:
         assert ev["kind"] == "prelaunch"
         assert ev["content_delta_z"] == 0.01
         assert ev["read_live_frac"] == 0.53
+
+
+#: Gate 3 as the 2026-09-16 probe batch wrote it: anchored on the B2-family
+#: config's mean_recurrence 32, while every arm trained at 8.
+_MISANCHORED = {
+    "gate": "read_live_fraction",
+    "anchor": "config.mean_recurrence",
+    "at_run_config": {"mean_recurrence": 32, "read_live_frac": 0.0195},
+    "sweep_mean_recurrence": [
+        {"mean_recurrence": 8, "read_live_frac": 0.546},
+        {"mean_recurrence": 16, "read_live_frac": 0.148},
+        {"mean_recurrence": 32, "read_live_frac": 0.019},
+    ],
+}
+
+
+class TestReadLiveAnchoring:
+    """read_live_frac decides what a null result for Z MEANS (P11 section 3), so
+    a number from the wrong depth is worse than no number: 0.0195 says the read
+    was starved and the null is uninformative, 0.546 says it was live and the
+    null is damning.  Nothing about the bare fraction distinguishes them."""
+
+    def test_the_depth_travels_with_the_fraction(self):
+        out = read_live_from_gate(_MISANCHORED)
+        assert out["read_live_frac"] == 0.0195
+        assert out["read_live_at_mr"] == 32
+        assert out["read_live_anchor"] == "config.mean_recurrence"
+
+    def test_a_known_trained_depth_re_anchors_onto_the_sweep(self):
+        out = read_live_from_gate(_MISANCHORED, trained_depth=8)
+        assert out["read_live_frac"] == 0.546
+        assert out["read_live_at_mr"] == 8
+        assert "re-anchored" in out["read_live_note"]
+
+    def test_the_displaced_number_is_kept_not_dropped(self):
+        """So a table can be reconciled against the record it came from."""
+        out = read_live_from_gate(_MISANCHORED, trained_depth=8)
+        assert out["read_live_frac_at_run_config"] == 0.0195
+
+    def test_a_correctly_anchored_record_is_left_alone(self):
+        gate = {"gate": "read_live_fraction", "anchor": "trained_depth",
+                "at_run_config": {"mean_recurrence": 8, "read_live_frac": 0.534},
+                "sweep_mean_recurrence": _MISANCHORED["sweep_mean_recurrence"]}
+        out = read_live_from_gate(gate, trained_depth=8)
+        assert out["read_live_frac"] == 0.534      # the 4000-sample measurement,
+        assert "read_live_note" not in out         # not the 1000-sample sweep row
+
+    def test_it_says_so_rather_than_guessing_when_the_sweep_has_no_such_row(self):
+        out = read_live_from_gate(_MISANCHORED, trained_depth=12)
+        assert out["read_live_frac"] == 0.0195
+        assert out["read_live_at_mr"] == 32
+        assert "NOT re-anchored" in out["read_live_note"]
+
+    def test_an_e_only_record_still_yields_its_donor_contrast(self):
+        """a1 and a3 have no content_delta_e/z.  Dropping them from the table
+        for that is what hid the 2026-09-16 result that ALL FOUR arms went
+        negative together."""
+        import tempfile
+        tmp = tempfile.mkdtemp()
+        doc = {"all_passed": True, "gates": [
+            {"gate": "donor_control", "content_delta_both": -0.1234,
+             "column_delta": -0.2412},
+            _MISANCHORED]}
+        ev = read_eval(self._write(tmp, "a1.json", doc), trained_depth=8)
+        assert ev["content_delta_both"] == -0.1234
+        assert "content_delta_z" not in ev
+        assert ev["read_live_frac"] == 0.546
+
+    def _write(self, tmp, name, doc):
+        p = os.path.join(tmp, name)
+        with open(p, "w", encoding="ascii") as fh:
+            json.dump(doc, fh)
+        return p
 
 
 class TestThePrintedComparison:

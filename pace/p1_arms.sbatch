@@ -486,8 +486,19 @@ if [ -n "$PROBE" ] && [ $RC -eq 0 ]; then
     #    unit test can catch), the MEASURED no-grad split that goes into the Z
     #    pre-registration, and the per-channel donor control (P0.6 -- it never
     #    ran on B2).  Each one can come back negative.
+    #
+    #    --trained_depth IS NOT OPTIONAL HERE, and leaving it off cost the
+    #    2026-09-16 batch its headline Z number.  Gate 3 anchors on
+    #    config.mean_recurrence when it is not given, and on every B2-family
+    #    checkpoint that field still says 32 while the ramp capped the arm at
+    #    MAX_MEAN_REC=8.  read_live_frac is 0.546 at mr8 and 0.0195 at mr32, so
+    #    the omission does not shift the number, it REPLACES it with one from an
+    #    operating point no arm ran -- and P11 section 3 makes a null result for
+    #    Z mean opposite things across that 28x.  pace/prelaunch_final.sbatch
+    #    has passed it since 21:54 on 2026-09-16; this copy had not.
     python tools/prelaunch_final.py --model_name $MODEL $PROBE_SETS $PROBE_PROSE \
-        --checkpoint "$LAST" --chunks $CROSS_CHUNKS --chunk_len 256 \
+        --checkpoint "$LAST" --trained_depth $MAX_MEAN_REC \
+        --chunks $CROSS_CHUNKS --chunk_len 256 \
         --T $MAX_MEAN_REC --out $OUT/prelaunch.json || RC=1
 
     echo ""

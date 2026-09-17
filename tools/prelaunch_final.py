@@ -297,9 +297,19 @@ def check_read_live(model, mean_recurrence=None, mean_backprop_depth=None,
     for m in sorted({mr, 8, 16, 32}):
         sweep.append(read_live_fraction(model, max(n_samples // 4, 250), m, bd))
     return {"gate": "read_live_fraction", "at_run_config": at_run,
+            # WHICH DEPTH `at_run_config` IS ANCHORED ON, recorded rather than
+            # left for a reader to infer.  Without --trained_depth the anchor is
+            # config.mean_recurrence, which on a B2-family checkpoint is the
+            # base recipe's 32 while the arm trained at 8 -- 0.0195 against
+            # 0.546.  A downstream reader (tools/compare_arms.py) cannot tell
+            # those apart from the number alone, and the 2026-09-16 probe batch
+            # is the record of what that costs.
+            "anchor": ("trained_depth" if mean_recurrence is not None
+                       else "config.mean_recurrence"),
             "sweep_mean_recurrence": sweep, "passed": True,
             "note": "put read_live_frac in the Z pre-registration: it changes "
-                    "what a null result for Z means."}
+                    "what a null result for Z means -- and read `anchor` "
+                    "before quoting it."}
 
 
 # ---------------------------------------------------------------------------

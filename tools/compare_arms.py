@@ -93,6 +93,13 @@ def parse_args() -> argparse.Namespace:
                         "default because it is the one carrying B2's buffer")
     p.add_argument("--last", type=int, default=100,
                    help="window of most recent steps used for the loss summary")
+    p.add_argument("--trained_depth", type=int, default=0,
+                   help="mean_recurrence the arms actually trained at (8 for "
+                        "the P1 probes).  Re-anchors read_live_frac onto the "
+                        "sweep row measured there, because gate 3 falls back "
+                        "to config.mean_recurrence -- still 32 on every "
+                        "B2-family checkpoint -- when prelaunch_final was run "
+                        "without --trained_depth")
     p.add_argument("--boot", type=int, default=5000)
     p.add_argument("--out", default=None)
     return p.parse_args()
@@ -153,7 +160,43 @@ def read_csv_losses(path: str) -> dict:
     return out
 
 
-def read_eval(path: str) -> dict:
+def read_live_from_gate(gate: dict, trained_depth: int = 0) -> dict:
+    """Pull read_live_frac out of gate 3 WITH the depth it was measured at.
+
+    The bare fraction is not quotable.  `at_run_config` is anchored on
+    config.mean_recurrence unless prelaunch_final was given --trained_depth, and
+    on every B2-family checkpoint that field still says 32 while the arm trained
+    at 8: 0.0195 against 0.546, a factor of 28.  P11 section 3 makes a null
+    result for Z mean OPPOSITE things across that gap -- a starved read makes
+    the null uninformative, a live one makes it damning -- so the anchor travels
+    with the number, and a known trained depth re-anchors it onto the sweep row
+    that was actually measured there.  The displaced value is kept, not dropped,
+    so a table can be reconciled against the record it came from.
+    """
+    at = gate.get("at_run_config") or {}
+    out = {"read_live_frac": at.get("read_live_frac"),
+           "read_live_at_mr": at.get("mean_recurrence"),
+           "read_live_anchor": gate.get("anchor", "unrecorded")}
+    if not trained_depth or out["read_live_at_mr"] == trained_depth:
+        return out
+    row = next((r for r in gate.get("sweep_mean_recurrence") or []
+                if r.get("mean_recurrence") == trained_depth), None)
+    if row is None:
+        out["read_live_note"] = (
+            f"NOT re-anchored: --trained_depth {trained_depth} was given but "
+            f"this record has no sweep row measured there")
+        return out
+    out["read_live_frac_at_run_config"] = out["read_live_frac"]
+    out["read_live_frac"] = row.get("read_live_frac")
+    out["read_live_at_mr"] = trained_depth
+    out["read_live_note"] = (
+        f"re-anchored onto the mr={trained_depth} sweep row; the record's own "
+        f"at_run_config was measured at mr={at.get('mean_recurrence')}, which "
+        f"is not a depth this arm ran")
+    return out
+
+
+def read_eval(path: str, trained_depth: int = 0) -> dict:
     """Pull the headline out of any eval JSON this repo writes, BY KEY.
 
     Keyed rather than positional so a file whose shape changed is reported as
@@ -173,8 +216,7 @@ def read_eval(path: str) -> dict:
                     if k in g:
                         out[k] = g[k]
             if g.get("gate") == "read_live_fraction":
-                out["read_live_frac"] = (g.get("at_run_config") or {}).get(
-                    "read_live_frac")
+                out.update(read_live_from_gate(g, trained_depth))
     elif isinstance(doc, dict) and "cells" in doc:        # carry 2x2
         out["kind"] = "carry_2x2"
         out["cells"] = doc["cells"]
@@ -407,18 +449,19 @@ def print_comparison(rec, out=sys.stdout) -> None:
 # ---------------------------------------------------------------------------
 
 def build(arm_dirs: dict, csvs: dict, evals: dict, ref: str, last: int,
-          n_boot: int) -> dict:
+          n_boot: int, trained_depth: int = 0) -> dict:
     arms = {}
     for label, dirs in arm_dirs.items():
         d = dirs[0]
         rec = {"dir": d, "diag": read_diag(d)}
         if label in csvs:
             rec["csv_losses"] = read_csv_losses(csvs[label][0])
-        rec["evals"] = [read_eval(p) for p in evals.get(label, [])
+        rec["evals"] = [read_eval(p, trained_depth) for p in evals.get(label, [])
                         if os.path.isfile(p)]
         rec["health"] = health_summary(rec["diag"])
         arms[label] = rec
     out = {"when": datetime.now().isoformat(timespec="seconds"),
+           "trained_depth": trained_depth or None,
            "arms": arms,
            "loss": compare_losses(arms, ref, last, n_boot)}
     for a in out["arms"].values():
@@ -442,7 +485,7 @@ def main() -> int:
         print(f"ERROR: no such run directory: {missing}")
         return 1
     rec = build(arm_dirs, _pairs(args.csv), _pairs(args.eval),
-                args.reference, args.last, args.boot)
+                args.reference, args.last, args.boot, args.trained_depth)
     empty = [k for k, v in rec["arms"].items() if not v["health"]]
     if empty:
         print(f"WARNING: no cortex_diag.jsonl under {empty} -- those runs were "
