@@ -347,6 +347,8 @@ class CortexMemory(nn.Module):
                 gate_norm=str(getattr(config, "gate_norm", "tanh") or "tanh"),
                 gate_init=str(getattr(config, "gate_init", "zero") or "zero"),
                 fill=str(getattr(config, "gate_fill", "grow") or "grow"),
+                forget_bias_init=float(
+                    getattr(config, "gate_forget_bias", 1.0) or 1.0),
                 carries_latent=self.latent_carry)
         elif pmode:
             raise ValueError(f"prefix_memory must be '', 'accum' or 'gated'; got {pmode!r}")

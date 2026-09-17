@@ -66,13 +66,36 @@ export HF_HUB_OFFLINE=1
 export TOKENIZERS_PARALLELISM=false
 
 TOKENIZER=${TOKENIZER:-ckpts/olmo-retrofit-cortex}
+MAX_LENGTH=${MAX_LENGTH:-4096}
+# THE VALIDATION PACK, and why it needed fixing (2026-09-17).
+# `data/pg19_olmo_val_len4096` holds FIFTY ROWS.  PG-19's validation split is 50
+# books and the OLD packer emitted one truncated row per book, so every eval
+# that reads it silently caps at n=50 however large --max_examples is: the P2.1
+# sweep asked for 100 and got 50 on all 18 cells, i.e. half the pre-registered
+# power, and nothing in the log said so.  The strided packer turns each book
+# into ceil(tokens/row_len) consecutive windows instead of discarding the rest,
+# so the same 50 books yield hundreds of rows at the same row length -- more
+# samples from the same source, no new data, no distribution change.
+#
+#   SPLIT=validation sbatch pace/prepare_pg19_pack.sbatch
+#       -> data/pg19_olmo_validation_len4096_strided
+#
+# The evals keep pointing at the OLD pack until you pass DATA= explicitly.  That
+# is deliberate: switching the default silently would make new numbers
+# non-comparable with the 18 P2.1 cells, which is this project's ARM_DATA
+# failure wearing a different hat.  Re-run a cell at the higher n on purpose,
+# and say in the record which pack it read.
+SPLIT=${SPLIT:-train}
 # NOT data/pg19_olmo_len4096 — that name is TAKEN by the old truncating
 # packer's output (28,602 rows / ~117M tokens, the first ~4k tokens of each
 # book), which past results were built on.  Two artifacts sharing one name is
 # how this project lost six weeks to ARM_DATA and why the two base checkpoints
 # carry a standing warning.  The suffix names the mechanism that differs.
-OUT=${OUT:-data/pg19_olmo_len4096_strided}
-MAX_LENGTH=${MAX_LENGTH:-4096}
+if [ "$SPLIT" = "train" ]; then
+    OUT=${OUT:-data/pg19_olmo_len${MAX_LENGTH}_strided}
+else
+    OUT=${OUT:-data/pg19_olmo_${SPLIT}_len${MAX_LENGTH}_strided}
+fi
 NUM_PROC=${NUM_PROC:-16}
 MAP_BATCH=${MAP_BATCH:-1}
 WRITER_BATCH=${WRITER_BATCH:-200}
@@ -101,12 +124,13 @@ fi
 
 echo "=== pg19 pack | $DATASET -> $OUT | max_length=$MAX_LENGTH ==="
 echo "    num_proc=$NUM_PROC map_batch=$MAP_BATCH writer_batch=$WRITER_BATCH"
-echo "    tokenizer=$TOKENIZER  min_tokens=$MIN_TOKENS"
+echo "    tokenizer=$TOKENIZER  min_tokens=$MIN_TOKENS  split=$SPLIT"
 free -g | head -2
 
 python tools/prepare_pg19_dataset.py \
     --tokenizer "$TOKENIZER" \
     --dataset "$DATASET" \
+    --split "$SPLIT" \
     --out "$OUT" \
     --max_length "$MAX_LENGTH" \
     --num_proc "$NUM_PROC" \

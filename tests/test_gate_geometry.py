@@ -24,16 +24,20 @@ Run: /c/Users/henry/miniconda3/envs/cortex-retro/python.exe -m pytest tests/ -q
 """
 from __future__ import annotations
 
+import io
 import os
 import sys
 
 import pytest
 import torch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-sys.path.insert(0, os.path.dirname(__file__))
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(REPO, 'evals'))
 
 from cortex_memory.buffers import PrefixAccumBuffer, PrefixGatedBuffer
+from diag_gate_geometry import ids_from_pack  # noqa: E402
 
 B, D = 2, 64
 
@@ -406,3 +410,58 @@ class TestGraftWiring:
     def test_gate_slots_zero_means_n_vec(self):
         c = self._cortex(accum_vecs=8, gate_slots=0)
         assert c.prefix.n_slots == 8
+
+
+class TestPackSourceAndOverrides:
+    """The A(d) probe died in four seconds on its first real run, twice over:
+    its only prose source was --text_file pointing above the repo (true on a
+    laptop, absent on PACE), and it loaded with NO config overrides against a
+    base dir whose config carries no cortex flags -- so even with prose it would
+    have exited 2 with "no prefix buffer".  Both are pinned here because both
+    were invisible until a GPU allocation went to waste on them.
+    """
+
+    def _pack(self, tmp_path, rows=8, row_len=10):
+        import datasets
+        ds = datasets.Dataset.from_dict(
+            {"input_ids": [[r * 100 + c for c in range(row_len)]
+                           for r in range(rows)]})
+        d = str(tmp_path / "pack")
+        ds.save_to_disk(d)
+        return d
+
+    def test_the_donor_rows_cannot_overlap_the_main_tapes_rows(self, tmp_path):
+        """The whole point of skip_rows.  A donor that shares rows with the main
+        tape is a near-copy of it, and A(d) then measures rounding error and
+        comes back flat for a reason that is not the buffer."""
+        d = self._pack(tmp_path)
+        main = ids_from_pack(d, 20, 0)
+        donor = ids_from_pack(d, 20, 2)
+        assert len(main) == len(donor) == 20
+        assert not (set(main) & set(donor))
+
+    def test_a_pack_too_small_for_the_geometry_refuses_instead_of_padding(self, tmp_path):
+        """Silently returning fewer tokens would make the last chunks repeats of
+        the first, which reads as a buffer that remembers everything."""
+        d = self._pack(tmp_path)
+        with pytest.raises(SystemExit) as e:
+            ids_from_pack(d, 10_000, 0)
+        assert "rows" in str(e.value)
+
+    def test_the_probe_accepts_data_and_set(self):
+        """Argument-level, because the failure was at argument level: the flag
+        either exists on the parser or the job dies on the node."""
+        import diag_gate_geometry as g
+        src = io.open(g.__file__, encoding="utf-8").read()
+        assert '"--data"' in src
+        assert '"--set"' in src
+        assert "parse_config_overrides(args.set)" in src
+        assert "config_overrides=overrides or None" in src
+
+    def test_the_launcher_passes_both(self):
+        s = io.open(os.path.join(REPO, "pace", "gate_geometry_ad.sbatch"),
+                    encoding="utf-8").read()
+        assert '--data "$DATA"' in s
+        assert "--set use_memory=true" in s
+        assert "text_file" not in s.split("cd $SLURM_SUBMIT_DIR")[1], (
+            "the launcher still reaches for a file above the repo")

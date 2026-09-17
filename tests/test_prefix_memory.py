@@ -462,3 +462,63 @@ class TestSeedingPersistence:
         m2(_ids(), (0, 1))
         assert torch.allclose(m2.cortex.prefix.summary_emb,
                               m2.wte.weight[EOS].expand(NV, H))
+
+
+class TestForgetBiasInit:
+    """`gate_forget_bias` -- the buffer's horizon before training moves it.
+
+    Retention is F(d) = ig * fg ** floor(d / (K/W)) with fg = sigmoid(bias), and
+    at cross_chunks 8 the gate never sees content older than 8 chunks, so there
+    is no gradient pressure on the bias and the INIT VALUE IS THE HORIZON.  The
+    risk is the same one post_init's clobber already cost this project once: a
+    designed init that something downstream quietly overwrites.  So the knob is
+    pinned at three places -- the constructor, the re-init path, and the graft's
+    config read -- and the default is pinned hardest, because every arm on
+    record was trained at it.
+    """
+
+    def test_the_default_is_lm2s_published_value_and_has_not_moved(self):
+        buf = PrefixGatedBuffer(8, n_vec=4, n_slots=16, route="ring")
+        assert buf.forget_bias.detach().item() == pytest.approx(1.0)
+        assert torch.sigmoid(buf.forget_bias.detach()).item() == pytest.approx(0.7311, abs=1e-4)
+
+    def test_a_raised_bias_buys_the_horizon_the_numbers_say_it_should(self):
+        """BABILong 16k needs fg >= 0.818, 32k needs >= 0.905.  Those are the
+        two values the pre-registration names, so they are the two pinned."""
+        for bias, fg in ((1.50, 0.8176), (2.25, 0.9047), (2.40, 0.9168)):
+            buf = PrefixGatedBuffer(8, n_vec=4, n_slots=16, route="ring",
+                                    forget_bias_init=bias)
+            assert torch.sigmoid(buf.forget_bias.detach()).item() == pytest.approx(fg, abs=1e-4)
+
+    def test_the_reinit_path_reapplies_the_CUSTOM_value_not_the_default(self):
+        """apply_gate_init is called from train.py's reset_cortex_graft_init to
+        undo post_init's clobber.  If it re-applied 1.0 it would silently
+        discard the configured horizon on every run -- bug class 1, the exact
+        shape that put a garbage forget_bias into the eval path and produced a
+        NaN on the first full second lap."""
+        buf = PrefixGatedBuffer(8, n_vec=4, n_slots=16, route="ring",
+                                forget_bias_init=2.4)
+        with torch.no_grad():
+            buf.forget_bias.fill_(-99.0)          # the clobber
+        buf.apply_gate_init()                     # the repair
+        assert buf.forget_bias.detach().item() == pytest.approx(2.4)
+
+    def test_the_z_gate_gets_the_same_horizon(self):
+        buf = PrefixGatedBuffer(8, n_vec=4, n_slots=16, route="ring",
+                                carries_latent=True, forget_bias_init=2.4)
+        assert buf.forget_bias_z.detach().item() == pytest.approx(2.4)
+
+    def test_a_non_finite_bias_is_refused_at_build(self):
+        with pytest.raises(ValueError):
+            PrefixGatedBuffer(8, n_vec=4, n_slots=16, forget_bias_init=float("nan"))
+
+    def test_the_graft_reads_it_off_the_config(self):
+        """The knob is worth nothing if the config path drops it: that is how
+        `use_memory` turned out to be the master switch and three other flags
+        turned out to be decoration."""
+        m = _model("gated", gate_slots=16, gate_forget_bias=2.4)
+        assert m.cortex.prefix.forget_bias.detach().item() == pytest.approx(2.4)
+
+    def test_omitting_it_leaves_every_arm_on_record_untouched(self):
+        m = _model("gated", gate_slots=16)
+        assert m.cortex.prefix.forget_bias.detach().item() == pytest.approx(1.0)

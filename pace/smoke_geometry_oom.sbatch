@@ -50,6 +50,23 @@
 #   OOM at GRAD 1       -> cc8 is forced.  Stop carrying the geometry as open,
 #       and state in the writeup that the gate ships without a trained horizon.
 #
+# ==== RESULT 2026-09-17, jobs 13304813 / 13304814 -- cc16 IS DEAD ===========
+# Both TBPTT windows OOM, at K=128 gated and accum_max=256 alike:
+#
+#     4096 x cc16 chunk 256  accum  W16  cols 256  OOM  (GRAD 2 and GRAD 1)
+#     4096 x cc16 chunk 256  gated  W16  cols 128  OOM  (GRAD 2 and GRAD 1)
+#
+# The unpriced lever was the last one that exists -- batch_size costs no memory
+# at micro_batch_size 1, and activation checkpointing across chunks is not
+# implemented.  So the ~1 GiB miss is not a tuning question after all.
+#
+# THE GEOMETRY QUESTION IS CLOSED: cc8, K <= 64 by the two-lap constraint,
+# eviction out of distribution for accum, and NO gradient pressure on the forget
+# gate past 8 chunks.  The consequence is a design decision, not another job:
+# at cc8 the forget bias never moves, so `gate_forget_bias` at INIT is the whole
+# horizon -- see cortex_memory/buffers.py and train.py's flag block.
+# Do not re-run this row hoping for a different answer.
+#
 # P1_Z=1 adds the two Z arms.  Their memory has NEVER been priced -- every
 # number in this gate's history is from an E-only run -- and the second gate
 # is ~33.5M more parameters with optimizer state, which is not a rounding

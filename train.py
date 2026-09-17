@@ -250,6 +250,17 @@ class CLISettings:
     # gate_init           : 'zero' makes step 0 the constant EMA
     #                       0.731*state + 0.5*candidate and leaves the read
     #                       fully live; 'default' restores kaiming gate weights.
+    # gate_forget_bias    : the forget gate's bias at INIT, i.e. the buffer's
+    #                       horizon before training moves it: fg =
+    #                       sigmoid(bias), retention F(d) = ig * fg**floor(d/(K/W)).
+    #                       1.0 is LM2 as published (fg 0.731, half-life ~2.2
+    #                       chunks).  At cross_chunks 8 the gate never sees
+    #                       content older than 8 chunks, so NOTHING pushes this
+    #                       up during training and the init value is the whole
+    #                       horizon -- BABILong 16k wants >= 1.50, 32k >= 2.25.
+    #                       Raising it is free in parameters and cost; it is a
+    #                       DECISION, and it changes what an arm is comparable
+    #                       to, so do not move it mid-comparison.
     # gate_fill           : rows a ring has not reached on its first lap —
     #                       'grow' (emit only written rows; the buffer IS
     #                       PrefixAccumBuffer for exactly one lap, so an accum
@@ -299,7 +310,7 @@ class CLISettings:
             # unless a run asks for it; the recommended arm is
             #   accum_vecs 16, gate_slots 64, gate_route ring.
             gate_slots=0, gate_route="ring", gate_norm="tanh",
-            gate_init="zero", gate_fill="grow",
+            gate_init="zero", gate_fill="grow", gate_forget_bias=1.0,
             # THE Z CHANNEL (the dual-channel carry).  latent_carry false is
             # byte-identical to B2 and to every arm run so far; true widens the
             # carried tensor to 2D (E at [...,:D], Z at [...,D:]), adds a second
@@ -446,6 +457,12 @@ class CLISettings:
                     assert self.cortex[key] in allowed, (
                         f"cortex.{key} must be one of {allowed}; got "
                         f"{self.cortex[key]!r}")
+                fb = float(self.cortex["gate_forget_bias"])
+                assert math.isfinite(fb) and abs(fb) <= 10.0, (
+                    f"cortex.gate_forget_bias ({fb}) is outside [-10, 10]: "
+                    "sigmoid saturates well before that, so a value out here "
+                    "is a typo, and a saturated forget gate either never "
+                    "forgets or never keeps")
                 K = int(self.cortex["gate_slots"]) or int(self.cortex["accum_vecs"])
                 W = int(self.cortex["accum_vecs"])
                 assert K >= W, (

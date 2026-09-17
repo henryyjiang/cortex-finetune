@@ -396,7 +396,8 @@ class PrefixGatedBuffer(_PrefixBufferBase):
                  n_slots: Optional[int] = None, route: str = "ring",
                  gate_norm: str = "tanh", gate_init: str = "zero",
                  fill: str = "grow", route_init_std: float = 0.02,
-                 carries_latent: bool = False) -> None:
+                 carries_latent: bool = False,
+                 forget_bias_init: float = 1.0) -> None:
         super().__init__(hidden_size, n_vec, carries_latent)
         self.n_slots = int(n_slots) if n_slots else int(n_vec)
         if self.n_slots < n_vec:
@@ -421,7 +422,11 @@ class PrefixGatedBuffer(_PrefixBufferBase):
                 f"of n_vec ({n_vec}) -- a partial lap would write a different "
                 "row set every time round and break the depth->row map that "
                 "`depth_rows` depends on.  Use route='mix' for a ragged ratio.")
+        if not math.isfinite(float(forget_bias_init)):
+            raise ValueError(
+                f"forget_bias_init must be finite; got {forget_bias_init!r}")
         self.route = route
+        self.forget_bias_init = float(forget_bias_init)
         self.gate_norm = gate_norm
         self.gate_init = gate_init
         self.fill = fill
@@ -429,6 +434,7 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         self.gate_proj_in  = nn.Linear(hidden_size, hidden_size * 2)
         self.gate_proj_mem = nn.Linear(hidden_size, hidden_size * 2)
         self.forget_bias   = nn.Parameter(torch.ones(1))    # +1.0, LM2 3.3
+                                                           # (see forget_bias_init)
         self.input_bias    = nn.Parameter(torch.zeros(1))
         if carries_latent:
             # E AND Z GET SEPARATE GATES, SHARING THE RING POINTER.  This is the
@@ -489,10 +495,23 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         non-finite clobber, which puts kaiming weights back into both gate
         projections and silently discards gate_init="zero".  Bug class 1.
         """
-        nn.init.ones_(self.forget_bias)
+        # THE FORGET BIAS IS THE HORIZON, and at cc=8 it is the WHOLE horizon.
+        # Retention is F(d) = ig * fg ** floor(d / (K/W)) with fg =
+        # sigmoid(forget_bias), so the init value alone fixes how far back the
+        # buffer reaches until training moves it -- and at cross_chunks 8 the
+        # gate never SEES content older than 8 chunks, so there is no gradient
+        # pressure to raise it and it never does move.  LM2's +1.0 gives
+        # fg = 0.731: a 2.2-chunk half-life on the DENSE route and 8.9 on the
+        # ring, where retention steps once per lap rather than once per chunk
+        # (quote the right one -- the two differ by K/W).  BABILong 16k needs fg >= 0.818
+        # (bias >= 1.50) and 32k needs 0.905 (bias >= 2.25), which at +1.0 they
+        # get 4% and 0.3% of.  Left at 1.0 by default so every arm on record
+        # keeps its behaviour; this is a knob to DECIDE before a long run, not
+        # a default to drift.
+        nn.init.constant_(self.forget_bias, self.forget_bias_init)
         nn.init.zeros_(self.input_bias)
         if self.carries_latent:
-            nn.init.ones_(self.forget_bias_z)
+            nn.init.constant_(self.forget_bias_z, self.forget_bias_init)
             nn.init.zeros_(self.input_bias_z)
         if self.gate_init != "zero":
             return

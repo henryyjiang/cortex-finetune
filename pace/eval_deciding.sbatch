@@ -160,6 +160,21 @@ if [ ! -d "$DATA" ]; then
     echo "ERROR: no such pack: DATA=$DATA"; exit 1
 fi
 
+# HOW MANY ROWS DOES THE PACK ACTUALLY HOLD.  --max_examples is a ceiling, not a
+# sample size: the P2.1 sweep passed 100 and every one of its 18 cells ran n=50,
+# because data/pg19_olmo_val_len4096 holds 50 rows (PG-19 validation is 50 books
+# and the old packer kept one truncated row per book).  Half the pre-registered
+# power, discovered only afterwards.  Printed here, and the cell says so out
+# loud when the flag over-promises.
+PACK_ROWS=$(python -c "import sys; from datasets import load_from_disk; print(len(load_from_disk(sys.argv[1])))" "$DATA" 2>/dev/null || echo "?")
+echo "    pack rows:  $PACK_ROWS   (--max_examples $MAX_EXAMPLES is a CEILING)"
+if [ "$PACK_ROWS" != "?" ] && [ "$PACK_ROWS" -lt "$MAX_EXAMPLES" ] 2>/dev/null; then
+    echo "    *** n IS $PACK_ROWS, NOT $MAX_EXAMPLES -- the pack binds, not the flag."
+    echo "    *** A bigger validation pack exists for exactly this:"
+    echo "    ***   SPLIT=validation sbatch pace/prepare_pg19_pack.sbatch"
+    echo "    *** then re-run with DATA=data/pg19_olmo_validation_len4096_strided"
+fi
+
 # THE GEOMETRY HAS TO BE FORCED, and the first run of this job died because it
 # was not.  --model_name loads ckpts/olmo-retrofit-cortex's config, which
 # carries NO cortex flags at all -- `use_memory` is literally '<absent>' there,

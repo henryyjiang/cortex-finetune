@@ -328,15 +328,44 @@ def tokenize_file(path: str, model_name: str, need: int):
     return ids
 
 
-def collect_tape(model, inner, path: str, args, device) -> torch.Tensor:
+def ids_from_pack(data_dir: str, need: int, skip_rows: int = 0) -> list:
+    """`need` token ids from a packed dataset, starting `skip_rows` rows in.
+
+    THE DONOR HAS TO BE A DIFFERENT DOCUMENT or A(d) measures nothing: swapping
+    a write for a near-copy of itself moves the state by rounding error and the
+    retention curve comes back flat for a reason that has nothing to do with the
+    buffer.  `skip_rows` is what guarantees it -- the caller passes the number of
+    rows the main tape consumed, so the two tapes cannot overlap.  On the PG-19
+    val pack, whose rows are one-per-book, different rows are different books.
+    """
+    from datasets import load_from_disk
+    ds = load_from_disk(data_dir)
+    col = "input_ids" if "input_ids" in ds.column_names else ds.column_names[0]
+    ids: list = []
+    for i in range(skip_rows, len(ds)):
+        ids.extend(int(t) for t in ds[i][col])
+        if len(ids) >= need:
+            return ids[:need]
+    raise SystemExit(
+        f"{data_dir} holds {len(ds)} rows; from row {skip_rows} that is "
+        f"{len(ids)} tokens against the {need} this geometry needs.  Use a "
+        f"bigger pack (SPLIT=validation sbatch pace/prepare_pg19_pack.sbatch) "
+        f"or lower --chunks / --batch.")
+
+
+def collect_tape(model, inner, path, args, device,
+                 skip_rows: int = 0) -> torch.Tensor:
     """[n_chunks, B, 32, D] of the checkpoint's own summary writes.
 
     The chain runs with the model's PRODUCTION accum carry, so each chunk's
     write is conditioned on a realistic read -- which is the closest available
     stand-in for what a trained gated arm would see.
     """
-    ids = tokenize_file(path, args.model_name,
-                        args.batch * args.seq_len * args.chunks)
+    need = args.batch * args.seq_len * args.chunks
+    if getattr(args, "data", None):
+        ids = ids_from_pack(args.data, need, skip_rows)
+    else:
+        ids = tokenize_file(path, args.model_name, need)
     per = args.seq_len * args.chunks
     rows = [ids[b * per:(b + 1) * per] for b in range(args.batch)]
     ids_t = torch.tensor(rows, dtype=torch.long, device=device)
@@ -384,6 +413,18 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model_name", default=None)
     ap.add_argument("--checkpoint", default=None)
+    ap.add_argument("--data", default=None,
+                    help="packed dataset dir (load_from_disk), the same source "
+                         "the walk and the horizon read.  Preferred over "
+                         "--text_file: the planning docs this file's examples "
+                         "name live above the repo on a laptop and nowhere on "
+                         "the cluster, which is how the A(d) job died in four "
+                         "seconds.  The donor is taken from LATER ROWS of the "
+                         "same pack, so it is a different document by "
+                         "construction.")
+    ap.add_argument("--row_len", type=int, default=4096,
+                    help="tokens per row in --data, used only to place the "
+                         "donor past the main tape's rows")
     ap.add_argument("--text_file", default=None,
                     help="real prose for the main tape")
     ap.add_argument("--donor_file", default=None,
@@ -410,6 +451,13 @@ def main() -> int:
                     help="cache path; written after collection, reused if it "
                          "exists and matches the requested shape")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="config override, repeatable -- the same flag the "
+                         "walk, the gates and the horizon take.  REQUIRED when "
+                         "--model_name is a graft-prepared BASE dir: its "
+                         "config.json carries no cortex flags at all, and "
+                         "use_memory is the master switch, so without these the "
+                         "graft builds no buffer and there is nothing to tape.")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -425,8 +473,10 @@ def main() -> int:
         tape = torch.randn(args.chunks, args.batch, 32, D)
         donor = torch.randn(args.chunks, args.batch, 32, D)
     else:
-        if not args.model_name or not args.text_file:
-            raise SystemExit("need --model_name and --text_file (or --synthetic)")
+        if not args.model_name or not (args.text_file or args.data):
+            raise SystemExit(
+                "need --model_name and one of --data / --text_file "
+                "(or --synthetic)")
         cached = (args.tape and os.path.exists(args.tape))
         if cached:
             blob = torch.load(args.tape)
@@ -438,28 +488,48 @@ def main() -> int:
             D = tape.shape[-1]
             print(f"[tape] reused {args.tape}  {tuple(tape.shape)}")
         else:
-            from evals.model_utils import load_checkpoint, _unwrap
+            from evals.model_utils import (explain_missing_cortex,
+                                            load_checkpoint,
+                                            parse_config_overrides, _unwrap)
             device = torch.device(args.device)
+            overrides = parse_config_overrides(args.set)
             model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
-                                         getattr(torch, args.dtype), device)
+                                         getattr(torch, args.dtype), device,
+                                         config_overrides=overrides or None)
             inner = _unwrap(model)
             if getattr(getattr(inner, "cortex", None), "prefix", None) is None:
                 print("FAILED: this checkpoint has no prefix buffer, so there "
                       "are no writes to tape.")
+                print("  " + explain_missing_cortex(cfg, overrides))
                 return 2
             D = int(cfg.n_embd)
-            print(f"[tape] main <- {args.text_file}", flush=True)
+            print(f"[tape] main <- {args.data or args.text_file}", flush=True)
             tape = collect_tape(model, inner, args.text_file, args, device)
-            donor_path = args.donor_file or args.text_file
-            print(f"[tape] donor <- {donor_path}", flush=True)
-            if args.donor_file:
+            # Rows the main tape consumed, rounded up -- where the donor starts.
+            # A pack row is one packed sequence; ceil() so the donor cannot
+            # share even a partial row with the main tape.
+            donor_skip = 0
+            if args.data:
+                need = args.batch * args.seq_len * args.chunks
+                donor_skip = -(-need // max(int(args.row_len or 4096), 1))
+            donor_path = args.data or args.donor_file or args.text_file
+            print(f"[tape] donor <- {donor_path}"
+                  + (f" (from row {donor_skip})" if args.data else ""), flush=True)
+            if args.data:
+                donor = collect_tape(model, inner, None, args, device,
+                                     skip_rows=donor_skip)
+            elif args.donor_file:
                 donor = collect_tape(model, inner, args.donor_file, args, device)
             else:
                 # Fall back to a lane roll: weaker (same document) but it keeps
                 # the probe runnable with one file.  Flagged in `source`.
                 donor = tape.roll(1, dims=1).roll(args.chunks // 2, dims=0)
-            source = (f"{args.text_file} / donor "
-                      f"{args.donor_file or 'lane-rolled self (WEAK DONOR)'}")
+            if args.data:
+                source = (f"{args.data} rows 0+ / donor rows {donor_skip}+ "
+                          f"(different documents by construction)")
+            else:
+                source = (f"{args.text_file} / donor "
+                          f"{args.donor_file or 'lane-rolled self (WEAK DONOR)'}")
             del model
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()

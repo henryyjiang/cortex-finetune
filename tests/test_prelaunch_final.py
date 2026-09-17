@@ -630,3 +630,34 @@ class TestRed10TheGateChainIsShifted:
         for ids, y in scored:
             assert not torch.equal(y, ids)
             assert torch.equal(y[:, :-1], ids[:, 1:])
+
+
+class TestTheSummaryDoesNotInventAVerdict:
+    """This script's own summary printed "STILL AT CHANCE" over a walk whose
+    margin was +7.6967, because a MISSING file and an AT-CHANCE file were folded
+    into one flag (job 13304811).  That is the exact failure shape reds 8-11
+    share -- a confident wrong verdict, not a loud failure -- committed by the
+    instrument built to catch it.  Pinned at the text level, since the summary
+    is a heredoc inside the launcher."""
+
+    def _sbatch(self):
+        return io.open(os.path.join(REPO, "pace", "red10_confirm.sbatch"),
+                       encoding="utf-8").read()
+
+    def test_missing_and_at_chance_are_tracked_separately(self):
+        s = self._sbatch()
+        assert "missing.append(name)" in s
+        assert "at_chance.append(name)" in s
+        assert "if at_chance:" in s, "the verdict must key off at_chance alone"
+
+    def test_the_width_walks_do_not_backprop(self):
+        """The W=32 walk OOMed at 139.78 GiB because the walk backprops one
+        summed chain loss and retains every chunk's graph.  The width contrast
+        reads the final carry's rank stats and needs no gradients -- and BOTH
+        sides must be run the same way or the contrast is between two different
+        measurements."""
+        s = self._sbatch()
+        # Both command lines, named individually -- counting occurrences would
+        # pass on two flags on the same side and a comment.
+        assert '$SETS_W16 --no_backward' in s
+        assert '$SETS_W32 --no_backward' in s

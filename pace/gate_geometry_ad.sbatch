@@ -46,7 +46,8 @@
 #       -> the mixing is wrong, not just the reading of it.  Check the slot
 #          mapping (depth_rows(j) vs rows_touched) before anything else, then
 #          forget_bias: fg=0.731 at init retains 73% of a row per lap, which is
-#          what would carry an injected row forward intact.
+#          what would carry an injected row forward intact.  `gate_forget_bias`
+#          is a config knob as of 2026-09-17, so this is testable without code.
 #   A(d) is FLAT to the FIFO edge
 #       -> the cell being scored is an accum row, not the ring.  Read the
 #          geometry table it prints and re-check --cell.
@@ -55,6 +56,18 @@
 # time: if the lap is contaminating the newest row, then K/W (laps of
 # separation) and gate_init/forget_bias are the levers, and both are full-run
 # decisions that the P2.3 cells cannot re-decide afterwards.
+#
+# ==== WHY THE FIRST ATTEMPT DIED IN FOUR SECONDS (job 13304815) =============
+# `ERROR: no prose at ../cortex_next_phase_framework.md`.  This probe's only
+# text source was --text_file, and the paths its own docstring suggests are
+# planning docs that sit ABOVE the repo -- true on a laptop, false on PACE.
+# Worse, it would then have exited 2 anyway: it called load_checkpoint with NO
+# config overrides against a graft-prepared BASE dir whose config carries no
+# cortex flags at all, so the graft builds no buffer and there is nothing to
+# tape.  Both fixed 2026-09-17: the probe now takes --data (the same packed
+# dataset the walk and the horizon read) and --set (the same overrides every
+# other probe takes).  The donor comes from LATER ROWS of the same pack, which
+# on a one-book-per-row PG-19 pack is a different book by construction.
 #
 # NOTE ON WHAT THIS DOES AND DOES NOT USE.  build_cells constructs FRESH buffers
 # at gate_init="zero" and replays writes taken from the REAL checkpoint's accum
@@ -71,37 +84,42 @@ conda activate cortex-retro
 export SCRATCH=${SCRATCH:-$HOME/scratch}
 export HF_HOME=$SCRATCH/hf_cache
 export HF_HUB_OFFLINE=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MODEL=${MODEL:-ckpts/olmo-retrofit-cortex}
 CKPT=${CKPT:-cortex-retrofit/retro-b2-heal/checkpoint_91552_w16}
-# Real prose, two DIFFERENT documents: the donor swap is only a content control
-# if the donor is content.  Repo-root planning docs, the same source
-# diag_depth_band.sbatch uses.
-TEXT=${TEXT:-../cortex_next_phase_framework.md}
-DONOR=${DONOR:-../control_launch_handoff.md}
+DATA=${DATA:-data/pg19_olmo_val_len4096}
+ROW_LEN=${ROW_LEN:-4096}    # tokens per row in $DATA; only places the donor
 CHUNKS=${CHUNKS:-24}        # 6 laps at K/W=4 -- enough to see the staircase
 SEQ_LEN=${SEQ_LEN:-512}
-BATCH=${BATCH:-1}           # 24 x 512 x 1 = 12,288 tokens per document
+BATCH=${BATCH:-1}           # 24 x 512 x 1 = 12,288 tokens = 3 rows of the pack
 STEPS=${STEPS:-8}           # T, the arms' trained depth
 STAMP=${STAMP:-$(date +%Y%m%d)}
 OUT=${OUT:-eval_results/gate_ad-$STAMP}
 mkdir -p "$OUT"
+
+[ -d "$CKPT" ] || { echo "ERROR: no such checkpoint dir: $CKPT"; exit 1; }
+[ -d "$DATA" ] || { echo "ERROR: no such pack: $DATA"; exit 1; }
+
+# The geometry has to be FORCED: --model_name loads the base dir, whose config
+# carries NO cortex flags (use_memory is literally '<absent>'), and use_memory
+# is the master switch.  Mirrors pace/eval_deciding.sbatch.
+SETS="--set use_memory=true --set memory_slots=0"
+SETS="$SETS --set prefix_memory=accum"
+SETS="$SETS --set accum_vecs=${ACCUM_VECS:-16}"
+SETS="$SETS --set accum_max=${ACCUM_MAX:-128}"
 
 # The three cells that answer the question and nothing else.  The full list is
 # ten and each one is a replay over 24 chunks; the locked cell, its cost-matched
 # accum control and the dense route are what the d=4 reading needs.
 CELLS=${CELLS:-"gated W16 K64 ring|accum W16 K64|gated W16 K64 mix"}
 
-for F in "$TEXT" "$DONOR"; do
-    [ -f "$F" ] || { echo "ERROR: no prose at $F"; exit 1; }
-done
-[ -d "$CKPT" ] || { echo "ERROR: no such checkpoint dir: $CKPT"; exit 1; }
-
 echo "=== gated-ring A(d) | $CHUNKS chunks x $SEQ_LEN | T=$STEPS ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 echo "    checkpoint: $CKPT"
-echo "    text:       $TEXT"
-echo "    donor:      $DONOR   <- a DIFFERENT document, or A(d) measures nothing"
+echo "    data:       $DATA  (donor = later rows of the same pack)"
+echo "    sets:       $SETS"
+echo "    The [cortex] OVERRIDE lines below are the proof the geometry arrived."
 echo ""
 
 CELL_ARGS=()
@@ -110,7 +128,7 @@ for c in "${CL[@]}"; do CELL_ARGS+=(--cell "$c"); done
 
 python evals/diag_gate_geometry.py \
     --model_name "$MODEL" --checkpoint "$CKPT" \
-    --text_file "$TEXT" --donor_file "$DONOR" \
+    --data "$DATA" --row_len "$ROW_LEN" $SETS \
     --chunks "$CHUNKS" --seq_len "$SEQ_LEN" --batch "$BATCH" \
     --steps "$STEPS" --dtype float32 \
     --tape "$OUT/writes.pt" \

@@ -15,6 +15,7 @@ Run: /c/Users/henry/miniconda3/envs/cortex-retro/python.exe -m pytest tests/ -q
 """
 from __future__ import annotations
 
+import io
 import os
 import sys
 
@@ -104,3 +105,48 @@ class TestRaggedShare:
         ragged = [m for _, m in rows if sum(m) != 100]
         assert len(ragged) == 1
         assert len(rows) == 8
+
+
+class TestTheValidationPack:
+    """The 50-row cap, and the launcher change that lifts it.
+
+    PG-19's validation split is 50 books.  Under the old truncating packer that
+    was 50 rows, so every eval reading `data/pg19_olmo_val_len4096` silently ran
+    at n=50 however large --max_examples was -- the P2.1 sweep asked for 100 and
+    got 50 on all 18 cells.  The striding fix already exists; what was missing
+    was any way to point it at a split other than train, and any warning when
+    the pack binds instead of the flag.
+    """
+
+    def _sbatch(self, name):
+        path = os.path.join(REPO, "pace", name)
+        return io.open(path, encoding="utf-8").read()
+
+    def test_fifty_books_stride_into_hundreds_of_rows(self):
+        """The arithmetic the fix rests on, at PG-19's real shape: books average
+        ~69k tokens, so each one is ~17 windows at row_len 4096 rather than 1."""
+        rows = 0
+        for _ in range(50):
+            rows += len(stride_windows(list(range(69_000)), row_len=4096, eos=EOS))
+        assert rows > 800, "striding 50 books must beat the 50-row pack by >10x"
+
+    def test_the_launcher_can_ask_for_a_split(self):
+        s = self._sbatch("prepare_pg19_pack.sbatch")
+        assert "SPLIT=${SPLIT:-train}" in s
+        assert '--split "$SPLIT"' in s
+
+    def test_a_non_train_split_cannot_land_on_the_train_packs_name(self):
+        """Two artifacts under one name is the ARM_DATA failure; the existing
+        header already refuses to overwrite, and the derived default keeps a
+        validation pack from ever needing that refusal."""
+        s = self._sbatch("prepare_pg19_pack.sbatch")
+        assert 'data/pg19_olmo_${SPLIT}_len${MAX_LENGTH}_strided' in s
+        assert 'data/pg19_olmo_len${MAX_LENGTH}_strided' in s
+
+    def test_the_deciding_cells_print_the_row_count(self):
+        """n=50 was discovered after 18 cells had run.  The cell now says what
+        the pack holds, and says so LOUDER when the flag over-promises."""
+        s = self._sbatch("eval_deciding.sbatch")
+        assert "PACK_ROWS" in s
+        assert "is a CEILING" in s
+        assert "the pack binds, not the flag" in s
