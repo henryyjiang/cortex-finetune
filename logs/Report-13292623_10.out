@@ -1,0 +1,30 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 11:39:18
+Job ID:    13292995
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  p21_subst
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== P2.1 substitution sweep | 2 cells | index 10 ===
+    [0] a1 donor both
+    [1] parent donor both
+no cell at index 10 (the array is wider than the cell list, which is
+what an ARMS/DAMAGES override does).  Nothing to do.
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 11:39:22
+Job ID:        13292995
+Array Job ID:  13292623_10
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      p21_subst
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:01:04,vmem=0,walltime=00:00:08,mem=39632K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------

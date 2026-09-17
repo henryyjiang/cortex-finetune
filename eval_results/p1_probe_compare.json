@@ -1,0 +1,205 @@
+{
+  "when": "2026-09-17T10:19:13",
+  "trained_depth": 8,
+  "arms": {
+    "a1": {
+      "dir": "cortex-retrofit/probe-p1-a1-accum-w16-cc8",
+      "evals": [
+        {
+          "file": "prelaunch.json",
+          "kind": "prelaunch",
+          "all_passed": true,
+          "read_live_frac": 0.546,
+          "read_live_at_mr": 8,
+          "read_live_anchor": "unrecorded",
+          "read_live_frac_at_run_config": 0.0195,
+          "read_live_note": "re-anchored onto the mr=8 sweep row; the record's own at_run_config was measured at mr=32, which is not a depth this arm ran",
+          "content_delta_both": -0.12344646453857422,
+          "column_delta": -0.2412405014038086
+        }
+      ],
+      "health": {
+        "diag_rows": 40,
+        "first_step": 91560,
+        "last_step": 91950,
+        "e_row_norm": 112.89097595214844,
+        "e_centred_cosine": -0.004781156312674284,
+        "e_eff_rank_pr": 19.600770950317383,
+        "rows": 128,
+        "latent_carry": 0,
+        "grad_norm_max": 3.7049663066864014,
+        "grad_norm_mean": 2.055175045132637,
+        "grad_norm_nonfinite": 0
+      }
+    },
+    "a2": {
+      "dir": "cortex-retrofit/probe-p1-a2-accum-w16-cc8-z",
+      "evals": [
+        {
+          "file": "prelaunch.json",
+          "kind": "prelaunch",
+          "all_passed": true,
+          "read_live_frac": 0.546,
+          "read_live_at_mr": 8,
+          "read_live_anchor": "unrecorded",
+          "read_live_frac_at_run_config": 0.0195,
+          "read_live_note": "re-anchored onto the mr=8 sweep row; the record's own at_run_config was measured at mr=32, which is not a depth this arm ran",
+          "content_delta_both": -0.12530231475830078,
+          "content_delta_e": -0.12539291381835938,
+          "content_delta_z": -7.152557373046875e-05,
+          "column_delta": -0.21582412719726562
+        }
+      ],
+      "health": {
+        "diag_rows": 40,
+        "first_step": 91560,
+        "last_step": 91950,
+        "e_row_norm": 113.00117492675781,
+        "e_centred_cosine": -0.004232848063111305,
+        "e_eff_rank_pr": 16.15116310119629,
+        "z_row_norm": 3.292271614074707,
+        "z_over_e_norm": 0.02913484409528137,
+        "z_eff_rank_pr": 20.28491973876953,
+        "rows": 128,
+        "latent_carry": 1,
+        "z_read_grad_frac": 0.5508793969849246,
+        "z_write_grad_frac": 0.3333333333333333,
+        "grad_norm_max": 6.326321601867676,
+        "grad_norm_mean": 2.3114638060331343,
+        "grad_norm_nonfinite": 0,
+        "z_read_grad_frac_run_avg": 0.5508793969849246
+      }
+    },
+    "a3": {
+      "dir": "cortex-retrofit/probe-p1-a3-gated-w16k64-cc8",
+      "evals": [
+        {
+          "file": "prelaunch.json",
+          "kind": "prelaunch",
+          "all_passed": true,
+          "read_live_frac": 0.546,
+          "read_live_at_mr": 8,
+          "read_live_anchor": "unrecorded",
+          "read_live_frac_at_run_config": 0.0195,
+          "read_live_note": "re-anchored onto the mr=8 sweep row; the record's own at_run_config was measured at mr=32, which is not a depth this arm ran",
+          "content_delta_both": -0.07583904266357422,
+          "column_delta": -0.10486984252929688
+        }
+      ],
+      "health": {
+        "diag_rows": 40,
+        "first_step": 91560,
+        "last_step": 91950,
+        "e_row_norm": 136.12289428710938,
+        "e_centred_cosine": -0.004811394028365612,
+        "e_eff_rank_pr": 12.351616859436035,
+        "fg_at_bias": 0.7275441884994507,
+        "rows": 64,
+        "latent_carry": 0,
+        "gate_left_init": true,
+        "gate_left_init_step": 91560,
+        "grad_norm_max": 3.67623233795166,
+        "grad_norm_mean": 1.8738920956850051,
+        "grad_norm_nonfinite": 0
+      }
+    },
+    "a3z": {
+      "dir": "cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z",
+      "evals": [
+        {
+          "file": "prelaunch.json",
+          "kind": "prelaunch",
+          "all_passed": true,
+          "read_live_frac": 0.546,
+          "read_live_at_mr": 8,
+          "read_live_anchor": "unrecorded",
+          "read_live_frac_at_run_config": 0.0195,
+          "read_live_note": "re-anchored onto the mr=8 sweep row; the record's own at_run_config was measured at mr=32, which is not a depth this arm ran",
+          "content_delta_both": -0.053955078125,
+          "content_delta_e": -0.054060935974121094,
+          "content_delta_z": 6.198883056640625e-05,
+          "column_delta": -0.17452526092529297
+        }
+      ],
+      "health": {
+        "diag_rows": 40,
+        "first_step": 91560,
+        "last_step": 91950,
+        "e_row_norm": 137.3919219970703,
+        "e_centred_cosine": -0.000920168065931648,
+        "e_eff_rank_pr": 10.929174423217773,
+        "z_row_norm": 2.888227701187134,
+        "z_over_e_norm": 0.02102181597873506,
+        "z_eff_rank_pr": 12.04914665222168,
+        "fg_at_bias": 0.7328111529350281,
+        "fg_z_at_bias": 0.7252723574638367,
+        "rows": 64,
+        "latent_carry": 1,
+        "z_read_grad_frac": 0.5508793969849246,
+        "z_write_grad_frac": 0.3333333333333333,
+        "gate_left_init": true,
+        "gate_left_init_step": 91560,
+        "gate_z_left_init": true,
+        "gate_z_left_init_step": 91560,
+        "grad_norm_max": 3.0187315940856934,
+        "grad_norm_mean": 1.8226073801517486,
+        "grad_norm_nonfinite": 0,
+        "z_read_grad_frac_run_avg": 0.5508793969849246
+      }
+    }
+  },
+  "loss": {
+    "reference": "a1",
+    "arms": {
+      "a1": {
+        "steps": 40,
+        "first_step": 91560,
+        "last_step": 91950,
+        "mean_loss_last": 3.1089373171329497,
+        "window": 40
+      },
+      "a2": {
+        "steps": 40,
+        "first_step": 91560,
+        "last_step": 91950,
+        "mean_loss_last": 3.107436728477478,
+        "window": 40,
+        "shared_steps": 40,
+        "paired_delta_vs_ref": -0.0015005886554718018,
+        "ci95": [
+          -0.003753008246421814,
+          0.0006678692996501918
+        ],
+        "separated_from_zero": false
+      },
+      "a3": {
+        "steps": 40,
+        "first_step": 91560,
+        "last_step": 91950,
+        "mean_loss_last": 3.1290325820446014,
+        "window": 40,
+        "shared_steps": 40,
+        "paired_delta_vs_ref": 0.02009526491165161,
+        "ci95": [
+          0.015126790553331375,
+          0.025044223368167876
+        ],
+        "separated_from_zero": true
+      },
+      "a3z": {
+        "steps": 40,
+        "first_step": 91560,
+        "last_step": 91950,
+        "mean_loss_last": 3.1314328789710997,
+        "window": 40,
+        "shared_steps": 40,
+        "paired_delta_vs_ref": 0.022495561838150026,
+        "ci95": [
+          0.01736117511987686,
+          0.02753060087561607
+        ],
+        "separated_from_zero": true
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 10:11:50
+Job ID:    13290595
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  unit_suite
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== unit suite | atl1-1-02-011-25-2.pace.gatech.edu ===
+    tests: tests/test_compare_arms.py tests/test_prelaunch_final.py
+    args:  -q
+    torch 2.5.1+cu121, python 3.11.15
+
+........................................................................ [ 85%]
+............                                                             [100%]
+84 passed in 25.80s
+
+==============================================================
+SUITE GREEN in 28s
+==============================================================
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 10:12:31
+Job ID:        13290595
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      unit_suite
+Resources:     cpu=8,mem=32G,node=1
+Rsrc Used:     cput=00:05:52,vmem=0,walltime=00:00:44,mem=1031064K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-011-25-2
+---------------------------------------

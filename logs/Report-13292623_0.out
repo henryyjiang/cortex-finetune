@@ -1,0 +1,41 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 11:26:55
+Job ID:    13292632
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  p21_subst
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== P2.1 substitution sweep | 2 cells | index 0 ===
+    [0] a1 donor both
+    [1] parent donor both
+
+    arm=a1 damage=donor channel=both
+    checkpoint: cortex-retrofit/probe-p1-a1-accum-w16-cc8/checkpoint_91952
+    data:       data/pg19_olmo_val_len4096   (READ THIS LINE -- it is the only proof the pack arrived)
+    T=8  n_chunks=8  depths=1 2 3 4 6  n=20
+    out:        eval_results/p21_substitution-20260917/a1-donor-both
+NVIDIA H200, 143771 MiB
+
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.18s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.65it/s]
+[load] overlaid cortex-retrofit/probe-p1-a1-accum-w16-cc8/checkpoint_91952/chkpt.pt: 0 missing / 2 unexpected keys
+FAILED: this checkpoint has no prefix buffer, so there is no carry whose influence could be measured.
+
+cell a1/donor/both FAILED rc=2
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 11:30:32
+Job ID:        13292632
+Array Job ID:  13292623_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      p21_subst
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:29:20,vmem=0,walltime=00:03:40,mem=17045548K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-18-0
+---------------------------------------
