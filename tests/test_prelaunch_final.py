@@ -428,3 +428,71 @@ class TestStepThreeUsesTheArmsGeometry:
         sb = self._sb()
         assert "walk-branch-w$ACCUM_VECS.json" in sb
         assert "--branch $OUT/walk-branch-w$ACCUM_VECS.json" in sb
+
+
+class TestPostInitClobberIsUndoneOnTheEvalPath:
+    """REGRESSION from job 13270491, which went NaN at chunk 5 and took three of
+    the four gates with it.
+
+    `from_pretrained` runs post_init on every parameter the checkpoint does not
+    supply, and for the cortex gate that is not the designed init -- the walk
+    reported fg(bias) = 1.0000 where the design says sigmoid(1.0) = 0.7311, and
+    ig_z(bias) = 1.0000 where it says sigmoid(0) = 0.5.  Four chunks ran clean;
+    the NaN appeared at chunk 5, the first full SECOND lap, i.e. the first time
+    the clobbered forget gate was applied to a row it had already written.
+
+    train.py calls reset_cortex_graft_init for exactly this reason, and so does
+    tools/smoke_prefix_real.py -- which is why the smoke passed every equivalent
+    check in the same job.  The EVAL path never did.
+    """
+
+    @staticmethod
+    def _src():
+        return open(os.path.join(REPO, "evals", "model_utils.py"),
+                    encoding="utf-8").read()
+
+    def test_load_checkpoint_reapplies_the_designed_init(self):
+        assert "reset_cortex_graft_init" in self._src()
+
+    def test_it_runs_BEFORE_the_overlay_or_it_would_wipe_the_write_path(self):
+        """Resetting re-seeds summary_emb and clears summary_seeded.  After the
+        overlay that would destroy a trained write path; before it, every key the
+        checkpoint carries is restored on top and only the genuinely missing ones
+        keep the designed init."""
+        src = self._src()
+        assert (src.index("reset_cortex_graft_init(model")
+                < src.index("# Optional overlay of finetuned weights"))
+
+    def test_it_is_skipped_when_there_is_no_graft(self):
+        src = self._src()
+        i = src.index("reset_cortex_graft_init(model")
+        head = src[max(0, i - 500):i]
+        assert 'getattr(_unwrap(model), "cortex", None) is not None' in head
+
+    def test_a_failure_to_reset_warns_rather_than_killing_the_load(self):
+        src = self._src()
+        i = src.index("reset_cortex_graft_init(model")
+        assert "WARNING" in src[i:i + 600]
+
+
+class TestGateThreeUsesTheTrainedDepth:
+    """Job 13270491 reported read_live_frac at mr=32 (0.019) when the arms run
+    mr8 (0.545) -- the inherited-mean_recurrence field again, on the one number
+    that decides what a Z null result means."""
+
+    def test_prelaunch_takes_a_trained_depth(self):
+        src = open(os.path.join(REPO, "tools", "prelaunch_final.py"),
+                   encoding="utf-8").read()
+        assert 'p.add_argument("--trained_depth"' in src
+        assert "mean_recurrence=args.trained_depth or None" in src
+
+    def test_omitting_it_warns_instead_of_reporting_the_wrong_row(self):
+        src = open(os.path.join(REPO, "tools", "prelaunch_final.py"),
+                   encoding="utf-8").read()
+        i = src.index("[gate 3] WARNING")
+        assert "INHERITED" in src[i:i + 500]
+
+    def test_the_sbatch_passes_the_arms_depth(self):
+        sb = open(os.path.join(REPO, "pace", "prelaunch_final.sbatch"),
+                  encoding="utf-8").read()
+        assert "--trained_depth $MAX_MEAN_REC" in sb

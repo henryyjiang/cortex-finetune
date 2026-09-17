@@ -201,6 +201,7 @@ fi
 echo ""
 echo "######## 4. the pre-launch gates ########"
 python tools/prelaunch_final.py --model_name $MODEL $CKPT_ARG $SETS \
+    --trained_depth $MAX_MEAN_REC \
     --chunks $CROSS_CHUNKS --chunk_len $CHUNK_LEN --T $MAX_MEAN_REC \
     --out $OUT/prelaunch.json || RC=1
 

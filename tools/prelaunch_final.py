@@ -454,6 +454,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--chunk_len", type=int, default=256)
     p.add_argument("--batch", type=int, default=2)
     p.add_argument("--T", type=int, default=8)
+    p.add_argument("--trained_depth", type=int, default=0,
+                   help="the mean_recurrence this arm TRAINS at.  config.json "
+                        "does not carry it: a B2-family checkpoint reads 32 "
+                        "from the base recipe while its ramp caps max_mean_rec "
+                        "at 8, so gate 3 reported read_live_frac at mr=32 "
+                        "(0.019) when the arms run mr8 (0.545) -- the wrong end "
+                        "of the only number that decides what a Z null means.")
     p.add_argument("--samples", type=int, default=4000,
                    help="draws for the no-grad split distribution")
     p.add_argument("--dtype", default="float32",
@@ -567,7 +574,14 @@ def main() -> int:
     if "roundtrip" not in args.skip:
         gates.append(check_roundtrip(inner, chunks_a[:2], num_steps, args.seed))
     if "read_live" not in args.skip:
-        gates.append(check_read_live(inner, n_samples=args.samples))
+        if not args.trained_depth:
+            print("[gate 3] WARNING: --trained_depth not given, so the sweep is "
+                  "anchored on config.mean_recurrence, which is INHERITED from "
+                  "the base recipe and is not what the arm trains at.  The "
+                  "sweep rows below are still correct per mr; read the one for "
+                  "YOUR arm, not the 'at_run_config' row.")
+        gates.append(check_read_live(inner, mean_recurrence=args.trained_depth or None,
+                                     n_samples=args.samples))
     if "donor" not in args.skip:
         gates.append(check_donor_control(inner, cortex, chunks_a, chunks_b,
                                          num_steps, args.seed))

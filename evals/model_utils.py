@@ -208,6 +208,37 @@ def load_checkpoint(
         torch_dtype=dtype,
     )
 
+    # UNDO post_init's CLOBBER, BEFORE the checkpoint overlay.
+    #
+    # `from_pretrained` runs post_init on every parameter the checkpoint does
+    # not supply, and for the cortex buffers that does not mean "the designed
+    # init" -- it means kaiming weights in the gate projections and a garbage
+    # forget_bias (the measured value on this graft is +/-2.2e12).  train.py
+    # calls reset_cortex_graft_init for exactly this reason, and so does
+    # tools/smoke_prefix_real.py; the EVAL path never did.
+    #
+    # The symptom is not a crash at load.  Job 13270491 loaded a gated+Z model
+    # with 12 freshly initialised gate tensors, reported fg(bias) = 1.0000 where
+    # the design says sigmoid(1.0) = 0.7311, ran four clean chunks, and went NaN
+    # at chunk 5 -- the first full second lap, i.e. the first time the clobbered
+    # forget gate was applied to a row it had already written.  That NaN then
+    # poisoned the carry, and three of the four pre-launch gates failed on it.
+    #
+    # ORDER MATTERS AND IS THE WHOLE TRICK.  Resetting re-seeds `summary_emb`
+    # and clears `summary_seeded`, which would DESTROY a trained write path --
+    # so it has to happen BEFORE the overlay, never after.  Every key the
+    # checkpoint carries is then restored on top, and only the genuinely
+    # missing ones keep the designed init.  For a fully-trained checkpoint this
+    # is a no-op by construction.
+    if getattr(_unwrap(model), "cortex", None) is not None:
+        try:
+            from cortex_graft import reset_cortex_graft_init
+            reset_cortex_graft_init(model, log=print)
+        except Exception as e:                      # noqa: BLE001
+            print(f"[cortex] WARNING: could not re-apply the designed cortex "
+                  f"init ({type(e).__name__}: {e}).  Any parameter the "
+                  f"checkpoint does not supply is at post_init's values, which "
+                  f"for the gate means a garbage forget_bias.")
     # Optional overlay of finetuned weights from a train.py checkpoint.
     if checkpoint:
         sd = torch.load(checkpoint, map_location="cpu", weights_only=False)
