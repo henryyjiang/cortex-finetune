@@ -152,18 +152,61 @@ if [ ! -d "$DATA" ]; then
     echo "ERROR: no such pack: DATA=$DATA"; exit 1
 fi
 
+# THE GEOMETRY HAS TO BE FORCED, and the first run of this job died because it
+# was not.  --model_name loads ckpts/olmo-retrofit-cortex's config, which
+# carries NO cortex flags at all -- `use_memory` is literally '<absent>' there,
+# which is why every p1_arms probe log opens with a block of
+# "[cortex] OVERRIDE config.use_memory: '<absent>' -> True" lines.  Without
+# these the graft builds with no prefix buffer and the eval exits 2 with "this
+# checkpoint has no prefix buffer".  Mirrors p1_arms.sbatch's PROBE_SETS,
+# which is the construction that is known to load these exact dirs.
+ACCUM_MAX=${ACCUM_MAX:-$(( ACCUM_VECS * CROSS_CHUNKS ))}
+case "$ARM" in
+    a1|a2|parent) PREFIX_MODE=accum ;;
+    *)            PREFIX_MODE=gated ;;
+esac
+case "$ARM" in
+    a2|a3z) LATENT=1 ;;
+    *)      LATENT=0 ;;
+esac
+
+SETS="--set use_memory=true --set memory_slots=0"
+SETS="$SETS --set prefix_memory=$PREFIX_MODE"
+SETS="$SETS --set accum_vecs=$ACCUM_VECS"
+if [ "$PREFIX_MODE" = "accum" ]; then
+    SETS="$SETS --set accum_max=$ACCUM_MAX"
+else
+    SETS="$SETS --set gate_slots=$GATE_SLOTS"
+    SETS="$SETS --set gate_route=${GATE_ROUTE:-ring}"
+    SETS="$SETS --set gate_norm=${GATE_NORM:-tanh}"
+    SETS="$SETS --set gate_init=${GATE_INIT:-zero}"
+    SETS="$SETS --set gate_fill=${GATE_FILL:-grow}"
+fi
+if [ "$LATENT" = "1" ]; then
+    SETS="$SETS --set latent_carry=true"
+    SETS="$SETS --set latent_depth_rule=${LATENT_RULE:-absolute}"
+    SETS="$SETS --set latent_depth_lo=${LATENT_LO:-2}"
+    SETS="$SETS --set latent_depth_hi=${LATENT_HI:-9}"
+    SETS="$SETS --set latent_renorm=${LATENT_RENORM:-none}"
+fi
+
 OUT=$OUT_BASE/$ARM-$DMG-$CH
 echo ""
 echo "    arm=$ARM damage=$DMG channel=$CH"
 echo "    checkpoint: $CKPT"
 echo "    data:       $DATA   (READ THIS LINE -- it is the only proof the pack arrived)"
+echo "    geometry:   $PREFIX_MODE  W=$ACCUM_VECS  latent=$LATENT"
+echo "    sets:       $SETS"
 echo "    T=$MAX_MEAN_REC  n_chunks=$CROSS_CHUNKS  depths=$DEPTHS  n=$MAX_EXAMPLES"
 echo "    out:        $OUT"
+echo ""
+echo "    The [cortex] OVERRIDE lines below are the proof the geometry arrived."
+echo "    A cell that prints none of them is running on a buffer-less graft."
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 echo ""
 
 python evals/eval_influence_horizon.py \
-    --model_name $MODEL --checkpoint "$CKPT" --data $DATA \
+    --model_name $MODEL --checkpoint "$CKPT" --data $DATA $SETS \
     --n_chunks $CROSS_CHUNKS --depths $DEPTHS \
     --damage $DMG --damage_channel $CH \
     --T $MAX_MEAN_REC --max_examples $MAX_EXAMPLES --boot $BOOT \

@@ -90,7 +90,9 @@ import torch.nn.functional as F
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from model_utils import load_checkpoint, to_num_steps, _unwrap  # noqa: E402
+from model_utils import (  # noqa: E402
+    load_checkpoint, parse_config_overrides, to_num_steps, _unwrap,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -126,6 +128,16 @@ def parse_args() -> argparse.Namespace:
                    choices=["float32", "bfloat16"])
     p.add_argument("--boot", type=int, default=2000,
                    help="bootstrap resamples for the paired CI")
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="force a graft-building config flag, e.g. "
+                        "--set use_memory=true --set prefix_memory=gated.  "
+                        "REQUIRED on any arm checkpoint: --model_name loads the "
+                        "BASE dir's config, which carries no cortex flags at "
+                        "all (use_memory is '<absent>' on "
+                        "ckpts/olmo-retrofit-cortex), so without these the "
+                        "graft builds with NO prefix buffer and the run dies "
+                        "with 'this checkpoint has no prefix buffer'.  Mirror "
+                        "pace/p1_arms.sbatch's PROBE_SETS for the arm.")
     p.add_argument("--out_dir",
                    default="eval_results/influence_horizon")
     return p.parse_args()
@@ -361,13 +373,21 @@ def main() -> int:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dtype = getattr(torch, args.dtype)
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
-                                 dtype, device)
+                                 dtype, device,
+                                 config_overrides=overrides or None)
     inner = _unwrap(model)
     buf = getattr(getattr(inner, "cortex", None), "prefix", None)
     if buf is None:
         print("FAILED: this checkpoint has no prefix buffer, so there is no "
               "carry whose influence could be measured.")
+        if not args.set:
+            print("  and --set was not given.  --model_name loads the BASE "
+                  "dir's config, which carries no cortex flags (use_memory is "
+                  "'<absent>' there), so an arm checkpoint needs its geometry "
+                  "forced: --set use_memory=true --set prefix_memory=... .  "
+                  "See pace/eval_deciding.sbatch, which builds them per arm.")
         return 2
     kind = "append" if _is_append(buf) else "gated"
     num_steps = to_num_steps(args.T)
@@ -460,7 +480,8 @@ def main() -> int:
                                       if kind == "append" else
                                       "pre-merge write, through prefix.merge")},
         "config": {"n_chunks": args.n_chunks, "damage": args.damage,
-                   "T": args.T, "dtype": args.dtype, "samples": n_used},
+                   "T": args.T, "dtype": args.dtype, "samples": n_used,
+                   "config_overrides": overrides},
         "depths": {},
     }
     for d in args.depths:

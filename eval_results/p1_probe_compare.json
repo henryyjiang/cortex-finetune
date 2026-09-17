@@ -1,23 +1,9 @@
 {
-  "when": "2026-09-17T10:19:13",
-  "trained_depth": 8,
+  "when": "2026-09-16T23:50:57",
   "arms": {
     "a1": {
       "dir": "cortex-retrofit/probe-p1-a1-accum-w16-cc8",
-      "evals": [
-        {
-          "file": "prelaunch.json",
-          "kind": "prelaunch",
-          "all_passed": true,
-          "read_live_frac": 0.546,
-          "read_live_at_mr": 8,
-          "read_live_anchor": "unrecorded",
-          "read_live_frac_at_run_config": 0.0195,
-          "read_live_note": "re-anchored onto the mr=8 sweep row; the record's own at_run_config was measured at mr=32, which is not a depth this arm ran",
-          "content_delta_both": -0.12344646453857422,
-          "column_delta": -0.2412405014038086
-        }
-      ],
+      "evals": [],
       "health": {
         "diag_rows": 40,
         "first_step": 91560,
@@ -39,11 +25,7 @@
           "file": "prelaunch.json",
           "kind": "prelaunch",
           "all_passed": true,
-          "read_live_frac": 0.546,
-          "read_live_at_mr": 8,
-          "read_live_anchor": "unrecorded",
-          "read_live_frac_at_run_config": 0.0195,
-          "read_live_note": "re-anchored onto the mr=8 sweep row; the record's own at_run_config was measured at mr=32, which is not a depth this arm ran",
+          "read_live_frac": 0.0195,
           "content_delta_both": -0.12530231475830078,
           "content_delta_e": -0.12539291381835938,
           "content_delta_z": -7.152557373046875e-05,
@@ -72,20 +54,7 @@
     },
     "a3": {
       "dir": "cortex-retrofit/probe-p1-a3-gated-w16k64-cc8",
-      "evals": [
-        {
-          "file": "prelaunch.json",
-          "kind": "prelaunch",
-          "all_passed": true,
-          "read_live_frac": 0.546,
-          "read_live_at_mr": 8,
-          "read_live_anchor": "unrecorded",
-          "read_live_frac_at_run_config": 0.0195,
-          "read_live_note": "re-anchored onto the mr=8 sweep row; the record's own at_run_config was measured at mr=32, which is not a depth this arm ran",
-          "content_delta_both": -0.07583904266357422,
-          "column_delta": -0.10486984252929688
-        }
-      ],
+      "evals": [],
       "health": {
         "diag_rows": 40,
         "first_step": 91560,
@@ -110,11 +79,7 @@
           "file": "prelaunch.json",
           "kind": "prelaunch",
           "all_passed": true,
-          "read_live_frac": 0.546,
-          "read_live_at_mr": 8,
-          "read_live_anchor": "unrecorded",
-          "read_live_frac_at_run_config": 0.0195,
-          "read_live_note": "re-anchored onto the mr=8 sweep row; the record's own at_run_config was measured at mr=32, which is not a depth this arm ran",
+          "read_live_frac": 0.0195,
           "content_delta_both": -0.053955078125,
           "content_delta_e": -0.054060935974121094,
           "content_delta_z": 6.198883056640625e-05,
