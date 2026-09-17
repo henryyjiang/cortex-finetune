@@ -469,6 +469,16 @@ def parse_args() -> argparse.Namespace:
                         "bar here is a small difference of large states, the "
                         "class of quantity a bf16 pass got wrong by 6x in P0.1")
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    p.add_argument("--data", default=None,
+                   help="a PACKED dataset for the gates to run over.  GATE 4 IS "
+                        "MEANINGLESS WITHOUT IT: the donor control measures "
+                        "whether the carry's CONTENT transfers, and a carry "
+                        "built from random ids has no content, so the delta is "
+                        "~0 by construction.  Gates 1 and 2 are exact-equality "
+                        "checks and do not care.")
+    p.add_argument("--text_file", default=None,
+                   help="prose alternative to --data, re-tokenized with this "
+                        "model's own tokenizer")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--skip", action="append", default=[],
                    choices=["z_off", "roundtrip", "read_live", "donor"],
@@ -554,9 +564,43 @@ def main() -> int:
     torch.manual_seed(args.seed)
     V = inner.config.vocab_size
     n_tok = args.chunks * args.chunk_len
-    mk = lambda: [c.contiguous().to(device) for c in torch.chunk(
-        torch.randint(0, V - 1, (args.batch, n_tok)), args.chunks, dim=1)]
-    chunks_a, chunks_b = mk(), mk()
+
+    def mk(offset=0):
+        """Two INDEPENDENT chains.  The donor control needs the second to be a
+        different document, not a different random draw of the same noise."""
+        if args.data:
+            from datasets import load_from_disk
+            ds = load_from_disk(args.data)
+            rows = [ds[offset + i]["input_ids"][:n_tok] for i in range(args.batch)]
+            if min(len(r) for r in rows) < n_tok:
+                raise SystemExit(f"{args.data} rows are shorter than {n_tok} "
+                                 f"tokens; lower --chunks or --chunk_len.")
+            ids = torch.tensor(rows, dtype=torch.long)
+        elif args.text_file:
+            from transformers import AutoTokenizer
+            tok = AutoTokenizer.from_pretrained(args.model_name,
+                                                trust_remote_code=True)
+            raw = open(args.text_file, encoding="utf-8",
+                       errors="replace").read()
+            t = tok(raw, return_tensors=None)["input_ids"]
+            need = args.batch * n_tok * 2
+            while len(t) < need:
+                t = t + t
+            base = offset * args.batch * n_tok
+            ids = torch.tensor(
+                [t[base + i * n_tok: base + (i + 1) * n_tok]
+                 for i in range(args.batch)], dtype=torch.long)
+        else:
+            print("[gates] WARNING: no --data/--text_file, so the gates run on "
+                  "RANDOM IDS.  Gates 1 and 2 are exact-equality checks and "
+                  "stay valid; GATE 4's content deltas are ~0 BY CONSTRUCTION "
+                  "and mean nothing -- a carry built from noise has no content "
+                  "to transfer.")
+            ids = torch.randint(0, V - 1, (args.batch, n_tok))
+        return [c.contiguous().to(device) for c in torch.chunk(ids, args.chunks,
+                                                               dim=1)]
+
+    chunks_a, chunks_b = mk(0), mk(args.batch)
     num_steps = torch.tensor([0, int(args.T)])
 
     gates, notes = [], {}

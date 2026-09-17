@@ -228,6 +228,13 @@ esac
 # tensors load as "unexpected keys" and are dropped, and every check runs
 # against a no-memory baseline -- which is how job 13266470 failed all
 # three of its post-load steps at once.
+# The post-probe checks read the ARM'S OWN CORPUS.  Without a prose source the
+# walk now refuses to run at all, and the donor gate would measure nothing: a
+# carry built from random ids has no content to transfer, so its content delta
+# is ~0 by construction.  ARM_DATA is what this arm just trained on, which is
+# also the only distribution its carry is meaningful over.
+PROBE_PROSE="--data $ARM_DATA"
+
 PROBE_SETS="--set use_memory=true --set memory_slots=0"
 PROBE_SETS="$PROBE_SETS --set prefix_memory=$PREFIX_MODE"
 PROBE_SETS="$PROBE_SETS --set accum_vecs=$ACCUM_VECS"
@@ -432,7 +439,7 @@ if [ -n "$PROBE" ] && [ $RC -eq 0 ]; then
     #    write norms as a ratio to ||s0||, the tape and its depths, whether s0's
     #    head really equals the carried Z, and the per-parameter grad norms.
     #    Read it; it is not a threshold.
-    python evals/diag_dual_channel_walk.py --model_name $MODEL $PROBE_SETS \
+    python evals/diag_dual_channel_walk.py --model_name $MODEL $PROBE_SETS $PROBE_PROSE \
         --checkpoint "$LAST" --chunks $CROSS_CHUNKS --chunk_len 256 \
         --T $MAX_MEAN_REC --out $OUT/walk.json || RC=1
 
@@ -441,7 +448,7 @@ if [ -n "$PROBE" ] && [ $RC -eq 0 ]; then
     #    unit test can catch), the MEASURED no-grad split that goes into the Z
     #    pre-registration, and the per-channel donor control (P0.6 -- it never
     #    ran on B2).  Each one can come back negative.
-    python tools/prelaunch_final.py --model_name $MODEL $PROBE_SETS \
+    python tools/prelaunch_final.py --model_name $MODEL $PROBE_SETS $PROBE_PROSE \
         --checkpoint "$LAST" --chunks $CROSS_CHUNKS --chunk_len 256 \
         --T $MAX_MEAN_REC --out $OUT/prelaunch.json || RC=1
 

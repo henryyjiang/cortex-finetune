@@ -280,3 +280,45 @@ class TestAnEmptyGeometryListMeansNone:
         sb = _read("smoke_geometry_oom.sbatch")
         assert 'GEOMETRIES=${GEOMETRIES-"' in sb
         assert 'GEOMETRIES=${GEOMETRIES:-"' not in sb
+
+
+class TestThePostProbeChecksHaveAProseSource:
+    """Without one the walk now REFUSES to run -- so all four probes would
+    finish their 400 steps and then fail their own checks.  And the donor gate
+    would measure nothing either way: a carry built from random ids has no
+    content to transfer, so its content delta is ~0 by construction."""
+
+    def test_both_post_probe_consumers_get_the_arms_corpus(self):
+        body = ARMS[ARMS.index('if [ -n "$PROBE" ] && [ $RC -eq 0 ]; then'):]
+        for tool in ("diag_dual_channel_walk.py", "prelaunch_final.py"):
+            i = body.index(tool)
+            assert "$PROBE_PROSE" in body[i:body.index("\n", i)], tool
+
+    def test_the_corpus_is_the_one_the_arm_trained_on(self):
+        assert 'PROBE_PROSE="--data $ARM_DATA"' in ARMS
+
+    def test_the_walk_refuses_rather_than_falling_back_to_noise(self):
+        import os
+        src = open(os.path.join(REPO, "evals", "diag_dual_channel_walk.py"),
+                   encoding="utf-8").read()
+        i = src.index("no prose source")
+        assert "--random_ids" in src[i:i + 400]
+
+    def test_the_gates_warn_when_they_fall_back_to_noise(self):
+        """Gates 1 and 2 are exact-equality checks and stay valid on random ids;
+        gate 4 does not, and must say so rather than print a meaningless 0."""
+        import os
+        src = open(os.path.join(REPO, "tools", "prelaunch_final.py"),
+                   encoding="utf-8").read()
+        i = src.index("[gates] WARNING")
+        block = src[i:i + 700]
+        assert "GATE 4" in block and "BY CONSTRUCTION" in block
+        assert "Gates 1 and 2" in block
+
+    def test_the_donor_control_draws_a_genuinely_different_document(self):
+        """chunks_b must be a different DOCUMENT, not a second random draw --
+        otherwise 'donor' and 'real' are the same distribution."""
+        import os
+        src = open(os.path.join(REPO, "tools", "prelaunch_final.py"),
+                   encoding="utf-8").read()
+        assert "chunks_a, chunks_b = mk(0), mk(args.batch)" in src
