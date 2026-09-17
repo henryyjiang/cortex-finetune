@@ -93,16 +93,24 @@ fi
 SEQ_LEN=${SEQ_LEN:-512}
 BATCH=${BATCH:-2}
 N_SLOTS=${N_SLOTS:-16}                 # W, so the printed map is A3's shape
+# The depth the checkpoint ACTUALLY TRAINED AT.  config.json does not carry it:
+# a B2-family checkpoint reads mean_recurrence 32 from the base recipe while its
+# ramp capped max_mean_rec at 8, so reading it off the config marks NO row as
+# out of distribution when in fact everything past 8 is -- and the late
+# trajectory a depth band is read from sits entirely in that gap.
+TRAINED_DEPTH=${TRAINED_DEPTH:-0}
 T_SWEEP=${T_SWEEP:-"4 8 16 32"}
 OUT=${OUT:-eval_results/p07_depth_band_${SLURM_JOB_ID}}
 
 echo "=== P0.7 depth band | $MODEL | T in $T_SWEEP ==="
+echo "    trained depth: ${TRAINED_DEPTH:-unknown (pass TRAINED_DEPTH)}"
 echo "    prose source: $SRC_DESC"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
 python evals/diag_depth_band.py \
     --model_name "$MODEL" \
     $SRC_ARGS \
+    --trained_depth $TRAINED_DEPTH \
     --T $T_SWEEP \
     --seq_len "$SEQ_LEN" \
     --batch "$BATCH" \
@@ -133,6 +141,7 @@ if [ -n "$HUGINN" ]; then
         python evals/diag_depth_band.py \
             --model_name "$HUGINN_MODEL" \
             --text_file "$TEXT" \
+            --trained_depth $TRAINED_DEPTH \
             --T $T_SWEEP \
             --seq_len "$SEQ_LEN" \
             --batch "$BATCH" \
