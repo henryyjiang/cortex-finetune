@@ -61,7 +61,8 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-from model_utils import load_checkpoint, has_cross_state, to_num_steps
+from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
+                         parse_config_overrides)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -89,6 +90,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dtype",        default="bfloat16", choices=["float32", "bfloat16"])
     p.add_argument("--device",       default=None,
                    help="cuda / cpu (default: cuda when available)")
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="force a graft-building config flag, e.g. "
+                        "--set use_memory=true --set prefix_memory=accum.  "
+                        "REQUIRED whenever --model_name is the BASE dir and the "
+                        "weights arrive via --checkpoint: the base config.json "
+                        "carries no cortex flags at all, so without these the "
+                        "graft builds NO buffer and the run dies on 'no cross "
+                        "state'.  Mirror the arm geometry exactly -- accum_vecs "
+                        "is summary_emb's width.")
     return p.parse_args()
 
 
@@ -166,8 +176,10 @@ def main() -> None:
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float32
 
     print(f"Loading: {args.model_name}  (overlay: {args.checkpoint})")
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name,
-                                 args.memory_slots, dtype, device)
+                                 args.memory_slots, dtype, device,
+                                 config_overrides=overrides or None)
     if not has_cross_state(model):
         raise SystemExit("Model has no cross state — there is no write to measure.")
     prefix_mode = _is_prefix(model)
