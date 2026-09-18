@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.join(REPO, "evals"))
 from test_cortex_eval import VOCAB, _build_raven  # noqa: E402
 
 from cortex_memory.buffers import PrefixGatedBuffer  # noqa: E402
+from cortex_memory.health import TOP_K  # noqa: E402
 from cortex_memory.health import (  # noqa: E402
     carry_health, expected_ring_rows, gate_param_health, rank_stats,
     read_live_fraction, split_carry,
@@ -300,3 +301,81 @@ class TestRed10TheLabelsAreShifted:
         healthy = chance_margin([3.19, 3.23], 100352)
         assert healthy["at_chance"] is False
         assert healthy["margin"] == pytest.approx(8.30, abs=0.02)
+
+
+class TestTheSpectrumIsRecorded:
+    """The width contrast could not be settled from what the walk wrote down.
+
+    PR is a participation ratio over the eigenvalues s^2; `eff_rank_entropy` is
+    the spectral entropy of p ~ s.  Two different quantities, so PR << entropy
+    is generic and their "disagreement in direction" was never evidence.  And
+    the measured gap -- parent PR 2.348 over 256 rows against branch 21.324 over
+    128, with chunks retained [8.0, 8.0] so the documented accum_max confound is
+    excluded -- has two readings the JSON could not separate.  The spectrum head
+    separates them.
+    """
+
+    def test_the_old_keys_keep_their_meaning(self):
+        """Records already written quote eff_rank_pr and eff_rank_entropy.
+        Silently redefining a reported statistic is how two instruments end up
+        disagreeing about the same checkpoint."""
+        m = torch.randn(1, 32, 16)
+        st = rank_stats(m)
+        for k in ("centred_cosine", "eff_rank_entropy", "eff_rank_pr"):
+            assert k in st
+
+    def test_the_new_keys_are_there_and_well_formed(self):
+        st = rank_stats(torch.randn(1, 32, 16))
+        assert len(st["spectrum_top"]) == TOP_K
+        assert st["spectrum_top"] == sorted(st["spectrum_top"], reverse=True)
+        assert abs(st["top1_share"] - st["spectrum_top"][0]) < 1e-9
+        assert 0.0 < st["top1_share"] <= 1.0
+
+    def test_one_dominant_row_shows_up_as_top1_and_not_as_rank(self):
+        """The case the diagnosis exists for: PR collapses toward 1 while the
+        tail stays broad, which is exactly the parent's shape."""
+        torch.manual_seed(0)
+        m = torch.randn(1, 64, 32)
+        m[0, 0] = torch.randn(32) * 12.0           # one dominant row
+        st = rank_stats(m)
+        # top1 0.75, PR 1.76, entropy(s) 21.8 -- the parent's shape in
+        # miniature (PR 2.35 with entropy 134.7 over 256 rows).  A row 100x the
+        # others collapses the entropy too and stops being this case.
+        assert st["top1_share"] > 0.5
+        assert st["eff_rank_pr"] < 4.0
+        assert st["eff_rank_entropy"] > 10.0, "the tail is still broad"
+        assert st["eff_rank_entropy"] > 5 * st["eff_rank_pr"], (
+            "PR and entropy must be able to look like opposites on ONE "
+            "spectrum -- that is the whole point")
+
+    def test_an_isotropic_block_has_no_dominant_direction(self):
+        st = rank_stats(torch.randn(1, 64, 32))
+        assert st["top1_share"] < 0.25
+        assert st["eff_rank_entropy_sq"] > 5.0
+
+    def test_entropy_on_s2_is_never_larger_than_entropy_on_s(self):
+        """Squaring concentrates, so the s^2 entropy is the lower of the two on
+        any spectrum.  If this ever flips, the two are not being computed on the
+        same singular values."""
+        for seed in range(4):
+            torch.manual_seed(seed)
+            st = rank_stats(torch.randn(1, 48, 24))
+            assert st["eff_rank_entropy_sq"] <= st["eff_rank_entropy"] + 1e-6
+
+    def test_a_degenerate_block_does_not_crash_or_lie(self):
+        st = rank_stats(torch.zeros(1, 8, 4))
+        assert st["spectrum_top"] == [0.0] * TOP_K
+        st1 = rank_stats(torch.randn(1, 1, 4))
+        assert st1["eff_rank_pr"] == 1.0
+
+    def test_compare_width_reads_the_new_keys_through_carry_health(self):
+        """carry_health prefixes every rank_stats key with the channel, so the
+        contrast sees e_top1_share and not top1_share.  A prefix mismatch would
+        print a blank column and read as 'the walk is old'."""
+        h = carry_health(torch.randn(1, 16, 8), 8)
+        for k in ("e_top1_share", "e_spectrum_top", "e_eff_rank_entropy_sq"):
+            assert k in h
+        src = io.open(os.path.join(REPO, "tools", "compare_width.py"),
+                      encoding="utf-8").read()
+        for k in ("e_top1_share", "e_spectrum_top", "e_eff_rank_entropy_sq"):
+            assert k in src

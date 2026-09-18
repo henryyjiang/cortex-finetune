@@ -181,9 +181,14 @@ def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
             # substitution, handled by the graft hook rather than here.
         cortex.latent_read_null = (None if z_on
                                    else ("noise", s0_std, seed + i))
-        out = model(input_ids=xc.unsqueeze(0).to(device),
-                    num_steps=num_steps, m_cross_in=m_in,
-                    return_m_cross=True)
+        # no_grad IS LOAD-BEARING, not tidiness.  `state` carries the graph to
+        # the next chunk, so without this the chain holds every chunk's graph at
+        # once -- the footprint that OOMed the W=32 walk at 139.78 GiB on an
+        # H200.  This tool never backprops.
+        with torch.no_grad():
+            out = model(input_ids=xc.unsqueeze(0).to(device),
+                        num_steps=num_steps, m_cross_in=m_in,
+                        return_m_cross=True)
         state = (out.get("m_cross") if isinstance(out, dict)
                  else getattr(out, "m_cross", None))
         n = int(mc.sum())
@@ -249,16 +254,43 @@ def main() -> int:
         return 3
 
     cells = CELLS if z_live else (("E1Z1", True, True), ("E0Z1", False, True))
-    # s0's own scale, for Z's null.  The graft exposes the trunc_normal_ std the
-    # model uses; falling back to the analytic value keeps this runnable on a
-    # config that does not carry it.
-    s0_std = float(getattr(cfg, "init_values", {}).get("std", 0.02)
-                   if isinstance(getattr(cfg, "init_values", None), dict)
-                   else 0.02)
     num_steps = to_num_steps(args.T)
 
     from datasets import load_from_disk
     ds = load_from_disk(args.data)
+
+    # ---- Z's null has to be at s0's MEASURED scale, and this is RED 11 -----
+    # `_null_latent` takes a PER-ELEMENT std.  This tool used to pass
+    # `cfg.init_values["std"]` with a 0.02 fallback: a weight-init number, not
+    # s0's rms, and off by whatever the two happen to differ by on the day.
+    # The consequence is not noise, it is a false null -- diag_s0_sensitivity
+    # measured that the substitution site has NO GAIN until the injected norm
+    # reaches ~175.8 against ||E|| = 171.0, so a null at 0.02 lands deep in the
+    # flat region, every Z cell equals its E twin, and the table says "Z carries
+    # nothing" about the instrument rather than the model.
+    #
+    # `_z_s0_rms` is only populated by a forward, so prime one first.  Same
+    # guard and same wording as diag_s0_sensitivity, on purpose: two tools
+    # disagreeing about which scale s0 has is how RED 11 happened.
+    s0_std = None
+    if z_live:
+        prime_ids = torch.tensor(ds[0]["input_ids"][:512], dtype=torch.long)
+        with torch.no_grad():
+            model(input_ids=prime_ids.unsqueeze(0).to(device),
+                  num_steps=num_steps, m_cross_in=None, return_m_cross=False)
+        rms = getattr(cortex, "_z_s0_rms", None)
+        row = getattr(cortex, "_z_s0_scale", None)
+        if rms is None:
+            print("FAILED: the graft on this checkpoint does not record "
+                  "`_z_s0_rms`, so the only scale available is a ROW NORM and "
+                  "feeding it to `_null_latent` is exactly RED 11.  Re-run "
+                  "tools/prepare_cortex_checkpoint.py against a cortex_graft.py "
+                  "at 2026-09-17 or later.")
+            return 2
+        s0_std = float(rms)
+        print(f"[2x2] Z null at s0's MEASURED per-element rms {s0_std:.6g}"
+              + (f" (row norm {float(row):.4g}, sqrt(D) apart -- do not swap "
+                 f"them)" if row else ""))
     n = len(ds) if args.max_examples == 0 else min(args.max_examples, len(ds))
 
     per_cell: dict[str, list[float]] = {c[0]: [] for c in cells}

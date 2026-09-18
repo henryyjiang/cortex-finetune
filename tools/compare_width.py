@@ -74,6 +74,9 @@ def _row(tag, rec):
     return {"arm": tag, "n_vec": g.get("n_vec"), "rows": c.get("rows"),
             "eff_rank_pr": c.get("e_eff_rank_pr"),
             "eff_rank_entropy": c.get("e_eff_rank_entropy"),
+            "eff_rank_entropy_sq": c.get("e_eff_rank_entropy_sq"),
+            "top1_share": c.get("e_top1_share"),
+            "spectrum_top": c.get("e_spectrum_top"),
             "centred_cosine": c.get("e_centred_cosine"),
             "row_norm": c.get("e_row_norm")}
 
@@ -158,6 +161,46 @@ def print_report(rec, out=sys.stdout) -> None:
         p(f"  {tag:<8}{(r['n_vec'] or 0):>4}{(r['rows'] or 0):>6}"
           f"{f(r['eff_rank_pr']):>13}{f(r['eff_rank_entropy']):>10}"
           f"{f(r['centred_cosine']):>10}{f(r['row_norm']):>10}")
+    # THE SPECTRUM, which is what the PR-vs-entropy question actually needs.
+    # `eff_rank_pr` is a participation ratio over the eigenvalues s^2 and
+    # `entropy` is the spectral entropy of p ~ s, so PR << entropy is GENERIC:
+    # the two were never on the same quantity and never disagreed about
+    # anything.  `entropy(s2)` is the comparable one.  `top1` is the diagnosis:
+    # a PR of ~2 over 256 rows is either ONE ROW dominating the variance, in
+    # which case top1 holds most of the mass and PR is describing that row, or
+    # genuine concentration, in which case the head decays smoothly.
+    if any(rec[t].get("spectrum_top") for t in ("parent", "branch")):
+        p("")
+        p("  SPECTRUM of the carried block -- what PR is actually reporting")
+        p(f"  {'arm':<8}{'entropy(s)':>12}{'entropy(s2)':>13}{'top1':>9}"
+          f"   leading shares")
+        for tag in ("parent", "branch"):
+            r = rec[tag]
+            head = r.get("spectrum_top") or []
+            shares = " ".join(f"{v:.3f}" for v in head[:6])
+            p(f"  {tag:<8}{f(r.get('eff_rank_entropy')):>12}"
+              f"{f(r.get('eff_rank_entropy_sq')):>13}"
+              f"{f(r.get('top1_share')):>9}   {shares}")
+        t_a = rec["parent"].get("top1_share")
+        t_b = rec["branch"].get("top1_share")
+        if t_a is not None and t_b is not None:
+            p("")
+            if t_a > 0.5 and t_a > 2 * t_b:
+                p(f"    READ: the parent's top direction holds {100 * t_a:.0f}%"
+                  f" of its variance against {100 * t_b:.0f}% on the branch,")
+                p("    so its PR is reporting ONE dominant row, not a narrower"
+                  " basis.  Quote")
+                p("    entropy(s2); the PR ratio is not a width number.")
+            elif abs(t_a - t_b) < 0.1:
+                p(f"    READ: the two heads are comparable "
+                  f"({100 * t_a:.0f}% vs {100 * t_b:.0f}%), so the PR gap is")
+                p("    NOT an outlier artifact and the delivered-rank"
+                  " difference is real.")
+            else:
+                p(f"    READ: top1 {100 * t_a:.0f}% vs {100 * t_b:.0f}% --"
+                  f" between the two clean cases.  Report")
+                p("    both statistics and the heads; do not pick the one that"
+                  " suits the verdict.")
     if "delivered_retained" in rec:
         p("")
         p(f"  delivered rank retained: {100 * rec['delivered_retained']:.0f}% "

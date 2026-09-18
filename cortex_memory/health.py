@@ -24,6 +24,11 @@ from __future__ import annotations
 import math
 from typing import Optional
 
+#: How many leading eigenvalue shares `rank_stats` records.  Eight is
+#: enough to see whether the head decays smoothly or falls off a cliff
+#: after one row, which is the whole question PR cannot answer.
+TOP_K = 8
+
 import torch
 
 
@@ -46,7 +51,7 @@ def rank_stats(mat: torch.Tensor) -> dict:
     top few directions.  B2's accum carry measures ~4 of 32 on the second.
     """
     m = mat.detach().float()
-    cos, ent, pr = [], [], []
+    cos, ent, pr, ent2, spec = [], [], [], [], []
     for b in range(m.shape[0]):
         c = m[b] - m[b].mean(0, keepdim=True)
         K = c.shape[0]
@@ -54,6 +59,8 @@ def rank_stats(mat: torch.Tensor) -> dict:
             cos.append(0.0)
             ent.append(1.0)
             pr.append(1.0)
+            ent2.append(1.0)
+            spec.append([1.0] + [0.0] * (TOP_K - 1))
             continue
         n = c.norm(dim=-1, keepdim=True).clamp_min(1e-12)
         g = (c / n) @ (c / n).T
@@ -64,16 +71,40 @@ def rank_stats(mat: torch.Tensor) -> dict:
         if tot <= 0:
             ent.append(1.0)
             pr.append(1.0)
+            ent2.append(1.0)
+            spec.append([0.0] * TOP_K)
             continue
         p = s / s.sum()
         nz = p[p > 0]
         ent.append(float(torch.exp(-(nz * nz.log()).sum())))
         s2 = s ** 2
         pr.append(float((s2.sum() ** 2) / (s2 ** 2).sum().clamp_min(1e-30)))
+        # PR AND ENTROPY WERE NEVER ON THE SAME QUANTITY, which is why their
+        # "disagreement in direction" was never evidence: PR is a participation
+        # ratio over the EIGENVALUES s^2, while `eff_rank_entropy` above is the
+        # spectral entropy of p ~ s.  So PR << entropy is generic.  The s^2
+        # entropy is the comparable one; the s entropy stays because records
+        # already written quote it, and silently changing a reported statistic
+        # is how two instruments end up disagreeing about the same checkpoint.
+        p2 = s2 / s2.sum().clamp_min(1e-30)
+        nz2 = p2[p2 > 0]
+        ent2.append(float(torch.exp(-(nz2 * nz2.log()).sum())))
+        # The spectrum head itself, as SHARES of total variance.  This is what
+        # decides the open question: a PR of ~2 over 256 rows is either one
+        # outlier row dominating, in which case top1 is most of the mass and PR
+        # is describing that row rather than the width, or it is genuine
+        # concentration, in which case the shares decay smoothly.  No amount of
+        # re-reading PR can tell those apart.
+        head = p2[:TOP_K].tolist()
+        spec.append(head + [0.0] * (TOP_K - len(head)))
     n = len(cos)
+    mean_spec = [sum(row[i] for row in spec) / n for i in range(TOP_K)]
     return {"centred_cosine": sum(cos) / n,
             "eff_rank_entropy": sum(ent) / n,
-            "eff_rank_pr": sum(pr) / n}
+            "eff_rank_pr": sum(pr) / n,
+            "eff_rank_entropy_sq": sum(ent2) / n,
+            "top1_share": mean_spec[0],
+            "spectrum_top": mean_spec}
 
 
 def split_carry(state: Optional[torch.Tensor], hidden_size: int):
