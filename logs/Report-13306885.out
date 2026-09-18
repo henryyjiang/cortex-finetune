@@ -1,0 +1,146 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-17-2026 20:11:52
+Job ID:    13306885
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  red10
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== RED 10 confirmation | 8 x 512 tokens | T=8 ===
+NVIDIA H200, 143771 MiB
+    branch (W=16): cortex-retrofit/retro-b2-heal/checkpoint_91552_w16
+    parent (W=32): cortex-retrofit/retro-b2-heal/checkpoint_91552
+    data:          data/pg19_olmo_val_len4096   <- REAL PROSE.  Random ids score at chance too
+                   (that was RED 3), so the pack line is load-bearing.
+
+
+######## width walk: branch W=16 (no backward, batch 1) ########
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.03it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.94it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   289.61      -       -      -   yes           -   3.7282
+ 1    16->32      D        16         -   289.04      -       -      -   yes           -   3.5907
+ 2    32->48      D        16         -   288.97      -       -      -   yes           -   3.6500
+ 3    48->64      D        16         -   289.00      -       -      -   yes           -   3.6482
+ 4    64->80      D        16         -   288.51      -       -      -   yes           -   3.5497
+ 5    80->96      D        16         -   288.61      -       -      -   yes           -   3.6438
+ 6   96->112      D        16         -   288.00      -       -      -   yes           -   3.8536
+ 7  112->128      D        16         -   288.79      -       -      -   yes           -   5.4664
+
+   mean NLL 3.8913   chance (ln vocab) 11.5164   margin +7.6251
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 112.212  centred_cos -0.0064  eff_rank_pr 21.32  entropy 95.85
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/red10_confirm-20260917/width_w16.json
+
+######## width walk: parent W=32 (no backward, batch 1) ########
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 32  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 256  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  4.93it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  9.81it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=32 max_vecs=256 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=32 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->32      D        32         -   292.49      -       -      -   yes           -   3.7282
+ 1    32->64      D        32         -   292.05      -       -      -   yes           -   3.5619
+ 2    64->96      D        32         -   291.84      -       -      -   yes           -   3.6507
+ 3   96->128      D        32         -   291.34      -       -      -   yes           -   3.6487
+ 4  128->160      D        32         -   291.14      -       -      -   yes           -   3.5383
+ 5  160->192      D        32         -   291.36      -       -      -   yes           -   3.6231
+ 6  192->224      D        32         -   291.06      -       -      -   yes           -   3.8565
+ 7  224->256      D        32         -   291.22      -       -      -   yes           -   5.4369
+
+   mean NLL 3.8805   chance (ln vocab) 11.5164   margin +7.6359
+
+-- final carry ------------------------------------------------------
+   rows 256  channels 1
+   E: row_norm 113.318  centred_cos 0.0395  eff_rank_pr 2.35  entropy 134.68
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/red10_confirm-20260917/width_w32.json
+
+######## width contrast: parent W=32 vs branch W=16 ########
+
+  DELIVERED rank of the carried block -- the number that decides width
+  arm        W  rows  eff_rank_pr   entropy       cos     |row|
+  parent    32   256        2.348   134.676     0.039   113.318
+  branch    16   128       21.324    95.846    -0.006   112.212
+
+  SPECTRUM of the carried block -- what PR is actually reporting
+  arm       entropy(s)  entropy(s2)     top1   leading shares
+  parent       134.676        8.067    0.649   0.649 0.038 0.028 0.020 0.018 0.014
+  branch        95.846       43.036    0.140   0.140 0.095 0.069 0.053 0.043 0.038
+
+    READ: the parent's top direction holds 65% of its variance against 14% on the branch,
+    so its PR is reporting ONE dominant row, not a narrower basis.  Quote
+    entropy(s2); the PR ratio is not a width number.
+
+  delivered rank retained: 908% at 50% of the write columns
+  chunks retained: [8.0, 8.0] (these MUST match, or the contrast is horizon and not width)
+
+  VERDICT: INVALID
+    delivered rank went UP by 9.08x on half the write columns, which no width effect produces.
+    Something other than width differs between the two runs -- check accum_max, the prose source, and that both sides loaded their own weights.
+
+  This is a rank measurement, not a benchmark.  It says whether the
+  carry's BASIS narrowed, not whether the arm is worse -- that is the
+  cells' job (p11_z_probe_prereg.md).
+
+wrote eval_results/red10_confirm-20260917/width.json
+(INVALID here is a REFUSAL, not a verdict -- and PR vs entropy is not
+ a disagreement until both are computed on the same power of s.)
+
+=== summary ===
+   walk_w16.json  mean NLL  3.8197  chance 11.5164  margin +7.6967  ok
+  width_w16.json  mean NLL  3.8913  chance 11.5164  margin +7.6251  ok
+  width_w32.json  mean NLL  3.8805  chance 11.5164  margin +7.6359  ok
+
+Every walk that ran scores a model (3 of 3).  RED 10 stays closed.
+---------------------------------------
+Begin Slurm Epilog: Sep-17-2026 20:17:53
+Job ID:        13306885
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      red10
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:48:16,vmem=0,walltime=00:06:02,mem=22884244K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------
