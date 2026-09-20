@@ -103,11 +103,35 @@ if want pack; then
         echo "    already built and COMPLETE (state.json present); skipping."
         echo "    rows: $(python -c "from datasets import load_from_disk; print(len(load_from_disk('$NEW_PACK')))" 2>/dev/null || echo '?')"
     else
-        OUT=$($SUB SPLIT=validation pace/prepare_pg19_pack.sbatch 2>&1) || true
-        echo "    $OUT"
-        # "Submitted batch job 12345" -> 12345, so the evals can depend on it.
-        PACK_JOB=$(echo "$OUT" | grep -oE '[0-9]+$' | tail -1)
-        [ -n "$PACK_JOB" ] && echo "    evals will wait on job $PACK_JOB"
+        # THE ASSIGNMENT PREFIX GOES BEFORE THE COMMAND, NOT AFTER IT.
+        # This line was `$SUB SPLIT=validation pace/...`, which expands to
+        # `sbatch SPLIT=validation pace/...` -- so sbatch looked for a FILE
+        # named "SPLIT=validation", failed, and the stage fell through to the
+        # 50-row pack with only a warning.  Submitted nothing on 2026-09-19.
+        # Third instance of the same trap in this project (ARM_DATA, then
+        # ${ARM_DATA:+...} in submit_cc_geometry.sh, then this): the handoff's
+        # S5 is right that the var-assignment prefix IS the mechanism.
+        if [ -n "${DRY:-}" ]; then
+            echo "    [dry] SPLIT=validation sbatch pace/prepare_pg19_pack.sbatch"
+            PACK_JOB=""
+        else
+            OUT=$(SPLIT=validation sbatch pace/prepare_pg19_pack.sbatch 2>&1) || true
+            echo "    $OUT"
+            # "Submitted batch job 12345" -> 12345, so the evals can depend on it.
+            PACK_JOB=$(echo "$OUT" | grep -oE '[0-9]+$' | tail -1)
+            if [ -n "$PACK_JOB" ]; then
+                echo "    evals will wait on job $PACK_JOB"
+            else
+                # LOUD, because the old behaviour was a warning buried above a
+                # wall of reading-order text and it got missed.
+                echo ""
+                echo "    *** THE PACK DID NOT SUBMIT.  sbatch said:"
+                echo "    ***   $OUT"
+                echo "    *** Not falling through silently: fix this before the"
+                echo "    *** evals run, or they read the 50-row pack."
+                [ "$ONLY" = "pack" ] && exit 1
+            fi
+        fi
     fi
     echo ""
 fi
