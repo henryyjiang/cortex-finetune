@@ -59,6 +59,10 @@ GATE_SLOTS=${GATE_SLOTS:-64}
 CROSS_CHUNKS=${CROSS_CHUNKS:-8}
 STAMP=${STAMP:-$(date +%Y%m%d)}
 OUT_ROOT=${OUT_ROOT:-cortex-retrofit}
+# The cells' stop update.  Kept as ONE variable here and mirrored by
+# eval_carry_2x2.sbatch:115 and eval_deciding.sbatch:175, so the three
+# launchers cannot drift apart on what counts as a finished cell.
+MIN_STEP=${MIN_STEP:-115966}
 NEW_PACK=${NEW_PACK:-data/pg19_olmo_validation_len4096_strided}
 OLD_PACK=${OLD_PACK:-data/pg19_olmo_val_len4096}
 
@@ -158,16 +162,16 @@ if want write; then
                | sort -t_ -k2 -n | tail -1)
         CKPT_NAME=$(basename "$LAST")
         STEP=$(echo "$CKPT_NAME" | sed 's/^checkpoint_//; s/_.*$//')
-        if [ "$STEP" -lt 115966 ] 2>/dev/null; then
+        if [ "$MIN_STEP" != "0" ] && [ "$STEP" -lt "$MIN_STEP" ] 2>/dev/null; then
             echo "    REFUSED $ARM: $CKPT_NAME is step $STEP, below the cells'"
-            echo "            stop step 115966.  Probe or unfinished cell."
+            echo "            stop step $MIN_STEP.  Probe or unfinished cell."
             continue
         fi
         echo "    $ARM -> $RUN/$CKPT_NAME ($MODE)"
         OUT_ROOT="$OUT_ROOT" RUN="$RUN" CKPT_NAME="$CKPT_NAME" \
             BASE=ckpts/olmo-retrofit-cortex EVAL_TAG="cells-$STAMP" \
             PREFIX_MODE="$MODE" ACCUM_VECS=$ACCUM_VECS GATE_SLOTS=$GATE_SLOTS \
-            N_CHUNKS=$CROSS_CHUNKS T_EVAL=8 MAX_EXAMPLES=${WC_N:-50} \
+            N_CHUNKS=$CROSS_CHUNKS T_EVAL=8 MAX_EXAMPLES=${WC_N:-200} \
             DATA="$EVAL_DATA" \
             $SUB $DEP pace/eval_write_capacity.sbatch
     done

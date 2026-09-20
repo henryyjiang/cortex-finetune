@@ -232,6 +232,11 @@ def paired_ci(deltas, n_boot: int, seed: int = 0):
 EFFECTS = (
     ("E_main", "E0Z1", "E1Z1", True,
      "NLL without E minus with E, Z held on.  Positive = E helps."),
+    # The E-only wording for the SAME row.  On a model with no latent channel
+    # the cells are still named E1Z1/E0Z1 -- the labels are the 2x2's, not the
+    # model's -- so the default note above would tell a reader of results.json
+    # that "Z held on" when the record's own z_channel field says false.
+    # Swapped in by compute_effects when z_live is False.
     ("Z_main", "E1Z0", "E1Z1", False,
      "NLL without Z minus with Z, E held on.  Positive = Z helps."),
     ("Z_alone", "E0Z0", "E0Z1", False,
@@ -266,6 +271,10 @@ def compute_effects(per_cell: dict, z_live: bool, n_boot: int,
         if not d:
             continue
         m, lo, hi = paired_ci(d, n_boot, seed)
+        if label == "E_main" and not z_live:
+            note = ("NLL without E minus with E.  Positive = E helps.  THIS "
+                    "MODEL HAS NO Z CHANNEL: the E1Z1/E0Z1 cell labels are the "
+                    "2x2's, not the model's, and this row is a 1x2.")
         out[label] = {"mean_nats": m, "ci_lo": lo, "ci_hi": hi,
                       "n": len(d), "note": note}
 

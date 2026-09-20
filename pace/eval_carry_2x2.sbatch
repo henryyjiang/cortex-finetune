@@ -182,6 +182,22 @@ echo "    data:       $DATA"
 echo "    geometry:   $PREFIX_MODE  W=$ACCUM_VECS  latent=$LATENT"
 echo "    sets:       $SETS $ALLOW"
 echo "    out:        $OUT"
+# HOW MANY ROWS DOES THE PACK ACTUALLY HOLD.  --max_examples is a CEILING, not
+# a sample size.  data/pg19_olmo_val_len4096 holds 50 rows, so this job asked
+# for 100 and ran n=50 on 2026-09-19 -- half the pre-registered power, and
+# nothing in the log said so.  eval_deciding.sbatch has printed this since the
+# P2.1 sweep found it the hard way; this launcher did not, which is why the
+# same surprise landed twice.  Keep the two in step.
+PACK_ROWS=$(python -c "import sys; from datasets import load_from_disk; print(len(load_from_disk(sys.argv[1])))" "$DATA" 2>/dev/null || echo "?")
+echo "    pack rows:  $PACK_ROWS   (--max_examples $MAX_EXAMPLES is a CEILING)"
+if [ "$PACK_ROWS" != "?" ] && [ "$PACK_ROWS" -lt "$MAX_EXAMPLES" ] 2>/dev/null; then
+    echo "    *** n IS $PACK_ROWS, NOT $MAX_EXAMPLES -- the pack binds, not the flag."
+    echo "    *** The strided validation pack exists for exactly this:"
+    echo "    ***   SPLIT=validation sbatch pace/prepare_pg19_pack.sbatch"
+    echo "    *** then re-run with DATA=data/pg19_olmo_validation_len4096_strided"
+    echo "    *** and SAY IN THE RECORD which pack it read -- switching packs"
+    echo "    *** breaks comparability with every earlier cell."
+fi
 if [ "$LATENT" = "1" ]; then
     echo "    Z IS LIVE: look for the '[2x2] Z null at s0's MEASURED per-element"
     echo "    rms ...' line.  If it is absent the null is not at s0's scale and"
