@@ -1,0 +1,75 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-19-2026 20:35:36
+Job ID:    13359425
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  carry2x2
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== 2x2 carry ablation | arm=a1 | T=8 | n_chunks=8 ===
+NVIDIA H200, 143771 MiB
+    checkpoint: cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966
+    data:       data/pg19_olmo_val_len4096
+    geometry:   accum  W=16  latent=0
+    sets:       --set use_memory=true --set memory_slots=0 --set prefix_memory=accum --set accum_vecs=16 --set accum_max=128 --allow_missing_z
+    out:        eval_results/carry_2x2-20260919/a1
+    E-ONLY ARM: this is a 1x2 (E on/off) and the record says so.
+
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.57s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.23it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+
+==============================================================================
+2x2 carry ablation -- mean NLL over chunks 2..8, n=50 paired samples
+column count is IDENTICAL in every cell; only the contents change
+==============================================================================
+  E1Z1  E=on   Z=on    NLL 2.90219
+  E0Z1  E=off  Z=on    NLL 3.29962
+
+  chunk-1 sanity: max spread across cells 0.00e+00 (should be ~0 -- no cell has an incoming carry there)
+
+------------------------------------------------------------------------------
+  E_main         0.39743  [  0.37838,   0.42000]  *
+               NLL without E minus with E, Z held on.  Positive = E helps.
+
+  Z axis UNAVAILABLE: this model carries no latent channel, so
+  Z_main, Z_alone and the interaction are not reported.  The E axis
+  above is a genuine matched-column contrast; the 2x2 is not.
+
+wrote eval_results/carry_2x2-20260919/a1/results.json
+
+2x2 (a1) DONE -> eval_results/carry_2x2-20260919/a1/results.json
+
+READ THE CHUNK-1 SPREAD FIRST.  Every cell runs chunk 1 with no
+incoming carry, so the four must agree there to floating-point noise.
+A spread that is not ~0 means the cells differ in something other than
+the carry's contents, and no row below it is interpretable.
+---------------------------------------
+Begin Slurm Epilog: Sep-19-2026 20:41:03
+Job ID:        13359425
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      carry2x2
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:43:44,vmem=0,walltime=00:05:28,mem=16940744K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------

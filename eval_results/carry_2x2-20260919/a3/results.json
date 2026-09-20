@@ -1,0 +1,33 @@
+{
+  "instrument": "2x2 carry ablation (matched column count)",
+  "when": "2026-09-19T20:41:02",
+  "model_name": "ckpts/olmo-retrofit-cortex",
+  "z_channel": false,
+  "config": {
+    "n_chunks": 8,
+    "T": 8,
+    "dtype": "float32",
+    "samples": 50,
+    "s0_std": null
+  },
+  "cells": {
+    "E1Z1": {
+      "mean_nll": 2.885945395146097,
+      "n": 50
+    },
+    "E0Z1": {
+      "mean_nll": 3.1943063235282896,
+      "n": 50
+    }
+  },
+  "effects": {
+    "E_main": {
+      "mean_nats": 0.30836092838219237,
+      "ci_lo": 0.2900743654966355,
+      "ci_hi": 0.33009325579234533,
+      "n": 50,
+      "note": "NLL without E minus with E, Z held on.  Positive = E helps."
+    }
+  },
+  "chunk1_max_spread": 0.0
+}
