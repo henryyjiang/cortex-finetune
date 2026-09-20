@@ -1,0 +1,86 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-19-2026 21:30:17
+Job ID:    13360884
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_write_capacity.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+    load: BASE ckpts/olmo-retrofit-cortex + overlay cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966
+    sets: --set use_memory=true --set memory_slots=0 --set prefix_memory=accum --set accum_vecs=16 --set accum_max=128
+    The [cortex] OVERRIDE lines below are the proof it arrived.
+=== write capacity: p1-a1-accum-w16-cc8 -> eval_results/write_capacity_cells-20260919/p1-a1-accum-w16-cc8 ===
+Loading: ckpts/olmo-retrofit-cortex  (overlay: cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:20<00:20, 20.29s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:23<00:00, 10.48s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:23<00:00, 11.95s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+mechanism: prefix splice  device=cuda  dtype=bfloat16
+T=8  n_chunks=8
+data/pg19_olmo_validation_len4096_strided: 1059 rows, evaluating 200
+  sample 1 took 3.8s -> ETA 13 min for 200 samples (5 forwards x 8 chunks each at T=8)
+  10/200 samples  [0 min elapsed]
+  20/200 samples  [1 min elapsed]
+  30/200 samples  [1 min elapsed]
+  40/200 samples  [1 min elapsed]
+  50/200 samples  [2 min elapsed]
+  60/200 samples  [2 min elapsed]
+  70/200 samples  [2 min elapsed]
+  80/200 samples  [3 min elapsed]
+  90/200 samples  [3 min elapsed]
+  100/200 samples  [3 min elapsed]
+  110/200 samples  [4 min elapsed]
+  120/200 samples  [4 min elapsed]
+  130/200 samples  [4 min elapsed]
+  140/200 samples  [5 min elapsed]
+  150/200 samples  [5 min elapsed]
+  160/200 samples  [5 min elapsed]
+  170/200 samples  [6 min elapsed]
+  180/200 samples  [6 min elapsed]
+  190/200 samples  [6 min elapsed]
+  200/200 samples  [7 min elapsed]
+
+  Chunk       N      self      prev      none      shuf     d(recon)      d(info)
+  ----------------------------------------------------------------------------------
+  1         200    3.4924    3.6571    3.6571    3.6288      0.16471      0.13639
+  2         200    3.4222    3.4940    3.6192    3.5881      0.07174      0.16584
+  3         197    3.4669    3.5298    3.6776    3.6370      0.06284      0.17004
+  4         197    3.4457    3.5068    3.6616    3.6209      0.06113      0.17525
+  5         197    3.4427    3.4886    3.6530    3.6116      0.04587      0.16892
+  6         196    3.4454    3.4980    3.6569    3.6174      0.05250      0.17198
+  7         196    3.4659    3.5138    3.6785    3.6386      0.04783      0.17264
+  8         196    3.4426    3.4865    3.6479    3.6076      0.04391      0.16498
+
+  chunks 2+ reconstruction (prev - self): +0.05517 (SE 0.00118)
+
+  chunks 2+ information   (shuf - self): +0.16994 (SE 0.00207)
+
+  Large positive reconstruction delta => the write encodes its own
+  chunk, so a flat carry-ablation delta is a READ failure.
+  Reconstruction large but information ~0 => the gain is the extra
+  prefix columns acting as registers, not the content.
+
+Results saved -> eval_results/write_capacity_cells-20260919/p1-a1-accum-w16-cc8
+---------------------------------------
+Begin Slurm Epilog: Sep-19-2026 21:39:12
+Job ID:        13360884
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_write_capacity.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=01:11:28,vmem=0,walltime=00:08:56,mem=22833048K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-16-0
+---------------------------------------

@@ -1,0 +1,371 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-19-2026 21:18:30
+Job ID:    13360886
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  normtrace
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== P2.5 norm trace | arm=a3 | gated | T=8 ===
+NVIDIA H200, 143771 MiB
+    run:        cortex-retrofit/p1-a3-gated-w16k64-cc8
+    data:       data/pg19_olmo_val_len4096
+    geometry:   W=16 chunks=8 chunk_len=512
+    sets:       --set use_memory=true --set memory_slots=0 --set prefix_memory=gated --set accum_vecs=16 --set gate_slots=64 --set gate_route=ring --set gate_norm=tanh --set gate_init=zero --set gate_fill=grow
+    out:        eval_results/norm_trace-20260919/a3
+    checkpoints:
+        cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_95000
+        cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_100000
+        cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_105000
+        cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_110000
+        cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_115000
+        cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_115966
+
+--- walking step 95000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.63s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.19it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 2 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_95000/chkpt.pt: 0 missing / 0 unexpected keys
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   304.15      -       -      -   yes           -   3.4652
+ 1    16->32      D        16         -   305.37      -       -      -   yes           -   3.2695
+ 2    32->48      D        16         -   308.61      -       -      -   yes           -   3.2821
+ 3    48->64      D        16         -   311.68      -       -      -   yes           -   3.3513
+ 4    64->64      D        16       yes   310.55      -       -      -   yes           -   3.2977
+ 5    64->64      D        16       yes   317.18      -       -      -   yes           -   3.1479
+ 6    64->64      D        16       yes   318.02      -       -      -   yes           -   3.4885
+ 7    64->64      D        16       yes   325.80      -       -      -   yes           -   3.6471
+
+   mean NLL 3.3687   chance (ln vocab) 11.5164   margin +8.1478
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 1
+   E: row_norm 150.283  centred_cos 0.0102  eff_rank_pr 9.57  entropy 48.07
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.7112  ig(bias) 0.5242  |W_in| 2.060e+01  |W_mem| 1.954e+01  left init: True
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a3/walk_95000.json
+--- walking step 100000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 69.61it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 2 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_100000/chkpt.pt: 0 missing / 0 unexpected keys
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   314.30      -       -      -   yes           -   3.2381
+ 1    16->32      D        16         -   320.01      -       -      -   yes           -   3.1799
+ 2    32->48      D        16         -   322.21      -       -      -   yes           -   3.1873
+ 3    48->64      D        16         -   323.54      -       -      -   yes           -   3.3318
+ 4    64->64      D        16       yes   322.04      -       -      -   yes           -   3.2487
+ 5    64->64      D        16       yes   328.62      -       -      -   yes           -   3.1215
+ 6    64->64      D        16       yes   330.01      -       -      -   yes           -   3.4693
+ 7    64->64      D        16       yes   336.14      -       -      -   yes           -   3.6504
+
+   mean NLL 3.3034   chance (ln vocab) 11.5164   margin +8.2130
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 1
+   E: row_norm 160.518  centred_cos 0.0267  eff_rank_pr 8.44  entropy 45.51
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.6954  ig(bias) 0.5673  |W_in| 3.213e+01  |W_mem| 2.973e+01  left init: True
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a3/walk_100000.json
+--- walking step 105000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 71.82it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 2 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_105000/chkpt.pt: 0 missing / 0 unexpected keys
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   320.31      -       -      -   yes           -   3.3270
+ 1    16->32      D        16         -   326.62      -       -      -   yes           -   3.1589
+ 2    32->48      D        16         -   327.71      -       -      -   yes           -   3.1696
+ 3    48->64      D        16         -   328.10      -       -      -   yes           -   3.3126
+ 4    64->64      D        16       yes   325.15      -       -      -   yes           -   3.2307
+ 5    64->64      D        16       yes   332.63      -       -      -   yes           -   3.1313
+ 6    64->64      D        16       yes   331.23      -       -      -   yes           -   3.4279
+ 7    64->64      D        16       yes   336.28      -       -      -   yes           -   3.5593
+
+   mean NLL 3.2896   chance (ln vocab) 11.5164   margin +8.2268
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 1
+   E: row_norm 162.252  centred_cos 0.0317  eff_rank_pr 7.80  entropy 45.41
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.6688  ig(bias) 0.6077  |W_in| 4.140e+01  |W_mem| 3.845e+01  left init: True
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a3/walk_105000.json
+--- walking step 110000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 66.67it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 2 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_110000/chkpt.pt: 0 missing / 0 unexpected keys
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   327.84      -       -      -   yes           -   3.3369
+ 1    16->32      D        16         -   335.46      -       -      -   yes           -   3.1849
+ 2    32->48      D        16         -   333.90      -       -      -   yes           -   3.1456
+ 3    48->64      D        16         -   332.38      -       -      -   yes           -   3.2765
+ 4    64->64      D        16       yes   328.28      -       -      -   yes           -   3.2410
+ 5    64->64      D        16       yes   337.74      -       -      -   yes           -   3.1481
+ 6    64->64      D        16       yes   336.83      -       -      -   yes           -   3.4168
+ 7    64->64      D        16       yes   341.13      -       -      -   yes           -   3.5244
+
+   mean NLL 3.2843   chance (ln vocab) 11.5164   margin +8.2321
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 1
+   E: row_norm 163.712  centred_cos 0.0405  eff_rank_pr 6.81  entropy 43.89
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.6431  ig(bias) 0.6500  |W_in| 4.796e+01  |W_mem| 4.503e+01  left init: True
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a3/walk_110000.json
+--- walking step 115000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 47.36it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 2 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_115000/chkpt.pt: 0 missing / 0 unexpected keys
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   330.89      -       -      -   yes           -   3.2411
+ 1    16->32      D        16         -   337.79      -       -      -   yes           -   3.1427
+ 2    32->48      D        16         -   335.01      -       -      -   yes           -   3.1272
+ 3    48->64      D        16         -   334.26      -       -      -   yes           -   3.3017
+ 4    64->64      D        16       yes   329.88      -       -      -   yes           -   3.1983
+ 5    64->64      D        16       yes   339.58      -       -      -   yes           -   3.0892
+ 6    64->64      D        16       yes   337.72      -       -      -   yes           -   3.3739
+ 7    64->64      D        16       yes   342.34      -       -      -   yes           -   3.5171
+
+   mean NLL 3.2489   chance (ln vocab) 11.5164   margin +8.2676
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 1
+   E: row_norm 160.437  centred_cos 0.0556  eff_rank_pr 5.86  entropy 42.03
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.6075  ig(bias) 0.6903  |W_in| 5.480e+01  |W_mem| 5.175e+01  left init: True
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a3/walk_115000.json
+--- walking step 115966
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 70.87it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.input_bias', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 2 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a3-gated-w16k64-cc8/checkpoint_115966/chkpt.pt: 0 missing / 0 unexpected keys
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   329.79      -       -      -   yes           -   3.2539
+ 1    16->32      D        16         -   337.72      -       -      -   yes           -   3.1350
+ 2    32->48      D        16         -   335.95      -       -      -   yes           -   3.1040
+ 3    48->64      D        16         -   336.09      -       -      -   yes           -   3.2632
+ 4    64->64      D        16       yes   330.66      -       -      -   yes           -   3.2277
+ 5    64->64      D        16       yes   338.99      -       -      -   yes           -   3.0883
+ 6    64->64      D        16       yes   337.51      -       -      -   yes           -   3.3851
+ 7    64->64      D        16       yes   342.55      -       -      -   yes           -   3.5244
+
+   mean NLL 3.2477   chance (ln vocab) 11.5164   margin +8.2688
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 1
+   E: row_norm 159.755  centred_cos 0.0553  eff_rank_pr 5.84  entropy 42.72
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.6030  ig(bias) 0.6973  |W_in| 5.624e+01  |W_mem| 5.309e+01  left init: True
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a3/walk_115966.json
+
+=== 6 walks written; assembling the curve ===
+=== E-norm trace | 6 checkpoints | steps 95000..115966 ===
+       95000  eval_results/norm_trace-20260919/a3/walk_95000.json
+      100000  eval_results/norm_trace-20260919/a3/walk_100000.json
+      105000  eval_results/norm_trace-20260919/a3/walk_105000.json
+      110000  eval_results/norm_trace-20260919/a3/walk_110000.json
+      115000  eval_results/norm_trace-20260919/a3/walk_115000.json
+      115966  eval_results/norm_trace-20260919/a3/walk_115966.json
+
+  buffer PrefixGatedBuffer  route=ring  W=16  K=64  chunks=8  chunk_len=512
+
+  ACROSS TRAINING -- P2.5's question
+      step  e_row_norm  last_write      /s0  eff_rank_pr   entropy  centred_cos
+  -----------------------------------------------------------------------------
+     95000     150.283     126.539   325.80         9.57     48.07       0.0102
+    100000     160.518     130.559   336.14         8.44     45.51       0.0267
+    105000     162.252     130.611   336.28         7.80     45.41       0.0317
+    110000     163.712     132.494   341.13         6.81     43.89       0.0405
+    115000     160.437     132.965   342.34         5.86     42.03       0.0556
+    115966     159.755     133.047   342.55         5.84     42.72       0.0553
+
+  slope per 1,000 steps:
+    e_row_norm              0.3437
+    last_e_write_norm       0.2741
+    e_eff_rank_pr          -0.1776
+
+  WITHIN EACH WALK -- the gate's per-sequence lift, not P2.5's question
+      step   lap  post-lap first      last   slope/chunk
+  ------------------------------------------------------
+     95000     4         120.639   126.539        1.7978
+    100000     4         125.104   130.559        1.6854
+    105000     4         126.311   130.611        1.2306
+    110000     4         127.527   132.494        1.4500
+    115000     4         128.147   132.965        1.3681
+    115966     4         128.452   133.047        1.3163
+
+  VERDICT: STILL CLIMBING
+    e_row_norm rose +6.30% over 20,966 steps (+0.3437 per 1k).  This is
+    the reading that costs money: extrapolate to the 5B run's step count
+    before committing, and price a renorm at the operating point.
+
+  A flat across-slope WITH a positive within-slope is the benign shape:
+  the gate lifts norms inside a sequence and training has found a stable
+  level for that lift.  Only the across-slope is P2.5's question.
+
+wrote eval_results/norm_trace-20260919/a3/trace.json
+
+NORM TRACE (a3) DONE -> eval_results/norm_trace-20260919/a3/trace.json
+
+NOW RUN THE OTHER ARM AND READ THEM TOGETHER.  A gated drift is only
+a gate result if accum's drift over the same steps is flatter; if
+both moved, it is the schedule or the corpus.
+---------------------------------------
+Begin Slurm Epilog: Sep-19-2026 21:32:46
+Job ID:        13360886
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      normtrace
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=01:54:16,vmem=0,walltime=00:14:17,mem=16579512K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-18-0
+---------------------------------------

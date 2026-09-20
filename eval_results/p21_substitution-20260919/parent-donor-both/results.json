@@ -1,0 +1,67 @@
+{
+  "instrument": "influence horizon I(d)",
+  "damage_channel": "both",
+  "dual_channel_carry": false,
+  "when": "2026-09-19T21:18:15",
+  "model_name": "ckpts/olmo-retrofit-cortex",
+  "buffer": {
+    "kind": "append",
+    "class": "PrefixAccumBuffer",
+    "n_vec": 16,
+    "capacity": 128,
+    "damage_applied": "row substitution after the write"
+  },
+  "config": {
+    "n_chunks": 8,
+    "damage": "donor",
+    "T": 8,
+    "dtype": "float32",
+    "samples": 100,
+    "config_overrides": {
+      "use_memory": true,
+      "memory_slots": 0,
+      "prefix_memory": "accum",
+      "accum_vecs": 16,
+      "accum_max": 128
+    }
+  },
+  "intact": {
+    "mean_nats": 3.6180365443229676,
+    "chance_nats": 11.516439284270025,
+    "margin_below_chance": 7.898402739947057,
+    "at_chance": false,
+    "n": 100
+  },
+  "depths": {
+    "1": {
+      "mean_nats": 0.03205437421798706,
+      "ci_lo": 0.025397191166877747,
+      "ci_hi": 0.039513029694557174,
+      "n": 100
+    },
+    "2": {
+      "mean_nats": 0.008064050674438477,
+      "ci_lo": 0.0007317996025085449,
+      "ci_hi": 0.017937185525894156,
+      "n": 100
+    },
+    "3": {
+      "mean_nats": 0.0027556443214416504,
+      "ci_lo": -0.002896961331367493,
+      "ci_hi": 0.009503148853778832,
+      "n": 100
+    },
+    "4": {
+      "mean_nats": -0.0002760100364685059,
+      "ci_lo": -0.008199115574359895,
+      "ci_hi": 0.00810672867298126,
+      "n": 100
+    },
+    "6": {
+      "mean_nats": -0.0008314013481140137,
+      "ci_lo": -0.006565812945365906,
+      "ci_hi": 0.0058832442164421005,
+      "n": 100
+    }
+  }
+}

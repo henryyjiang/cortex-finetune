@@ -1,0 +1,51 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-19-2026 21:02:26
+Job ID:    13360882
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  prepare_pg19_pack.sbatch
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+=== pg19 pack | emozilla/pg19 -> data/pg19_olmo_validation_len4096_strided | max_length=4096 ===
+    num_proc=16 map_batch=1 writer_batch=200
+    tokenizer=ckpts/olmo-retrofit-cortex  min_tokens=0  split=validation
+               total        used        free      shared  buff/cache   available
+Mem:             187          18          25           0         144         168
+Using the latest cached version of the dataset since emozilla/pg19 couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/emozilla___pg19/default/0.0.0/c021754c8e01c5b1cc83a1f549c1f97fbbb756b8 (last modified on Mon Sep 14 20:31:36 2026).
+emozilla/pg19[validation]: 50 documents
+Map (num_proc=16):   0%|          | 0/50 [00:00<?, ? examples/s]Map (num_proc=16):   2%|▏         | 1/50 [00:00<00:41,  1.18 examples/s]Map (num_proc=16):   4%|▍         | 2/50 [00:00<00:20,  2.31 examples/s]Map (num_proc=16):  10%|█         | 5/50 [00:01<00:07,  6.38 examples/s]Map (num_proc=16):  14%|█▍        | 7/50 [00:01<00:05,  8.44 examples/s]Map (num_proc=16):  20%|██        | 10/50 [00:01<00:03, 11.30 examples/s]Map (num_proc=16):  26%|██▌       | 13/50 [00:01<00:02, 14.99 examples/s]Map (num_proc=16):  38%|███▊      | 19/50 [00:01<00:01, 23.95 examples/s]Map (num_proc=16):  46%|████▌     | 23/50 [00:01<00:01, 24.15 examples/s]Map (num_proc=16):  52%|█████▏    | 26/50 [00:01<00:01, 22.25 examples/s]Map (num_proc=16):  60%|██████    | 30/50 [00:02<00:00, 25.35 examples/s]Map (num_proc=16):  66%|██████▌   | 33/50 [00:02<00:00, 25.33 examples/s]Map (num_proc=16):  72%|███████▏  | 36/50 [00:02<00:00, 24.29 examples/s]Map (num_proc=16):  78%|███████▊  | 39/50 [00:02<00:00, 21.23 examples/s]Map (num_proc=16):  84%|████████▍ | 42/50 [00:02<00:00, 17.07 examples/s]Map (num_proc=16):  92%|█████████▏| 46/50 [00:02<00:00, 21.17 examples/s]Map (num_proc=16):  98%|█████████▊| 49/50 [00:03<00:00,  9.88 examples/s]Map (num_proc=16): 100%|██████████| 50/50 [00:03<00:00, 12.81 examples/s]
+Saving the dataset (0/8 shards):   0%|          | 0/1059 [00:00<?, ? examples/s]Saving the dataset (0/8 shards):  12%|█▏        | 132/1059 [00:02<00:16, 55.77 examples/s]Saving the dataset (1/8 shards):  37%|███▋      | 397/1059 [00:02<00:11, 55.77 examples/s]Saving the dataset (2/8 shards):  37%|███▋      | 397/1059 [00:02<00:11, 55.77 examples/s]Saving the dataset (3/8 shards):  37%|███▋      | 397/1059 [00:02<00:11, 55.77 examples/s]Saving the dataset (4/8 shards):  75%|███████▍  | 794/1059 [00:02<00:04, 55.77 examples/s]Saving the dataset (5/8 shards):  88%|████████▊ | 927/1059 [00:02<00:02, 55.77 examples/s]Saving the dataset (6/8 shards):  88%|████████▊ | 927/1059 [00:02<00:02, 55.77 examples/s]Saving the dataset (7/8 shards): 100%|██████████| 1059/1059 [00:02<00:00, 55.77 examples/s]Saving the dataset (8/8 shards): 100%|██████████| 1059/1059 [00:02<00:00, 55.77 examples/s]Saving the dataset (8/8 shards): 100%|██████████| 1059/1059 [00:02<00:00, 431.52 examples/s]
+saved 1059 rows x 4097 tokens -> data/pg19_olmo_validation_len4096_strided
+  21.2 rows per document (50 documents in, 0.00B tokens of window)
+full (unragged) windows, first 1000 sampled: 952/1000
+
+=== pack written; verifying it is complete ===
+-rw-r--r--.  1 hjiang420 pace-aivanova7 2705928 Sep 19 21:02 data-00005-of-00008.arrow
+-rw-r--r--.  1 hjiang420 pace-aivanova7 2705928 Sep 19 21:02 data-00006-of-00008.arrow
+-rw-r--r--.  1 hjiang420 pace-aivanova7 2705928 Sep 19 21:02 data-00007-of-00008.arrow
+-rw-r--r--.  1 hjiang420 pace-aivanova7    1344 Sep 19 21:02 dataset_info.json
+-rw-r--r--.  1 hjiang420 pace-aivanova7     660 Sep 19 21:02 state.json
+
+P0.4 answered.  Next: build the mix, then check_pack both legs —
+  python tools/prepare_corpus_mix.py --a data/pg19_olmo_validation_len4096_strided \
+      --b data/fineweb_edu_olmo_len4096 \
+      --out data/pg19_fw50_olmo_len4096 --ratio 0.5 --max_rows 940000
+
+  (--a is data/pg19_olmo_validation_len4096_strided, the STRIDED pack.  data/pg19_olmo_len4096 without the
+   suffix is the old truncated one — do not feed that to the mix.)
+  python tools/check_pack.py --data data/pg19_fw50_olmo_len4096 \
+      --steps 26703 --batch_size 32 --max_length 4096
+---------------------------------------
+Begin Slurm Epilog: Sep-19-2026 21:02:57
+Job ID:        13360882
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      prepare_pg19_pack.sbatch
+Resources:     cpu=16,mem=128G,node=1
+Rsrc Used:     cput=00:08:48,vmem=0,walltime=00:00:33,mem=3532064K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-006-6-2
+---------------------------------------

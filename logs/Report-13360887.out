@@ -1,0 +1,323 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-19-2026 21:32:41
+Job ID:    13360887
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  normtrace
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== P2.5 norm trace | arm=a1 | accum | T=8 ===
+NVIDIA H200, 143771 MiB
+    run:        cortex-retrofit/p1-a1-accum-w16-cc8
+    data:       data/pg19_olmo_val_len4096
+    geometry:   W=16 chunks=8 chunk_len=512
+    sets:       --set use_memory=true --set memory_slots=0 --set prefix_memory=accum --set accum_vecs=16 --set accum_max=128
+    out:        eval_results/norm_trace-20260919/a1
+    checkpoints:
+        cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_95000
+        cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_100000
+        cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_105000
+        cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_110000
+        cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115000
+        cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966
+
+--- walking step 95000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 67.74it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_95000/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   294.28      -       -      -   yes           -   3.5013
+ 1    16->32      D        16         -   291.94      -       -      -   yes           -   3.2747
+ 2    32->48      D        16         -   291.83      -       -      -   yes           -   3.2681
+ 3    48->64      D        16         -   292.03      -       -      -   yes           -   3.3696
+ 4    64->80      D        16         -   291.66      -       -      -   yes           -   3.3026
+ 5    80->96      D        16         -   292.33      -       -      -   yes           -   3.1683
+ 6   96->112      D        16         -   291.79      -       -      -   yes           -   3.5342
+ 7  112->128      D        16         -   292.75      -       -      -   yes           -   3.6450
+
+   mean NLL 3.3830   chance (ln vocab) 11.5164   margin +8.1335
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 113.583  centred_cos -0.0053  eff_rank_pr 23.47  entropy 100.85
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a1/walk_95000.json
+--- walking step 100000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  4.60it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  9.16it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_100000/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   297.07      -       -      -   yes           -   3.2533
+ 1    16->32      D        16         -   296.20      -       -      -   yes           -   3.1938
+ 2    32->48      D        16         -   296.00      -       -      -   yes           -   3.1964
+ 3    48->64      D        16         -   296.29      -       -      -   yes           -   3.3843
+ 4    64->80      D        16         -   296.01      -       -      -   yes           -   3.2299
+ 5    80->96      D        16         -   296.33      -       -      -   yes           -   3.1728
+ 6   96->112      D        16         -   296.17      -       -      -   yes           -   3.4858
+ 7  112->128      D        16         -   296.84      -       -      -   yes           -   3.6342
+
+   mean NLL 3.3188   chance (ln vocab) 11.5164   margin +8.1976
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 115.152  centred_cos -0.0058  eff_rank_pr 26.68  entropy 103.29
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a1/walk_100000.json
+--- walking step 105000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 123.53it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_105000/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   303.66      -       -      -   yes           -   3.3266
+ 1    16->32      D        16         -   302.69      -       -      -   yes           -   3.2003
+ 2    32->48      D        16         -   302.19      -       -      -   yes           -   3.1734
+ 3    48->64      D        16         -   302.64      -       -      -   yes           -   3.3169
+ 4    64->80      D        16         -   302.37      -       -      -   yes           -   3.2371
+ 5    80->96      D        16         -   302.48      -       -      -   yes           -   3.1540
+ 6   96->112      D        16         -   302.24      -       -      -   yes           -   3.4418
+ 7  112->128      D        16         -   303.09      -       -      -   yes           -   3.5764
+
+   mean NLL 3.3033   chance (ln vocab) 11.5164   margin +8.2131
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 117.602  centred_cos -0.0046  eff_rank_pr 23.31  entropy 101.46
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a1/walk_105000.json
+--- walking step 110000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 148.73it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_110000/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   310.37      -       -      -   yes           -   3.3102
+ 1    16->32      D        16         -   310.36      -       -      -   yes           -   3.1727
+ 2    32->48      D        16         -   309.78      -       -      -   yes           -   3.1094
+ 3    48->64      D        16         -   310.20      -       -      -   yes           -   3.2998
+ 4    64->80      D        16         -   310.43      -       -      -   yes           -   3.1984
+ 5    80->96      D        16         -   310.31      -       -      -   yes           -   3.1440
+ 6   96->112      D        16         -   310.14      -       -      -   yes           -   3.4150
+ 7  112->128      D        16         -   310.67      -       -      -   yes           -   3.5619
+
+   mean NLL 3.2764   chance (ln vocab) 11.5164   margin +8.2400
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 120.560  centred_cos -0.0060  eff_rank_pr 28.12  entropy 102.96
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a1/walk_110000.json
+--- walking step 115000
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  4.65it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  9.25it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115000/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   317.94      -       -      -   yes           -   3.2645
+ 1    16->32      D        16         -   319.10      -       -      -   yes           -   3.1399
+ 2    32->48      D        16         -   318.27      -       -      -   yes           -   3.1591
+ 3    48->64      D        16         -   318.87      -       -      -   yes           -   3.2630
+ 4    64->80      D        16         -   318.98      -       -      -   yes           -   3.2081
+ 5    80->96      D        16         -   318.75      -       -      -   yes           -   3.1011
+ 6   96->112      D        16         -   318.89      -       -      -   yes           -   3.3832
+ 7  112->128      D        16         -   319.45      -       -      -   yes           -   3.5749
+
+   mean NLL 3.2617   chance (ln vocab) 11.5164   margin +8.2547
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 123.863  centred_cos -0.0059  eff_rank_pr 27.99  entropy 103.82
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a1/walk_115000.json
+--- walking step 115966
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  8.68it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 17.21it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixAccumBuffer  W=16 K=None route=accum  Z=OFF  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16      D        16         -   318.29      -       -      -   yes           -   3.2743
+ 1    16->32      D        16         -   319.97      -       -      -   yes           -   3.1606
+ 2    32->48      D        16         -   319.16      -       -      -   yes           -   3.1323
+ 3    48->64      D        16         -   319.65      -       -      -   yes           -   3.2576
+ 4    64->80      D        16         -   319.65      -       -      -   yes           -   3.2242
+ 5    80->96      D        16         -   319.60      -       -      -   yes           -   3.0816
+ 6   96->112      D        16         -   319.46      -       -      -   yes           -   3.3781
+ 7  112->128      D        16         -   319.96      -       -      -   yes           -   3.5543
+
+   mean NLL 3.2579   chance (ln vocab) 11.5164   margin +8.2586
+
+-- final carry ------------------------------------------------------
+   rows 128  channels 1
+   E: row_norm 124.130  centred_cos -0.0062  eff_rank_pr 30.21  entropy 104.52
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/norm_trace-20260919/a1/walk_115966.json
+
+=== 6 walks written; assembling the curve ===
+=== E-norm trace | 6 checkpoints | steps 95000..115966 ===
+       95000  eval_results/norm_trace-20260919/a1/walk_95000.json
+      100000  eval_results/norm_trace-20260919/a1/walk_100000.json
+      105000  eval_results/norm_trace-20260919/a1/walk_105000.json
+      110000  eval_results/norm_trace-20260919/a1/walk_110000.json
+      115000  eval_results/norm_trace-20260919/a1/walk_115000.json
+      115966  eval_results/norm_trace-20260919/a1/walk_115966.json
+
+  buffer PrefixAccumBuffer  route=accum  W=16  K=None  chunks=8  chunk_len=512
+
+  ACROSS TRAINING -- P2.5's question
+      step  e_row_norm  last_write      /s0  eff_rank_pr   entropy  centred_cos
+  -----------------------------------------------------------------------------
+     95000     113.583     113.691   292.75        23.47    100.85      -0.0053
+    100000     115.152     115.277   296.84        26.68    103.29      -0.0058
+    105000     117.602     117.706   303.09        23.31    101.46      -0.0046
+    110000     120.560     120.648   310.67        28.12    102.96      -0.0060
+    115000     123.863     124.057   319.45        27.99    103.82      -0.0059
+    115966     124.130     124.255   319.96        30.21    104.52      -0.0062
+
+  slope per 1,000 steps:
+    e_row_norm              0.5267
+    last_e_write_norm       0.5287
+    e_eff_rank_pr           0.2616
+
+  WITHIN EACH WALK -- the gate's per-sequence lift, not P2.5's question
+      step   lap  post-lap first      last   slope/chunk
+  ------------------------------------------------------
+     95000     1         113.431   113.691        0.0198
+    100000     1         115.086   115.277        0.0144
+    105000     1         117.608   117.706       -0.0020
+    110000     1         120.587   120.648        0.0064
+    115000     1         123.983   124.057        0.0113
+    115966     1         124.323   124.255       -0.0119
+
+  VERDICT: STILL CLIMBING
+    e_row_norm rose +9.29% over 20,966 steps (+0.5267 per 1k).  This is
+    the reading that costs money: extrapolate to the 5B run's step count
+    before committing, and price a renorm at the operating point.
+
+  A flat across-slope WITH a positive within-slope is the benign shape:
+  the gate lifts norms inside a sequence and training has found a stable
+  level for that lift.  Only the across-slope is P2.5's question.
+
+wrote eval_results/norm_trace-20260919/a1/trace.json
+
+NORM TRACE (a1) DONE -> eval_results/norm_trace-20260919/a1/trace.json
+
+NOW RUN THE OTHER ARM AND READ THEM TOGETHER.  A gated drift is only
+a gate result if accum's drift over the same steps is flatter; if
+both moved, it is the schedule or the corpus.
+---------------------------------------
+Begin Slurm Epilog: Sep-19-2026 21:44:22
+Job ID:        13360887
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      normtrace
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=01:33:28,vmem=0,walltime=00:11:41,mem=16738232K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------

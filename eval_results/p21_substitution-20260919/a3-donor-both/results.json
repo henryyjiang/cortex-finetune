@@ -1,0 +1,71 @@
+{
+  "instrument": "influence horizon I(d)",
+  "damage_channel": "both",
+  "dual_channel_carry": false,
+  "when": "2026-09-19T21:32:34",
+  "model_name": "ckpts/olmo-retrofit-cortex",
+  "buffer": {
+    "kind": "gated",
+    "class": "PrefixGatedBuffer",
+    "n_vec": 16,
+    "capacity": 64,
+    "damage_applied": "pre-merge write, through prefix.merge"
+  },
+  "config": {
+    "n_chunks": 8,
+    "damage": "donor",
+    "T": 8,
+    "dtype": "float32",
+    "samples": 100,
+    "config_overrides": {
+      "use_memory": true,
+      "memory_slots": 0,
+      "prefix_memory": "gated",
+      "accum_vecs": 16,
+      "gate_slots": 64,
+      "gate_route": "ring",
+      "gate_norm": "tanh",
+      "gate_init": "zero",
+      "gate_fill": "grow"
+    }
+  },
+  "intact": {
+    "mean_nats": 2.996469867229462,
+    "chance_nats": 11.516439284270025,
+    "margin_below_chance": 8.519969417040564,
+    "at_chance": false,
+    "n": 100
+  },
+  "depths": {
+    "1": {
+      "mean_nats": 0.077610604763031,
+      "ci_lo": 0.06987575733661651,
+      "ci_hi": 0.08576877206563949,
+      "n": 100
+    },
+    "2": {
+      "mean_nats": 0.01178539514541626,
+      "ci_lo": 0.007114272832870484,
+      "ci_hi": 0.01669546180963516,
+      "n": 100
+    },
+    "3": {
+      "mean_nats": 0.006885647773742676,
+      "ci_lo": 0.0013568370938301087,
+      "ci_hi": 0.013391499400138854,
+      "n": 100
+    },
+    "4": {
+      "mean_nats": 0.005175893306732178,
+      "ci_lo": 0.0007270643711090088,
+      "ci_hi": 0.01033930248022078,
+      "n": 100
+    },
+    "6": {
+      "mean_nats": 0.002426927089691162,
+      "ci_lo": 0.0007746197581291199,
+      "ci_hi": 0.004134516954421997,
+      "n": 100
+    }
+  }
+}
