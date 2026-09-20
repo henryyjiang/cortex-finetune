@@ -126,6 +126,7 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from evals.model_utils import _unwrap, load_checkpoint  # noqa: E402
+from evals.model_utils import parse_config_overrides  # noqa: E402
 
 WRITE_LAYOUTS = ("zero", "tail", "contiguous", "spread")
 READ_LAYOUTS = ("zero", "contiguous", "spread")
@@ -404,6 +405,18 @@ def main() -> int:
     ap.add_argument("--device",
                     default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--set", action="append", default=[],
+                    metavar="KEY=VALUE",
+                    help="force a graft-building config flag, e.g. "
+                         "--set use_memory=true --set prefix_memory=gated.  "
+                         "REQUIRED on an OVERLAY checkpoint: train.py's "
+                         "checkpoint_<step> dirs, and the _w16 branch dirs cut "
+                         "from them, hold chkpt.pt and NO config.json, so "
+                         "--model_name loads the BASE dir whose config carries "
+                         "no cortex flags at all (use_memory is literally "
+                         "'<absent>' on ckpts/olmo-retrofit-cortex) and without "
+                         "these the graft builds with no buffer.  Mirror the "
+                         "arm's PROBE_SETS in pace/p1_arms.sbatch.  RED 12.")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -411,8 +424,10 @@ def main() -> int:
     device = torch.device(args.device)
     dtype = getattr(torch, args.dtype)
 
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
-                                 dtype, device)
+                                 dtype, device,
+                                 config_overrides=overrides or None)
     inner = _unwrap(model)
     cortex = getattr(inner, "cortex", None)
     if cortex is None or getattr(cortex, "prefix", None) is None:

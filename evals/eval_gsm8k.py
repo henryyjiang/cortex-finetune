@@ -34,6 +34,7 @@ from transformers import AutoTokenizer
 from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
                          ccot_prime, greedy_generate, seed_example,
                          score_continuation)
+from model_utils import parse_config_overrides  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -176,6 +177,18 @@ def parse_args() -> argparse.Namespace:
                         "slower; kept as the reference path for debugging.")
     p.add_argument("--max_examples",   type=int, default=0, help="0 = all")
     p.add_argument("--out_dir",        default="eval_results/gsm8k")
+    p.add_argument("--set", action="append", default=[],
+                   metavar="KEY=VALUE",
+                   help="force a graft-building config flag, e.g. "
+                        "--set use_memory=true --set prefix_memory=gated.  "
+                        "REQUIRED on an OVERLAY checkpoint: train.py's "
+                        "checkpoint_<step> dirs, and the _w16 branch dirs cut "
+                        "from them, hold chkpt.pt and NO config.json, so "
+                        "--model_name loads the BASE dir whose config carries "
+                        "no cortex flags at all (use_memory is literally "
+                        "'<absent>' on ckpts/olmo-retrofit-cortex) and without "
+                        "these the graft builds with no buffer.  Mirror the "
+                        "arm's PROBE_SETS in pace/p1_arms.sbatch.  RED 12.")
     p.add_argument("--dtype",          default="bfloat16", choices=["float32", "bfloat16"])
     return p.parse_args()
 
@@ -222,8 +235,10 @@ def main() -> None:
     dtype  = torch.bfloat16 if args.dtype == "bfloat16" else torch.float32
 
     print(f"Loading checkpoint: {args.checkpoint}")
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name,
-                                 args.memory_slots, dtype, device)
+                                 args.memory_slots, dtype, device,
+                                 config_overrides=overrides or None)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token

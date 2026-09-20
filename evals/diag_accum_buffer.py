@@ -47,6 +47,7 @@ import torch.nn.functional as F
 
 from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
                          greedy_generate, accumulating_buffer)
+from model_utils import parse_config_overrides  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,6 +69,18 @@ def parse_args() -> argparse.Namespace:
                    help="Store generated texts for this many samples in the JSON")
     p.add_argument("--seed",         type=int, default=1234)
     p.add_argument("--out_dir",      default="eval_results/diag_accum_buffer")
+    p.add_argument("--set", action="append", default=[],
+                   metavar="KEY=VALUE",
+                   help="force a graft-building config flag, e.g. "
+                        "--set use_memory=true --set prefix_memory=gated.  "
+                        "REQUIRED on an OVERLAY checkpoint: train.py's "
+                        "checkpoint_<step> dirs, and the _w16 branch dirs cut "
+                        "from them, hold chkpt.pt and NO config.json, so "
+                        "--model_name loads the BASE dir whose config carries "
+                        "no cortex flags at all (use_memory is literally "
+                        "'<absent>' on ckpts/olmo-retrofit-cortex) and without "
+                        "these the graft builds with no buffer.  Mirror the "
+                        "arm's PROBE_SETS in pace/p1_arms.sbatch.  RED 12.")
     p.add_argument("--dtype",        default="bfloat16", choices=["float32", "bfloat16"])
     return p.parse_args()
 
@@ -84,8 +97,10 @@ def main() -> None:
     dtype  = torch.bfloat16 if args.dtype == "bfloat16" else torch.float32
 
     print(f"Loading: {args.model_name}  (overlay: {args.checkpoint})")
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name,
-                                 args.memory_slots, dtype, device)
+                                 args.memory_slots, dtype, device,
+                                 config_overrides=overrides or None)
     if not has_cross_state(model):
         raise SystemExit("Model has no cross state — nothing to diagnose.")
     accum = accumulating_buffer(model)

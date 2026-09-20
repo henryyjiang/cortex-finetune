@@ -31,6 +31,7 @@ from transformers import AutoTokenizer
 from model_utils import (load_checkpoint, has_cross_state, to_num_steps,
                          prime_cross_state, greedy_generate, ccot_prime,
                          score_continuation, seed_example, buffer_geometry)
+from model_utils import parse_config_overrides  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +108,18 @@ def parse_args() -> argparse.Namespace:
                    help="Disable per-example RNG seeding. Seeding (default) "
                         "aligns the s0 draw across conditions so the paired "
                         "contrast isolates the carry.")
+    p.add_argument("--set", action="append", default=[],
+                   metavar="KEY=VALUE",
+                   help="force a graft-building config flag, e.g. "
+                        "--set use_memory=true --set prefix_memory=gated.  "
+                        "REQUIRED on an OVERLAY checkpoint: train.py's "
+                        "checkpoint_<step> dirs, and the _w16 branch dirs cut "
+                        "from them, hold chkpt.pt and NO config.json, so "
+                        "--model_name loads the BASE dir whose config carries "
+                        "no cortex flags at all (use_memory is literally "
+                        "'<absent>' on ckpts/olmo-retrofit-cortex) and without "
+                        "these the graft builds with no buffer.  Mirror the "
+                        "arm's PROBE_SETS in pace/p1_arms.sbatch.  RED 12.")
     p.add_argument("--dtype",        default="bfloat16", choices=["float32", "bfloat16"])
     return p.parse_args()
 
@@ -343,9 +356,11 @@ def main() -> None:
     dtype  = torch.bfloat16 if args.dtype == "bfloat16" else torch.float32
 
     print(f"Loading checkpoint: {args.checkpoint}")
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name,
                                  args.memory_slots, dtype, device,
-                                 accum_max=args.accum_max)
+                                 accum_max=args.accum_max,
+                                 config_overrides=overrides or None)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token

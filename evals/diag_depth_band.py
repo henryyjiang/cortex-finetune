@@ -104,6 +104,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from evals.diag_latent_scale import record_trajectory  # noqa: E402
 from evals.model_utils import _unwrap, load_checkpoint  # noqa: E402
+from evals.model_utils import parse_config_overrides  # noqa: E402
 
 #: Band edge criteria, fixed before the sweep.  See the header for the P0.1
 #: numbers each one reproduces; changing either after seeing a result is the
@@ -329,6 +330,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--device",
                    default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--out", default=None)
+    p.add_argument("--set", action="append", default=[],
+                   metavar="KEY=VALUE",
+                   help="force a graft-building config flag, e.g. "
+                        "--set use_memory=true --set prefix_memory=gated.  "
+                        "REQUIRED on an OVERLAY checkpoint: train.py's "
+                        "checkpoint_<step> dirs, and the _w16 branch dirs cut "
+                        "from them, hold chkpt.pt and NO config.json, so "
+                        "--model_name loads the BASE dir whose config carries "
+                        "no cortex flags at all (use_memory is literally "
+                        "'<absent>' on ckpts/olmo-retrofit-cortex) and without "
+                        "these the graft builds with no buffer.  Mirror the "
+                        "arm's PROBE_SETS in pace/p1_arms.sbatch.  RED 12.")
     p.add_argument("--seed", type=int, default=0)
     return p.parse_args()
 
@@ -342,8 +355,10 @@ def main() -> int:
               "0.37x that fp32 puts at 0.06x.  This probe reads exactly that "
               "region.  Do not quote these numbers.", flush=True)
     device = torch.device(args.device)
+    overrides = parse_config_overrides(args.set)
     model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
-                                 getattr(torch, args.dtype), device)
+                                 getattr(torch, args.dtype), device,
+                                 config_overrides=overrides or None)
     inner = _unwrap(model)
     D = int(cfg.n_embd)
     # THE CONFIG FIELD IS INHERITED, NOT TRAINED.  A B2-family checkpoint
