@@ -87,16 +87,49 @@ STAMP=${STAMP:-$(date +%Y%m%d)}
 # pace/p1_arms.sbatch and pace/eval_deciding.sbatch.  A mismatch here does not
 # score a different arm, it scores NOTHING and reports the arm as missing.
 if [ -z "$CKPT" ]; then
+    # RED 13 (found 2026-09-19, before submit): these defaults carried the
+    # `probe-` prefix, because when this launcher was written the ONLY
+    # checkpoints on disk were the 400-step architecture probes.  p1_arms.sbatch
+    # adds `probe-` only under PROBE=1 (line 324); the P2.3 cells ran without
+    # it and saved to the BARE name.  The probe dirs have the same layout, so
+    # the old default did not error -- it would have scored a 400-step probe
+    # and reported it as the 24,414-step cell.  Keep these in step with
+    # p1_arms.sbatch:241/251/269.
     case "$ARM" in
-    a1)  RUN=${RUN:-probe-p1-a1-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}} ;;
-    a2)  RUN=${RUN:-probe-p1-a2-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}-z} ;;
-    a3)  RUN=${RUN:-probe-p1-a3-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS}} ;;
-    a3z) RUN=${RUN:-probe-p1-a3z-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS}-z} ;;
+    a1)  RUN=${RUN:-p1-a1-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}} ;;
+    a2)  RUN=${RUN:-p1-a2-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}-z} ;;
+    a3)  RUN=${RUN:-p1-a3-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS}} ;;
+    a3z) RUN=${RUN:-p1-a3z-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS}-z} ;;
     *)   echo "ERROR: unknown ARM=$ARM (expected a1|a2|a3|a3z)"; exit 1 ;;
     esac
     # NUMERIC sort on the step, so checkpoint_91952 does not lose to
     # checkpoint_9999 the way a lexical sort would.
     CKPT=$(ls -d $OUT_ROOT/$RUN/checkpoint_* 2>/dev/null | sort -t_ -k2 -n | tail -1)
+fi
+
+# The name guard above is necessary and not sufficient: RUN= can still be
+# pointed at a probe by hand, and a cell that died early leaves a real
+# checkpoint at the wrong step.  MIN_STEP makes the step number itself the
+# check.  The P2.3 cells stop at 115966; the parent is 91552 and every probe
+# sits within 400 of it, so any of them trips this.  MIN_STEP=0 disables it.
+MIN_STEP=${MIN_STEP:-115966}
+if [ "$MIN_STEP" != "0" ] && [ -n "$CKPT" ]; then
+    CKPT_STEP=$(basename "$CKPT" | sed 's/^checkpoint_//; s/_.*$//')
+    case "$CKPT_STEP" in
+    ''|*[!0-9]*)
+        echo "ERROR: cannot read a step number out of '$CKPT'."
+        echo "       Pass MIN_STEP=0 to skip this guard if that is intended."
+        exit 1 ;;
+    *)
+        if [ "$CKPT_STEP" -lt "$MIN_STEP" ]; then
+            echo "ERROR: '$CKPT' is at step $CKPT_STEP, below MIN_STEP=$MIN_STEP."
+            echo "       This is a PROBE or an unfinished cell, not the P2.3 cell."
+            echo "       Scoring it would report a 400-step run as the 24,414-step"
+            echo "       one -- the same shape as REDs 8/9/10.  Check the cell"
+            echo "       finished, or pass MIN_STEP=0 deliberately."
+            exit 1
+        fi ;;
+    esac
 fi
 
 [ -n "$CKPT" ] && [ -d "$CKPT" ] || {
