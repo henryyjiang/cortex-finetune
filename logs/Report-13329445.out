@@ -1,0 +1,71 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-18-2026 22:29:58
+Job ID:    13329445
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_write_capacity.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+    load: BASE ckpts/olmo-retrofit-cortex + overlay cortex-retrofit/retro-b2-heal/checkpoint_91552_w16
+    sets: --set use_memory=true --set memory_slots=0 --set prefix_memory=accum --set accum_vecs=16 --set accum_max=128
+    The [cortex] OVERRIDE lines below are the proof it arrived.
+=== write capacity: retro-b2-heal -> eval_results/write_capacity_pass1-parent/retro-b2-heal ===
+Loading: ckpts/olmo-retrofit-cortex  (overlay: cortex-retrofit/retro-b2-heal/checkpoint_91552_w16)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:38<01:38, 98.62s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:51<00:00, 48.30s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:51<00:00, 55.85s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 0 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/retro-b2-heal/checkpoint_91552_w16/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+mechanism: prefix splice  device=cuda  dtype=bfloat16
+T=8  n_chunks=8
+data/pg19_olmo_val_len4096: 50 rows, evaluating 50
+  sample 1 took 2.8s -> ETA 2 min for 50 samples (5 forwards x 8 chunks each at T=8)
+  10/50 samples  [0 min elapsed]
+  20/50 samples  [1 min elapsed]
+  30/50 samples  [1 min elapsed]
+  40/50 samples  [1 min elapsed]
+  50/50 samples  [2 min elapsed]
+
+  Chunk       N      self      prev      none      shuf     d(recon)      d(info)
+  ----------------------------------------------------------------------------------
+  1          50    4.4009    4.4785    4.4785    4.4843      0.07762      0.08338
+  2          50    3.7112    3.7892    3.8793    3.9131      0.07804      0.20192
+  3          50    3.5916    3.6575    3.7576    3.7977      0.06592      0.20613
+  4          50    3.5689    3.6259    3.7269    3.7827      0.05706      0.21387
+  5          50    3.6999    3.7485    3.8415    3.9115      0.04861      0.21156
+  6          50    3.5909    3.6352    3.7399    3.8081      0.04429      0.21725
+  7          50    3.5896    3.6288    3.7310    3.8049      0.03921      0.21535
+  8          50    3.6538    3.6971    3.8025    3.8687      0.04330      0.21491
+
+  chunks 2+ reconstruction (prev - self): +0.05378 (SE 0.00160)
+
+  chunks 2+ information   (shuf - self): +0.21157 (SE 0.00309)
+
+  Large positive reconstruction delta => the write encodes its own
+  chunk, so a flat carry-ablation delta is a READ failure.
+  Reconstruction large but information ~0 => the gain is the extra
+  prefix columns acting as registers, not the content.
+
+Results saved -> eval_results/write_capacity_pass1-parent/retro-b2-heal
+---------------------------------------
+Begin Slurm Epilog: Sep-18-2026 22:35:38
+Job ID:        13329445
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_write_capacity.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:45:28,vmem=0,walltime=00:05:41,mem=21368208K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-02-018-35-0
+---------------------------------------
