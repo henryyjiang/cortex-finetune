@@ -106,12 +106,23 @@ BOOT=${BOOT:-2000}
 ARMS=${ARMS:-"a1 a2 a3 a3z parent"}
 DAMAGES=${DAMAGES:-"donor random"}
 
+# RED 13, second site (2026-09-19).  These names were HARDCODED to `probe-`,
+# with no override, because P2.1 ran on the 400-step architecture probes and
+# they were the only checkpoints that existed.  p1_arms.sbatch adds `probe-`
+# only under PROBE=1 (line 324); the P2.3 cells saved to the BARE name.  Run
+# this against the cells with the old default and it does not error -- the dirs
+# are identical in layout -- it scores a 400-step probe and labels it the cell.
+#
+#   (default)           the P2.3 cells
+#   RUN_PREFIX=probe-   the P1 architecture probes (what P2.1 scored)
+RUN_PREFIX=${RUN_PREFIX:-}
+
 arm_ckpt () {
     case "$1" in
-    a1)  RUN=probe-p1-a1-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS} ;;
-    a2)  RUN=probe-p1-a2-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}-z ;;
-    a3)  RUN=probe-p1-a3-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS} ;;
-    a3z) RUN=probe-p1-a3z-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS}-z ;;
+    a1)  RUN=${RUN_PREFIX}p1-a1-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS} ;;
+    a2)  RUN=${RUN_PREFIX}p1-a2-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}-z ;;
+    a3)  RUN=${RUN_PREFIX}p1-a3-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS} ;;
+    a3z) RUN=${RUN_PREFIX}p1-a3z-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS}-z ;;
     parent) echo "$BRANCH_PATH"; return 0 ;;
     *) return 1 ;;
     esac
@@ -155,6 +166,29 @@ if [ -z "$CKPT" ] || [ ! -d "$CKPT" ]; then
     echo "ERROR: no checkpoint for arm '$ARM' (looked for '$CKPT')."
     echo "       Run the P1 probes first: bash pace/submit_p1_probes.sh"
     exit 1
+fi
+
+# The name is not enough: RUN_PREFIX can be wrong, and a cell that died early
+# leaves a real checkpoint at the wrong step.  Make the step number itself the
+# check.  `parent` is EXEMPT -- BRANCH_PATH is checkpoint_91552_w16 by design
+# and is supposed to be below the cells.  Auto-off when scoring the probes.
+MIN_STEP=${MIN_STEP:-115966}
+[ -n "$RUN_PREFIX" ] && MIN_STEP=0
+if [ "$MIN_STEP" != "0" ] && [ "$ARM" != "parent" ]; then
+    CKPT_STEP=$(basename "$CKPT" | sed 's/^checkpoint_//; s/_.*$//')
+    case "$CKPT_STEP" in
+    ''|*[!0-9]*)
+        echo "ERROR: cannot read a step number out of '$CKPT'. MIN_STEP=0 to skip."
+        exit 1 ;;
+    *)
+        if [ "$CKPT_STEP" -lt "$MIN_STEP" ]; then
+            echo "ERROR: arm '$ARM' resolved to '$CKPT', step $CKPT_STEP < MIN_STEP=$MIN_STEP."
+            echo "       That is a PROBE or an unfinished cell, not the P2.3 cell."
+            echo "       Use RUN_PREFIX=probe- to score the probes deliberately,"
+            echo "       or MIN_STEP=0 to override."
+            exit 1
+        fi ;;
+    esac
 fi
 if [ ! -d "$DATA" ]; then
     echo "ERROR: no such pack: DATA=$DATA"; exit 1
