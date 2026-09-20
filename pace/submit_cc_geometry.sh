@@ -80,6 +80,43 @@ SUB="sbatch"
 [ -n "${DRY:-}" ] && SUB="echo [dry] sbatch"
 cd "$(dirname "$0")/.."
 
+# ===================== BUDGET, SET BY THE USER 2026-09-19 ==================
+# The ceiling for this job is TWENTY GPU-HOURS TOTAL.  Sizing, measured from
+# the P2.3 cells (Report-13297370/71: gres/gpu:h200=1, walltime 1-05:00:09):
+#
+#   one cell at CELL_STEPS=24414  =  ~29 h on ONE H200  =  29 GPU-hours
+#   PAIR=cc  (2 new cells)        =  ~58 GPU-hours   <-- OVER BUDGET
+#   PAIR=maxk (1 new cell)        =  ~29 GPU-hours   <-- OVER BUDGET
+#
+# So the full-budget form of this experiment is NOT affordable and the cells
+# must be shortened.  ~20 GPU-hours buys two cells of ~10 h each:
+#
+#   CELL_STEPS=8000 bash pace/submit_cc_geometry.sh      # ~20 GPU-hours
+#
+# WHY 8000 IS DEFENSIBLE, AND WHAT IT COSTS.  P2.3's paired delta crossed over
+# ~1,500 updates in and its plateau was established by ~4,000 of 24,414, so a
+# 8,000-update window is past the transient with room to spare.  Two things get
+# worse and both must be said in the record rather than discovered later:
+#   1. p23_cells_prereg.md S1's stopping rule was written against the FULL
+#      budget.  A short cell can return NOT_SEPARATED or INSUFFICIENT_DATA
+#      where the full one would have separated.  That is a WEAKER claim, not a
+#      wrong one -- and --stopping_rule now names which outcome you got.
+#   2. The delta is still mildly widening at 24k in P2.3, so a short cell's
+#      endpoint is a LOWER bound on whatever the full cell would have shown.
+#
+# One thing works in this experiment's favour that did not in P2.3: under
+# PAIR=cc both cells get fresh K=32 gate params of the SAME shape, so the
+# zero-init transient is symmetric and divides out of the paired delta.  P2.3's
+# did not -- that is why its first 400 updates read +0.019.
+#
+# AND FIRST: do not spend any of this until job 8 (the influence horizon on the
+# cells, pace/submit_cell_evals.sh) reports.  If the trained read still reaches
+# only ~2 chunks of 8, that alone justifies speccing the 5B run at cc4 -- you
+# need to know cc8 buys nothing, not that cc4 is better -- and this job is not
+# needed at all.  If the read reaches 6-8, cc8 is justified and this job is
+# cancelled.  Either way job 8 is free and this one is not.
+# ===========================================================================
+
 ARM=${ARM:-a3}                 # a3 = the gated ring, i.e. the arm P2.3 chose
 ACCUM_VECS=${ACCUM_VECS:-16}   # W.  A PARAMETER SHAPE -- never vary mid-chain.
 PAIR=${PAIR:-cc}
