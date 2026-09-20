@@ -42,7 +42,7 @@ reveals:
 
 USAGE
     python tools/check_latent_probe.py \
-        --probe cortex-retrofit/probe-p1-a2-accum-w16-cc8-z/checkpoint_91952 \
+        --probe cortex-retrofit/p1-a2-accum-w16-cc8-z/checkpoint_115966 \
         --parent cortex-retrofit/retro-b2-heal/checkpoint_91552_w16
 
 Exit code 0 = every live check passed, 1 = at least one failed.  A failure here

@@ -66,6 +66,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from model_utils import load_checkpoint, to_num_steps, _unwrap  # noqa: E402
 from model_utils import parse_config_overrides  # noqa: E402
+from cortex_memory.health import chance_margin  # noqa: E402
 
 CELLS = (("E1Z1", True, True), ("E1Z0", True, False),
          ("E0Z1", False, True), ("E0Z0", False, False))
@@ -86,6 +87,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dtype", default="float32",
                    choices=["float32", "bfloat16"])
     p.add_argument("--boot", type=int, default=2000)
+    p.add_argument("--chunk1_tol", type=float, default=1e-4,
+                   help="max allowed spread in the chunk-1 loss across cells. "
+                        "Every cell runs chunk 1 with no incoming carry, so "
+                        "they must agree there; a larger spread means the "
+                        "cells differ in something other than the carry's "
+                        "contents and no effect is interpretable")
     p.add_argument("--allow_missing_z", action="store_true",
                    help="run the E axis alone and report the Z rows as "
                         "unavailable, instead of failing.")
@@ -218,6 +225,65 @@ def paired_ci(deltas, n_boot: int, seed: int = 0):
     return float(t.mean()), float(lo), float(hi)
 
 
+#: SIGN CONVENTION, ONE LINE, AND EVERY ROW OBEYS IT:
+#:      effect = NLL(channel OFF) - NLL(channel ON),  so POSITIVE = it helps.
+#: The one row that did not obey it (Z_alone, inverted until 2026-09-19) is why
+#: this is a module-level function with tests rather than a closure in main().
+EFFECTS = (
+    ("E_main", "E0Z1", "E1Z1", True,
+     "NLL without E minus with E, Z held on.  Positive = E helps."),
+    ("Z_main", "E1Z0", "E1Z1", False,
+     "NLL without Z minus with Z, E held on.  Positive = Z helps."),
+    ("Z_alone", "E0Z0", "E0Z1", False,
+     "NLL without Z minus with Z, E held OFF.  Positive = Z helps on its own.  "
+     "The rung a non-recurrent baseline cannot compete on by construction."),
+)
+
+
+def compute_effects(per_cell: dict, z_live: bool, n_boot: int,
+                    seed: int = 0) -> dict:
+    """The 2x2's main effects and interaction, paired across samples.
+
+    EXTRACTED FROM main() ON PURPOSE.  It lived there as a closure, which meant
+    the arithmetic that produces every number this instrument reports had no
+    test -- and a sign error sat in the Z_alone row undetected because of it.
+    A function that takes a dict of lists needs no model, no GPU and no
+    checkpoint, so there is no excuse for it to be untested.
+
+    THE INTERACTION.  (E's effect without Z) minus (E's effect with Z).
+    NEGATIVE means COMPLEMENTS: E is worth more when Z is present.  Positive
+    means substitutes.  This is the design's actual hypothesis, and it is the
+    one term whose sign cannot be read off a single column.
+    """
+    out = {}
+
+    for label, off, on, always, note in EFFECTS:
+        if not (always or z_live):
+            continue
+        if off not in per_cell or on not in per_cell:
+            continue
+        d = [x - y for x, y in zip(per_cell[off], per_cell[on])]
+        if not d:
+            continue
+        m, lo, hi = paired_ci(d, n_boot, seed)
+        out[label] = {"mean_nats": m, "ci_lo": lo, "ci_hi": hi,
+                      "n": len(d), "note": note}
+
+    if z_live and all(k in per_cell for k in
+                      ("E0Z0", "E1Z0", "E0Z1", "E1Z1")):
+        d = [(a - b) - (c - e) for a, b, c, e in
+             zip(per_cell["E0Z0"], per_cell["E1Z0"],
+                 per_cell["E0Z1"], per_cell["E1Z1"])]
+        if d:
+            m, lo, hi = paired_ci(d, n_boot, seed)
+            out["interaction"] = {
+                "mean_nats": m, "ci_lo": lo, "ci_hi": hi, "n": len(d),
+                "note": "E's effect without Z minus E's effect with Z.  "
+                        "NEGATIVE = complements (each is worth MORE when the "
+                        "other is present); positive = substitutes."}
+    return out
+
+
 def main() -> int:
     args = parse_args()
     if args.dtype == "bfloat16":
@@ -337,37 +403,37 @@ def main() -> int:
         "cells": {}, "effects": {},
         "chunk1_max_spread": (max(chunk1_spread) if chunk1_spread else None),
     }
+
+    # --- the two VETOES.  Both exist because this project's failure mode is an
+    # instrument that returns a confident wrong number rather than failing.
+    #
+    # 1. CHUNK-1 AGREEMENT.  Every cell runs chunk 1 with no incoming carry, so
+    #    the four must agree there to floating-point noise.  A spread that is
+    #    not ~0 means the cells differ in something OTHER than the carry's
+    #    contents -- a shifted position, a different s0, a dropped column --
+    #    and then no effect below it is interpretable.  pace/eval_carry_2x2.sbatch
+    #    has always told the reader to check this by eye; checking it by eye is
+    #    how REDs 8, 9 and 10 survived.
+    # 2. CHANCE LEVEL.  RED 10 was two at-chance losses differenced into a
+    #    confident number.  Same check the walk got afterwards, same threshold,
+    #    same module -- keep them in step.
     for name, _, _ in cells:
         v = per_cell[name]
         report["cells"][name] = {
             "mean_nll": (sum(v) / len(v) if v else None), "n": len(v)}
 
-    def effect(a, b, label, note):
-        """Paired mean of (a - b) across samples."""
-        if a not in per_cell or b not in per_cell:
-            return
-        d = [x - y for x, y in zip(per_cell[a], per_cell[b])]
-        m, lo, hi = paired_ci(d, args.boot, args.seed)
-        report["effects"][label] = {"mean_nats": m, "ci_lo": lo, "ci_hi": hi,
-                                    "n": len(d), "note": note}
+    # AFTER the cells loop, not before: chance_margin reads report["cells"],
+    # and an empty list makes it return all-None -- a health check that is
+    # silently absent rather than failing, which is the exact shape of defect
+    # it was added to catch.
+    spread = report["chunk1_max_spread"]
+    report["chunk1_ok"] = (None if spread is None
+                           else bool(spread <= args.chunk1_tol))
+    vocab = int(getattr(getattr(inner, "config", None), "vocab_size", 0) or 0)
+    report["health"] = chance_margin(
+        [c["mean_nll"] for c in report["cells"].values()], vocab)
 
-    effect("E0Z1", "E1Z1", "E_main",
-           "NLL without E minus with E, Z held on.  Positive = E helps.")
-    if z_live:
-        effect("E1Z0", "E1Z1", "Z_main",
-               "NLL without Z minus with Z, E held on.  Positive = Z helps.")
-        effect("E0Z1", "E0Z0", "Z_alone",
-               "Does Z work with no E?  The rung a non-recurrent baseline "
-               "cannot compete on by construction.")
-        d = [(a - b) - (c - e) for a, b, c, e in
-             zip(per_cell["E0Z0"], per_cell["E1Z0"],
-                 per_cell["E0Z1"], per_cell["E1Z1"])]
-        m, lo, hi = paired_ci(d, args.boot, args.seed)
-        report["effects"]["interaction"] = {
-            "mean_nats": m, "ci_lo": lo, "ci_hi": hi, "n": len(d),
-            "note": "E's effect without Z minus E's effect with Z.  NEGATIVE "
-                    "= complements (each is worth MORE when the other is "
-                    "present); positive = substitutes."}
+    report["effects"] = compute_effects(per_cell, z_live, args.boot, args.seed)
 
     print(f"\n{'=' * 78}")
     print(f"2x2 carry ablation -- mean NLL over chunks 2..{args.n_chunks}, "
@@ -384,6 +450,21 @@ def main() -> int:
         print(f"\n  chunk-1 sanity: max spread across cells "
               f"{report['chunk1_max_spread']:.2e} "
               f"(should be ~0 -- no cell has an incoming carry there)")
+        if report["chunk1_ok"] is False:
+            print(f"\n  *** CHUNK-1 VETO: spread {spread:.3e} exceeds "
+                  f"--chunk1_tol {args.chunk1_tol:.0e}.")
+            print("  *** The cells differ in something OTHER than the carry's")
+            print("  *** contents -- a shifted position, a different s0, a")
+            print("  *** dropped column.  NO EFFECT BELOW IS INTERPRETABLE.")
+    h = report["health"]
+    if h.get("at_chance"):
+        print(f"\n  *** AT CHANCE: mean NLL {h['mean_nll']:.4f} against "
+              f"ln(vocab) {h['chance']:.4f} (margin {h['margin']:.4f}).")
+        print("  *** Every effect below is a difference of two noise levels.")
+        print("  *** This is RED 10's shape.  Fix the scoring, not the table.")
+    elif h.get("margin") is not None:
+        print(f"  health: mean NLL {h['mean_nll']:.4f}, "
+              f"{h['margin']:.2f} nats below chance")
     print(f"\n{'-' * 78}")
     for label, e in report["effects"].items():
         sig = "" if (e["ci_lo"] <= 0 <= e["ci_hi"]) else "  *"

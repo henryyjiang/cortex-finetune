@@ -42,7 +42,7 @@ CLOSING BLOCK
 USAGE
   # real checkpoint, the geometry a P1 arm runs
   python evals/diag_dual_channel_walk.py --model_name ckpts/olmo-retrofit-cortex \
-      --checkpoint cortex-retrofit/probe-p1-a3z-.../checkpoint_91952 \
+      --checkpoint cortex-retrofit/p1-a3z-.../checkpoint_115966 \
       --chunks 8 --chunk_len 256 --T 8 --out eval_results/walk.json
 
   # forward-only (no backward), for a quick look on a small machine

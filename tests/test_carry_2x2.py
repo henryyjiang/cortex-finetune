@@ -34,7 +34,8 @@ sys.path.insert(0, os.path.join(REPO, "evals"))
 from test_cortex_eval import VOCAB, _build_raven  # noqa: E402
 
 from eval_carry_2x2 import (  # noqa: E402
-    CELLS, chain_nll, has_latent_channel, null_e, null_z,
+    CELLS, EFFECTS, chain_nll, compute_effects, has_latent_channel, null_e,
+    null_z,
 )
 
 NV, K, CL, EOS = 4, 16, 16, VOCAB - 1
@@ -235,3 +236,117 @@ class TestTheLauncher:
         """config.mean_recurrence is 32 on every B2-family checkpoint and no
         arm ran there.  That was RED 8."""
         assert '--T "$T"' in self._sbatch()
+
+
+# ---------------------------------------------------------------------------
+# THE EFFECTS ARITHMETIC.  Extracted from main() 2026-09-19 so it could be
+# tested at all -- and the first test written against it found that Z_alone had
+# been computed ON minus OFF, the opposite sign from every other row, in a row
+# whose note never stated a convention.
+#
+# The convention, once, for all of them:
+#       effect = NLL(channel OFF) - NLL(channel ON)   =>  POSITIVE = it helps.
+# ---------------------------------------------------------------------------
+
+class TestTheEffectsArithmetic:
+
+    def _cells(self, e1z1, e1z0, e0z1, e0z0, n=8):
+        """Four cells with NO within-cell variance, so the CI is degenerate
+        and the test is about the SIGN and the pairing, not about noise."""
+        return {"E1Z1": [e1z1] * n, "E1Z0": [e1z0] * n,
+                "E0Z1": [e0z1] * n, "E0Z0": [e0z0] * n}
+
+    def test_a_helpful_E_gives_a_POSITIVE_E_main(self):
+        # E on = 3.0, E off = 3.2.  Turning E off costs 0.2 nats, so E helps.
+        per = self._cells(e1z1=3.0, e1z0=3.0, e0z1=3.2, e0z0=3.2)
+        eff = compute_effects(per, z_live=False, n_boot=50)
+        assert eff["E_main"]["mean_nats"] == pytest.approx(0.2)
+
+    def test_a_harmful_E_gives_a_NEGATIVE_E_main(self):
+        per = self._cells(e1z1=3.2, e1z0=3.2, e0z1=3.0, e0z0=3.0)
+        eff = compute_effects(per, z_live=False, n_boot=50)
+        assert eff["E_main"]["mean_nats"] == pytest.approx(-0.2)
+
+    def test_a_helpful_Z_gives_a_POSITIVE_Z_main(self):
+        # Z on = 3.0, Z off = 3.1, with E held on.
+        per = self._cells(e1z1=3.0, e1z0=3.1, e0z1=3.5, e0z0=3.6)
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        assert eff["Z_main"]["mean_nats"] == pytest.approx(0.1)
+
+    def test_Z_alone_uses_THE_SAME_SIGN_as_Z_main(self):
+        # THE REGRESSION.  Z helps by 0.1 both with E and without it, so
+        # Z_main and Z_alone must agree in sign AND magnitude.  Before the fix
+        # Z_alone came back -0.1 against Z_main's +0.1, and a reader would have
+        # concluded Z hurts when E is absent.
+        per = self._cells(e1z1=3.0, e1z0=3.1, e0z1=3.5, e0z0=3.6)
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        assert eff["Z_alone"]["mean_nats"] == pytest.approx(0.1)
+        assert (eff["Z_alone"]["mean_nats"] > 0) == (eff["Z_main"]["mean_nats"] > 0)
+
+    def test_every_reported_row_obeys_off_minus_on(self):
+        # A property, not an example: make each channel help by a known amount
+        # and assert every main effect is positive.  Any future row added with
+        # the arguments the other way round fails here.
+        per = self._cells(e1z1=3.0, e1z0=3.1, e0z1=3.4, e0z0=3.5)
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        for label in ("E_main", "Z_main", "Z_alone"):
+            assert eff[label]["mean_nats"] > 0, label
+
+    def test_perfect_complements_give_a_NEGATIVE_interaction(self):
+        # E is worth MORE when Z is present: E's effect with Z is 0.4, without
+        # Z it is 0.2.  interaction = 0.2 - 0.4 = -0.2, and NEGATIVE is the
+        # design's hypothesis (complements).
+        per = self._cells(e1z1=3.0, e1z0=3.2, e0z1=3.4, e0z0=3.4)
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        assert eff["interaction"]["mean_nats"] == pytest.approx(-0.2)
+
+    def test_perfect_substitutes_give_a_POSITIVE_interaction(self):
+        # E is worth LESS when Z is present.
+        per = self._cells(e1z1=3.0, e1z0=3.4, e0z1=3.2, e0z0=3.8)
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        assert eff["interaction"]["mean_nats"] == pytest.approx(0.2)
+
+    def test_additive_channels_give_a_ZERO_interaction(self):
+        per = self._cells(e1z1=3.0, e1z0=3.2, e0z1=3.3, e0z0=3.5)
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        assert eff["interaction"]["mean_nats"] == pytest.approx(0.0)
+
+    def test_an_E_only_model_reports_only_E_main(self):
+        # Reporting a Z row on a model with no Z channel is how a missing
+        # channel becomes a null result.
+        per = self._cells(e1z1=3.0, e1z0=3.0, e0z1=3.2, e0z0=3.2)
+        eff = compute_effects(per, z_live=False, n_boot=50)
+        assert set(eff) == {"E_main"}
+
+    def test_a_live_Z_model_reports_all_four(self):
+        per = self._cells(e1z1=3.0, e1z0=3.1, e0z1=3.4, e0z0=3.6)
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        assert set(eff) == {"E_main", "Z_main", "Z_alone", "interaction"}
+
+    def test_the_effects_are_PAIRED_across_samples(self):
+        # Per-sample difficulty must divide out.  Sample 2 is uniformly harder
+        # by 1.0 nat; the paired effect must not notice.
+        per = {"E1Z1": [3.0, 4.0], "E1Z0": [3.0, 4.0],
+               "E0Z1": [3.2, 4.2], "E0Z0": [3.2, 4.2]}
+        eff = compute_effects(per, z_live=False, n_boot=50)
+        assert eff["E_main"]["mean_nats"] == pytest.approx(0.2)
+        assert eff["E_main"]["n"] == 2
+
+    def test_a_missing_cell_is_omitted_rather_than_computed_from_nothing(self):
+        per = {"E1Z1": [3.0], "E0Z1": [3.2]}
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        assert "E_main" in eff
+        assert "Z_main" not in eff and "interaction" not in eff
+
+    def test_empty_cells_produce_no_rows_at_all(self):
+        per = {k: [] for k in ("E1Z1", "E1Z0", "E0Z1", "E0Z0")}
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        assert eff == {}
+
+    def test_every_row_carries_its_convention_in_the_note(self):
+        # The sign bug survived because the note did not state a direction.
+        per = self._cells(e1z1=3.0, e1z0=3.1, e0z1=3.4, e0z0=3.6)
+        eff = compute_effects(per, z_live=True, n_boot=50)
+        for label in ("E_main", "Z_main", "Z_alone"):
+            assert "Positive =" in eff[label]["note"], label
+        assert "NEGATIVE" in eff["interaction"]["note"]

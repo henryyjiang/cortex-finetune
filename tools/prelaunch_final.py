@@ -47,7 +47,7 @@ report "it ran" is not a probe.
 
 USAGE
     python tools/prelaunch_final.py --model_name ckpts/olmo-retrofit-cortex \
-        --checkpoint cortex-retrofit/probe-p1-a3z-.../checkpoint_91952 \
+        --checkpoint cortex-retrofit/p1-a3z-.../checkpoint_115966 \
         --chunks 8 --chunk_len 256 --out eval_results/prelaunch.json
 
 Exit code 0 = every gate passed, 1 = at least one failed.

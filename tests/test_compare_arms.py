@@ -24,8 +24,9 @@ sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, "evals"))
 
 from tools.compare_arms import (  # noqa: E402
-    build, compare_losses, health_summary, paired_ci, print_comparison,
-    read_diag, read_eval, read_live_from_gate,
+    build, compare_losses, health_summary, loss_series, paired_ci,
+    print_comparison, print_stopping_rule, read_diag, read_eval,
+    read_live_from_gate, read_log_series, stopping_rule,
 )
 
 
@@ -460,3 +461,208 @@ class TestTheWidthContrast:
                   self._walk(16, 4.02, rows=128))     # 8 chunks
         assert r["verdict"] == "SURVIVES"
         assert r["chunks_retained"] == [8.0, 8.0]
+
+
+# ---------------------------------------------------------------------------
+# THE STOPPING RULE.  p23_cells_prereg.md S1.
+#
+# These are written as properties of the RULE, not of the cells that happened
+# to satisfy it: the rule existed before any number did, and its job is to be
+# unable to say "separated" when it is not.  Every test below is a way the rule
+# could quietly say MORE than the evidence supports -- overlapping windows
+# counted as two, a spanning CI read as "no difference", a window silently
+# shrunk to fit, the budget folded into the verdict.
+# ---------------------------------------------------------------------------
+
+LOG_LINE = ("GPU: cuda:0 | Step: {st} | Updates: {up} | Time/step: 1.0000 | "
+            "Tok/sec=  {tok} | Loss: {loss:.4f} / log-ppl: 1.0 | "
+            "Grad-Norm 1.0 | ClipCoef 1.0 | Peak-Mem 1.0GiB\n")
+
+
+def _write_log(tmp_path, name, losses, first_update=1, tok=4000.0):
+    p = tmp_path / name
+    with open(p, "w", encoding="ascii") as fh:
+        fh.write("some preamble that is not a step line\n")
+        for i, v in enumerate(losses):
+            fh.write(LOG_LINE.format(st=(i + 1) * 4, up=first_update + i,
+                                     tok=tok, loss=v))
+    return str(p)
+
+
+class TestReadingTheTrainingLog:
+
+    def test_it_keys_on_updates_not_the_micro_step(self, tmp_path):
+        # The 4x trap: Step counts micro-batches, Updates counts optimiser
+        # steps, and the budget the rule is written against is in UPDATES.
+        path = _write_log(tmp_path, "r.out", [3.0, 2.9, 2.8], first_update=500)
+        s = read_log_series(path)
+        assert sorted(s) == [500, 501, 502]
+        assert s[500]["micro_step"] == 4
+
+    def test_it_carries_the_cost_column(self, tmp_path):
+        path = _write_log(tmp_path, "r.out", [3.0], tok=1234.5)
+        s = read_log_series(path)
+        assert s[1]["tok_s"] == pytest.approx(1234.5)
+        assert s[1]["s_per_step"] == pytest.approx(1.0)
+
+    def test_a_repeated_update_takes_the_later_row(self, tmp_path):
+        # A requeued run appends; the later row is the one it continued from.
+        # Same rule as read_diag, and keeping both would double-count a pair.
+        p = tmp_path / "r.out"
+        with open(p, "w", encoding="ascii") as fh:
+            fh.write(LOG_LINE.format(st=4, up=7, tok=1.0, loss=9.0))
+            fh.write(LOG_LINE.format(st=4, up=7, tok=1.0, loss=2.0))
+        s = read_log_series(str(p))
+        assert len(s) == 1 and s[7]["loss"] == pytest.approx(2.0)
+
+    def test_lines_that_are_not_step_lines_are_ignored(self, tmp_path):
+        path = _write_log(tmp_path, "r.out", [3.0, 2.0])
+        assert len(read_log_series(path)) == 2
+
+
+class TestTheStoppingRule:
+
+    def _series(self, n, delta, start=1):
+        ref = {start + i: 3.0 for i in range(n)}
+        arm = {start + i: 3.0 + delta for i in range(n)}
+        return ref, arm
+
+    def test_a_clear_separation_below_zero_satisfies_it(self):
+        ref, arm = self._series(1000, -0.05)
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        assert r["verdict"] == "SATISFIED"
+        assert r["direction"] == "below"
+        assert r["windows_agree"] is True
+
+    def test_the_two_windows_do_not_overlap(self):
+        ref, arm = self._series(1000, -0.05)
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        # [N-999, N-500] and [N-499, N]: the earlier must END before the
+        # latest BEGINS.  Sliding one window by a step and calling it a second
+        # window is the classic way to turn one piece of evidence into two.
+        assert r["earlier"]["last_update"] < r["latest"]["first_update"]
+        assert r["earlier"]["n"] == r["latest"]["n"] == 500
+
+    def test_a_ci_spanning_zero_is_continue_not_no_difference(self):
+        # The pre-registration is explicit: a CI spanning zero in either
+        # window is CONTINUE, not "converged at zero".
+        ref, arm = self._series(1000, 0.0)
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        assert r["verdict"] == "CONTINUE"
+        assert "converged at zero" in r["reading"]
+
+    def test_the_budget_is_what_turns_continue_into_not_separated(self):
+        ref, arm = self._series(1000, 0.0)
+        cont = stopping_rule(ref, arm, window=500, n_boot=200, budget=10 ** 9)
+        done = stopping_rule(ref, arm, window=500, n_boot=200, budget=1000)
+        assert cont["verdict"] == "CONTINUE"
+        assert done["verdict"] == "NOT_SEPARATED"
+        # And it must not be reported as a p-value hunt.
+        assert "do NOT extend one arm" in done["reading"]
+
+    def test_one_window_separated_and_one_not_is_not_satisfied(self):
+        # Both windows must clear zero ON THE SAME SIDE.  Here the earlier
+        # window is flat and only the latest separates.
+        ref = {i: 3.0 for i in range(1, 1001)}
+        arm = dict(ref)
+        for i in range(501, 1001):
+            arm[i] = 3.0 - 0.05
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        assert r["verdict"] == "CONTINUE"
+        assert r["sides"] == ["spans", "below"]
+
+    def test_opposite_sides_in_the_two_windows_is_not_satisfied(self):
+        ref = {i: 3.0 for i in range(1, 1001)}
+        arm = {i: (3.0 + 0.05 if i <= 500 else 3.0 - 0.05)
+               for i in range(1, 1001)}
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        assert r["windows_agree"] is False
+        assert r["sides"] == ["above", "below"]
+        assert r["verdict"] == "CONTINUE"
+
+    def test_too_little_data_refuses_rather_than_shrinking_the_window(self):
+        ref, arm = self._series(600, -0.05)
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        assert r["verdict"] == "INSUFFICIENT_DATA"
+        assert r["needed"] == 1000
+        # It must NOT quietly fit two 300-wide windows into 600 samples.
+        assert "DIFFERENT rule" in r["why"]
+
+    def test_windows_are_taken_by_position_so_a_gap_cannot_shrink_them(self):
+        # A requeue drops lines.  Arithmetic on the update number would make
+        # the earlier window hold fewer than `window` pairs while still
+        # looking like a full window; taking them by position cannot.
+        keys = list(range(1, 501)) + list(range(9001, 9501))
+        ref = {k: 3.0 for k in keys}
+        arm = {k: 2.95 for k in keys}
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        assert r["earlier"]["n"] == 500 and r["latest"]["n"] == 500
+        assert r["earlier"]["first_update"] == 1
+        assert r["latest"]["first_update"] == 9001
+
+    def test_only_the_shared_updates_are_paired(self):
+        ref = {i: 3.0 for i in range(1, 1201)}
+        arm = {i: 2.95 for i in range(201, 1401)}
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        assert r["shared_steps"] == 1000
+        assert r["latest"]["last_update"] == 1200
+
+    def test_the_cost_column_travels_with_the_delta(self):
+        # Prereg S2: a table with the delta and without the throughput is not
+        # a result this project will publish.  P2.3 predicted ~6% and
+        # measured -0.04%; only the paired throughput caught it.
+        ref, arm = self._series(1000, -0.05)
+        logs_ref = {k: {"tok_s": 4000.0} for k in ref}
+        logs_arm = {k: {"tok_s": 3800.0} for k in arm}
+        r = stopping_rule(ref, arm, window=500, n_boot=200,
+                          logs_ref=logs_ref, logs_arm=logs_arm)
+        assert r["latest"]["tok_s_ref"] == pytest.approx(4000.0)
+        assert r["latest"]["tok_s_arm"] == pytest.approx(3800.0)
+        assert r["latest"]["tok_s_rel"] == pytest.approx(-0.05)
+
+    def test_without_logs_there_is_no_cost_column_rather_than_a_fake_one(self):
+        ref, arm = self._series(1000, -0.05)
+        r = stopping_rule(ref, arm, window=500, n_boot=200)
+        assert "tok_s_rel" not in r["latest"]
+        assert "tok_s_ref" not in r["latest"]
+
+
+class TestTheStoppingRuleEndToEnd:
+
+    def test_it_reaches_a_verdict_from_logs_alone(self, tmp_path):
+        # The cells ran with diag_interval=0, so the log is the ONLY source.
+        # build() must reach the verdict without a run directory existing.
+        a1 = _write_log(tmp_path, "a1.out", [3.0] * 1000, first_update=1)
+        a3 = _write_log(tmp_path, "a3.out", [2.99] * 1000, first_update=1)
+        rec = build({"a1": [str(tmp_path / "nope")],
+                     "a3": [str(tmp_path / "nope")]},
+                    {}, {}, "a1", 100, 200,
+                    logs={"a1": [a1], "a3": [a3]},
+                    rule=True, window=500, budget=1000)
+        sr = rec["stopping_rule"]
+        assert sr["arms"]["a3"]["verdict"] == "SATISFIED"
+        assert sr["arms"]["a3"]["direction"] == "below"
+        assert sr["ci_backend"] in ("torch", "stdlib")
+
+    def test_the_log_beats_the_sampled_diagnostic(self, tmp_path):
+        # Precedence: an explicitly-passed --log is a deliberate act and the
+        # diagnostic is sampled every N steps, so the log wins.
+        d = _write_diag(tmp_path, "a1", _rows(n=5, base=9.0, slope=0.0))
+        log = _write_log(tmp_path, "a1.out", [1.0] * 5, first_update=1)
+        arm = {"dir": d, "diag": read_diag(d),
+               "log_series": read_log_series(log)}
+        assert loss_series(arm)[1] == pytest.approx(1.0)
+
+    def test_the_printer_says_when_the_cost_column_is_missing(self, tmp_path):
+        a1 = _write_log(tmp_path, "a1.out", [3.0] * 1000)
+        a3 = _write_log(tmp_path, "a3.out", [2.99] * 1000)
+        rec = build({"a1": ["x"], "a3": ["y"]}, {}, {}, "a1", 100, 200,
+                    logs={"a1": [a1], "a3": [a3]},
+                    rule=True, window=500, budget=1000)
+        # Strip the cost so the warning path is the one under test.
+        for w in ("earlier", "latest"):
+            for k in ("tok_s_ref", "tok_s_arm", "tok_s_rel"):
+                rec["stopping_rule"]["arms"]["a3"][w].pop(k, None)
+        buf = io.StringIO()
+        print_stopping_rule(rec, buf)
+        assert "NO COST COLUMN" in buf.getvalue()

@@ -135,8 +135,15 @@ if [ "$IDX" -ge "${#CELLS[@]}" ]; then
 fi
 
 ARM=${CELLS[$IDX]}
+# THE `probe-` PREFIX BELOW IS DELIBERATE AND IS NOT RED 13.  The s0 sweep ran
+# on the 400-step ARCHITECTURE PROBES, and only a2/a3z carry Z, so no P2.3 cell
+# exists for either arm.  p1_arms.sbatch adds that prefix only under PROBE=1
+# (line 324); the cells saved to the BARE name, and the launchers that read them
+# (eval_carry_2x2, eval_deciding, norm_trace, submit_cell_evals) were fixed on
+# 2026-09-19 to match.  Do not "fix" this one to agree with those -- but DO
+# revisit it if a Z cell is ever trained.
 case "$ARM" in
-a2)  RUN=probe-p1-a2-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}-z
+    a2)  RUN=probe-p1-a2-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}-z
      PREFIX_MODE=accum ;;
 a3z) RUN=probe-p1-a3z-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS}-z
      PREFIX_MODE=gated ;;

@@ -36,13 +36,28 @@ INPUTS, in the order it looks for them
                             KEY, so an unrecognised file is reported as
                             unrecognised rather than silently ignored.
 
-USAGE
+USAGE -- the P2.3 CELLS, with the stopping rule.  Note the run names have NO
+`probe-` prefix: that prefix is the 400-step architecture probe, and confusing
+the two is RED 13.  The cells ran with diag_interval=0, so --log is not
+optional here -- it is the only source that exists for them.
+
+    python tools/compare_arms.py \
+        --arm a1=cortex-retrofit/p1-a1-accum-w16-cc8 \
+        --arm a3=cortex-retrofit/p1-a3-gated-w16k64-cc8 \
+        --log a1=logs/Report-13297370.out \
+        --log a3=logs/Report-13297371.out \
+        --reference a1 --stopping_rule --budget 115966 \
+        --out eval_results/p23_cells_compare.json
+
+USAGE -- the P1 400-step probes, which is what this tool was written for.
+
     python tools/compare_arms.py \
         --arm a1=cortex-retrofit/probe-p1-a1-accum-w16-cc8 \
         --arm a2=cortex-retrofit/probe-p1-a2-accum-w16-cc8-z \
         --arm a3=cortex-retrofit/probe-p1-a3-gated-w16k64-cc8 \
         --arm a3z=cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z \
-        --reference a1 --out eval_results/p1_probe_compare.json
+        --reference a1 --trained_depth 8 \
+        --out eval_results/p1_probe_compare.json
 """
 from __future__ import annotations
 
@@ -52,10 +67,14 @@ import glob
 import json
 import math
 import os
+import re
 import sys
 from datetime import datetime
 
-import torch
+try:                                        # noqa: SIM105
+    import torch
+except ImportError:                         # pragma: no cover - see paired_ci
+    torch = None
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
@@ -101,6 +120,23 @@ def parse_args() -> argparse.Namespace:
                         "B2-family checkpoint -- when prelaunch_final was run "
                         "without --trained_depth")
     p.add_argument("--boot", type=int, default=5000)
+    p.add_argument("--log", action="append", default=[], metavar="LABEL=FILE",
+                   help="train.py stdout (logs/Report-<jobid>.out) for that "
+                        "arm.  The ONLY source that exists for a cell run with "
+                        "diag_interval=0, which is both P2.3 cells.  Keyed on "
+                        "Updates, not Step")
+    p.add_argument("--stopping_rule", action="store_true",
+                   help="apply p23_cells_prereg.md S1: the paired 95%% CI must "
+                        "stay on one side of zero across two consecutive "
+                        "NON-OVERLAPPING windows")
+    p.add_argument("--window", type=int, default=500,
+                   help="stopping-rule window, in optimiser UPDATES (the same "
+                        "unit as CELL_STEPS).  500 is what was pre-registered; "
+                        "changing it is a different rule")
+    p.add_argument("--budget", type=int, default=None,
+                   help="the cell's stop update (115966 for P2.3).  Reaching "
+                        "it with the rule unsatisfied is NOT_SEPARATED, which "
+                        "is a reportable outcome and not grounds to extend")
     p.add_argument("--out", default=None)
     return p.parse_args()
 
@@ -157,6 +193,53 @@ def read_csv_losses(path: str) -> dict:
                 continue
             if v == v:                      # drop NaN rows
                 out[s] = v
+    return out
+
+
+#: train.py's stdout line, as it lands in logs/Report-<jobid>.out:
+#:   GPU: cuda:0 | Step: 97656 | Updates: 115966 | Time/step: 1.1122 |
+#:   Tok/sec=  3682.70 | Loss: 2.8845 / log-ppl: 17.8940 | Grad-Norm ...
+_LOG_LINE = re.compile(
+    r"Step:\s*(?P<step>\d+)\s*\|\s*Updates:\s*(?P<upd>\d+)\s*\|\s*"
+    r"Time/step:\s*(?P<tstep>[\d.]+)\s*\|\s*Tok/sec=\s*(?P<toks>[\d.]+)\s*\|\s*"
+    r"Loss:\s*(?P<loss>[\d.]+)")
+
+
+def read_log_series(path: str) -> dict:
+    """A SLURM/train.py stdout log -> {UPDATE: {loss, tok_s, s_per_step}}.
+
+    WHY THIS EXISTS.  The other two readers cannot see the P2.3 cells at all.
+    `cortex_diag.jsonl` is written only when `--cortex.diag_interval` is
+    non-zero, and `pace/p1_arms.sbatch:232` defaults DIAG_INTERVAL=0 for a full
+    cell -- so both cells ran 24,414 updates and wrote no diagnostic.  The wandb
+    export needs a pull.  The stdout log is the one artifact that always exists,
+    and it is what the 2026-09-19 reading of P2.3 was actually done from.
+
+    KEYED ON `Updates`, NOT `Step`, AND THE DIFFERENCE IS 4x.  `Step` counts
+    micro-batches; `Updates` counts optimiser steps, and CELL_STEPS -- the
+    budget the stopping rule is written against -- is in UPDATES.  Keying on
+    `Step` would make a "500-step window" 125 updates wide and the rule would
+    read a quarter of the evidence it was pre-registered to read, with nothing
+    in the output saying so.
+
+    A resumed or requeued run appends, so a repeated update wins LAST, matching
+    read_diag's rule: it is the one the run actually continued from.
+    """
+    out = {}
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            m = _LOG_LINE.search(line)
+            if not m:
+                continue
+            loss = float(m.group("loss"))
+            if loss != loss:                # NaN
+                continue
+            out[int(m.group("upd"))] = {
+                "loss": loss,
+                "tok_s": float(m.group("toks")),
+                "s_per_step": float(m.group("tstep")),
+                "micro_step": int(m.group("step")),
+            }
     return out
 
 
@@ -240,6 +323,29 @@ def read_eval(path: str, trained_depth: int = 0) -> dict:
 # statistics
 # ---------------------------------------------------------------------------
 
+#: Which backend drew the last bootstrap.  Reported in the record, because the
+#: two draw DIFFERENT resamples -- see paired_ci.
+CI_BACKEND = "torch"
+
+
+def _quantile_linear(sorted_vals, q):
+    """torch.quantile's default 'linear' interpolation, in stdlib.
+
+    Written out rather than reached for from `statistics`, whose `quantiles`
+    uses a different (n+1) plotting position and would disagree with the torch
+    path in the third decimal -- which is exactly the size of the effects this
+    project reports.
+    """
+    n = len(sorted_vals)
+    if n == 1:
+        return sorted_vals[0]
+    pos = q * (n - 1)
+    lo = int(math.floor(pos))
+    hi = min(lo + 1, n - 1)
+    frac = pos - lo
+    return sorted_vals[lo] + frac * (sorted_vals[hi] - sorted_vals[lo])
+
+
 def paired_ci(deltas, n_boot: int = 5000, seed: int = 0):
     """Bootstrap CI on the paired mean.
 
@@ -247,24 +353,163 @@ def paired_ci(deltas, n_boot: int = 5000, seed: int = 0):
     against it in tests/test_compare_arms.py rather than imported, because that
     module pulls the model-loading stack and this tool must run on a login node
     with nothing but a checkpoint directory.
+
+    TWO BACKENDS, AND THEY DO NOT AGREE TO THE LAST DIGIT.  torch is used when
+    it is importable, so the cluster path and the pinned test are unchanged.
+    Without torch -- reading a SLURM log on a laptop, which is where the
+    stopping rule actually gets read -- a stdlib bootstrap runs instead.  Both
+    are valid bootstraps of the same statistic, but they draw DIFFERENT
+    resamples, so the CI bounds differ in about the fourth decimal at
+    n_boot=5000.  `CI_BACKEND` records which one ran and the tool prints it;
+    do not quote bounds from one path as a replication of the other.  The point
+    estimate is exact arithmetic and is identical either way.
     """
+    global CI_BACKEND
     if not deltas:
         return (float("nan"),) * 3
-    t = torch.tensor(deltas, dtype=torch.float64)
-    g = torch.Generator().manual_seed(seed)
-    idx = torch.randint(len(t), (n_boot, len(t)), generator=g)
-    means = t[idx].mean(dim=1)
-    lo, hi = torch.quantile(means, torch.tensor([0.025, 0.975],
-                                                dtype=torch.float64))
-    return float(t.mean()), float(lo), float(hi)
+    if torch is not None:
+        CI_BACKEND = "torch"
+        t = torch.tensor(deltas, dtype=torch.float64)
+        g = torch.Generator().manual_seed(seed)
+        idx = torch.randint(len(t), (n_boot, len(t)), generator=g)
+        means = t[idx].mean(dim=1)
+        lo, hi = torch.quantile(means, torch.tensor([0.025, 0.975],
+                                                    dtype=torch.float64))
+        return float(t.mean()), float(lo), float(hi)
+
+    CI_BACKEND = "stdlib"
+    import random as _random
+    rng = _random.Random(seed)
+    n = len(deltas)
+    point = math.fsum(deltas) / n
+    means = []
+    for _ in range(n_boot):
+        means.append(math.fsum(deltas[rng.randrange(n)]
+                               for _ in range(n)) / n)
+    means.sort()
+    return point, _quantile_linear(means, 0.025), _quantile_linear(means, 0.975)
 
 
 def loss_series(arm: dict) -> dict:
-    """{step: loss}, preferring the dense wandb export over the diagnostic."""
+    """{step: loss}, preferring the dense sources over the sampled diagnostic.
+
+    Precedence: an explicitly-passed --log, then --csv, then the diagnostic.
+    The log wins because passing it is a deliberate act and because it is the
+    only source that exists for a cell run with diag_interval=0.
+    """
+    if arm.get("log_series"):
+        return {k: v["loss"] for k, v in arm["log_series"].items()}
     if arm.get("csv_losses"):
         return arm["csv_losses"]
     return {int(r["step"]): float(r["loss"])
             for r in arm["diag"] if "loss" in r}
+
+
+# ---------------------------------------------------------------------------
+# THE STOPPING RULE.  p23_cells_prereg.md S1, verbatim, as code.
+# ---------------------------------------------------------------------------
+
+def stopping_rule(series_ref: dict, series_arm: dict, window: int,
+                  n_boot: int, budget: int | None = None,
+                  logs_ref: dict | None = None,
+                  logs_arm: dict | None = None) -> dict:
+    """Apply p23_cells_prereg.md S1 to one arm against the reference.
+
+    THE RULE, as pre-registered before any number existed:
+
+        Run until the paired delta's 95% bootstrap CI, computed over the last
+        500 steps, stays on ONE SIDE of zero across two consecutive
+        NON-OVERLAPPING 500-step windows -- or until the token budget is spent,
+        whichever comes first.
+
+    Four things about it are load-bearing and each is enforced here rather than
+    left to the caller:
+
+    1. NON-OVERLAPPING.  [N-2w+1, N-w] and [N-w+1, N].  An overlapping pair
+       shares samples and is not two pieces of evidence; sliding the window by
+       one step and calling it a second window is the classic version of this
+       mistake.
+    2. ONE SIDE MEANS ONE SIDE.  Both CIs entirely above zero, or both entirely
+       below.  A CI spanning zero in EITHER window is CONTINUE -- explicitly
+       not "converged at zero".  The rule cannot return "no difference" early;
+       only the budget can produce that reading.
+    3. THE BUDGET IS A HARD CAP.  Reaching it with the rule unsatisfied is a
+       reportable outcome ("not separated within the budget"), NOT grounds for
+       extending one arm.  That is why `budget_spent` is reported beside the
+       verdict instead of being folded into it.
+    4. THE WINDOW IS IN THE SAME UNIT AS THE BUDGET -- optimiser updates.  See
+       read_log_series on why keying the wrong column is a silent 4x error.
+
+    Returns a record; `verdict` is one of SATISFIED / CONTINUE / NOT_SEPARATED /
+    INSUFFICIENT_DATA.
+    """
+    shared = sorted(set(series_ref) & set(series_arm))
+    rec = {"window": window, "shared_steps": len(shared),
+           "needed": 2 * window}
+    if len(shared) < 2 * window:
+        rec["verdict"] = "INSUFFICIENT_DATA"
+        rec["why"] = (f"{len(shared)} shared updates, but two non-overlapping "
+                      f"windows of {window} need {2 * window}.  A shorter "
+                      f"window is a DIFFERENT rule; do not silently shrink it.")
+        return rec
+
+    last = shared[-1]
+    rec["last_update"] = last
+    # Windows are taken from the shared steps by POSITION, not by arithmetic on
+    # the update number: a gap in either log (a requeue, a dropped line) would
+    # otherwise make [N-999, N-500] hold fewer than `window` pairs while still
+    # looking like a full window.
+    w2 = shared[-window:]
+    w1 = shared[-2 * window:-window]
+
+    names = ("earlier", "latest")
+    sides = []
+    for name, win in zip(names, (w1, w2)):
+        d = [series_arm[t] - series_ref[t] for t in win]
+        m, lo, hi = paired_ci(d, n_boot)
+        side = "below" if hi < 0 else ("above" if lo > 0 else "spans")
+        sides.append(side)
+        entry = {"n": len(win), "first_update": win[0], "last_update": win[-1],
+                 "delta": m, "ci95": [lo, hi], "side": side}
+        # The cost column ships in the SAME record as the delta -- prereg S2:
+        # "A table with the delta and without the throughput is not a result
+        # this project will publish."  P2.3 is exactly why: it predicted ~6%
+        # and measured -0.04%, and only the paired throughput caught it.
+        for tag, logs in (("ref", logs_ref), ("arm", logs_arm)):
+            if logs:
+                vals = [logs[t]["tok_s"] for t in win if t in logs]
+                if vals:
+                    entry[f"tok_s_{tag}"] = sum(vals) / len(vals)
+        if "tok_s_ref" in entry and "tok_s_arm" in entry and entry["tok_s_ref"]:
+            entry["tok_s_rel"] = (entry["tok_s_arm"] - entry["tok_s_ref"]) \
+                                 / entry["tok_s_ref"]
+        rec[name] = entry
+
+    rec["sides"] = sides
+    agree = sides[0] == sides[1] and sides[0] != "spans"
+    rec["windows_agree"] = agree
+
+    spent = bool(budget is not None and last >= budget)
+    rec["budget"] = budget
+    rec["budget_spent"] = spent
+
+    if agree:
+        rec["verdict"] = "SATISFIED"
+        rec["direction"] = sides[0]
+        rec["reading"] = (
+            "the arm is BELOW the reference on loss" if sides[0] == "below"
+            else "the arm is ABOVE the reference on loss")
+    elif spent:
+        rec["verdict"] = "NOT_SEPARATED"
+        rec["reading"] = (
+            "budget spent with the rule unsatisfied.  Report the CI WIDTH, not "
+            "a p-value, and do NOT extend one arm to chase it -- prereg S3.")
+    else:
+        rec["verdict"] = "CONTINUE"
+        rec["reading"] = (
+            "a CI spans zero in at least one window.  That is CONTINUE, not "
+            "'converged at zero'; only the budget can end it the other way.")
+    return rec
 
 
 def compare_losses(arms: dict, ref: str, last: int, n_boot: int) -> dict:
@@ -435,6 +680,7 @@ def print_comparison(rec, out=sys.stdout) -> None:
         p("  evals/eval_influence_horizon.py (the replacement for the x1.31")
         p("  compounding metric, which SCORES A FIXED-WIDTH GATED BUFFER AS A")
         p("  FAILURE for plateauing, i.e. for behaving correctly).")
+    print_stopping_rule(rec, out)
     p("")
     p("WHAT THIS DOES NOT SAY.  A few hundred steps cannot decide whether Z")
     p("helps or whether the gate beats accum.  Those need the full cells, the")
@@ -444,18 +690,68 @@ def print_comparison(rec, out=sys.stdout) -> None:
     p("")
 
 
+def print_stopping_rule(rec, out=sys.stdout) -> None:
+    """The S1 verdict, with the S2 cost column in the SAME table."""
+    sr = rec.get("stopping_rule")
+    if not sr:
+        return
+    p = lambda *a: print(*a, file=out)
+    p("")
+    p("-- STOPPING RULE (p23_cells_prereg.md S1) ------------------------------")
+    p(f"  reference {sr['reference']}   window {sr['window']} UPDATES   "
+      f"budget {sr['budget'] if sr['budget'] is not None else '(none given)'}   "
+      f"CI backend: {sr.get('ci_backend', '?')}")
+    p("  two CONSECUTIVE NON-OVERLAPPING windows; both CIs must clear zero on")
+    p("  the SAME side.  A CI spanning zero is CONTINUE, never 'no difference'.")
+    for label, r in sr["arms"].items():
+        p("")
+        p(f"  {label} vs {sr['reference']}:  {r['verdict']}")
+        if r["verdict"] == "INSUFFICIENT_DATA":
+            p(f"      {r['why']}")
+            continue
+        p(f"      {'window':<10}{'n':>6}{'updates':>18}{'delta':>11}"
+          f"{'95% CI':>24}{'side':>8}{'tok/s (arm v ref)':>24}")
+        for name in ("earlier", "latest"):
+            w = r[name]
+            ci = f"[{w['ci95'][0]:+.5f}, {w['ci95'][1]:+.5f}]"
+            rng = f"{w['first_update']}-{w['last_update']}"
+            if "tok_s_rel" in w:
+                cost = (f"{w['tok_s_arm']:.0f} v {w['tok_s_ref']:.0f} "
+                        f"({w['tok_s_rel']:+.2%})")
+            else:
+                cost = "-- (pass --log)"
+            p(f"      {name:<10}{w['n']:>6}{rng:>18}{w['delta']:>+11.5f}"
+              f"{ci:>24}{w['side']:>8}{cost:>24}")
+        p(f"      windows agree: {r['windows_agree']}    "
+          f"budget spent: {r['budget_spent']}")
+        p(f"      -> {r['reading']}")
+        if "tok_s_rel" not in r["latest"]:
+            p("      NO COST COLUMN.  Prereg S2: a table with the delta and")
+            p("      without the throughput is not a result this project will")
+            p("      publish.  Pass --log for both arms.")
+    p("")
+    p("  P2.3 is why the cost column is not optional: it PREDICTED ~6% and")
+    p("  MEASURED -0.04%, and only the paired throughput caught that.")
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 def build(arm_dirs: dict, csvs: dict, evals: dict, ref: str, last: int,
-          n_boot: int, trained_depth: int = 0) -> dict:
+          n_boot: int, trained_depth: int = 0, logs: dict | None = None,
+          rule: bool = False, window: int = 500,
+          budget: int | None = None) -> dict:
+    logs = logs or {}
     arms = {}
     for label, dirs in arm_dirs.items():
         d = dirs[0]
         rec = {"dir": d, "diag": read_diag(d)}
         if label in csvs:
             rec["csv_losses"] = read_csv_losses(csvs[label][0])
+        if label in logs:
+            rec["log_series"] = read_log_series(logs[label][0])
+            rec["log"] = logs[label][0]
         rec["evals"] = [read_eval(p, trained_depth) for p in evals.get(label, [])
                         if os.path.isfile(p)]
         rec["health"] = health_summary(rec["diag"])
@@ -464,9 +760,32 @@ def build(arm_dirs: dict, csvs: dict, evals: dict, ref: str, last: int,
            "trained_depth": trained_depth or None,
            "arms": arms,
            "loss": compare_losses(arms, ref, last, n_boot)}
+
+    if rule:
+        series = {k: loss_series(v) for k, v in arms.items()}
+        ref_s = series.get(ref, {})
+        logs_ref = arms.get(ref, {}).get("log_series")
+        out["stopping_rule"] = {
+            "reference": ref, "window": window, "budget": budget,
+            "source": "p23_cells_prereg.md S1",
+            "ci_backend": CI_BACKEND,
+            "arms": {},
+        }
+        for label, s in series.items():
+            if label == ref or not s or not ref_s:
+                continue
+            out["stopping_rule"]["arms"][label] = stopping_rule(
+                ref_s, s, window, n_boot, budget,
+                logs_ref, arms[label].get("log_series"))
+        # Set AFTER the loop: paired_ci assigns CI_BACKEND as it runs, so
+        # reading it at dict-construction time would record whatever the
+        # previous call left there.
+        out["stopping_rule"]["ci_backend"] = CI_BACKEND
+
     for a in out["arms"].values():
         a.pop("diag", None)         # the trajectory is large; health keeps it
         a.pop("csv_losses", None)
+        a.pop("log_series", None)   # 24k rows per arm; the rule kept what it needs
     return out
 
 
@@ -479,13 +798,28 @@ def main() -> int:
               f"it should be the arm carrying B2's buffer (a1, accum) unless "
               f"you mean something else.")
         return 1
+    logs = _pairs(args.log)
+    # A missing run dir is fatal ONLY for an arm with no --log.  With a log the
+    # tool is self-sufficient: that is the whole point of the log reader, and it
+    # is what lets the stopping rule be applied off the SLURM output alone,
+    # away from the cluster, on a cell that wrote no diagnostic.
     missing = [f"{k}={v[0]}" for k, v in arm_dirs.items()
-               if not os.path.isdir(v[0])]
+               if not os.path.isdir(v[0]) and k not in logs]
     if missing:
         print(f"ERROR: no such run directory: {missing}")
+        print("       (an arm given --log does not need its dir; these were "
+              "not given one)")
+        return 1
+    for k, v in logs.items():
+        if not os.path.isfile(v[0]):
+            print(f"ERROR: no such log: {k}={v[0]}")
+            return 1
+    if args.window < 2:
+        print("ERROR: --window must be at least 2; the CI is over the window.")
         return 1
     rec = build(arm_dirs, _pairs(args.csv), _pairs(args.eval),
-                args.reference, args.last, args.boot, args.trained_depth)
+                args.reference, args.last, args.boot, args.trained_depth,
+                logs, args.stopping_rule, args.window, args.budget)
     empty = [k for k, v in rec["arms"].items() if not v["health"]]
     if empty:
         print(f"WARNING: no cortex_diag.jsonl under {empty} -- those runs were "

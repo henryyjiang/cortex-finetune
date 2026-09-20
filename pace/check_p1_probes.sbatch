@@ -88,6 +88,13 @@ ACCUM_VECS=${ACCUM_VECS:-16}
 GATE_SLOTS=${GATE_SLOTS:-64}
 CROSS_CHUNKS=${CROSS_CHUNKS:-8}
 
+#
+# THE `probe-` PREFIX HERE IS DELIBERATE AND IS NOT RED 13.  This script is
+# scoped to the 400-step ARCHITECTURE PROBES by name and by purpose;
+# p1_arms.sbatch adds that prefix only under PROBE=1 (line 324).  The P2.3
+# CELLS saved to the BARE name, and the launchers that read them
+# (eval_carry_2x2, eval_deciding, norm_trace, submit_cell_evals) were fixed
+# on 2026-09-19 to match.  Do not 'fix' this one to agree with those.
 A1_RUN=probe-p1-a1-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}
 A2_RUN=probe-p1-a2-accum-w${ACCUM_VECS}-cc${CROSS_CHUNKS}-z
 A3_RUN=probe-p1-a3-gated-w${ACCUM_VECS}k${GATE_SLOTS}-cc${CROSS_CHUNKS}

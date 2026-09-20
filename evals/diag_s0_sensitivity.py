@@ -79,7 +79,7 @@ without the level it is a difference of.
 USAGE
   python evals/diag_s0_sensitivity.py \
       --model_name ckpts/olmo-retrofit-cortex \
-      --checkpoint cortex-retrofit/probe-p1-a2-accum-w16-cc8-z/checkpoint_XXXX \
+      --checkpoint cortex-retrofit/p1-a2-accum-w16-cc8-z/checkpoint_XXXX \
       --data data/pg19_olmo_val_len4096 --n_chunks 8 --T 8 \
       --set use_memory=true --set prefix_memory=accum --set latent_carry=true \
       --out_dir eval_results/s0_sensitivity-$(date +%Y%m%d)
