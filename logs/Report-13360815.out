@@ -1,0 +1,35 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-19-2026 21:00:33
+Job ID:    13360815
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  eval_write_capacity.sbatch
+Partition: gpu-a100
+QOS:       inferno
+---------------------------------------
+    load: BASE ckpts/olmo-retrofit-cortex + overlay cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966
+    sets: --set use_memory=true --set memory_slots=0 --set prefix_memory=accum --set accum_vecs=16 --set accum_max=128
+    The [cortex] OVERRIDE lines below are the proof it arrived.
+=== write capacity: p1-a1-accum-w16-cc8 -> eval_results/write_capacity_cells-20260919/p1-a1-accum-w16-cc8 ===
+Loading: ckpts/olmo-retrofit-cortex  (overlay: cortex-retrofit/p1-a1-accum-w16-cc8/checkpoint_115966)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s][2026-09-19T21:01:46.284] error: *** JOB 13360815 ON atl1-1-01-002-20-0 CANCELLED AT 2026-09-19T21:01:46 DUE to SIGNAL Terminated ***
+---------------------------------------
+Begin Slurm Epilog: Sep-19-2026 21:01:48
+Job ID:        13360815
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      eval_write_capacity.sbatch
+Resources:     cpu=8,gres/gpu:a100=1,mem=64G,node=1
+Rsrc Used:     cput=00:09:52,vmem=0,walltime=00:01:14,mem=3126232K,energy_used=0
+Partition:     gpu-a100
+QOS:           inferno
+Nodes:         atl1-1-01-002-20-0
+---------------------------------------
