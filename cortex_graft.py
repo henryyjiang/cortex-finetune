@@ -130,6 +130,17 @@ from cortex_memory.latent_read import (LatentRead, LatentRefresh,
                                        apply_designed_init as apply_latent_read_init)
 
 
+def _row_norm(t: torch.Tensor) -> float:
+    """Mean per-token L2 ROW norm, fp32.
+
+    ROW norm, not per-element rms.  The two differ by sqrt(D) = 45.25 at
+    D=2048 and mixing them is RED 11, which injected 45x the norm its own
+    labels claimed and flipped a verdict.  Every scale this file records is a
+    row norm and every consumer must read it as one.
+    """
+    return float(t.detach().float().flatten(0, -2).norm(dim=-1).mean())
+
+
 def memory_enabled(config) -> bool:
     """Master switch — read once in RavenForCausalLM.__init__."""
     return bool(getattr(config, "use_memory", False))
@@ -752,6 +763,9 @@ class CortexMemory(nn.Module):
         self._z_loop_T:   Optional[int] = None         # T, from latent_init
         self._z_inloop_n: int = 0                      # read_into Z-read count
         self._z_matched_rows: Optional[int] = None     # rows the last matched read took
+        self._x_read_norm: Optional[float] = None      # ||x|| at the read site, fp32
+        self._z_row_norm: Optional[float] = None       # ||Z row||, fp32
+        self._z_read_delta_norm: Optional[float] = None  # ||injected delta||, fp32
 
     def begin(
         self,
@@ -860,6 +874,17 @@ class CortexMemory(nn.Module):
             z = z[:, rows]
 
         delta = self.latent_reader(x, z, read_mask=self._packed_read_mask(x))
+        # MEASURE THE SCALE, DO NOT ASSUME IT.  The pre-registration says the
+        # scale looks compatible for once -- post-adapter ||x|| ~ 10 against Z
+        # rows of ~1-5, where the s0 site had 0.39 against ||E|| = 171 -- and
+        # then says to measure it, with the same recording RED 11's fix added
+        # for `_e_carried_norm`.  All three in fp32: these are norms of large
+        # states and a bf16 pass already invented one plateau in this project
+        # (P0.1, 6x overstatement).  Last iteration wins; the probe reads them
+        # after the forward.
+        self._x_read_norm = _row_norm(x)
+        self._z_row_norm = _row_norm(z)
+        self._z_read_delta_norm = _row_norm(delta)
         return x + delta
 
     def iter_write(self, x: torch.Tensor,
