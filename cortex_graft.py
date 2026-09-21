@@ -126,6 +126,8 @@ import torch.nn as nn
 from cortex_memory.buffers import (AccumCCoT, DirectCCoT, GatedAccumBuffer,
                                    LSTMBuffer, PrefixAccumBuffer, PrefixGatedBuffer)
 from cortex_memory.eos import compute_eos_masks, apply_write_reset, apply_valid_write
+from cortex_memory.latent_read import (LatentRead, LatentRefresh,
+                                       apply_designed_init as apply_latent_read_init)
 
 
 def memory_enabled(config) -> bool:
@@ -315,6 +317,66 @@ class CortexMemory(nn.Module):
         self.latent_depth_lo = int(getattr(config, "latent_depth_lo", 2))
         self.latent_depth_hi = int(getattr(config, "latent_depth_hi", 9))
         self.latent_renorm = str(getattr(config, "latent_renorm", "none") or "none")
+        # P3.0 — THE READ SITE.  Two orthogonal flags, each doing one thing, so
+        # that "where Z is read" is a single-variable change:
+        #
+        #   latent_s0_read   the s0 substitution (`latent_init`).  True is what
+        #                    every arm on record ran.  MEASURED DEAD as a read
+        #                    site (job 13297293 through RED 11's units fix):
+        #                    deleting the carried columns outright costs
+        #                    +4.1e-5 / -2.5e-5 nats, opposite signs across the
+        #                    two arms, i.e. noise.  Kept as the default anyway
+        #                    so nothing that exists changes behaviour; a P3.0
+        #                    arm turns it OFF and reads in-loop instead.
+        #   latent_read      the in-loop read at `read_into`: 'none' (today),
+        #                    'refresh' (Option 0, one scalar, re-adds Z into
+        #                    the carried columns every iteration) or 'xattn'
+        #                    (Option 1, the LatentRead module).
+        #
+        # Orthogonal on purpose: Option 0's HYPOTHESIS is that s0's columns are
+        # washed because the loop overwrites them at iteration 1, so it is a
+        # refresh of what s0 put there and wants BOTH on.  Option 1 asks
+        # whether an in-loop read can extract anything at all and wants the
+        # dead site out of the way.  Either combination is expressible and the
+        # banner prints which one ran.
+        self.latent_s0_read = bool(getattr(config, "latent_s0_read", True))
+        self.latent_read = str(getattr(config, "latent_read", "none") or "none")
+        self.latent_read_depth = str(
+            getattr(config, "latent_read_depth", "none") or "none")
+        self.latent_read_heads = int(getattr(config, "latent_read_heads", 8))
+        self.latent_read_gate_init = float(
+            getattr(config, "latent_read_gate_init", 0.1))
+        if self.latent_read not in ("none", "refresh", "xattn"):
+            raise ValueError(
+                f"cortex.latent_read must be 'none', 'refresh' or 'xattn'; got "
+                f"{self.latent_read!r}.  See p30_readinto_prereg.md S2.")
+        if self.latent_read_depth not in ("none", "matched"):
+            raise ValueError(
+                f"cortex.latent_read_depth must be 'none' or 'matched'; got "
+                f"{self.latent_read_depth!r}.")
+        if self.latent_read_depth == "matched" and self.latent_read != "xattn":
+            raise ValueError(
+                "cortex.latent_read_depth='matched' needs latent_read='xattn'. "
+                "Matching selects a SUBSET of Z rows per iteration, and the "
+                "refresh is a per-column re-add that needs all of them.")
+        if self.latent_read != "none" and not self.latent_carry:
+            raise ValueError(
+                "cortex.latent_read needs --cortex.latent_carry true.  The "
+                "in-loop read reads the CARRIED Z rows; without the Z channel "
+                "there is nothing carried and the module would train against "
+                "an empty buffer.")
+        if not self.latent_s0_read and not self.latent_carry:
+            raise ValueError(
+                "cortex.latent_s0_read=false without latent_carry is a no-op "
+                "written as a decision.  Turning the s0 read off is only "
+                "meaningful on a Z arm; state the arm.")
+        if self.latent_carry and self.latent_read == "none" \
+                and not self.latent_s0_read:
+            raise ValueError(
+                "latent_carry is on with latent_s0_read=false and "
+                "latent_read='none': Z would be written every chunk and read "
+                "NOWHERE.  That is the frozen-write arm, and it is almost "
+                "certainly not what was meant -- pick a read site.")
         if self.latent_depth_rule not in ("absolute", "relative"):
             raise ValueError(
                 f"cortex.latent_depth_rule must be 'absolute' or 'relative'; "
@@ -398,6 +460,20 @@ class CortexMemory(nn.Module):
             self.summary_init_token = -1
             self.prefix_pos = "tail"
             self.prefix_eos_reset = False
+
+        # The in-loop Z read (P3.0).  Built here, at graft construction, for
+        # the same reason latent_carry is read here and not lazily: it changes
+        # the PARAMETER SET, and a flag that added parameters after the
+        # optimizer was built would leave them untrained with no symptom.
+        if self.latent_read == "xattn":
+            self.latent_reader = LatentRead(
+                D, n_heads=self.latent_read_heads,
+                gate_init=self.latent_read_gate_init)
+        elif self.latent_read == "refresh":
+            self.latent_reader = LatentRefresh(
+                D, alpha_init=self.latent_read_gate_init)
+        else:
+            self.latent_reader = None
 
         # R4 dual-role mitigation: project h_T before the M_cross write so the
         # buffer path and the coda path see independent representations.
@@ -673,6 +749,9 @@ class CortexMemory(nn.Module):
         self._z_s0_scale: Optional[float] = None       # ||s0|| per TOKEN (row L2), fp32
         self._z_s0_rms:   Optional[float] = None       # s0 per-ELEMENT rms, fp32
         self._e_carried_norm: Optional[float] = None   # ||E carried row||, fp32
+        self._z_loop_T:   Optional[int] = None         # T, from latent_init
+        self._z_inloop_n: int = 0                      # read_into Z-read count
+        self._z_matched_rows: Optional[int] = None     # rows the last matched read took
 
     def begin(
         self,
@@ -693,9 +772,19 @@ class CortexMemory(nn.Module):
             self._valid_write     = valid
 
     # ── hooks called inside core_block_forward ──────────────────────────────
-    def read_into(self, x: torch.Tensor) -> torch.Tensor:
+    def read_into(self, x: torch.Tensor,
+                  current_step: Optional[int] = None) -> torch.Tensor:
         """Additive memory reads, injected after the adapter and before the
-        core layers (cortex first-layer injection).  Returns the updated x."""
+        core layers (cortex first-layer injection).  Returns the updated x.
+
+        `current_step` is optional so a checkpoint carrying an OLDER COPY of
+        the modeling file (which calls this with one argument) keeps loading
+        instead of dying on a TypeError -- the same pattern, and the same
+        reason, as `iter_write`.  Unlike iter_write, one mode genuinely needs
+        it: `latent_read_depth='matched'` RAISES when it is None rather than
+        silently falling back to depth-agnostic, because a silent fallback
+        would run the wrong arm behind a healthy loss curve.
+        """
         # M_cross / DirectCCoT / AccumCCoT cross-segment read (masked to the
         # continuing doc)
         if self.m_cross is not None and self._cross_buf is not None:
@@ -715,7 +804,63 @@ class CortexMemory(nn.Module):
             if self._iter_buf is None:
                 self._iter_buf = x.new_zeros(B * S, self.memory_slots_iter, D)
             x = x + self.m_iter.read(x.reshape(B * S, 1, D), self._iter_buf).reshape(B, S, D)
+
+        # ── the in-loop Z read (P3.0) ──────────────────────────────────────
+        # THE SITE IS THE POINT.  This fires on every iteration of BOTH loops,
+        # so the read gradient is live by construction -- `num_steps_with_grad`
+        # is min(s, Poisson(rate)+1) >= 1 on every training batch -- where the
+        # s0 read's gradient is exactly zero the moment the sampler draws one
+        # no-grad step (measured: 0.0 at (1,T-1), (2,T-2), (3,T-3)).
+        if self.latent_reader is not None:
+            x = self._latent_read_into(x, current_step)
         return x
+
+    def _latent_read_into(self, x: torch.Tensor,
+                          current_step: Optional[int]) -> torch.Tensor:
+        n_pre = self._n_pre
+        if not n_pre:
+            return x
+        z = self._latent_z_rows(x)
+        if z is None:
+            return x
+        if z.shape[1] != n_pre:
+            raise ValueError(
+                f"carried Z has {z.shape[1]} rows but {n_pre} carried columns "
+                "were spliced; E and Z share the ring pointer and must share "
+                "the row count.")
+        self._z_inloop_n += 1
+
+        if isinstance(self.latent_reader, LatentRefresh):
+            return self.latent_reader(x, z, n_pre)
+
+        if self.latent_read_depth == "matched":
+            if current_step is None:
+                raise RuntimeError(
+                    "latent_read_depth='matched' needs `current_step`, and the "
+                    "modeling file called read_into without it.  That copy of "
+                    "raven_modeling_minimal_*.py predates P3.0; re-run "
+                    "tools/prepare_cortex_checkpoint.py against the base.  "
+                    "NOT falling back to depth-agnostic on purpose: the "
+                    "fallback would run a different arm than the config names "
+                    "and nothing downstream could tell.")
+            if self._z_loop_T is None:
+                raise RuntimeError(
+                    "latent_read_depth='matched' needs the loop length T, and "
+                    "the modeling file never passed it to latent_init.  Same "
+                    "cause and same fix as the current_step branch above: that "
+                    "copy of raven_modeling_minimal_*.py predates P3.0.")
+            rows = self.latent_read_rows(
+                self._z_loop_T, z.shape[1], int(current_step))
+            self._z_matched_rows = len(rows)
+            if not rows:
+                # No row carries this depth.  Inject exactly zero rather than
+                # falling back to all rows: "the band does not cover this
+                # iteration" is the arm doing what it says.
+                return x
+            z = z[:, rows]
+
+        delta = self.latent_reader(x, z, read_mask=self._packed_read_mask(x))
+        return x + delta
 
     def iter_write(self, x: torch.Tensor,
                    current_step: Optional[int] = None) -> None:
@@ -783,7 +928,8 @@ class CortexMemory(nn.Module):
         self._z_prev = cur
 
     def latent_init(self, s0: torch.Tensor,
-                    num_steps_no_grad: Optional[int] = None) -> torch.Tensor:
+                    num_steps_no_grad: Optional[int] = None,
+                    num_steps_with_grad: Optional[int] = None) -> torch.Tensor:
         """THE Z READ.  Substitute the carried trajectory into `s0`'s carried
         columns, replacing the noise `initialize_state` put there.
 
@@ -834,11 +980,28 @@ class CortexMemory(nn.Module):
         signal shapes the READ side.  `latent_read_grad_frac` is the number;
         put it in the pre-registration, because it changes what a null result
         for Z means.
+
+        `num_steps_with_grad` is taken only so the LOOP LENGTH T is known
+        before the loop runs.  `latent_read_depth='matched'` needs it (the tape
+        is being built as the loop goes, so `len(self._z_tape)` at iteration i
+        is i, not T), and an older modeling file that does not pass it leaves
+        T unknown, which the matched path raises on rather than guessing.
         """
+        if num_steps_no_grad is not None and num_steps_with_grad is not None:
+            self._z_loop_T = int(num_steps_no_grad) + int(num_steps_with_grad)
         if self.prefix is None:
             return s0
         if self.latent_carry and num_steps_no_grad is not None:
-            self._z_read_live = int(num_steps_no_grad) == 0
+            # WHICH SITE IS BEING COUNTED MATTERS.  At s0 the read is live only
+            # when the sampler drew a zero-length no-grad prefix (0.546 at mr8,
+            # 0.0152 at mr32).  An in-loop read is live on EVERY batch by
+            # construction -- `num_steps_with_grad` is min(s, Poisson(rate)+1)
+            # >= 1 always, and `read_into` fires on every one of those steps --
+            # so the fraction is 1.0 and that is the whole point of P3.0.  If
+            # both sites are on, the read as a whole is live whenever either is.
+            self._z_read_live = (self.latent_reader is not None
+                                 or (self.latent_s0_read
+                                     and int(num_steps_no_grad) == 0))
             self._z_read_n += 1
             self._z_read_live_n += int(self._z_read_live)
         if self.latent_carry and self._n_sum:
@@ -860,38 +1023,131 @@ class CortexMemory(nn.Module):
         if not self.latent_carry or not n_pre:
             return s0
 
+        if not self.latent_s0_read:
+            # P3.0: the s0 site is measured dead and this arm reads in-loop.
+            # Leave s0 exactly as the model drew it.
+            return s0
+
         head = s0[:, :n_pre]
-        null = getattr(self, "latent_read_null", None)
-        if null is not None:
-            # Z's null is FRESH NOISE at s0's own scale -- the model's trained
-            # default for these columns, in distribution, identical column
-            # count.  Contrast E's null, which is zeros: a zero key still scores
-            # a mid-range logit and absorbs ~3-5% of the softmax mass, so the E
-            # axis of the 2x2 is the confounded one and the Z axis is clean.
-            # The asymmetry is stated in eval_carry_2x2.py and must be stated in
-            # the writeup too.
-            z = self._null_latent(null, head)
-        else:
-            _, z = self.prefix.split_channels(self._carried_state())
-            if z is None:
-                return s0
-            z = z.to(device=s0.device, dtype=s0.dtype)
-            if z.shape[1] != n_pre:
-                raise ValueError(
-                    f"carried Z has {z.shape[1]} rows but {n_pre} carried "
-                    f"columns were spliced.  E and Z share the ring pointer and "
-                    f"must share the row count; a mismatch means the two "
-                    f"channels were merged at different widths.")
-            # Rows never written carry exactly zero (see
-            # PrefixGatedBuffer._slot_init_block).  A zero column in s0 is NOT
-            # the trained default -- the model has only ever seen noise there --
-            # so fall back to the noise rather than substituting a dead field.
-            unwritten = (z.detach().abs().sum(dim=-1, keepdim=True) == 0)
-            if bool(unwritten.any()):
-                z = torch.where(unwritten, head, z)
+        # Z's null is FRESH NOISE at s0's own scale -- the model's trained
+        # default for these columns, in distribution, identical column count.
+        # Contrast E's null, which is zeros: a zero key still scores a
+        # mid-range logit and absorbs ~3-5% of the softmax mass, so the E axis
+        # of the 2x2 is the confounded one and the Z axis is clean.  The
+        # asymmetry is stated in eval_carry_2x2.py and must be stated in the
+        # writeup too.  Applied inside _latent_z_rows, which both read sites
+        # share.
+        z = self._latent_z_rows(head)
+        if z is None:
+            return s0
+        if z.shape[1] != n_pre:
+            raise ValueError(
+                f"carried Z has {z.shape[1]} rows but {n_pre} carried "
+                f"columns were spliced.  E and Z share the ring pointer and "
+                f"must share the row count; a mismatch means the two "
+                f"channels were merged at different widths.")
+        # Rows never written carry exactly zero (see
+        # PrefixGatedBuffer._slot_init_block).  A zero column in s0 is NOT
+        # the trained default -- the model has only ever seen noise there --
+        # so fall back to the noise rather than substituting a dead field.
+        # (The in-loop site handles the same rows differently and for a good
+        # reason: there they are KEYS, and the fix for a key that should not
+        # be attended to is to mask it, not to fill it with noise.)
+        unwritten = (z.detach().abs().sum(dim=-1, keepdim=True) == 0)
+        if bool(unwritten.any()):
+            z = torch.where(unwritten, head, z)
         if self.latent_renorm == "s0":
             z = self._renorm_to(z, head)
         return torch.cat([z, s0[:, n_pre:]], dim=1)
+
+    def _latent_z_rows(self, template: torch.Tensor) -> Optional[torch.Tensor]:
+        """The carried Z rows [B, K, D], WITH the ablation null applied.
+
+        ONE function for BOTH read sites, deliberately.  `latent_read_null` is
+        the contract `evals/eval_carry_2x2.py` and `evals/eval_influence_
+        horizon.py` set to turn Z off, and until P3.0 it lived inside
+        `latent_init` because s0 was the only site.  A second site whose reads
+        bypassed the null would report "Z off" while feeding the model real Z:
+        a confident wrong number, in the exact shape of REDs 8/9/10, firing on
+        the very first P3.0 arm.  So the null is applied where Z is FETCHED,
+        not where it is used.
+
+        `template` supplies device and dtype only.  THE NULL'S SHAPE COMES FROM
+        THE REAL Z, always: the ablation replaces the carry's CONTENT, never
+        its geometry, and the two read sites hand in templates of different
+        widths (s0's carried columns vs the whole packed x).  Taking the shape
+        from the template put a [B, S_packed, D] noise block where [B, K, D]
+        was wanted -- caught by gate 9, which is the test written for exactly
+        this class of mistake.
+
+        Returns None when there is nothing carried yet.
+        """
+        if self.prefix is None or not self.latent_carry:
+            return None
+        _, z = self.prefix.split_channels(self._carried_state())
+        if z is None:
+            return None
+        z = z.to(device=template.device, dtype=template.dtype)
+        null = getattr(self, "latent_read_null", None)
+        if null is not None:
+            z = self._null_latent(null, z)
+        return z
+
+    def _packed_read_mask(self, x: torch.Tensor) -> Optional[torch.Tensor]:
+        """`_cross_read_mask` lifted onto the PACKED layout -> [B, S_packed, 1].
+
+        `begin()` builds the EOS masks from the REAL sequence length, before
+        `prefix_pack` prepends the n_pre carried columns and appends the n_sum
+        summary slots, so the stored mask is short by n_pre + n_sum and cannot
+        be applied to `read_into`'s x as it stands.  Nothing caught this before
+        because every `read_into` branch is dead in prefix mode.
+
+        The two added blocks get the only values consistent with what the mask
+        MEANS ("this position is past the first EOS, so it belongs to a new
+        document and must not read the previous one's carry"):
+
+        * carried columns -> 1.  They sit BEFORE every real token, so they are
+          before the first EOS by construction.  They are also the previous
+          document's own carry, which is the thing they would be reading.
+        * summary slots -> the mask's LAST token value.  They trail every real
+          token, so if the chunk contains an EOS at all they are past it.
+        """
+        crm = self._cross_read_mask
+        if crm is None:
+            return None
+        n_pre, n_sum = self._n_pre, self._n_sum
+        if crm.shape[1] + n_pre + n_sum != x.shape[1]:
+            raise ValueError(
+                f"EOS read mask is {crm.shape[1]} long and the packed sequence "
+                f"is {x.shape[1]} with n_pre={n_pre}, n_sum={n_sum}; these must "
+                "add up.  The mask is built in begin() from the real sequence "
+                "length and lifted here, so a mismatch means prefix_pack and "
+                "begin() disagree about the layout.")
+        parts = [crm.new_ones(crm.shape[0], n_pre, 1), crm]
+        if n_sum:
+            parts.append(crm[:, -1:].expand(-1, n_sum, -1))
+        return torch.cat(parts, dim=1)
+
+    def latent_read_rows(self, T_loop: int, K: int,
+                         current_step: int) -> Optional[list]:
+        """Which carried rows `latent_read_depth='matched'` reads at this step.
+
+        Iteration i consumes s_i and produces s_{i+1}, so the delta it is the
+        counterpart of is d_{i+1} -- the depth map's k = current_step + 1.
+
+        Row -> depth comes from the WRITE convention and is not re-derived
+        here: `latent_write` gives write-vector j the depth `latent_depth_map`
+        assigns it, and under route='ring' chunk c writes vector j to row
+        (cW + j) mod K, so row r always holds write-index r mod W
+        (`PrefixGatedBuffer.depth_rows`).  Accum appends W rows at a time into
+        a block whose length is a multiple of W, so the same congruence holds.
+        Returns [] when no row carries this depth -- a real state, not an
+        error, and one the caller must inject exactly zero for.
+        """
+        W = self.prefix.n_vec
+        depths = self.latent_depth_map(T_loop, W)
+        want = int(current_step) + 1
+        return [r for r in range(K) if depths[r % W] == want]
 
     def _null_latent(self, null, head: torch.Tensor) -> torch.Tensor:
         """Z's ablation null.  `latent_read_null` is the contract
@@ -1206,6 +1462,13 @@ def reset_cortex_graft_init(model, log=None):
             torch.nn.init.zeros_(pre.input_bias)
             tags += ["forget_bias=1", "input_bias=0"]
         fixed.append("prefix.[" + ",".join(tags) + "]")
+    # The in-loop Z read (P3.0).  Step (1) above put KAIMING into q/k/v/out --
+    # the same thing it does to the ring's gate projections -- so the module's
+    # designed init has to be re-applied here or the arm runs an init nobody
+    # chose.  The module owns it; this only calls the hook.
+    reader = getattr(cortex, "latent_reader", None)
+    if reader is not None:
+        fixed += apply_latent_read_init(reader)
     # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
     #     some module lacked reset_parameters and slipped through.
     bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]

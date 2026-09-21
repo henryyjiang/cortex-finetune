@@ -326,6 +326,23 @@ class CLISettings:
             # run.  Do not launch a Z arm before P0.7 reports.
             latent_carry=False, latent_depth_rule="absolute",
             latent_depth_lo=2, latent_depth_hi=9, latent_renorm="none",
+            # P3.0 — WHERE Z IS READ.  The s0 site is MEASURED DEAD (job
+            # 13297293, read through RED 11's units fix: deleting the carried
+            # columns outright costs +4.1e-5 / -2.5e-5 nats, opposite signs
+            # across the two arms, i.e. noise), and a single no-grad step cuts
+            # its read gradient to exactly zero.  Both defaults below reproduce
+            # every arm on record anyway -- latent_s0_read True, latent_read
+            # 'none' -- so nothing moves unless an arm asks.
+            #
+            #   latent_read  'refresh' = Option 0, one scalar re-adding Z into
+            #                the carried columns every iteration (tests whether
+            #                the loop WASHES s0 rather than whether s0 has no
+            #                gain); 'xattn' = Option 1, the LatentRead module.
+            #   latent_read_depth  'matched' reads only the rows whose taped
+            #                depth equals this iteration.  A FLAG and not a
+            #                code change, same reasoning as latent_depth_rule.
+            latent_s0_read=True, latent_read="none", latent_read_depth="none",
+            latent_read_heads=8, latent_read_gate_init=0.1,
             # diag_interval: every N optimizer steps, log the architecture's
             # health (carry rank + per-channel norms, whether either gate has
             # left its exactly-zero init, the Z read/write gradient fractions)
@@ -994,7 +1011,15 @@ def startup(cfg: CLISettings):
                    # would construct an E-only buffer, drop the Z gate's weights
                    # as unexpected keys, and run a half-width carry.
                    "latent_carry", "latent_depth_rule", "latent_depth_lo",
-                   "latent_depth_hi", "latent_renorm"):
+                   "latent_depth_hi", "latent_renorm",
+                   # P3.0's read site.  latent_read is in the same class as
+                   # latent_carry -- it ADDS PARAMETERS (16.8M for xattn), so a
+                   # key missing here would rebuild the graft without the read
+                   # module on resume or at eval, drop its weights as
+                   # unexpected keys, and score an arm that reads nothing while
+                   # reporting the arm that does.
+                   "latent_s0_read", "latent_read", "latent_read_depth",
+                   "latent_read_heads", "latent_read_gate_init"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -1013,7 +1038,12 @@ def startup(cfg: CLISettings):
                   + (f"latent(Z on, rule={cfg.cortex['latent_depth_rule']}"
                      f",band={cfg.cortex['latent_depth_lo']}.."
                      f"{cfg.cortex['latent_depth_hi']}"
-                     f",renorm={cfg.cortex['latent_renorm']}) "
+                     f",renorm={cfg.cortex['latent_renorm']}"
+                     f",read={'s0+' if cfg.cortex['latent_s0_read'] else ''}"
+                     f"{cfg.cortex['latent_read']}"
+                     + (f"/{cfg.cortex['latent_read_depth']}"
+                        if cfg.cortex['latent_read'] == 'xattn' else "")
+                     + ") "
                      if cfg.cortex['latent_carry'] else "") +
                   f"prefix_pos={cfg.cortex['prefix_pos']} "
                   f"prefix_eos_reset={cfg.cortex['prefix_eos_reset']} "

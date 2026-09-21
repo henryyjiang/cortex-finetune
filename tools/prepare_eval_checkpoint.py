@@ -68,6 +68,12 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 # the Z channel
                 "latent_carry", "latent_depth_rule", "latent_depth_lo",
                 "latent_depth_hi", "latent_renorm",
+                # P3.0's read site.  latent_read ADDS PARAMETERS, so an eval
+                # that rebuilt the graft without it would drop the read
+                # module's weights as unexpected keys and score an arm that
+                # reads nothing while reporting the arm that does.
+                "latent_s0_read", "latent_read", "latent_read_depth",
+                "latent_read_heads", "latent_read_gate_init",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

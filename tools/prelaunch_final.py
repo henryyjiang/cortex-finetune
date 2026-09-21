@@ -108,10 +108,18 @@ class _SuppressZRead:
         self._had = "latent_init" in vars(cortex)
 
     def __enter__(self):
-        def suppressed(s0, num_steps_no_grad=None):
-            self._real(s0, num_steps_no_grad)
+        def suppressed(s0, num_steps_no_grad=None, num_steps_with_grad=None):
+            self._real(s0, num_steps_no_grad, num_steps_with_grad)
             return s0
         self.cortex.latent_init = suppressed
+        # P3.0: SUPPRESSING THE s0 SUBSTITUTION IS NO LONGER SUPPRESSING THE Z
+        # READ.  On an in-loop arm the read lives at `read_into`, and a gate
+        # that only unhooked latent_init would compare "Z off" against a model
+        # that was still reading Z on every iteration -- and PASS, because the
+        # two losses would genuinely match.  Take the read module out too.
+        self._real_reader = getattr(self.cortex, "latent_reader", None)
+        if self._real_reader is not None:
+            self.cortex.latent_reader = None
         return self
 
     def __exit__(self, *exc):
@@ -119,6 +127,8 @@ class _SuppressZRead:
             self.cortex.latent_init = self._real
         else:
             del self.cortex.latent_init
+        if self._real_reader is not None:
+            self.cortex.latent_reader = self._real_reader
         return False
 
 

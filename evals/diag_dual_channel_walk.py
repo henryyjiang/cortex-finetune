@@ -185,9 +185,12 @@ class _Tap:
             self.merges.append(rec)
             return out
 
-        def latent_init(s0, num_steps_no_grad=None):
+        def latent_init(s0, num_steps_no_grad=None, num_steps_with_grad=None):
+            # Three args since P3.0: latent_init takes the loop length so the
+            # matched read knows T.  A tap that kept the two-arg signature
+            # would TypeError on every forward.
             before = s0.detach().clone()
-            out = self._real_init(s0, num_steps_no_grad)
+            out = self._real_init(s0, num_steps_no_grad, num_steps_with_grad)
             rec = {
                 "n_pre": int(self.cortex._n_pre),
                 "num_steps_no_grad": (None if num_steps_no_grad is None

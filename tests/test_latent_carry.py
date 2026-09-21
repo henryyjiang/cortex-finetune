@@ -72,9 +72,9 @@ def _spy_s0(m):
     seen = []
     real = m.cortex.latent_init
 
-    def spy(s0, num_steps_no_grad=None):
+    def spy(s0, num_steps_no_grad=None, num_steps_with_grad=None):
         before = s0.detach().clone()
-        out = real(s0, num_steps_no_grad)
+        out = real(s0, num_steps_no_grad, num_steps_with_grad)
         seen.append((before, out.detach().clone()))
         return out
 

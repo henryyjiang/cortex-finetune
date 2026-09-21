@@ -839,7 +839,8 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
         # below the split costs nothing -- x is untouched in between -- and buys
         # a measured number instead of an assumption.
         if input_states is None and self.cortex is not None:
-            x = self.cortex.latent_init(x, int(num_steps_no_grad))
+            x = self.cortex.latent_init(
+                x, int(num_steps_no_grad), int(num_steps_with_grad))
         xk = x
 
         with torch.no_grad():
@@ -875,7 +876,7 @@ class RavenForCausalLM(RavenPreTrainedModel, GenerationMixin):
         # cortex: additive memory read injected after the adapter, before the
         # core layers (cortex first-layer injection).  No-op when disabled.
         if self.cortex is not None:
-            x = self.cortex.read_into(x)
+            x = self.cortex.read_into(x, current_step)
         for block in self.transformer.core_block:  # type: ignore # types broken in 2.6+
             block_idx += 1
             x = block(x, freqs_cis, block_idx, mask, past_key_values)

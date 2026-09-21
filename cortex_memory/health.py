@@ -247,6 +247,22 @@ def latent_runtime(cortex) -> dict:
         "s0_scale": (float(cortex._z_s0_scale)
                      if getattr(cortex, "_z_s0_scale", None) is not None
                      else None),
+        # P3.0.  `read_site` is what makes `read_grad_frac` interpretable: the
+        # same 1.0 means "the sampler happened to draw no no-grad prefix all
+        # run" at s0 and "live by construction" in-loop, and only this field
+        # distinguishes them.
+        "read_site": (("s0+" if getattr(cortex, "latent_s0_read", True) else "")
+                      + str(getattr(cortex, "latent_read", "none"))),
+        "read_depth": str(getattr(cortex, "latent_read_depth", "none")),
+        # The read gate, reported per step exactly as `forget_bias` is for the
+        # E ring -- because the pre-registration fixes its reading IN ADVANCE:
+        # a gate that collapses toward zero over training is the model saying
+        # it does not want the read, and that is a legitimate negative.
+        "read_gate": (float(cortex.latent_reader.gate_value)
+                      if getattr(cortex, "latent_reader", None) is not None
+                      else None),
+        "read_calls": int(getattr(cortex, "_z_inloop_n", 0)),
+        "matched_rows": getattr(cortex, "_z_matched_rows", None),
     }
 
 
