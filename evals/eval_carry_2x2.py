@@ -64,6 +64,7 @@ import torch.nn.functional as F
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from cortex_memory.health import refuse_if_scrambled  # noqa: E402
 from model_utils import load_checkpoint, to_num_steps, _unwrap  # noqa: E402
 from model_utils import parse_config_overrides  # noqa: E402
 from cortex_memory.health import chance_margin  # noqa: E402
@@ -107,6 +108,12 @@ def parse_args() -> argparse.Namespace:
                         "with 'this checkpoint has no prefix buffer'.  Mirror "
                         "pace/p1_arms.sbatch's PROBE_SETS for the arm.")
     p.add_argument("--out_dir", default="eval_results/carry_2x2")
+    p.add_argument("--allow_scrambled", action="store_true",
+                   help="score a checkpoint whose read is wired to ANOTHER "
+                        "document's Z (tier 1.5's shuffled limb).  Without "
+                        "it such a checkpoint is REFUSED: every content "
+                        "number on it is about the control arm and nothing "
+                        "in the output would say so.")
     return p.parse_args()
 
 
@@ -307,6 +314,7 @@ def main() -> int:
                                  config_overrides=overrides or None)
     inner = _unwrap(model)
     cortex = getattr(inner, "cortex", None)
+    refuse_if_scrambled(cortex, "carry_2x2", args.allow_scrambled)
     if cortex is None or getattr(cortex, "prefix", None) is None:
         print("FAILED: this checkpoint has no prefix buffer.")
         return 2

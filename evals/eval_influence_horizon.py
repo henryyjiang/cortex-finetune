@@ -141,6 +141,12 @@ def parse_args() -> argparse.Namespace:
                         "pace/p1_arms.sbatch's PROBE_SETS for the arm.")
     p.add_argument("--out_dir",
                    default="eval_results/influence_horizon")
+    p.add_argument("--allow_scrambled", action="store_true",
+                   help="score a checkpoint whose read is wired to ANOTHER "
+                        "document's Z (tier 1.5's shuffled limb).  Without "
+                        "it such a checkpoint is REFUSED: every content "
+                        "number on it is about the control arm and nothing "
+                        "in the output would say so.")
     return p.parse_args()
 
 
@@ -403,6 +409,8 @@ def main() -> int:
                                  config_overrides=overrides or None)
     inner = _unwrap(model)
     buf = getattr(getattr(inner, "cortex", None), "prefix", None)
+    refuse_if_scrambled(getattr(inner, "cortex", None), "influence_horizon",
+                        args.allow_scrambled)
     if buf is None:
         print("FAILED: this checkpoint has no prefix buffer, so there is no "
               "carry whose influence could be measured.")

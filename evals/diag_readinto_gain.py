@@ -105,6 +105,7 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from cortex_memory.health import refuse_if_scrambled  # noqa: E402
 from model_utils import load_checkpoint, to_num_steps, _unwrap  # noqa: E402
 from model_utils import parse_config_overrides  # noqa: E402
 
@@ -205,6 +206,12 @@ def parse_args() -> argparse.Namespace:
                         "'content effect at init' was the 4.8x scale gap.")
     p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
     p.add_argument("--out_dir", default=None)
+    p.add_argument("--allow_scrambled", action="store_true",
+                   help="score a checkpoint whose read is wired to ANOTHER "
+                        "document's Z (tier 1.5's shuffled limb).  Without "
+                        "it such a checkpoint is REFUSED: every content "
+                        "number on it is about the control arm and nothing "
+                        "in the output would say so.")
     return p.parse_args()
 
 
@@ -393,6 +400,7 @@ def main() -> int:
                                  config_overrides=overrides or None)
     inner = _unwrap(model)
     cortex = getattr(inner, "cortex", None)
+    refuse_if_scrambled(cortex, "readinto_gain", args.allow_scrambled)
     if cortex is None or getattr(cortex, "prefix", None) is None:
         print("FAILED: no prefix buffer on this checkpoint.  Force the "
               "geometry with --set (see pace/diag_readinto.sbatch).")

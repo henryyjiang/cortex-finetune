@@ -225,6 +225,39 @@ def grad_norms(module, prefix: str = "") -> dict:
 # the Z channel's runtime counters
 # ---------------------------------------------------------------------------
 
+def refuse_if_scrambled(cortex, tool: str, allow: bool = False) -> None:
+    """Refuse to measure CONTENT on a control-arm checkpoint.
+
+    P3.0 tier 1.5's shuffled limb trains with `latent_read_scramble`, and that
+    flag PERSISTS into the checkpoint -- it has to, or the control arm and the
+    treatment arm become the same file.  The consequence is that any eval which
+    reloads that checkpoint rebuilds it WITH THE ROLL STILL LIVE, and every
+    content measurement it makes is then against a read that is deliberately
+    looking at the wrong document.
+
+    `eval_carry_2x2` would report a normal 2x2.  `eval_influence_horizon
+    --damage donor` would compare a donor's Z against an already-rolled Z.
+    Neither would say anything was wrong: the numbers are finite, plausible and
+    wrong, which is the shape of reds 8, 9, 10 and 11.
+
+    `allow` exists because measuring the control arm IS sometimes the point --
+    the tier's whole comparison is real vs shuffled.  It has to be asked for.
+    """
+    if not bool(getattr(cortex, "latent_read_scramble", False)):
+        return
+    if allow:
+        print(f"[{tool}] NOTE: latent_read_scramble is ON for this checkpoint. "
+              f"Every number below is for the CONTROL arm -- the read is "
+              f"looking at another document's Z by construction.")
+        return
+    raise SystemExit(
+        f"[{tool}] REFUSING: this checkpoint carries latent_read_scramble=true, "
+        f"so its read is wired to ANOTHER DOCUMENT's Z.  Any content measurement "
+        f"here is about the control arm, not the model, and nothing in the "
+        f"output would say so.  Pass --allow_scrambled if that is what you "
+        f"meant (it is, for the shuffled limb of the tier 1.5 pair).")
+
+
 def latent_runtime(cortex) -> dict:
     """The Z channel's per-forward counters, straight off the live graft.
 

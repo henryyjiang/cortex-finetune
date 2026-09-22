@@ -232,3 +232,49 @@ class TestTheArmsAreDistinguishableAfterTheFact:
     def test_the_banner_names_the_control_arm(self):
         src = open(os.path.join(REPO, "train.py"), encoding="utf-8").read()
         assert "SCRAMBLED(control arm)" in src
+
+
+class TestAControlArmCheckpointCannotBeScoredSilently:
+    """`latent_read_scramble` PERSISTS into the checkpoint -- it has to, or the
+    control arm and the treatment arm become the same file.  The consequence is
+    that any eval reloading the shuffled limb rebuilds it WITH THE ROLL LIVE,
+    and every content number it produces is about the control arm.  Finite,
+    plausible, wrong, and silent: the shape of reds 8, 9, 10 and 11.  Tier 3
+    runs exactly these evals on exactly these checkpoints."""
+
+    def _cortex(self, scramble):
+        m = _model(latent_read_scramble=scramble)
+        return m.cortex
+
+    def test_a_scrambled_checkpoint_is_refused(self):
+        from cortex_memory.health import refuse_if_scrambled
+        with pytest.raises(SystemExit, match="REFUSING"):
+            refuse_if_scrambled(self._cortex(True), "carry_2x2")
+
+    def test_an_ordinary_checkpoint_passes_silently(self, capsys):
+        from cortex_memory.health import refuse_if_scrambled
+        refuse_if_scrambled(self._cortex(False), "carry_2x2")
+        assert capsys.readouterr().out == ""
+
+    def test_allow_scrambled_passes_but_says_so_loudly(self, capsys):
+        """Measuring the control arm IS sometimes the point -- the tier's whole
+        comparison is real vs shuffled.  It just has to be asked for, and the
+        log has to carry the caveat next to the numbers."""
+        from cortex_memory.health import refuse_if_scrambled
+        refuse_if_scrambled(self._cortex(True), "carry_2x2", allow=True)
+        out = capsys.readouterr().out
+        assert "CONTROL arm" in out
+
+    def test_an_e_only_model_is_not_tripped_by_the_guard(self):
+        from cortex_memory.health import refuse_if_scrambled
+        refuse_if_scrambled(_model(latent=False).cortex, "carry_2x2")
+
+    @pytest.mark.parametrize("tool", ["eval_carry_2x2", "eval_influence_horizon",
+                                      "diag_readinto_gain"])
+    def test_every_content_eval_calls_the_guard(self, tool):
+        """A guard that exists and is not wired in is the RED 14 shape -- a
+        correct check in code no run reaches."""
+        src = open(os.path.join(REPO, "evals", tool + ".py"),
+                   encoding="utf-8").read()
+        assert "refuse_if_scrambled(" in src, f"{tool} never calls the guard"
+        assert "--allow_scrambled" in src, f"{tool} has no escape hatch"
