@@ -834,6 +834,26 @@ class CortexMemory(nn.Module):
         n_pre = self._n_pre
         if not n_pre:
             return x
+        if current_step is None:
+            # A STALE MODELING FILE, AND IT IS NOT A HYPOTHETICAL -- the phrase
+            # is prepare_cortex_checkpoint.py's own docstring, which warns that
+            # the grafted modeling file inside a checkpoint dir is a COPY and
+            # goes stale the moment the graft changes.  Job 13425548 ran
+            # against a copy that predates P3.0 (`read_into(x)`, one argument)
+            # and nothing said so: depth was 'none', so the run simply did not
+            # use the step and the staleness stayed invisible until a
+            # matched-depth arm would have hit it.
+            #
+            # Raised unconditionally rather than warned, because there is no
+            # legitimate old caller: the in-loop read is new, so any checkpoint
+            # running it must already carry a current modeling file.
+            raise RuntimeError(
+                "read_into was called WITHOUT current_step, so this "
+                "checkpoint's copy of raven_modeling_minimal_cortex.py "
+                "predates P3.0.  Re-run tools/prepare_cortex_checkpoint.py "
+                "against the base to refresh it.  Not falling through: a "
+                "stale copy runs a different model than the source tree and "
+                "says nothing about it.")
         z = self._latent_z_rows(x)
         if z is None:
             return x
@@ -1205,6 +1225,14 @@ class CortexMemory(nn.Module):
         g = torch.Generator(device="cpu").manual_seed(seed)
         n = torch.empty(head.shape, dtype=torch.float32).normal_(
             0.0, std, generator=g)
+        # GENERATED ON CPU (so the seed gives the same draw on any device),
+        # THEN MOVED ONCE, HERE.  Everything after this line is on `head`'s
+        # device and in fp32.  The first version of the matched branch below
+        # multiplied the CPU tensor by a CUDA `ref` and every cell of job
+        # 13425548 died on "Expected all tensors to be on the same device".
+        # The unit suite could not see it: run_tests.sbatch requests NO GPU on
+        # purpose, so every tensor in it is already on the CPU.
+        n = n.to(device=head.device)
         if kind == "noise_matched":
             # ROW-NORM MATCHED TO THE FIELD IT REPLACES, which a fixed std is
             # NOT.  At D=2048 a per-element std of 0.02 is a row of norm 0.905,
@@ -1220,7 +1248,7 @@ class CortexMemory(nn.Module):
             # written at different chunk ages and their norms are not equal.
             ref = head.detach().float().norm(dim=-1, keepdim=True)
             n = n * (ref / n.norm(dim=-1, keepdim=True).clamp_min(1e-12))
-        return n.to(device=head.device, dtype=head.dtype)
+        return n.to(dtype=head.dtype)
 
     @staticmethod
     def _renorm_to(z: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:

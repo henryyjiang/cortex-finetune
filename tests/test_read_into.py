@@ -365,6 +365,21 @@ class TestGate7DepthMatched:
         with pytest.raises(RuntimeError, match="current_step"):
             m.cortex.read_into(torch.randn(1, m.cortex._n_pre + CL + NV, 64))
 
+    def test_a_stale_modeling_file_is_refused_on_every_mode(self):
+        """Job 13425548 ran against a checkpoint copy of the modeling file
+        that predates P3.0 -- `read_into(x)`, one argument.  Depth was 'none',
+        so the run did not use the step and the staleness was INVISIBLE; it
+        would have surfaced as a wrong arm the first time a matched-depth cell
+        ran.  prepare_cortex_checkpoint.py's docstring already calls the stale
+        copy 'not a hypothetical'.  Refused on every mode now, not just
+        matched."""
+        for depth in ("none", "matched"):
+            m = _model(depth=depth)
+            _chain(m, n_chunks=2)
+            with pytest.raises(RuntimeError, match="predates P3.0|current_step"):
+                m.cortex.read_into(
+                    torch.randn(1, m.cortex._n_pre + CL + NV, 64))
+
 
 # ---------------------------------------------------------------------------
 # gate 8 — E-only is untouched

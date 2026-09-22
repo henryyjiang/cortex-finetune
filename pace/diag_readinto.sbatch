@@ -53,21 +53,29 @@
 # sqrt(D) = 45.25 because a ROW NORM was handed in where a PER-ELEMENT rms
 # belonged.  Read the ratio column, not the gate.
 #
-# HOW TO READ IT -- pre-registered, in evals/diag_readinto_gain.py's docstring:
+# HOW TO READ IT -- pre-registered, in evals/diag_readinto_gain.py's docstring.
+# The statistic is k in `d_nats ~ k * r^p` with r = ||delta||/||x||, NOT the
+# span: job 13420851 read LIVE at one cut of the span and DEAD at every other,
+# off the same table, so the span is printed at four cuts and decides nothing.
 #
-#   LIVE_site_has_gain                  responds well below ||delta|| = ||x||.
-#       Proceed to tier 1.5.  Print this row beside the s0 table; that PAIR is
-#       the evidence for the whole redesign, not either row alone.
-#   DEAD_no_gain_in_distribution        flat across orders, like s0 was.  This
-#       CONTRADICTS the pre-registration's premise.  p30 S5 row 3: stop and
-#       AUDIT THE INSTRUMENT before spending anything.  Do not proceed to tier
-#       1.5 on a flat tier 1.
-#   INVALID_knob_unproven               nothing moved anywhere, not even the
-#       deliberately oversized cell.  Indistinguishable from a knob that was
-#       never wired -- reds 8, 9, 10 and 11 were all instruments returning a
-#       confident wrong number, so this refuses instead of reading it as DEAD.
-#   INVALID_at_chance                   RED 10.  The intact loss is at
-#       ln(vocab) = 11.5157 and the table is differences of noise.
+#   SENSITIVE_unlike_s0        k >= 100x s0's 8.6e-06.  Something injected here
+#       survives to the loss, which is what s0 failed.  Necessary condition met
+#       -> tier 1.5.  Print the row beside the s0 table; the PAIR is the
+#       evidence, not either row alone.
+#   INERT_like_s0              k at s0's own level.  CONTRADICTS p30's premise;
+#       S5 row 3 says stop and audit before spending the 8 GPU-hours.
+#   AUDIT_control_not_matched  real and noise separate AT INIT, which a random
+#       projection cannot do.  The control is broken, not the site.
+#   INVALID_no_axis            no ||delta||/||x|| recorded, so the cells could
+#       only be scored on gate values.  Both tier-0.5 cells of job 13420851.
+#   INVALID_knob_unproven      nothing moved anywhere, including the oversized
+#       cell -- indistinguishable from a knob that was never wired.
+#   INVALID_at_chance          RED 10.  The level vetoes the verdict.
+#
+# p is reported beside k.  p ~ 2 means the response is driven by the SIZE of
+# the injection and nothing else.  AT INIT THAT IS EXPECTED -- the module is
+# random, so content-specificity is untestable here by construction, and this
+# sweep can only establish SENSITIVITY.  Damage vs reading is tier 1.5's job.
 #
 # THE REAL-vs-NOISE PAIR AT EVERY GATE.  Each cell is scored twice, once on the
 # carried Z and once on `latent_read_null` noise at matched scale.  AT INIT THE
