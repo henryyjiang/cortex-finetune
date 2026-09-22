@@ -143,13 +143,30 @@ S0_RESPONSE_COEFF = 8.6e-06
 #: orders, so nothing here turns on the exact figure.
 SENSITIVE_OVER_S0 = 100.0
 
-#: A real-vs-noise gap this large AT INIT is an AUDIT trigger, not a finding.
-#: An untrained random projection cannot prefer real content, so a separation
-#: means the control is not controlling -- on job 13420851 it meant the noise
-#: was 4.8x quieter than the Z it stood in for.  Pre-registered in the first
-#: version of this file's docstring and NOT wired into the verdict, which is
-#: why the run printed LIVE over the top of its own audit condition.
-CONTENT_AT_INIT_NATS = 0.01
+#: THE AUDIT TRIGGER, RESPECIFIED 2026-09-22 after job 13430665 refused all
+#: four cells for the wrong reason.
+#:
+#: The first version compared real and noise AT MATCHED GATE and flagged any
+#: nat gap over 0.01.  That is not a content comparison.  At the same gate the
+#: xattn module emits a BIGGER delta on real Z than on noise -- structured keys
+#: concentrate the attention, unstructured keys spread it and the averaged V
+#: partly cancels -- so the two limbs sit at different INJECTED MAGNITUDES and
+#: the gap is mostly that.  Job 13430665 reported 0.198 and 0.434 nats of
+#: "content effect" on cells whose scale-free k agreed to 3% and 25%.
+#:
+#: The right comparison is the scale-free one: k_real vs k_noise, which divides
+#: the magnitude out.  At init these must agree -- a RANDOM projection cannot
+#: prefer this document's trajectory over another's.
+#:
+#: NOISE IS NOT THE CONTENT CONTROL AND CANNOT BE.  It differs from real Z in
+#: COHERENCE as well as in content correspondence: Z's rows come from one
+#: trajectory and are correlated, while isotropic noise is not, and a coherent
+#: perturbation pushes the state off-manifold more than an incoherent one of
+#: the same per-row norm.  The control for CONTENT CORRESPONDENCE is another
+#: document's Z -- equally coherent, equally structured, differing only in
+#: whose trajectory it is.  That is tier 1.5's batch roll, and it is why this
+#: sweep cannot answer the content question no matter how it is scored.
+CONTENT_RATIO_AT_INIT = 2.0
 
 #: Thresholds the span is reported at, so its dependence on the cut is VISIBLE
 #: rather than silent.  Never used for the verdict.
@@ -274,6 +291,17 @@ def summarize(cells: dict, norms: dict, chance: float) -> dict:
                 pairs[g] = mean[k] - mean[other]
     content_at_init = max((abs(v) for v in pairs.values()), default=0.0)
 
+    # The SCALE-FREE content comparison.  `noise_coeff` is the same fit run
+    # over the noise limb, so k_real / k_noise divides the magnitude out; the
+    # raw nat gap above is kept as a diagnostic and no longer decides anything.
+    noise_delta = {k.replace("noise@", "real@"): v
+                   for k, v in delta.items() if k.startswith("noise@")}
+    noise_norms = {k.replace("noise@", "real@"): v
+                   for k, v in norms.items() if k.startswith("noise@")}
+    noise_coeff, _ = response_fit(noise_delta, noise_norms)
+    content_ratio = ((coeff / noise_coeff)
+                     if (coeff and noise_coeff) else None)
+
     over_s0 = (coeff / S0_RESPONSE_COEFF) if coeff else None
 
     if at_chance:
@@ -286,12 +314,12 @@ def summarize(cells: dict, norms: dict, chance: float) -> dict:
         reading = "INVALID_no_axis"
     elif not knob_live:
         reading = "INVALID_knob_unproven"
-    elif content_at_init > CONTENT_AT_INIT_NATS:
-        # An untrained projection preferring real content is not a result, it
-        # is a broken control.  This condition was pre-registered from the
-        # first version of this file and left out of the verdict; it fired on
-        # all four cells of job 13420851 while the tool printed LIVE.
-        reading = "AUDIT_control_not_matched"
+    elif content_ratio is not None and content_ratio > CONTENT_RATIO_AT_INIT:
+        # Scale-free, so this is no longer the magnitude gap that refused all
+        # four cells of job 13430665.  A random projection preferring real
+        # content by more than 2x at MATCHED magnitude means something in the
+        # setup is not what it claims -- look before reading the rest.
+        reading = "AUDIT_content_at_init"
     elif over_s0 is not None and over_s0 >= SENSITIVE_OVER_S0:
         reading = "SENSITIVE_unlike_s0"
     else:
@@ -310,6 +338,8 @@ def summarize(cells: dict, norms: dict, chance: float) -> dict:
         "coeff_over_s0": over_s0,
         "real_minus_noise": pairs,
         "content_effect_at_init": content_at_init,
+        "noise_coeff": noise_coeff,
+        "content_ratio_at_init": content_ratio,
         "reading": reading,
         "intact": {"mean_nats": base, "chance_nats": chance,
                    "margin_below_chance": (None if base is None
@@ -524,8 +554,14 @@ def print_report(rec: dict, out=sys.stdout) -> None:
     w(nl + "    knob proven connected              %s%s"
       % (rec["knob_live"], nl))
     w("    axis present                       %s%s" % (rec["have_axis"], nl))
-    w("    real-vs-noise gap at init          %.5f nats  (want ~0)%s"
+    w("    k_noise (same fit, noise limb)     %s%s"
+      % ("%.4g" % rec["noise_coeff"] if rec.get("noise_coeff") else "-", nl))
+    w("    k_real / k_noise AT INIT           %s   (want ~1)%s"
+      % ("%.2f" % rec["content_ratio_at_init"]
+         if rec.get("content_ratio_at_init") else "-", nl))
+    w("    raw nat gap at matched GATE        %.5f  (diagnostic only -- the%s"
       % (rec["content_effect_at_init"], nl))
+    w("                                       limbs sit at different |d| there)%s" % nl)
 
     w(nl + "    READING: %s%s" % (rec["reading"], nl))
     for line in VERDICT_NOTES.get(rec["reading"], VERDICT_NOTES["_default"]):
@@ -549,10 +585,11 @@ VERDICT_NOTES = {
         "premise; S5 row 3 says stop and audit the instrument before",
         "spending the 8 GPU-hours on tier 1.5.",
     ],
-    "AUDIT_control_not_matched": [
-        "A random projection cannot prefer real content, so this gap is the",
-        "CONTROL failing, not a finding.  Check that the null is row-norm",
-        "matched to the real Z before reading anything else.",
+    "AUDIT_content_at_init": [
+        "A random projection cannot prefer real content at MATCHED magnitude,",
+        "so a ratio this far from 1 means the setup is not what it claims.",
+        "Look before reading anything else.  Note this is scale-free: it is",
+        "NOT the matched-gate nat gap that refused job 13430665.",
     ],
     "INVALID_no_axis": [
         "Every ||delta||/||x|| is missing, so the cells were scored on gate",

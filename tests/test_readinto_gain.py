@@ -91,17 +91,36 @@ class TestTheVerdict:
         assert rec["reading"] == "INVALID_no_axis"
         assert rec["have_axis"] is False
 
-    def test_an_unmatched_control_is_an_audit_not_a_finding(self):
-        """Fired on all four cells of job 13420851 and was ignored, because the
-        condition was pre-registered in prose and never wired into the verdict.
-        It is wired in now."""
+    def test_a_content_preference_at_init_is_an_audit(self):
+        """A random projection cannot prefer real content AT MATCHED
+        MAGNITUDE.  Scale-free, so it is not the matched-gate nat gap."""
         rec = summarize(
             _cells(**{"real@0": 3.20, "noise@0": 3.20,
-                      "real@10": 3.475, "noise@10": 3.195}),
-            {"real@0": 0.0, "noise@0": 0.0, "real@10": 0.5, "noise@10": 0.04},
+                      "real@10": 3.45, "noise@10": 3.26}),
+            {"real@0": 0.0, "noise@0": 0.0, "real@10": 0.5, "noise@10": 0.5},
             CHANCE)
-        assert rec["reading"] == "AUDIT_control_not_matched"
-        assert rec["content_effect_at_init"] > 0.01
+        assert rec["content_ratio_at_init"] > 2.0
+        assert rec["reading"] == "AUDIT_content_at_init"
+
+    def test_a_pure_magnitude_gap_is_NOT_an_audit(self):
+        """Job 13430665's defect, pinned.  All four cells were refused for a
+        0.198-0.434 nat gap at matched GATE, while their scale-free k agreed
+        to 3-25%: at the same gate the xattn module emits a bigger delta on
+        structured Z than on noise, so the limbs sat at different injected
+        magnitudes and the gap was mostly that."""
+        rec = summarize(
+            _cells(**{"real@0": 3.19202, "noise@0": 3.19202,
+                      "real@1": 3.19346, "noise@1": 3.19221,
+                      "real@3": 3.20598, "noise@3": 3.19498,
+                      "real@10": 3.42957, "noise@10": 3.23126}),
+            {"real@0": 0.0, "noise@0": 0.0, "real@1": 0.0520,
+             "noise@1": 0.0242, "real@3": 0.1546, "noise@3": 0.0721,
+             "real@10": 0.5162, "noise@10": 0.2370},
+            CHANCE)
+        assert rec["content_effect_at_init"] > 0.19, "the raw gap is large"
+        assert rec["content_ratio_at_init"] == pytest.approx(1.03, abs=0.1), (
+            "but scale-free the two limbs agree to ~3%")
+        assert rec["reading"] == "SENSITIVE_unlike_s0"
 
     def test_nothing_moving_anywhere_is_invalid(self):
         rec = summarize(
@@ -185,7 +204,7 @@ class TestTheReport:
         import io
         from evals.diag_readinto_gain import VERDICT_NOTES
         for reading in ("SENSITIVE_unlike_s0", "INERT_like_s0",
-                        "AUDIT_control_not_matched", "INVALID_no_axis",
+                        "AUDIT_content_at_init", "INVALID_no_axis",
                         "INVALID_at_chance", "INVALID_knob_unproven"):
             assert reading in VERDICT_NOTES
             rec = summarize(*_sensitive(), CHANCE)
