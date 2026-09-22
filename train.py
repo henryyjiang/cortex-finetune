@@ -836,12 +836,35 @@ def load_checkpoint(state, cfg, device, branch: bool = False):
         unwrap.load_state_dict(ckpt["model"], strict=True)
         state["optimizer"].load_state_dict(ckpt["optimizer"])
 
-    if cfg.mean_recurrence_schedule["turn_on"] and ("mean_recurrence_scheduler" in ckpt):
-        state["mean_recurrence_scheduler"].load_state_dict(ckpt["mean_recurrence_scheduler"])
-    if cfg.mean_backprop_depth_schedule["turn_on"] and ("mean_backprop_depth_scheduler" in ckpt):
-        state["mean_backprop_depth_scheduler"].load_state_dict(ckpt["mean_backprop_depth_scheduler"])
+    # A train_read_only branch (the P3.0 oracle probe) is a NEW optimisation
+    # problem, not a continuation: different optimizer (AdamW, not Muon), a
+    # different param-group count, and its own max_steps horizon.  Job
+    # 13434102 died here on both counts -- the parent's LambdaLR carried one
+    # lr_lambda per MUON group and the probe's AdamW has one group
+    # (IndexError), and had it loaded, the inherited step counter (91,952)
+    # would have been past max_steps=1000: ONE optimizer step at min LR,
+    # then a clean "DONE" and a null result by construction.
+    fresh = branch and cfg.train_read_only
+    if fresh and is_main_process():
+        print("[branch] train_read_only: LR schedule, recurrence schedules and "
+              "step counter start FRESH (the parent's belong to a different "
+              "optimizer and horizon)")
 
-    if not cfg.ignore_past_scheduler:
+    if not fresh:
+        if cfg.mean_recurrence_schedule["turn_on"] and ("mean_recurrence_scheduler" in ckpt):
+            state["mean_recurrence_scheduler"].load_state_dict(ckpt["mean_recurrence_scheduler"])
+        if cfg.mean_backprop_depth_schedule["turn_on"] and ("mean_backprop_depth_scheduler" in ckpt):
+            state["mean_backprop_depth_scheduler"].load_state_dict(ckpt["mean_backprop_depth_scheduler"])
+
+    if not cfg.ignore_past_scheduler and not fresh:
+        n_saved = len(ckpt["scheduler"].get("lr_lambdas") or [])
+        n_now = len(state["optimizer"].param_groups)
+        if n_saved and n_saved != n_now:
+            raise RuntimeError(
+                f"{path}: the saved LR scheduler has {n_saved} param groups and "
+                f"this run's optimizer has {n_now} (optimizer or memory_lr/"
+                f"throttle changed).  LambdaLR cannot map one onto the other.  "
+                f"Pass --ignore_past_scheduler true if a fresh schedule is intended.")
         state["scheduler"].load_state_dict(ckpt["scheduler"])
     # A branch switches datasets (healing corpus -> the arms' corpus), so the
     # saved parquet position is meaningless and restoring it would skip into
@@ -853,6 +876,9 @@ def load_checkpoint(state, cfg, device, branch: bool = False):
     torch.cuda.set_rng_state_all([rng.to("cpu") for rng in ckpt["cuda_rng_state"]])
     print(f"{'Branched' if branch else 'Resumed'} from {path}")
     agg = dict(ckpt["agg_vars_dict"])
+    if fresh:
+        agg.update(optimizer_step=0, total_tokens=0,
+                   total_tokens_with_loss=0, elapsed_time=0.0)
     if branch:
         agg["data_start_step"] = 1        # fresh corpus, read it from the top
     elif cfg.reset_dataset_position:
@@ -2332,6 +2358,14 @@ def main():
     if cfg.resume_path is not None or cfg.branch_path is not None:
         agg_dict = load_checkpoint(state, cfg, device, branch=cfg.resume_path is None)
         data_start_step, optimizer_step, total_tokens, total_tokens_with_loss, elapsed_time = agg_dict["data_start_step"], agg_dict["optimizer_step"], agg_dict["total_tokens"], agg_dict["total_tokens_with_loss"], agg_dict["elapsed_time"]
+        # max_steps is an ABSOLUTE horizon.  A restored counter already at or
+        # past it runs one optimizer step and exits "reached_target" -- a
+        # finished-looking run that trained nothing.
+        if cfg.max_steps and optimizer_step >= cfg.max_steps:
+            raise RuntimeError(
+                f"restored optimizer_step={optimizer_step:,} is already >= "
+                f"max_steps={cfg.max_steps:,}: this run would train for one "
+                f"step and report success.  max_steps is absolute, not NEW steps.")
         # cfg.max_steps = optimizer_step + cfg.max_steps # make max_steps max NEW steps
 
     # train
