@@ -1164,6 +1164,14 @@ class CortexMemory(nn.Module):
             return None
         z = z.to(device=template.device, dtype=template.dtype)
         null = getattr(self, "latent_read_null", None)
+        if null is not None and (null[0] if isinstance(null, (tuple, list))
+                                 else str(null)) == "off":
+            # NO READ AT ALL: the same path chunk 1 takes when nothing is
+            # carried (both sites return their input unchanged on None).  The
+            # tier 1.5 read-out's "no-read" baseline -- zeros would be masked
+            # out by written_row_mask at read_into but would reach s0 as a
+            # state the model has never seen, so the null is None, not zeros.
+            return None
         if null is not None:
             z = self._null_latent(null, z)
         elif self.latent_read_scramble:
@@ -1251,7 +1259,8 @@ class CortexMemory(nn.Module):
         kind = null[0] if isinstance(null, (tuple, list)) else str(null)
         if kind not in ("noise", "noise_matched"):
             raise ValueError(
-                f"latent_read_null kind must be 'noise' or 'noise_matched'; "
+                f"latent_read_null kind must be 'noise', 'noise_matched' or "
+                f"'off' (handled in _latent_z_rows); "
                 f"got {kind!r}.  Zeros are E's null and the wrong one for Z -- "
                 "a zeroed latent field is not a state the model has ever seen, "
                 "while noise is its own trained default for these columns.")

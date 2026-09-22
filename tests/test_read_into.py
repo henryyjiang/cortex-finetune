@@ -528,3 +528,31 @@ class TestTheConfigSurface:
         assert m.cortex.latent_reader is not None, "the reader must come back"
         assert not torch.equal(live[-1], off[-1]), (
             "suppression changed nothing, so the gate is blind on this arm")
+
+
+class TestOffNullIsTheNoReadModel:
+    """Tier 1.5's read-out needs a NO-READ baseline (p30 S5 rows 2/3).
+    ("off",) must skip the read outright -- identical to a read whose gate is
+    zero -- rather than feed it anything, zeros or noise."""
+
+    def test_off_equals_a_zero_gate(self):
+        m = _model()
+        with torch.no_grad():
+            m.cortex.latent_reader.gate.fill_(0.5)
+        live, _ = _chain(m, n_chunks=3)
+        m.cortex.latent_read_null = ("off",)
+        off, _ = _chain(m, n_chunks=3)
+        m.cortex.latent_read_null = None
+        with torch.no_grad():
+            m.cortex.latent_reader.gate.zero_()
+        gated, _ = _chain(m, n_chunks=3)
+        assert not torch.equal(live[-1], off[-1]), "'off' changed nothing"
+        assert torch.allclose(off[-1], gated[-1], atol=1e-6, rtol=0), (
+            "'off' is not the no-read model: it differs from a zero-gate read")
+
+    def test_eval_2x2_threads_z_null(self):
+        src = open(os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "evals", "eval_carry_2x2.py"),
+            encoding="utf-8").read()
+        assert 'else ("off",) if z_null == "off"' in src
+        assert "z_null=args.z_null" in src

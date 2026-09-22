@@ -107,6 +107,12 @@ def parse_args() -> argparse.Namespace:
                         "graft builds with NO prefix buffer and the run dies "
                         "with 'this checkpoint has no prefix buffer'.  Mirror "
                         "pace/p1_arms.sbatch's PROBE_SETS for the arm.")
+    p.add_argument("--z_null", default="noise", choices=["noise", "off"],
+                   help="what a Z-off cell feeds the read.  'noise' (default) "
+                        "is s0's trained default and was the only null before "
+                        "P3.0.  'off' SKIPS the read entirely -- the exact "
+                        "no-read model, and the baseline tier 1.5's readings "
+                        "(p30 S5 rows 2 and 3) are defined against.")
     p.add_argument("--out_dir", default="eval_results/carry_2x2")
     p.add_argument("--allow_scrambled", action="store_true",
                    help="score a checkpoint whose read is wired to ANOTHER "
@@ -175,7 +181,8 @@ def null_z(state: torch.Tensor, std: float, seed: int) -> torch.Tensor:
 
 
 def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
-              e_on: bool, z_on: bool, s0_std: float, hidden_size: int):
+              e_on: bool, z_on: bool, s0_std: float, hidden_size: int,
+              z_null: str = "noise"):
     """Mean NLL over chunks 2..N for one cell of the 2x2.
 
     Chunk 1 is excluded from the endpoint (no incoming carry either way, so
@@ -194,6 +201,7 @@ def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
             # takes it from the same slot columns.  Nulling it is a per-chunk
             # substitution, handled by the graft hook rather than here.
         cortex.latent_read_null = (None if z_on
+                                   else ("off",) if z_null == "off"
                                    else ("noise", s0_std, seed + i))
         # no_grad IS LOAD-BEARING, not tidiness.  `state` carries the graph to
         # the next chunk, so without this the chain holds every chunk's graph at
@@ -394,7 +402,7 @@ def main() -> int:
         for name, e_on, z_on in cells:
             nll, first = chain_nll(model, cortex, xs, ys, ms, num_steps, device,
                                    args.seed + si, e_on, z_on, s0_std,
-                                   hidden_size)
+                                   hidden_size, z_null=args.z_null)
             if nll is None:
                 ok = False
                 break
@@ -416,7 +424,7 @@ def main() -> int:
         "z_channel": z_live,
         "config": {"n_chunks": args.n_chunks, "T": args.T,
                    "dtype": args.dtype, "samples": n_used,
-                   "s0_std": s0_std},
+                   "s0_std": s0_std, "z_null": args.z_null},
         "cells": {}, "effects": {},
         "chunk1_max_spread": (max(chunk1_spread) if chunk1_spread else None),
     }

@@ -174,6 +174,12 @@ else
     ALLOW="--allow_missing_z"
 fi
 
+# EXTRA_SETS: graft flags this launcher does not build, e.g. the P3.0 read
+# module on a tier-1.5 oracle checkpoint, whose latent_reader weights have
+# nowhere to load without them.  Z_NULL=off makes the Z-off cells SKIP the read
+# (the exact no-read model) instead of feeding it s0-scale noise.
+SETS="$SETS ${EXTRA_SETS:-}"
+Z_NULL=${Z_NULL:-noise}
 OUT=${OUT:-eval_results/carry_2x2-$STAMP/$ARM}
 echo "=== 2x2 carry ablation | arm=$ARM | T=$T | n_chunks=$CROSS_CHUNKS ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
@@ -181,6 +187,7 @@ echo "    checkpoint: $CKPT"
 echo "    data:       $DATA"
 echo "    geometry:   $PREFIX_MODE  W=$ACCUM_VECS  latent=$LATENT"
 echo "    sets:       $SETS $ALLOW"
+echo "    z null:     $Z_NULL"
 echo "    out:        $OUT"
 # HOW MANY ROWS DOES THE PACK ACTUALLY HOLD.  --max_examples is a CEILING, not
 # a sample size.  data/pg19_olmo_val_len4096 holds 50 rows, so this job asked
@@ -211,7 +218,7 @@ python evals/eval_carry_2x2.py \
     --model_name "$MODEL" --checkpoint "$CKPT" --data "$DATA" $SETS $ALLOW \
     --n_chunks "$CROSS_CHUNKS" --T "$T" \
     --max_examples "$MAX_EXAMPLES" --boot "$BOOT" \
-    --dtype float32 \
+    --dtype float32 --z_null "$Z_NULL" \
     --out_dir "$OUT"
 RC=$?
 
