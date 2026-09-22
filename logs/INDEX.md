@@ -172,8 +172,8 @@ cites them.
 | 2026-09-14 | 13202177 | smoke_geometry_oom.sbatch | completed | 7 KB |
 | 2026-09-14 | 13202515 | smoke_geometry_oom.sbatch | OOM | 6 KB |
 | 2026-09-14 | 13203119 | smoke_geometry_oom.sbatch | completed | 5 KB |
-| 2026-09-14 | 13203714 | prepare_pg19_pack.sbatch | completed | 1 KB |
-| 2026-09-14 | 13203736 | prepare_pg19_pack.sbatch | completed | 1 KB |
+| 2026-09-14 | 13203714 | prepare_pg19_pack.sbatch | completed | 0 KB |
+| 2026-09-14 | 13203736 | prepare_pg19_pack.sbatch | completed | 0 KB |
 | 2026-09-14 | 13203795 | prepare_pg19_pack.sbatch | completed | 533 KB |
 | 2026-09-15 | 13219072 | eval_context_ceiling.sbatch | completed | 4 KB |
 | 2026-09-15 | 13219073 | eval_context_ceiling.sbatch | completed | 4 KB |
@@ -198,7 +198,7 @@ cites them.
 | 2026-09-15 | 13225106 | eval_basic.sbatch | completed | 2 KB |
 | 2026-09-16 | 13255789 | eval_basic.sbatch | completed | 7 KB |
 | 2026-09-16 | 13266470 | prelaunch_final.sbatch | completed | 34 KB |
-| 2026-09-16 | 13266627 | diag_depth_band.sbatch | completed | 10 KB |
+| 2026-09-16 | 13266627 | diag_depth_band.sbatch | completed | 9 KB |
 | 2026-09-16 | 13266802 | diag_depth_band.sbatch | completed | 5 KB |
 | 2026-09-16 | 13266933 | diag_depth_band.sbatch | completed | 6 KB |
 | 2026-09-16 | 13268047 | prelaunch_final.sbatch | completed | 37 KB |
@@ -210,28 +210,28 @@ cites them.
 | 2026-09-16 | 13272609 | prelaunch_final.sbatch | completed | 43 KB |
 | 2026-09-16 | 13273099 | smoke_geometry_oom.sbatch | OOM | 13 KB |
 | 2026-09-16 | 13275754 | check_p1_probes.sbatch | completed | 6 KB |
-| 2026-09-16 | 13275762 | check_p1_probes.sbatch | completed | 4 KB |
+| 2026-09-16 | 13275762 | check_p1_probes.sbatch | completed | 3 KB |
 | 2026-09-16 | 13275764 | check_p1_probes.sbatch | completed | 8 KB |
 | 2026-09-17 | 13273098 | diag_depth_band.sbatch | completed | 5 KB |
 | 2026-09-17 | 13290595 | unit_suite | completed | 1 KB |
 | 2026-09-17 | 13292623_0 | p21_subst | completed | 1 KB |
 | 2026-09-17 | 13292623_1 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_10 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_11 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_12 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_13 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_14 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_15 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_16 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_17 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_2 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_3 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_4 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_5 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_6 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_7 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_8 | p21_subst | completed | 1 KB |
-| 2026-09-17 | 13292623_9 | p21_subst | completed | 1 KB |
+| 2026-09-17 | 13292623_10 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_11 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_12 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_13 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_14 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_15 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_16 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_17 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_2 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_3 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_4 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_5 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_6 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_7 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_8 | p21_subst | completed | 0 KB |
+| 2026-09-17 | 13292623_9 | p21_subst | completed | 0 KB |
 | 2026-09-17 | 13293539_0 | p21_subst | completed | 4 KB |
 | 2026-09-17 | 13293539_1 | p21_subst | completed | 4 KB |
 | 2026-09-17 | 13294890_0 | p21_subst | completed | 4 KB |
@@ -281,10 +281,11 @@ cites them.
 | 2026-09-19 | 13360885 | eval_write_capacity.sbatch | completed | 5 KB |
 | 2026-09-19 | 13360886 | normtrace | completed | 27 KB |
 | 2026-09-19 | 13360887 | normtrace | completed | 23 KB |
+| 2026-09-19 | 13364458 | unit_suite | completed | 1 KB |
 
 ## Totals
 
-- 268 logs
-- completed: 250
+- 269 logs
+- completed: 251
 - cancelled: 13
 - OOM: 5

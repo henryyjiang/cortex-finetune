@@ -1,0 +1,112 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-21-2026 21:53:40
+Job ID:    13423122
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  readinto_gain
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== in-loop read gain | 4 cells | index 0 ===
+    [0] xattn:a2
+    [1] xattn:a3z
+    [2] refresh:a2
+    [3] refresh:a3z
+    for THIS cell list:  sbatch --array=0-3
+
+    tier 1 | module=xattn  arm=a2
+    checkpoint: cortex-retrofit/probe-p1-a2-accum-w16-cc8-z/checkpoint_91952
+    data:       data/pg19_olmo_val_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:   accum  W=16  latent=ON  s0_read=OFF
+    T=8  n_chunks=8  n=50
+    gates:      0 0.001 0.01 0.1 1 10   (read the |d|/||x|| column, NOT these -- RED 11)
+    out:        eval_results/readinto_gain-20260921/xattn-a2
+
+NVIDIA H200, 143771 MiB
+
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'xattn'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_depth: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_heads: '<absent>' -> 8  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:06<00:06,  6.13s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:06<00:00,  3.08s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_reader.gate', 'cortex.latent_reader.k_proj.weight', 'cortex.latent_reader.out_proj.weight', 'cortex.latent_reader.q_proj.weight', 'cortex.latent_reader.v_proj.weight', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]', 'latent_reader.[qkv,out~N(0,0.02) NOT zero -- see LatentRead]', 'latent_reader.gate=0.1'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/probe-p1-a2-accum-w16-cc8-z/checkpoint_91952/chkpt.pt: 5 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+
+=== P3.0 tier 1 | in-loop read-site gain | LatentRead ===
+    examples 50, T=8
+    ||x|| at the read site  16.1341   <- what the delta is added to
+    ||Z row||               4.3405   <- what is being read
+    intact 3.1920 nats, chance 11.5164, margin 8.3244
+
+    cell                   nats    d(intact)  |d|/||x||
+    noise@0             3.19202      0.00000     0.0000
+    real@0              3.19202      0.00000     0.0000
+    noise@0.001         3.19202      0.00000     0.0000
+    real@0.001          3.19202      0.00000     0.0001
+    noise@0.01          3.19202     -0.00000     0.0000
+    real@0.01           3.19202      0.00000     0.0005
+    noise@0.1           3.19202     -0.00000     0.0004
+    real@0.1            3.19206      0.00004     0.0052
+    noise@1             3.19201     -0.00001     0.0043
+    real@1              3.19529      0.00327     0.0509
+    noise@10            3.19323      0.00121     0.0433
+    real@10             3.46679      0.27477     0.5126
+
+    span (in-distribution cells only)  0.27478 nats
+    knob proven connected              True
+    largest real-vs-noise gap at init  0.27356 nats
+
+    READING: LIVE_site_has_gain
+    Proceed to tier 1.5, the oracle read probe.  Print this row
+    beside the s0 table: that pair is the redesign's evidence.
+
+    A reading is about the SITE only if it holds on BOTH arms.
+    Run a2 and a3z before quoting this.
+
+wrote eval_results/readinto_gain-20260921/xattn-a2/readinto_gain.json
+
+cell xattn/a2 DONE -> eval_results/readinto_gain-20260921/xattn-a2/readinto_gain.json
+
+READING ORDER, and it is not the order the cells finish in:
+  1. Is the intact loss below chance?  If not, nothing else in the
+     table is a result (RED 10).
+  2. Does the |d|/||x|| column move with the gate?  If not, the axis
+     is fiction and the verdict is meaningless.
+  3. Do BOTH arms agree in the in-distribution window?  Only then is
+     the reading about the SITE rather than about a buffer.
+  4. Only then: LIVE -> tier 1.5 (~8 GPU-hours).  DEAD -> audit the
+     instrument, do NOT spend the 8 hours.
+---------------------------------------
+Begin Slurm Epilog: Sep-21-2026 22:15:42
+Job ID:        13423122
+Array Job ID:  13420851_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      readinto_gain
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=02:56:48,vmem=0,walltime=00:22:06,mem=13985212K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-018-14-0
+---------------------------------------
