@@ -15,7 +15,7 @@
 
 # P3.0 TIER 1.5 -- THE ORACLE READ PROBE.  THE GO/NO-GO.
 #
-#   sbatch pace/p30_oracle.sbatch                        # 4 cells, ~8 GPU-hours
+#   sbatch pace/p30_oracle.sbatch                        # 4 cells, ~5-7 GPU-hours
 #   ARMS=a2 sbatch --array=0-1 pace/p30_oracle.sbatch    # one arm, both limbs
 #
 # THE QUESTION, and it is the only one left that Z can be closed on:
@@ -133,7 +133,12 @@ READ_DEPTH=${READ_DEPTH:-none}
 # 141, so there is room -- but nobody has measured THIS configuration, so read
 # the first cell's peak before assuming the other three fit.
 MICRO_BS=${MICRO_BS:-2}
-BATCH_SIZE=${BATCH_SIZE:-8}
+# BATCH_SIZE 4, NOT 8.  The scramble needs micro_batch >= 2; it does NOT need a
+# bigger EFFECTIVE batch, and every arm on record ran 4 sequences x 4096 =
+# 16,384 tokens per optimizer step (p1_arms: micro 1, batch 4).  Holding that
+# constant keeps the token budget comparable and halves the cost; micro 2 with
+# batch 4 is simply 2 accumulation steps instead of 4.
+BATCH_SIZE=${BATCH_SIZE:-4}
 MAX_LENGTH=${MAX_LENGTH:-4096}
 if [ "$MICRO_BS" -lt 2 ]; then
     echo "ERROR: MICRO_BS=$MICRO_BS but the scramble control needs >= 2."
@@ -145,11 +150,22 @@ if [ $(( MAX_LENGTH % CROSS_CHUNKS )) -ne 0 ]; then
     echo "ERROR: MAX_LENGTH ($MAX_LENGTH) is not divisible by CROSS_CHUNKS"          "($CROSS_CHUNKS) -- chunks would be ragged."; exit 1
 fi
 
-# ~2 h per cell.  The transient is visible far earlier -- the gate's deficit
-# halved inside a 400-step window on P2.3 -- but the read starts from a small
-# nonzero init and this is the only training it gets, so do not read it before
-# the budget.
-PROBE_STEPS=${PROBE_STEPS:-2000}
+# COST, from the P2.3 measurement (3,935 tok/s at micro 1 / batch 4 / 4096,
+# sampled num_steps, Muon on, full-model optimizer).  Throughput HERE is
+# unmeasured and pulls both ways: the forced [0,T] split puts all 8 iterations
+# in the gradient where the sampler averaged fewer, but there is no Muon and
+# only FIVE trainable tensors, so the optimizer step is nearly free.  Bracketed
+# 2,500-3,900 tok/s:
+#
+#   1000 steps x 4 x 4096 = 16.4M tok  ->  1.2-1.8 h/cell, 4.7-7.3 GPU-h for 4
+#   2000 steps                         ->  2.3-3.6 h/cell, 9.3-14.6 GPU-h
+#
+# 1000 is the default because only 16.8M parameters train here, at lr 1e-3, and
+# they either learn to use Z or they do not -- this is an existence test, not a
+# cell, and it is NOT governed by p23's stopping rule.  THE GATE TRAJECTORY IN
+# cortex_diag.jsonl IS THE CHECK: if the read gate is still moving at step 1000,
+# extend rather than reading a number off a module that had not settled.
+PROBE_STEPS=${PROBE_STEPS:-1000}
 
 # DIAG_INTERVAL: p1_arms.sbatch defaults this to 0 and that default is why job
 # 10 had to be reconstructed post-hoc from six checkpoints.  The read GATE's
