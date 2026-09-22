@@ -843,9 +843,26 @@ class CortexMemory(nn.Module):
                 "were spliced; E and Z share the ring pointer and must share "
                 "the row count.")
         self._z_inloop_n += 1
+        # RECORDED ON BOTH PATHS.  The refresh branch used to return before
+        # this block, so tiers 0.5's whole axis printed as a dash and the two
+        # refresh cells of job 13420851 were scored on gate values alone --
+        # the one thing their own launcher header says not to read.  A norm
+        # that is recorded on one branch of two is not a measurement.
+        self._x_read_norm = _row_norm(x)
+        self._z_row_norm = _row_norm(z)
 
         if isinstance(self.latent_reader, LatentRefresh):
-            return self.latent_reader(x, z, n_pre)
+            # ||x|| OVER THE CARRIED COLUMNS ONLY for this module, because
+            # those are the only columns it perturbs.  The ratio has to mean
+            # "how big is the injection against the field it is injected into"
+            # on BOTH modules or the two tiers are on different axes: xattn
+            # touches every packed position, the refresh touches n_pre of
+            # ~650.  Measured against the whole-sequence mean the refresh would
+            # look ~5x quieter than it is.
+            self._x_read_norm = _row_norm(x[:, :n_pre])
+            out = self.latent_reader(x, z, n_pre)
+            self._z_read_delta_norm = _row_norm(out[:, :n_pre] - x[:, :n_pre])
+            return out
 
         if self.latent_read_depth == "matched":
             if current_step is None:
@@ -878,12 +895,11 @@ class CortexMemory(nn.Module):
         # scale looks compatible for once -- post-adapter ||x|| ~ 10 against Z
         # rows of ~1-5, where the s0 site had 0.39 against ||E|| = 171 -- and
         # then says to measure it, with the same recording RED 11's fix added
-        # for `_e_carried_norm`.  All three in fp32: these are norms of large
-        # states and a bf16 pass already invented one plateau in this project
-        # (P0.1, 6x overstatement).  Last iteration wins; the probe reads them
-        # after the forward.
-        self._x_read_norm = _row_norm(x)
-        self._z_row_norm = _row_norm(z)
+        # for `_e_carried_norm`.  fp32: these are norms of large states and a
+        # bf16 pass already invented one plateau in this project (P0.1, 6x
+        # overstatement).  Last iteration wins; the probe reads them after the
+        # forward.  x and Z were recorded above, before the depth subset, so
+        # `_z_row_norm` is the whole carried Z and not the matched slice.
         self._z_read_delta_norm = _row_norm(delta)
         return x + delta
 
@@ -1178,17 +1194,32 @@ class CortexMemory(nn.Module):
         """Z's ablation null.  `latent_read_null` is the contract
         evals/eval_carry_2x2.py sets: ("noise", std, seed)."""
         kind = null[0] if isinstance(null, (tuple, list)) else str(null)
-        if kind != "noise":
+        if kind not in ("noise", "noise_matched"):
             raise ValueError(
-                f"latent_read_null kind must be 'noise'; got {kind!r}.  Zeros "
-                "are E's null and the wrong one for Z -- a zeroed latent field "
-                "is not a state the model has ever seen, while noise is its own "
-                "trained default for these columns.")
-        std = float(null[1]) if len(null) > 1 else 0.02
+                f"latent_read_null kind must be 'noise' or 'noise_matched'; "
+                f"got {kind!r}.  Zeros are E's null and the wrong one for Z -- "
+                "a zeroed latent field is not a state the model has ever seen, "
+                "while noise is its own trained default for these columns.")
+        std = float(null[1]) if len(null) > 1 and null[1] is not None else 0.02
         seed = int(null[2]) if len(null) > 2 else 0
         g = torch.Generator(device="cpu").manual_seed(seed)
         n = torch.empty(head.shape, dtype=torch.float32).normal_(
             0.0, std, generator=g)
+        if kind == "noise_matched":
+            # ROW-NORM MATCHED TO THE FIELD IT REPLACES, which a fixed std is
+            # NOT.  At D=2048 a per-element std of 0.02 is a row of norm 0.905,
+            # against ||Z row|| ~ 4.3 on both P1 arms -- 4.8x apart.  Job
+            # 13420851 reported that gap as a "content effect at init" of 0.27
+            # nats when it was almost entirely magnitude, which is the same
+            # class of error as RED 11: a label claiming something the code
+            # does not do.  A content control has to differ from the real thing
+            # in CONTENT ONLY.
+            #
+            # `head` here is the real Z (see _latent_z_rows), so the match is
+            # exact and PER ROW rather than on the mean -- the ring's rows are
+            # written at different chunk ages and their norms are not equal.
+            ref = head.detach().float().norm(dim=-1, keepdim=True)
+            n = n * (ref / n.norm(dim=-1, keepdim=True).clamp_min(1e-12))
         return n.to(device=head.device, dtype=head.dtype)
 
     @staticmethod

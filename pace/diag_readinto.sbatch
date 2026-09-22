@@ -121,7 +121,7 @@ READ_DEPTH=${READ_DEPTH:-none}
 # contributing exactly nothing) and 10 is deliberately oversized so the run
 # carries its own proof that the knob reaches the model.  KEEP AT LEAST ONE
 # CELL ABOVE ||delta|| = ||x|| or the verdict can only ever be INVALID.
-GATES=${GATES:-"0 0.001 0.01 0.1 1 10"}
+GATES=${GATES:-"0 0.001 0.01 0.1 0.3 1 3 10"}
 
 # Only the DUAL arms have a Z to read, and only the xattn/refresh modules have
 # a knob to turn.  The tool refuses anything else rather than printing a flat
