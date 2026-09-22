@@ -1,0 +1,165 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-22-2026 19:17:23
+Job ID:    13454425
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  p30_noread
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== p30 no-read | arm=a2 ===
+    parent:  cortex-retrofit/probe-p1-a2-accum-w16-cc8-z/checkpoint_91952
+    oracle:  cortex-retrofit/p30-oracle-a2-real/final_checkpoint
+    overlay: cortex-retrofit/p30-oracle-a2-real/eval_overlay
+{
+ "parent": "cortex-retrofit/probe-p1-a2-accum-w16-cc8-z/checkpoint_91952",
+ "oracle": "cortex-retrofit/p30-oracle-a2-real/final_checkpoint",
+ "reader_keys": [
+  "cortex.latent_reader.gate",
+  "cortex.latent_reader.k_proj.weight",
+  "cortex.latent_reader.out_proj.weight",
+  "cortex.latent_reader.q_proj.weight",
+  "cortex.latent_reader.v_proj.weight"
+ ],
+ "frozen_checked": [
+  "cortex.prefix.summary_emb",
+  "cortex.prefix.summary_seeded",
+  "transformer.coda.1.norm_1.weight",
+  "transformer.coda.2.attn.Wqkv.weight",
+  "transformer.core_block.0.attn.q_norm.weight",
+  "transformer.core_block.1.attn.k_norm.weight",
+  "transformer.core_block.2.attn.proj.weight",
+  "transformer.core_block.3.norm_2.weight",
+  "transformer.core_block.4.mlp.fc.weight",
+  "transformer.core_block.5.mlp.proj.weight",
+  "transformer.prelude.1.norm_1.weight",
+  "transformer.prelude.2.attn.Wqkv.weight",
+  "transformer.prelude.3.attn.q_norm.weight",
+  "transformer.wte.weight"
+ ],
+ "reader_gate": 0.014254403300583363,
+ "when": "2026-09-22T19:18:23"
+}
+[overlay] 5 reader tensors on the parent; 14 frozen tensors matched bit-for-bit -> cortex-retrofit/p30-oracle-a2-real/eval_overlay/chkpt.pt
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== 2x2 carry ablation | arm=a2 | T=8 | n_chunks=8 ===
+NVIDIA H200, 143771 MiB
+    checkpoint: cortex-retrofit/p30-oracle-a2-real/eval_overlay
+    data:       data/pg19_olmo_validation_len4096_strided
+    geometry:   accum  W=16  latent=1
+    sets:       --set use_memory=true --set memory_slots=0 --set prefix_memory=accum --set accum_vecs=16 --set accum_max=128 --set latent_carry=true --set latent_depth_rule=absolute --set latent_depth_lo=2 --set latent_depth_hi=9 --set latent_renorm=none --set latent_read=xattn --set latent_read_depth=none --set latent_read_heads=8 --set latent_s0_read=false 
+    z null:     off
+    out:        eval_results/p30_noread/a2
+    pack rows:  1059   (--max_examples 300 is a CEILING)
+    Z IS LIVE: look for the '[2x2] Z null at s0's MEASURED per-element
+    rms ...' line.  If it is absent the null is not at s0's scale and
+    the Z axis is measuring the instrument.
+
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'accum'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'xattn'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_depth: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_heads: '<absent>' -> 8  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.27s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.54it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_reader.gate', 'cortex.latent_reader.k_proj.weight', 'cortex.latent_reader.out_proj.weight', 'cortex.latent_reader.q_proj.weight', 'cortex.latent_reader.v_proj.weight', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward)]', 'latent_reader.[qkv,out~N(0,0.02) NOT zero -- see LatentRead]', 'latent_reader.gate=0.1'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/p30-oracle-a2-real/eval_overlay/chkpt.pt: 0 missing / 0 unexpected keys
+[cortex] carry buffer: n_vec=16 max_vecs=128 (config.json) -> holds the newest 8 chunks; older writes are dropped by the FIFO
+[2x2] Z null at s0's MEASURED per-element rms 0.00858915 (row norm 0.3887, sqrt(D) apart -- do not swap them)
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+  60 samples
+  70 samples
+  80 samples
+  90 samples
+  100 samples
+  110 samples
+  120 samples
+  130 samples
+  140 samples
+  150 samples
+  160 samples
+  170 samples
+  180 samples
+  190 samples
+  200 samples
+  210 samples
+  220 samples
+  230 samples
+  240 samples
+  250 samples
+  260 samples
+  270 samples
+  280 samples
+  290 samples
+  300 samples
+
+==============================================================================
+2x2 carry ablation -- mean NLL over chunks 2..8, n=300 paired samples
+column count is IDENTICAL in every cell; only the contents change
+==============================================================================
+  E1Z1  E=on   Z=on    NLL 3.64053
+  E1Z0  E=on   Z=off   NLL 3.64754
+  E0Z1  E=off  Z=on    NLL 3.98195
+  E0Z0  E=off  Z=off   NLL 3.96023
+
+  chunk-1 sanity: max spread across cells 0.00e+00 (should be ~0 -- no cell has an incoming carry there)
+  health: mean NLL 3.8076, 7.71 nats below chance
+
+------------------------------------------------------------------------------
+  E_main         0.34142  [  0.32130,   0.35834]  *
+               NLL without E minus with E, Z held on.  Positive = E helps.
+  Z_main         0.00701  [ -0.00868,   0.01980]
+               NLL without Z minus with Z, E held on.  Positive = Z helps.
+  Z_alone       -0.02172  [ -0.03456,  -0.01160]  *
+               NLL without Z minus with Z, E held OFF.  Positive = Z helps on its own.  The rung a non-recurrent baseline cannot compete on by construction.
+  interaction   -0.02873  [ -0.03577,  -0.02115]  *
+               E's effect without Z minus E's effect with Z.  NEGATIVE = complements (each is worth MORE when the other is present); positive = substitutes.
+
+wrote eval_results/p30_noread/a2/results.json
+
+2x2 (a2) DONE -> eval_results/p30_noread/a2/results.json
+
+READ THE CHUNK-1 SPREAD FIRST.  Every cell runs chunk 1 with no
+incoming carry, so the four must agree there to floating-point noise.
+A spread that is not ~0 means the cells differ in something other than
+the carry's contents, and no row below it is interpretable.
+---------------------------------------
+Begin Slurm Epilog: Sep-22-2026 19:42:22
+Job ID:        13454425
+Array Job ID:  13450717_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      p30_noread
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=03:20:16,vmem=0,walltime=00:25:02,mem=14319372K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-18-0
+---------------------------------------

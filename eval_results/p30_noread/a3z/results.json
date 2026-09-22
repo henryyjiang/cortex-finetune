@@ -1,0 +1,70 @@
+{
+  "instrument": "2x2 carry ablation (matched column count)",
+  "when": "2026-09-22T19:52:41",
+  "model_name": "ckpts/olmo-retrofit-cortex",
+  "z_channel": true,
+  "config": {
+    "n_chunks": 8,
+    "T": 8,
+    "dtype": "float32",
+    "samples": 300,
+    "s0_std": 0.008582298643887043,
+    "z_null": "off"
+  },
+  "cells": {
+    "E1Z1": {
+      "mean_nll": 3.6276444827374954,
+      "n": 300
+    },
+    "E1Z0": {
+      "mean_nll": 3.613564717145192,
+      "n": 300
+    },
+    "E0Z1": {
+      "mean_nll": 3.8936190710748946,
+      "n": 300
+    },
+    "E0Z0": {
+      "mean_nll": 3.862348215579985,
+      "n": 300
+    }
+  },
+  "effects": {
+    "E_main": {
+      "mean_nats": 0.2659745883373987,
+      "ci_lo": 0.25220077903497784,
+      "ci_hi": 0.2773540225241865,
+      "n": 300,
+      "note": "NLL without E minus with E, Z held on.  Positive = E helps."
+    },
+    "Z_main": {
+      "mean_nats": -0.014079765592302613,
+      "ci_lo": -0.04695371122019633,
+      "ci_hi": 0.013165527096816463,
+      "n": 300,
+      "note": "NLL without Z minus with Z, E held on.  Positive = Z helps."
+    },
+    "Z_alone": {
+      "mean_nats": -0.03127085549490791,
+      "ci_lo": -0.05727749084858665,
+      "ci_hi": -0.009355189628544296,
+      "n": 300,
+      "note": "NLL without Z minus with Z, E held OFF.  Positive = Z helps on its own.  The rung a non-recurrent baseline cannot compete on by construction."
+    },
+    "interaction": {
+      "mean_nats": -0.017191089902605296,
+      "ci_lo": -0.025686739197799097,
+      "ci_hi": -0.007839291073027065,
+      "n": 300,
+      "note": "E's effect without Z minus E's effect with Z.  NEGATIVE = complements (each is worth MORE when the other is present); positive = substitutes."
+    }
+  },
+  "chunk1_max_spread": 0.0,
+  "chunk1_ok": true,
+  "health": {
+    "mean_nll": 3.749294121634392,
+    "chance": 11.516439284270025,
+    "margin": 7.767145162635632,
+    "at_chance": false
+  }
+}
