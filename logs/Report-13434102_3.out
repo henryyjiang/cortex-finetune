@@ -1,0 +1,104 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-22-2026 13:13:08
+Job ID:    13434102
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  p30_oracle
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== P3.0 tier 1.5 oracle probe | 4 cells | index 3 ===
+    [0] a2:real
+    [1] a2:shuffled
+    [2] a3z:real
+    [3] a3z:shuffled
+    for THIS cell list:  sbatch --array=0-3
+
+    arm=a3z  limb=shuffled  (scramble=true)
+    branch:     cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952
+    data:       data/pg19_fw50_olmo_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:   gated  W=16  cc=8  T=[0,8]
+    trainable:  cortex.latent_reader ONLY
+    batch:      micro=2 total=4   (micro >= 2 REQUIRED -- the scramble rolls it)
+    steps:      1000   diag every 50
+    run:        p30-oracle-a3z-shuffled
+
+NVIDIA H200, 143771 MiB
+
+Tue Sep 22 13:13:22: Time to load libraries: 11.23 seconds.
+[cortex] WARNING: latent_carry with max_mean_rec 32 and mean_backprop_depth 8 (assumed; set --override_mean_backprop_depth to be sure) freezes the first 24 loop steps, which covers the whole write band 2..9.  Z becomes a FROZEN FEATURE EXTRACTOR: the model can learn to USE it, never to SHAPE it.  That is the mirror of the frozen-READ failure that cost x0.90 -> x1.33.  Raise mean_backprop_depth or accept it IN THE PRE-REGISTRATION -- it changes what a null result for Z means.
+--------------------------------------------------------------------
+------------------ Launching run p30-oracle-a3z-shuffled------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-03-020-18-0.pace.gatech.edu.
+GPU : NVIDIA H200. CUDA: 12.1.
+[cortex] memory ON: K=0 K_iter=0 ccot_direct=False accum_ccot=False (vecs=16/max=64) gated_accum=False prefix_memory=gated gate(K=64,route=ring,norm=tanh,init=zero,fill=grow) latent(Z on, rule=absolute,band=2..9,renorm=none,read=xattn/none,SCRAMBLED(control arm)) prefix_pos=tail prefix_eos_reset=False cross_chunks=8 carry_grad_chunks=4 random_segments=False lora_rank=0
+[cortex] Z channel ON.  latent_depth_rule='absolute' is P0.7's question (evals/diag_depth_band.py): P0.1 measured the band at a SINGLE T and cannot say whether 'informative' tracks the absolute step or the fraction of the loop.  If P0.7 has not reported, this run is asserting an answer it does not have -- record which, in this run's sbatch header.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [07:04<07:04, 424.03s/it]Loading checkpoint shards: 100%|██████████| 2/2 [07:06<00:00, 175.87s/it]Loading checkpoint shards: 100%|██████████| 2/2 [07:06<00:00, 213.09s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_reader.gate', 'cortex.latent_reader.k_proj.weight', 'cortex.latent_reader.out_proj.weight', 'cortex.latent_reader.q_proj.weight', 'cortex.latent_reader.v_proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run n31x61la
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retrofit/wandb/run-20260922_132042-n31x61la
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run p30-oracle-a3z-shuffled
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/n31x61la
+/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py:788: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  ckpt = torch.load(f"{path}/chkpt.pt", map_location=device)
+[cortex] reset 8 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_reader.[qkv,out~N(0,0.02) NOT zero -- see LatentRead]', 'latent_reader.gate=0.1'] (undo post_init clobber)
+[cortex] TIER 1.5 ORACLE PROBE: training 5 params under cortex.latent_reader, froze 129.  Nothing else can absorb the signal -- and nothing else will improve, so this run's loss is NOT comparable to a cell's.
+[branch] loaded weights from cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952; 5 new memory params start fresh: ['cortex.latent_reader.gate', 'cortex.latent_reader.q_proj.weight', 'cortex.latent_reader.k_proj.weight', 'cortex.latent_reader.v_proj.weight', 'cortex.latent_reader.out_proj.weight']
+[branch] optimizer state NOT restored (param set changed); LR schedule, recurrence ramp and step counter continue
+--------------------------------------------------------------------
+Run finished with errors.
+---------Total time: 0:20:32.261112 ---------
+-----------------Shutdown complete.--------------------------
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 2376, in <module>
+    guarded_main()
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 2364, in guarded_main
+    run_name = main()
+               ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 2333, in main
+    agg_dict = load_checkpoint(state, cfg, device, branch=cfg.resume_path is None)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py", line 845, in load_checkpoint
+    state["scheduler"].load_state_dict(ckpt["scheduler"])
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/optim/lr_scheduler.py", line 378, in load_state_dict
+    self.lr_lambdas[idx].__dict__.update(fn)
+    ~~~~~~~~~~~~~~~^^^^^
+IndexError: list index out of range
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mp30-oracle-a3z-shuffled[0m at: [34mhttps://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/n31x61la[0m
+
+cell a3z/shuffled FAILED rc=1
+---------------------------------------
+Begin Slurm Epilog: Sep-22-2026 13:33:45
+Job ID:        13434102
+Array Job ID:  13434102_3
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      p30_oracle
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=01:28:56,vmem=0,walltime=00:11:07,mem=4364928K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------
