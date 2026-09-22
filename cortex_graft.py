@@ -357,6 +357,20 @@ class CortexMemory(nn.Module):
         self.latent_read_heads = int(getattr(config, "latent_read_heads", 8))
         self.latent_read_gate_init = float(
             getattr(config, "latent_read_gate_init", 0.1))
+        # P3.0 tier 1.5's control arm.  A CONFIG FLAG and not a runtime
+        # attribute like `latent_read_null`, because this one runs for a whole
+        # TRAINING cell rather than per chunk of an eval: it has to persist
+        # into the checkpoint, print in the banner, and be impossible to
+        # confuse with the treatment arm after the fact.
+        self.latent_read_scramble = bool(
+            getattr(config, "latent_read_scramble", False))
+        if self.latent_read_scramble and self.latent_read == "none":
+            raise ValueError(
+                "cortex.latent_read_scramble with latent_read='none' scrambles "
+                "a channel nothing reads.  The scramble is the CONTROL for an "
+                "in-loop read arm; without the read it changes nothing and the "
+                "cell would be labelled a control while being a duplicate of "
+                "the baseline.")
         if self.latent_read not in ("none", "refresh", "xattn"):
             raise ValueError(
                 f"cortex.latent_read must be 'none', 'refresh' or 'xattn'; got "
@@ -1152,6 +1166,27 @@ class CortexMemory(nn.Module):
         null = getattr(self, "latent_read_null", None)
         if null is not None:
             z = self._null_latent(null, z)
+        elif self.latent_read_scramble:
+            # TIER 1.5's CAPACITY CONTROL, and it belongs on the READ side
+            # only.  Rolling the batch gives every sequence another document's
+            # carried trajectory: same shape, same scale, same statistics, same
+            # number of parameters reading it -- differing ONLY in whether the
+            # content corresponds to this document's own previous chunk.  That
+            # is the comparison p30 S5 fixes as the treatment-vs-control pair,
+            # and it is what separates "the read module buys capacity or
+            # register" from "the read module buys CONTENT".
+            #
+            # Rolled here, in the read fetch, so the WRITE is untouched: the
+            # buffer still receives this document's own trajectory and the two
+            # arms differ in exactly one thing.
+            if z.shape[0] < 2:
+                raise ValueError(
+                    "latent_read_scramble needs batch >= 2 -- a roll of a "
+                    "single row returns that same row, so the control arm "
+                    "would silently BE the treatment arm and the two would "
+                    "differ by nothing.  Raise per_device_bs or lower "
+                    "accumulation.")
+            z = torch.roll(z, shifts=1, dims=0)
         return z
 
     def _packed_read_mask(self, x: torch.Tensor) -> Optional[torch.Tensor]:
@@ -1417,6 +1452,46 @@ def _unwrap_for_reset(model):
     if hasattr(m, "_orig_mod"):
         m = m._orig_mod
     return m
+
+
+def set_read_only_trainable(model) -> tuple:
+    """P3.0 tier 1.5: freeze EVERYTHING except the in-loop read module.
+
+    Returns (n_trainable, n_frozen).
+
+    NOT `set_loop_trainable(False)`, which is the opposite end of the model:
+    that freezes adapter + core_block and leaves memory, coda, embeddings and
+    norms TRAINING.  The oracle probe needs the reverse -- only
+    `cortex.latent_reader` may move -- so that nothing else can absorb,
+    launder or fight the signal.  If the buffer, the gates or the coda were
+    free, a win could come from them and the arm would answer a different
+    question than the one it was run to answer.
+
+    The name match is on the module path, not a substring of a parameter name:
+    `latent_reader` is a submodule of the graft, so every parameter under it
+    starts with the same prefix and nothing else does.
+    """
+    target = _unwrap_for_reset(model)
+    cortex = getattr(target, "cortex", None)
+    if cortex is None or getattr(cortex, "latent_reader", None) is None:
+        raise ValueError(
+            "train_read_only needs an in-loop read module: pass "
+            "--cortex.latent_read xattn|refresh.  Freezing everything with "
+            "nothing left trainable would run a cell whose loss cannot move "
+            "and report it as a null.")
+    n_train = n_frozen = 0
+    for name, p in target.named_parameters():
+        want = ".latent_reader." in ("." + name)
+        p.requires_grad_(want)
+        n_train += int(want)
+        n_frozen += int(not want)
+    if not n_train:
+        raise ValueError(
+            "train_read_only matched ZERO parameters under cortex."
+            "latent_reader.  The module exists but its parameters are named "
+            "something this filter does not see -- fix the filter, do not run "
+            "a cell with a frozen model.")
+    return n_train, n_frozen
 
 
 def reset_cortex_graft_init(model, log=None):

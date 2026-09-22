@@ -74,6 +74,7 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 # reads nothing while reporting the arm that does.
                 "latent_s0_read", "latent_read", "latent_read_depth",
                 "latent_read_heads", "latent_read_gate_init",
+                "latent_read_scramble",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

@@ -25,6 +25,7 @@ from datasets import load_dataset, Dataset, load_from_disk
 from contextlib import nullcontext
 from stateful_parquet_dataset import get_parquet_dataloader
 from cortex_graft import reset_cortex_graft_init as _reset_cortex_graft_init
+from cortex_graft import set_read_only_trainable as _set_read_only_trainable
 from cortex_memory.chunking import random_chunk_sizes, detach_old_vecs
 from cortex_memory.health import training_diag
 from recipe_utils import (
@@ -110,6 +111,16 @@ class CLISettings:
     wandb_disabled: bool = False
     seed: int = 74
     fix_num_steps: bool = False
+    # P3.0 tier 1.5.  "n,k" forces num_steps = [n, k] on every batch, e.g.
+    # "0,8" = zero no-grad prefix at the trained depth, which makes the read
+    # gradient live on every iteration of every batch.  Empty = off, and off
+    # is the default so nothing that exists changes.  Distinct from
+    # fix_num_steps (hardcoded [0,1], for compile warmup) because reusing that
+    # would run the oracle probe at a single recurrent step.
+    force_num_steps: str = ""
+    # P3.0 tier 1.5.  Freeze everything except cortex.latent_reader, so the
+    # oracle probe measures the READ and nothing else can absorb the signal.
+    train_read_only: bool = False
     init_from_scratch: bool = False
     take_loss_over_all_tokens: bool = False # for chat templated datasets default is to only supervise assistant tokens
     max_grad_norm: float = 1.0
@@ -343,6 +354,11 @@ class CLISettings:
             #                code change, same reasoning as latent_depth_rule.
             latent_s0_read=True, latent_read="none", latent_read_depth="none",
             latent_read_heads=8, latent_read_gate_init=0.1,
+            # P3.0 tier 1.5's CONTROL arm: the read sees another document's
+            # carried Z (a roll of the batch), so treatment and control
+            # differ in CONTENT CORRESPONDENCE and nothing else -- same
+            # module, same capacity, same seed, same data order.
+            latent_read_scramble=False,
             # diag_interval: every N optimizer steps, log the architecture's
             # health (carry rank + per-channel norms, whether either gate has
             # left its exactly-zero init, the Z read/write gradient fractions)
@@ -910,6 +926,18 @@ def set_loop_trainable(model, trainable: bool) -> int:
     return n
 
 
+def set_read_only_trainable(model) -> tuple:
+    """Rank-0-logging wrapper over cortex_graft.set_read_only_trainable.
+
+    The body lives in cortex_graft.py for the same reason
+    reset_cortex_graft_init's does: train.py imports wandb, so ANY helper that
+    lives here is unreachable from the unit suite and from the login-node
+    tools.  A freeze whose correctness cannot be tested is a freeze that
+    silently trains the wrong parameter set.
+    """
+    return _set_read_only_trainable(get_unwrapped_model_from_module(model))
+
+
 def reset_cortex_graft_init(model):
     """Rank-0-logging wrapper over cortex_graft.reset_cortex_graft_init.
 
@@ -1019,7 +1047,11 @@ def startup(cfg: CLISettings):
                    # unexpected keys, and score an arm that reads nothing while
                    # reporting the arm that does.
                    "latent_s0_read", "latent_read", "latent_read_depth",
-                   "latent_read_heads", "latent_read_gate_init"):
+                   "latent_read_heads", "latent_read_gate_init",
+                   # The control arm MUST persist: a scrambled-read cell
+                   # reloaded without it becomes the treatment arm, and the
+                   # two would be indistinguishable after the fact.
+                   "latent_read_scramble"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -1043,6 +1075,8 @@ def startup(cfg: CLISettings):
                      f"{cfg.cortex['latent_read']}"
                      + (f"/{cfg.cortex['latent_read_depth']}"
                         if cfg.cortex['latent_read'] == 'xattn' else "")
+                     + (",SCRAMBLED(control arm)"
+                        if cfg.cortex['latent_read_scramble'] else "")
                      + ") "
                      if cfg.cortex['latent_carry'] else "") +
                   f"prefix_pos={cfg.cortex['prefix_pos']} "
@@ -1223,6 +1257,19 @@ def startup(cfg: CLISettings):
         n_frozen = set_loop_trainable(model, trainable=False)
         if is_main_process():
             print(f"[cortex] froze {n_frozen} loop (adapter+core_block) params")
+    if cfg.train_read_only:
+        if cfg.cortex["freeze_loop"]:
+            raise ValueError(
+                "train_read_only and freeze_loop are different freezes and "
+                "combining them is a configuration error, not a stricter "
+                "freeze: freeze_loop leaves memory and coda TRAINING, which "
+                "train_read_only then overrides wholesale.  Pick one.")
+        n_train, n_frozen = set_read_only_trainable(model)
+        if is_main_process():
+            print(f"[cortex] TIER 1.5 ORACLE PROBE: training {n_train} params "
+                  f"under cortex.latent_reader, froze {n_frozen}.  Nothing "
+                  f"else can absorb the signal -- and nothing else will "
+                  f"improve, so this run's loss is NOT comparable to a cell's.")
 
     ##########  Distribute model   ##############
     if distributed:
@@ -1810,6 +1857,32 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
         new_backprop_depth = model_config.mean_backprop_depth
         num_steps_sampler_partial = partial(num_steps_sampler, mean_recurrence=new_mean_rec, mean_backprop_depth=new_backprop_depth, cfg=cfg)
 
+    # P3.0 tier 1.5's forced split.  Parsed ONCE, here, so a malformed value
+    # fails before the data loader and the wandb run exist rather than on the
+    # first forward of a queued job -- the same reason summary_init_token is
+    # resolved at build time.
+    _FORCED_NUM_STEPS = None
+    if cfg.force_num_steps:
+        try:
+            _n, _k = (int(v) for v in str(cfg.force_num_steps).split(","))
+        except Exception:
+            raise ValueError(
+                f"force_num_steps must be 'n,k' (e.g. '0,8'); got "
+                f"{cfg.force_num_steps!r}")
+        if _n < 0 or _k < 1:
+            raise ValueError(
+                f"force_num_steps needs n >= 0 and k >= 1; got {_n},{_k}.  "
+                "k < 1 would put the whole loop outside the gradient.")
+        _FORCED_NUM_STEPS = torch.tensor([_n, _k], dtype=torch.long)
+        if is_main_process():
+            print(f"[cortex] force_num_steps: every batch runs [{_n}, {_k}].  "
+                  f"This OVERRIDES the sampler, so mean_recurrence and "
+                  f"mean_backprop_depth no longer describe this run.")
+            if _n == 0:
+                print("[cortex]   n=0: the Z read gradient is live on EVERY "
+                      "batch (latent_read_grad_frac 1.0 by construction, not "
+                      "by the sampler's ~0.55 at mr8).")
+
     # The resume cursor is only meaningful within one pass over the data:
     # data_step restarts at 1 on every epoch, so "resume at item N" does not name
     # a position once there is more than one epoch.  Before 2026-09-14 this
@@ -1864,7 +1937,17 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
             tokens_in_step += input_ids.numel()
             is_accumulating = (data_step % accumulation_steps != 0)
  
-            if cfg.fix_num_steps:
+            if cfg.force_num_steps:
+                # P3.0 tier 1.5: a FIXED split, zero no-grad prefix, so every
+                # iteration carries read gradient.  A deliberate departure from
+                # the training distribution -- this is an existence test, not a
+                # cell -- and it is why the tier is not a Tier 2 result.
+                #
+                # Separate from `fix_num_steps`, which is hardcoded to [0,1]
+                # and exists for compile warmup.  Reusing that flag would have
+                # meant running the oracle probe at ONE recurrent step.
+                num_steps = _FORCED_NUM_STEPS.to(model.device)
+            elif cfg.fix_num_steps:
                 num_steps = torch.tensor([0,1], device=model.device)
             elif cfg.compile_warmup_routine:
                 num_steps = get_steps_compiling(data_step, model.device)
