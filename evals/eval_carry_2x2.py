@@ -130,6 +130,14 @@ def parse_args() -> argparse.Namespace:
                         "carry can supply it), 'local' = answers computable "
                         "from this chunk alone -- the task's own positive "
                         "control.  Chunk boundaries are this eval's own.")
+    p.add_argument("--cells", default="",
+                   help="comma list of cells to run, e.g. E1Z1,E1Z0.  Empty = "
+                        "every cell the model supports (the default, and every "
+                        "2x2 on record).  Added for J1: its main limbs trained "
+                        "with E always on, so their E-off cells are an "
+                        "untrained condition and cost half the read-out for "
+                        "nothing.  Effects whose cells were not run are "
+                        "omitted, never computed from nothing.")
     p.add_argument("--out_dir", default="eval_results/carry_2x2")
     p.add_argument("--allow_scrambled", action="store_true",
                    help="score a checkpoint whose read is wired to ANOTHER "
@@ -298,6 +306,28 @@ def score_mask(row: dict, score: str, n_chunks: int, keep: int) -> torch.Tensor:
     return torch.tensor(m, dtype=torch.float32)
 
 
+def select_cells(cells: tuple, wanted: str) -> tuple:
+    """The subset of `cells` named in the comma list `wanted` ('' = all).
+
+    Refuses a name the model does not support (an E-only model has no E1Z0)
+    rather than dropping it, and refuses a single cell: the chunk-1 veto
+    compares cells, and one cell would pass it vacuously.
+    """
+    if not wanted.strip():
+        return cells
+    names = [w.strip() for w in wanted.split(",") if w.strip()]
+    have = {c[0] for c in cells}
+    bad = [n for n in names if n not in have]
+    if bad:
+        raise SystemExit(f"--cells {wanted!r}: {bad} not among this model's "
+                         f"cells {sorted(have)}")
+    out = tuple(c for c in cells if c[0] in names)
+    if len(out) < 2:
+        raise SystemExit("--cells needs at least two cells: the chunk-1 veto "
+                         "compares cells and would pass vacuously on one.")
+    return out
+
+
 def paired_ci(deltas, n_boot: int, seed: int = 0):
     if not deltas:
         return (float("nan"),) * 3
@@ -426,6 +456,7 @@ def main() -> int:
         return 3
 
     cells = CELLS if z_live else (("E1Z1", True, True), ("E0Z1", False, True))
+    cells = select_cells(cells, args.cells)
     num_steps = to_num_steps(args.T)
 
     from datasets import load_from_disk
@@ -521,7 +552,9 @@ def main() -> int:
         "config": {"n_chunks": args.n_chunks, "T": args.T,
                    "dtype": args.dtype, "samples": n_used,
                    "s0_std": s0_std, "z_null": args.z_null,
-                   "score": args.score},
+                   "score": args.score, "data": args.data,
+                   "checkpoint": args.checkpoint,
+                   "cells": [c[0] for c in cells]},
         "cells": {}, "effects": {},
         # PER-SAMPLE NLLs, in sample order.  Kept so two MODELS scored on the
         # same pack (J1's three limbs) can be paired offline without a rerun.
