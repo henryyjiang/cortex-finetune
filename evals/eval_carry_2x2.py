@@ -57,6 +57,7 @@ import json
 import os
 import sys
 from datetime import datetime
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -107,12 +108,28 @@ def parse_args() -> argparse.Namespace:
                         "graft builds with NO prefix buffer and the run dies "
                         "with 'this checkpoint has no prefix buffer'.  Mirror "
                         "pace/p1_arms.sbatch's PROBE_SETS for the arm.")
-    p.add_argument("--z_null", default="noise", choices=["noise", "off"],
+    p.add_argument("--z_null", default="noise",
+                   choices=["noise", "off", "donor"],
                    help="what a Z-off cell feeds the read.  'noise' (default) "
                         "is s0's trained default and was the only null before "
                         "P3.0.  'off' SKIPS the read entirely -- the exact "
                         "no-read model, and the baseline tier 1.5's readings "
-                        "(p30 S5 rows 2 and 3) are defined against.")
+                        "(p30 S5 rows 2 and 3) are defined against.  'donor' "
+                        "feeds ANOTHER ROW's carried Z at the same chunk index "
+                        "(row si + n//2): the content control, and how J1's "
+                        "donor limb is scored in its own trained condition "
+                        "(its in-batch roll cannot run at this tool's batch 1).")
+    p.add_argument("--score", default="all",
+                   choices=["all", "answers", "carry", "local"],
+                   help="which tokens a cell's NLL averages over.  'all' (the "
+                        "default, every 2x2 on record) is every token.  The "
+                        "others need a pack with an `answer_dep` column "
+                        "(tools/prepare_carry_task.py --with_answer_dep): "
+                        "'answers' = every answer token, 'carry' = answers "
+                        "whose dependency lies in an EARLIER chunk (only the "
+                        "carry can supply it), 'local' = answers computable "
+                        "from this chunk alone -- the task's own positive "
+                        "control.  Chunk boundaries are this eval's own.")
     p.add_argument("--out_dir", default="eval_results/carry_2x2")
     p.add_argument("--allow_scrambled", action="store_true",
                    help="score a checkpoint whose read is wired to ANOTHER "
@@ -180,9 +197,28 @@ def null_z(state: torch.Tensor, std: float, seed: int) -> torch.Tensor:
     return n.to(device=state.device, dtype=state.dtype)
 
 
+def carried_z(model, cortex, xs, num_steps, device, seed,
+              hidden_size: int) -> list:
+    """The Z rows each chunk of this row READS: entry i is the Z half of the
+    carry entering chunk i (None for chunk 1).  Run as the E1Z1 chain, so a
+    donor's Z is what that row carries in normal use."""
+    torch.manual_seed(seed)
+    state, out_z = None, []
+    cortex.latent_read_null = None
+    for xc in xs:
+        out_z.append(None if state is None else state[..., hidden_size:].clone())
+        with torch.no_grad():
+            out = model(input_ids=xc.unsqueeze(0).to(device),
+                        num_steps=num_steps, m_cross_in=state,
+                        return_m_cross=True)
+        state = (out.get("m_cross") if isinstance(out, dict)
+                 else getattr(out, "m_cross", None))
+    return out_z
+
+
 def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
               e_on: bool, z_on: bool, s0_std: float, hidden_size: int,
-              z_null: str = "noise"):
+              z_null: str = "noise", donor_z: Optional[list] = None):
     """Mean NLL over chunks 2..N for one cell of the 2x2.
 
     Chunk 1 is excluded from the endpoint (no incoming carry either way, so
@@ -202,6 +238,7 @@ def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
             # substitution, handled by the graft hook rather than here.
         cortex.latent_read_null = (None if z_on
                                    else ("off",) if z_null == "off"
+                                   else ("donor", donor_z[i]) if z_null == "donor"
                                    else ("noise", s0_std, seed + i))
         # no_grad IS LOAD-BEARING, not tidiness.  `state` carries the graph to
         # the next chunk, so without this the chain holds every chunk's graph at
@@ -213,19 +250,52 @@ def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
                         return_m_cross=True)
         state = (out.get("m_cross") if isinstance(out, dict)
                  else getattr(out, "m_cross", None))
+        logits = (out["logits"] if isinstance(out, dict) else out.logits)[0].float()
+        ce = F.cross_entropy(logits, yc.to(device), reduction="none")
+        if i == 0:
+            # The chunk-1 SANITY loss is over EVERY token, whatever --score
+            # selects: it checks that the cells agree where no carry exists,
+            # and a scoring mask can leave chunk 1 with nothing to score
+            # (--score carry has no carry answers there by construction).
+            # Identical to the old number under the default all-ones mask.
+            first = float(ce.mean())
+            continue
         n = int(mc.sum())
         if n == 0:
             continue
-        logits = (out["logits"] if isinstance(out, dict) else out.logits)[0].float()
-        ce = F.cross_entropy(logits, yc.to(device), reduction="none")
         loss = float((ce * mc.to(device)).sum() / n)
-        if i == 0:
-            first = loss
-            continue
         tot += loss * n
         ntok += n
     cortex.latent_read_null = None
     return (tot / ntok if ntok else None), first
+
+
+def score_mask(row: dict, score: str, n_chunks: int, keep: int) -> torch.Tensor:
+    """The per-label scoring mask for one row, [keep] float32.
+
+    'all' is all ones -- exactly the mask every 2x2 on record used.  The other
+    modes read the row's `answer_dep` and classify each answer against THIS
+    eval's chunk boundaries (tools/prepare_carry_task.classify), so a model
+    trained on random chunk sizes is scored on the chunking it is evaluated at.
+    """
+    if score == "all":
+        return torch.ones(keep, dtype=torch.float32)
+    dep = row.get("answer_dep")
+    if dep is None:
+        raise SystemExit(
+            f"--score {score} needs an `answer_dep` column and this pack has "
+            "none.  Build the validation pack with tools/prepare_carry_task.py "
+            "--with_answer_dep; a training pack does not carry it.")
+    from tools.prepare_carry_task import NOT_ANSWER, classify
+    if score == "answers":
+        m = [0.0 if d == NOT_ANSWER else 1.0 for d in list(dep)[1:keep + 1]]
+        return torch.tensor(m, dtype=torch.float32)
+    carry, local = classify(list(dep), n_chunks)
+    m = carry if score == "carry" else local
+    if len(m) != keep:
+        raise ValueError(f"score mask covers {len(m)} labels, the row keeps "
+                         f"{keep}: the chunk arithmetic disagrees")
+    return torch.tensor(m, dtype=torch.float32)
 
 
 def paired_ci(deltas, n_boot: int, seed: int = 0):
@@ -323,6 +393,17 @@ def main() -> int:
     inner = _unwrap(model)
     cortex = getattr(inner, "cortex", None)
     refuse_if_scrambled(cortex, "carry_2x2", args.allow_scrambled)
+    if bool(getattr(cortex, "latent_read_scramble", False)):
+        # A scrambled limb's in-batch ROLL cannot run here: this tool scores
+        # batch 1, and a roll of one row raises (or, worse, returns the row).
+        # Its trained condition -- reading another document's Z -- is the
+        # E1Z0 cell under --z_null donor, so turn the roll off and say so.
+        cortex.latent_read_scramble = False
+        print("[2x2] scrambled (donor) limb: in-batch roll OFF for scoring.  "
+              "Its trained condition is the E1Z0 cell under --z_null donor"
+              + ("" if args.z_null == "donor" else
+                 " -- and this run is NOT --z_null donor, so no cell here is "
+                 "that condition"), flush=True)
     if cortex is None or getattr(cortex, "prefix", None) is None:
         print("FAILED: this checkpoint has no prefix buffer.")
         return 2
@@ -385,7 +466,7 @@ def main() -> int:
     n = len(ds) if args.max_examples == 0 else min(args.max_examples, len(ds))
 
     per_cell: dict[str, list[float]] = {c[0]: [] for c in cells}
-    chunk1_spread, n_used = [], 0
+    chunk1_spread, n_used, rows_used = [], 0, []
     for si in range(n):
         ids = torch.tensor(ds[si]["input_ids"], dtype=torch.long)
         if ids.numel() < args.n_chunks * 8:
@@ -393,16 +474,30 @@ def main() -> int:
         x, y = ids[:-1], ids[1:]
         keep = (x.numel() // args.n_chunks) * args.n_chunks
         x, y = x[:keep], y[:keep]
-        mask = torch.ones_like(y, dtype=torch.float32)
+        mask = score_mask(ds[si], args.score, args.n_chunks, keep)
         xs = list(torch.chunk(x, args.n_chunks))
         ys = list(torch.chunk(y, args.n_chunks))
         ms = list(torch.chunk(mask, args.n_chunks))
+
+        donor_z = None
+        if z_live and args.z_null == "donor":
+            # Row si + n//2: far enough that a strided PG-19 pack (~21 rows a
+            # book) puts it in another book, and any other synthetic row is an
+            # independent document by construction.
+            dj = (si + n // 2) % n
+            dids = torch.tensor(ds[dj]["input_ids"], dtype=torch.long)[:-1]
+            if dj == si or dids.numel() < keep:
+                continue
+            dxs = list(torch.chunk(dids[:keep], args.n_chunks))
+            donor_z = carried_z(model, cortex, dxs, num_steps, device,
+                                args.seed + dj, hidden_size)
 
         firsts, ok = [], True
         for name, e_on, z_on in cells:
             nll, first = chain_nll(model, cortex, xs, ys, ms, num_steps, device,
                                    args.seed + si, e_on, z_on, s0_std,
-                                   hidden_size, z_null=args.z_null)
+                                   hidden_size, z_null=args.z_null,
+                                   donor_z=donor_z)
             if nll is None:
                 ok = False
                 break
@@ -414,6 +509,7 @@ def main() -> int:
             continue
         chunk1_spread.append(max(firsts) - min(firsts))
         n_used += 1
+        rows_used.append(si)
         if n_used % 10 == 0:
             print(f"  {n_used} samples", flush=True)
 
@@ -424,8 +520,13 @@ def main() -> int:
         "z_channel": z_live,
         "config": {"n_chunks": args.n_chunks, "T": args.T,
                    "dtype": args.dtype, "samples": n_used,
-                   "s0_std": s0_std, "z_null": args.z_null},
+                   "s0_std": s0_std, "z_null": args.z_null,
+                   "score": args.score},
         "cells": {}, "effects": {},
+        # PER-SAMPLE NLLs, in sample order.  Kept so two MODELS scored on the
+        # same pack (J1's three limbs) can be paired offline without a rerun.
+        "per_sample": {k: list(v) for k, v in per_cell.items()},
+        "sample_rows": rows_used,
         "chunk1_max_spread": (max(chunk1_spread) if chunk1_spread else None),
     }
 
@@ -462,7 +563,7 @@ def main() -> int:
 
     print(f"\n{'=' * 78}")
     print(f"2x2 carry ablation -- mean NLL over chunks 2..{args.n_chunks}, "
-          f"n={n_used} paired samples")
+          f"n={n_used} paired samples, scoring {args.score.upper()} tokens")
     print(f"column count is IDENTICAL in every cell; only the contents change")
     print("=" * 78)
     for name, e_on, z_on in cells:

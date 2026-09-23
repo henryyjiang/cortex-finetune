@@ -296,6 +296,14 @@ def latent_runtime(cortex) -> dict:
                       else None),
         "read_calls": int(getattr(cortex, "_z_inloop_n", 0)),
         "matched_rows": getattr(cortex, "_z_matched_rows", None),
+        # J1.  The limb and the encoding belong in every diag row: a no-read
+        # limb and a real limb have identical-looking gate columns (the no-read
+        # one is None), and the encoding changes what write_grad_frac means.
+        "encoding": str(getattr(cortex, "latent_encoding", "delta")),
+        "write_only": bool(getattr(cortex, "latent_write_only", False)),
+        "read_znorm": str(getattr(cortex, "latent_read_znorm", "none")),
+        "e_dropout": float(getattr(cortex, "e_dropout", 0.0)),
+        "e_dropped": int(getattr(cortex, "_e_dropped", 0)),
     }
 
 

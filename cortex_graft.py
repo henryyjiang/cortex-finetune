@@ -141,6 +141,18 @@ def _row_norm(t: torch.Tensor) -> float:
     return float(t.detach().float().flatten(0, -2).norm(dim=-1).mean())
 
 
+def rescale_rows(z: torch.Tensor, target: float) -> torch.Tensor:
+    """Rescale every row of z to ROW norm `target` (same unit as _row_norm).
+
+    Unwritten ring rows are EXACTLY zero and must stay exactly zero -- they
+    are masked as keys by `written_row_mask`, which tests for exact zero -- so
+    the divisor is clamped rather than the row filled: 0 / eps is 0.
+    Differentiable; the norm is computed in fp32 and cast back.
+    """
+    n = z.float().norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    return (z.float() * (float(target) / n)).to(z.dtype)
+
+
 def memory_enabled(config) -> bool:
     """Master switch — read once in RavenForCausalLM.__init__."""
     return bool(getattr(config, "use_memory", False))
@@ -364,6 +376,81 @@ class CortexMemory(nn.Module):
         # confuse with the treatment arm after the fact.
         self.latent_read_scramble = bool(
             getattr(config, "latent_read_scramble", False))
+        # Z ATTEMPT 2 (J1) -- findings doc, "Attempt 2", Step 2.  Each is a
+        # single-variable switch whose default reproduces every arm on record.
+        #
+        #   latent_encoding    WHAT Z is.  'delta' = the staggered trajectory
+        #                      deltas (attempt 1).  'endpoint' = s_T at the
+        #                      summary columns.  'tokens' = s_T at the last
+        #                      W * latent_tok_pool REAL token columns, mean-
+        #                      pooled to W rows -- the text's working state.
+        #                      Step 0 (D1/D2) picks it; a flag so the pick is a
+        #                      config change, not a modeling-file change.
+        #                      Both state encodings are taken from the LAST
+        #                      iteration, which is always inside the gradient
+        #                      window, where a delta at depth 2..9 is not.
+        #   latent_read_znorm  'rms' rescales every carried Z row to a fixed
+        #                      row norm (latent_read_znorm_target) before the
+        #                      xattn read, so encodings differ in CONTENT and
+        #                      not in injection scale: the endpoint is ~30x the
+        #                      deltas' norm and v_proj is linear in it.
+        #   latent_write_only  J1's NO-READ limb: Z is written every chunk (same
+        #                      write cost, same carry width) and read nowhere.
+        #                      Without the flag that combination raises below,
+        #                      because as an accident it is the frozen-write arm.
+        #   e_dropout          blank the SPLICED E rows of a random share of
+        #                      sequences per forward, training only, so Z is
+        #                      the only carry on those chunks and an E-off eval
+        #                      cell is not out of distribution.  The stored
+        #                      buffer is untouched; only the read is blanked.
+        self.latent_encoding = str(
+            getattr(config, "latent_encoding", "delta") or "delta")
+        _pool = getattr(config, "latent_tok_pool", 4)
+        # No `or 4`: that turned an explicit 0 into 4 and skipped the check.
+        self.latent_tok_pool = int(4 if _pool is None else _pool)
+        self.latent_read_znorm = str(
+            getattr(config, "latent_read_znorm", "none") or "none")
+        self.latent_read_znorm_target = float(
+            getattr(config, "latent_read_znorm_target", 3.0) or 3.0)
+        self.latent_write_only = bool(getattr(config, "latent_write_only", False))
+        self.e_dropout = float(getattr(config, "e_dropout", 0.0) or 0.0)
+        if self.latent_encoding not in ("delta", "endpoint", "tokens"):
+            raise ValueError(
+                f"cortex.latent_encoding must be 'delta', 'endpoint' or "
+                f"'tokens'; got {self.latent_encoding!r}.")
+        if self.latent_encoding != "delta" and not self.latent_carry:
+            raise ValueError(
+                "cortex.latent_encoding selects what the Z channel writes; "
+                "without --cortex.latent_carry true there is no Z channel.")
+        if self.latent_tok_pool < 1:
+            raise ValueError(f"cortex.latent_tok_pool must be >= 1; got "
+                             f"{self.latent_tok_pool}")
+        if self.latent_read_znorm not in ("none", "rms"):
+            raise ValueError(
+                f"cortex.latent_read_znorm must be 'none' or 'rms'; got "
+                f"{self.latent_read_znorm!r}.")
+        if self.latent_read_znorm == "rms" and self.latent_read != "xattn":
+            raise ValueError(
+                "cortex.latent_read_znorm='rms' needs latent_read='xattn'.  With "
+                "no read it normalises nothing; with the refresh it would re-add "
+                "a row of norm latent_read_znorm_target straight into x, which "
+                "is a different arm, not a normalisation.")
+        if self.latent_read_znorm_target <= 0:
+            raise ValueError("cortex.latent_read_znorm_target must be > 0")
+        if self.latent_write_only and (self.latent_read != "none"
+                                       or self.latent_s0_read
+                                       or not self.latent_carry):
+            raise ValueError(
+                "cortex.latent_write_only is the NO-READ limb: it needs "
+                "latent_carry=true, latent_read='none' and latent_s0_read=false. "
+                "With any read on, the flag contradicts the arm it labels.")
+        if not 0.0 <= self.e_dropout < 1.0:
+            raise ValueError(f"cortex.e_dropout must be in [0, 1); got "
+                             f"{self.e_dropout}")
+        if self.e_dropout > 0 and not pmode:
+            raise ValueError(
+                "cortex.e_dropout blanks the carried E rows of the prefix "
+                "splice; without --cortex.prefix_memory there are none.")
         if self.latent_read_scramble and self.latent_read == "none":
             raise ValueError(
                 "cortex.latent_read_scramble with latent_read='none' scrambles "
@@ -396,12 +483,13 @@ class CortexMemory(nn.Module):
                 "written as a decision.  Turning the s0 read off is only "
                 "meaningful on a Z arm; state the arm.")
         if self.latent_carry and self.latent_read == "none" \
-                and not self.latent_s0_read:
+                and not self.latent_s0_read and not self.latent_write_only:
             raise ValueError(
                 "latent_carry is on with latent_s0_read=false and "
                 "latent_read='none': Z would be written every chunk and read "
                 "NOWHERE.  That is the frozen-write arm, and it is almost "
-                "certainly not what was meant -- pick a read site.")
+                "certainly not what was meant -- pick a read site, or pass "
+                "--cortex.latent_write_only true if this IS J1's no-read limb.")
         if self.latent_depth_rule not in ("absolute", "relative"):
             raise ValueError(
                 f"cortex.latent_depth_rule must be 'absolute' or 'relative'; "
@@ -651,6 +739,22 @@ class CortexMemory(nn.Module):
                 # nothing branches on it.
                 self._e_carried_norm = float(
                     e_state.detach().float().flatten(0, -2).norm(dim=-1).mean())
+                # E-DROPOUT (J1 / Step 3), measured AFTER the norm above so that
+                # diagnostic keeps meaning "the E row a read competes with".
+                # Per sequence, per forward, training only; the null is ZEROS,
+                # the same null the 2x2's E-off cell splices, so an E-off eval
+                # is the condition this trained on.  Only the READ is blanked:
+                # the buffer merge below still sees the real carry.
+                # parts[-1] IS REPLACED, not e_state rebound: the splice list
+                # already holds the tensor, and rebinding the local left the
+                # model reading full E while _e_dropped reported the drop
+                # (caught by test_j1_joint before it ever trained).
+                if self.training and self.e_dropout > 0:
+                    keep = (torch.rand(e_state.shape[0], 1, 1,
+                                       device=e_state.device)
+                            >= self.e_dropout).to(e_state.dtype)
+                    parts[-1] = e_state * keep
+                    self._e_dropped = int((keep == 0).sum())
         parts.append(input_embeds)
 
         if write:
@@ -780,6 +884,8 @@ class CortexMemory(nn.Module):
         self._x_read_norm: Optional[float] = None      # ||x|| at the read site, fp32
         self._z_row_norm: Optional[float] = None       # ||Z row||, fp32
         self._z_read_delta_norm: Optional[float] = None  # ||injected delta||, fp32
+        self._z_last_x: Optional[torch.Tensor] = None  # final loop state, NOT detached
+        self._e_dropped: int = 0                       # E rows blanked this forward
 
     def begin(
         self,
@@ -924,6 +1030,8 @@ class CortexMemory(nn.Module):
                 return x
             z = z[:, rows]
 
+        if self.latent_read_znorm == "rms":
+            z = rescale_rows(z, self.latent_read_znorm_target)
         delta = self.latent_reader(x, z, read_mask=self._packed_read_mask(x))
         # MEASURE THE SCALE, DO NOT ASSUME IT.  The pre-registration says the
         # scale looks compatible for once -- post-adapter ||x|| ~ 10 against Z
@@ -996,6 +1104,10 @@ class CortexMemory(nn.Module):
         """
         if not self.latent_carry or self.prefix is None or not self._n_sum:
             return
+        # The whole state, by reference, for the state encodings.  Only the
+        # last call's survives, and that tensor goes on to the coda anyway, so
+        # this holds nothing the graph was not already holding.
+        self._z_last_x = x
         cur = x[:, -self._n_sum:]
         if self._z_prev is not None:
             self._z_tape.append(cur - self._z_prev)
@@ -1172,6 +1284,22 @@ class CortexMemory(nn.Module):
             # out by written_row_mask at read_into but would reach s0 as a
             # state the model has never seen, so the null is None, not zeros.
             return None
+        if null is not None and (null[0] if isinstance(null, (tuple, list))
+                                 else str(null)) == "donor":
+            # ANOTHER DOCUMENT'S Z -- the content control, and the only null
+            # that differs from the real Z in content alone (noise differs in
+            # coherence too; p30 S5).  The caller supplies the donor's carried
+            # rows for THIS chunk index.  Same shape or it is not a swap.
+            dz = null[1] if len(null) > 1 else None
+            if dz is None:
+                return None
+            dz = dz.to(device=template.device, dtype=template.dtype)
+            if dz.shape != z.shape:
+                raise ValueError(
+                    f"donor Z is {tuple(dz.shape)} but this document's carried "
+                    f"Z is {tuple(z.shape)}.  A donor must come from the same "
+                    "chunk index of a row chunked the same way.")
+            return dz
         if null is not None:
             z = self._null_latent(null, z)
         elif self.latent_read_scramble:
@@ -1345,6 +1473,8 @@ class CortexMemory(nn.Module):
         # written down (rule B is specified as k_j = round(f_j * (T-1))), and
         # matching the specification beats reclaiming one delta at the saturated
         # end of the trajectory, which is the end P0.1 says carries least.
+        if self.latent_encoding != "delta":
+            return self._latent_state_write()
         T_loop = len(self._z_tape)
         W = self.prefix.n_vec
         depths = self.latent_depth_map(T_loop, W)
@@ -1353,6 +1483,45 @@ class CortexMemory(nn.Module):
             d = self._z_tape[min(max(k, 1), T_loop) - 1]
             rows.append(d[:, j:j + 1])
         return torch.cat(rows, dim=1)
+
+    def _latent_state_write(self) -> torch.Tensor:
+        """The state encodings: [B, W, D] from the FINAL loop state.
+
+        'endpoint'  s_T at the W summary columns -- the pre-coda twin of E, so
+                    expect it to be largely redundant with E (Step 0's D2
+                    measures exactly that).
+        'tokens'    s_T at the last W * latent_tok_pool real-token columns,
+                    mean-pooled in consecutive groups to W rows.  Packed layout
+                    is [carry | tokens | summary], so the real tokens end at
+                    -n_sum.
+
+        Live (not detached): the last iteration is always inside the gradient
+        window, so this write is on the loss for every training batch.
+        """
+        x = self._z_last_x
+        if x is None:
+            raise RuntimeError(
+                "latent_encoding is a state encoding but the final loop state "
+                "was never recorded: iter_write did not fire.  Same cause as "
+                "the empty-tape error above -- a stale modeling file.")
+        W, n_sum, n_pre = self.prefix.n_vec, self._n_sum, self._n_pre
+        if n_sum != W:
+            raise RuntimeError(
+                f"{n_sum} summary columns but the buffer writes {W}; the packed "
+                "layout does not match the buffer.")
+        if self.latent_encoding == "endpoint":
+            return x[:, -n_sum:]
+        B, S_packed, D = x.shape
+        L = W * self.latent_tok_pool
+        n_real = S_packed - n_pre - n_sum
+        if L > n_real:
+            raise ValueError(
+                f"latent_encoding='tokens' pools the last {L} real tokens "
+                f"(W={W} x latent_tok_pool={self.latent_tok_pool}) but this "
+                f"chunk has only {n_real}.  Lower latent_tok_pool or lengthen "
+                "the chunk.")
+        end = S_packed - n_sum
+        return x[:, end - L:end].reshape(B, W, self.latent_tok_pool, D).mean(dim=2)
 
     def latent_depth_map(self, T: int, n_slots: int) -> list:
         """slot -> loop depth.  The two rules P0.7 exists to choose between.
@@ -1409,6 +1578,10 @@ class CortexMemory(nn.Module):
         """
         if not self._z_grad:
             return 0.0
+        if self.latent_encoding != "delta":
+            # A state encoding is written from the LAST step only, so the share
+            # of the whole tape would understate it at any no-grad prefix.
+            return 1.0 if self._z_grad[-1] else 0.0
         return sum(1 for g in self._z_grad if g) / len(self._z_grad)
 
     # ── hook called in forward() after iterate_forward ──────────────────────

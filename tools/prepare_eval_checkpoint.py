@@ -75,6 +75,10 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 "latent_s0_read", "latent_read", "latent_read_depth",
                 "latent_read_heads", "latent_read_gate_init",
                 "latent_read_scramble",
+                # J1.  A no-read limb's config does not BUILD without
+                # latent_write_only, and latent_encoding changes what Z is.
+                "latent_encoding", "latent_tok_pool", "latent_read_znorm",
+                "latent_read_znorm_target", "latent_write_only", "e_dropout",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

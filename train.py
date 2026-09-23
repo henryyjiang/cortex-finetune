@@ -359,6 +359,18 @@ class CLISettings:
             # differ in CONTENT CORRESPONDENCE and nothing else -- same
             # module, same capacity, same seed, same data order.
             latent_read_scramble=False,
+            # Z ATTEMPT 2 (J1).  Defaults reproduce every arm on record; see
+            # CortexMemory.__init__ for what each switch does and why.
+            #   latent_encoding    'delta' | 'endpoint' | 'tokens' (Step 0 picks)
+            #   latent_read_znorm  'rms' rescales Z rows to a fixed row norm
+            #                      before the xattn read, so encodings differ in
+            #                      content and not in scale
+            #   latent_write_only  J1's no-read limb, deliberately
+            #   e_dropout          blank the spliced E rows of this share of
+            #                      sequences per forward (training only)
+            latent_encoding="delta", latent_tok_pool=4,
+            latent_read_znorm="none", latent_read_znorm_target=3.0,
+            latent_write_only=False, e_dropout=0.0,
             # diag_interval: every N optimizer steps, log the architecture's
             # health (carry rank + per-channel norms, whether either gate has
             # left its exactly-zero init, the Z read/write gradient fractions)
@@ -1077,7 +1089,15 @@ def startup(cfg: CLISettings):
                    # The control arm MUST persist: a scrambled-read cell
                    # reloaded without it becomes the treatment arm, and the
                    # two would be indistinguishable after the fact.
-                   "latent_read_scramble"):
+                   "latent_read_scramble",
+                   # J1.  latent_encoding changes what the carried Z IS, and
+                   # latent_write_only is the only thing that lets a no-read
+                   # limb's config build at all -- an eval rebuilt without it
+                   # raises.  e_dropout is training-only in effect but persists
+                   # so the checkpoint records the condition it trained under.
+                   "latent_encoding", "latent_tok_pool", "latent_read_znorm",
+                   "latent_read_znorm_target", "latent_write_only",
+                   "e_dropout"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -1103,6 +1123,13 @@ def startup(cfg: CLISettings):
                         if cfg.cortex['latent_read'] == 'xattn' else "")
                      + (",SCRAMBLED(control arm)"
                         if cfg.cortex['latent_read_scramble'] else "")
+                     + (",WRITE-ONLY(no-read limb)"
+                        if cfg.cortex['latent_write_only'] else "")
+                     + f",enc={cfg.cortex['latent_encoding']}"
+                     + (f",znorm={cfg.cortex['latent_read_znorm_target']}"
+                        if cfg.cortex['latent_read_znorm'] == 'rms' else "")
+                     + (f",e_dropout={cfg.cortex['e_dropout']}"
+                        if cfg.cortex['e_dropout'] else "")
                      + ") "
                      if cfg.cortex['latent_carry'] else "") +
                   f"prefix_pos={cfg.cortex['prefix_pos']} "

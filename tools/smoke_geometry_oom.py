@@ -137,6 +137,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--json_out", default="",
                    help="append one JSON line per run; the sbatch summarises it")
     p.add_argument("--device", default="cuda")
+    p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                   help="any further graft flag, applied AFTER the geometry "
+                        "flags above, e.g. --set latent_read=xattn --set "
+                        "latent_s0_read=false.  Typed by the shared parser "
+                        "(a string 'false' would be truthy).  Added for J1, "
+                        "whose read module is 16.8M parameters with optimizer "
+                        "state that an E-only price does not include.")
     return p.parse_args()
 
 
@@ -162,6 +169,9 @@ def build_model(args, use_memory: bool):
                  ("gate_fill", args.gate_fill),
                  ("latent_carry", args.latent_carry),
                  ("prefix_pos", "tail"), ("prefix_eos_reset", False)):
+        setattr(cfg, k, v)
+    from evals.model_utils import parse_config_overrides
+    for k, v in parse_config_overrides(getattr(args, "set", [])).items():
         setattr(cfg, k, v)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name, trust_remote_code=True, config=cfg,
@@ -500,6 +510,7 @@ def main() -> int:
                 "gate_route": args.gate_route if gated else "",
                 "gate_fill": args.gate_fill if gated else "",
                 "latent_carry": bool(args.latent_carry),
+                "sets": list(getattr(args, "set", [])),
                 "carry_grad_chunks": args.carry_grad_chunks,
                 "peak_alloc_gib": round(peak_alloc / GIB, 2),
                 "peak_res_gib": round(peak_res / GIB, 2),

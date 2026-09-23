@@ -180,6 +180,9 @@ fi
 # (the exact no-read model) instead of feeding it s0-scale noise.
 SETS="$SETS ${EXTRA_SETS:-}"
 Z_NULL=${Z_NULL:-noise}
+# SCORE: all (default) | answers | carry | local -- the last three need a pack
+# with answer_dep (the carry-task validation pack).  EXTRA_EVAL_ARGS passes
+# anything else through, e.g. --allow_scrambled for J1's donor limb.
 OUT=${OUT:-eval_results/carry_2x2-$STAMP/$ARM}
 echo "=== 2x2 carry ablation | arm=$ARM | T=$T | n_chunks=$CROSS_CHUNKS ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
@@ -187,7 +190,7 @@ echo "    checkpoint: $CKPT"
 echo "    data:       $DATA"
 echo "    geometry:   $PREFIX_MODE  W=$ACCUM_VECS  latent=$LATENT"
 echo "    sets:       $SETS $ALLOW"
-echo "    z null:     $Z_NULL"
+echo "    z null:     $Z_NULL   score: ${SCORE:-all}"
 echo "    out:        $OUT"
 # HOW MANY ROWS DOES THE PACK ACTUALLY HOLD.  --max_examples is a CEILING, not
 # a sample size.  data/pg19_olmo_val_len4096 holds 50 rows, so this job asked
@@ -218,7 +221,8 @@ python evals/eval_carry_2x2.py \
     --model_name "$MODEL" --checkpoint "$CKPT" --data "$DATA" $SETS $ALLOW \
     --n_chunks "$CROSS_CHUNKS" --T "$T" \
     --max_examples "$MAX_EXAMPLES" --boot "$BOOT" \
-    --dtype float32 --z_null "$Z_NULL" \
+    --dtype float32 --z_null "$Z_NULL" --score "${SCORE:-all}" \
+    ${EXTRA_EVAL_ARGS:-} \
     --out_dir "$OUT"
 RC=$?
 
