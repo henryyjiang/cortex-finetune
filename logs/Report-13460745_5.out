@@ -1,0 +1,92 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-23-2026 06:55:44
+Job ID:    13477518
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j1_readout
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== J1 read-out | SET=main task 5 = noread_local_off ===
+    run:        j1-a3z-tokens-noread
+    checkpoint: cortex-retrofit/j1-a3z-tokens-noread/checkpoint_93552
+    data:       data/carry_task_r16_len4096_val   (score local, z_null off, n 100, cells E1Z1,E1Z0)
+    out:        eval_results/j1_readout/j1-a3z-tokens-noread/carry-local-off
+NVIDIA H200, 143771 MiB
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'tokens'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_write_only: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 70.83it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/j1-a3z-tokens-noread/checkpoint_93552/chkpt.pt: 0 missing / 0 unexpected keys
+[2x2] Z null at s0's MEASURED per-element rms 0.00858588 (row norm 0.3885, sqrt(D) apart -- do not swap them)
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+  60 samples
+  70 samples
+  80 samples
+  90 samples
+  100 samples
+
+==============================================================================
+2x2 carry ablation -- mean NLL over chunks 2..8, n=100 paired samples, scoring LOCAL tokens
+column count is IDENTICAL in every cell; only the contents change
+==============================================================================
+  E1Z1  E=on   Z=on    NLL 0.00118
+  E1Z0  E=on   Z=off   NLL 0.00118
+
+  chunk-1 sanity: max spread across cells 0.00e+00 (should be ~0 -- no cell has an incoming carry there)
+  health: mean NLL 0.0012, 11.52 nats below chance
+
+------------------------------------------------------------------------------
+  Z_main         0.00000  [  0.00000,   0.00000]
+               NLL without Z minus with Z, E held on.  Positive = Z helps.
+
+wrote eval_results/j1_readout/j1-a3z-tokens-noread/carry-local-off/results.json
+
+J1 read-out noread_local_off (j1-a3z-tokens-noread) DONE -> eval_results/j1_readout/j1-a3z-tokens-noread/carry-local-off/results.json
+  Numbers are READ ONLY through evals/score_j1.py (pace/j1_verdict.sbatch).
+---------------------------------------
+Begin Slurm Epilog: Sep-23-2026 07:00:49
+Job ID:        13477518
+Array Job ID:  13460745_5
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j1_readout
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:40:56,vmem=0,walltime=00:05:07,mem=25623948K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------

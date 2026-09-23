@@ -1,0 +1,158 @@
+{
+  "answer": "NO: the jointly trained read/write did not learn to carry content even with E removed",
+  "audit": [],
+  "main": {
+    "vetoes": [],
+    "local_nll": {
+      "real": 0.0011030395126020811,
+      "noread": 0.0011812948994072848
+    },
+    "task_learned": true,
+    "noread_carry_nll": 0.4607023397293681,
+    "carry": {
+      "D_noread": {
+        "mean": -0.2626585897464267,
+        "lo": -0.26876157173882204,
+        "hi": -0.25620044299854433,
+        "n": 300,
+        "n_clusters": 300,
+        "cmp_nll": 0.4607023397293681,
+        "real_nll": 0.7233609294757954
+      },
+      "D_donor": {
+        "mean": -0.11531222247418739,
+        "lo": -0.12079420249760235,
+        "hi": -0.10940648091017913,
+        "n": 300,
+        "n_clusters": 300,
+        "cmp_nll": 0.6080487070016076,
+        "real_nll": 0.7233609294757954
+      },
+      "real_Z_main_off": {
+        "mean": 8.605933585664638e-05,
+        "lo": -0.00019357038762962464,
+        "hi": 0.00027615144278719843,
+        "n": 300,
+        "n_clusters": 300,
+        "cmp_nll": 0.7234469888116525,
+        "real_nll": 0.7233609294757954
+      },
+      "real_Z_main_donor": {
+        "mean": -1.8894426781480936e-05,
+        "lo": -4.757175091178567e-05,
+        "hi": 3.7775192702649287e-07,
+        "n": 300,
+        "n_clusters": 300,
+        "cmp_nll": 0.7233420350490137,
+        "real_nll": 0.7233609294757954
+      }
+    },
+    "carry_reading": "READ_HURTS",
+    "pg19": {
+      "D_noread": {
+        "mean": 0.003461168444632418,
+        "lo": 0.0021186297047560425,
+        "hi": 0.005626977898969182,
+        "n": 383,
+        "n_clusters": 18,
+        "cmp_nll": 3.438682029514959,
+        "real_nll": 3.435220861070329
+      },
+      "D_donor": {
+        "mean": 0.002293406872107261,
+        "lo": -0.0012623059037076415,
+        "hi": 0.005328398730073659,
+        "n": 383,
+        "n_clusters": 18,
+        "cmp_nll": 3.437514267942434,
+        "real_nll": 3.435220861070329
+      },
+      "real_Z_main_off": {
+        "mean": 7.891614950221894e-05,
+        "lo": -0.00017445059230483749,
+        "hi": 0.00036972350919778466,
+        "n": 383,
+        "n_clusters": 18,
+        "cmp_nll": 3.4352997772198304,
+        "real_nll": 3.435220861070329
+      },
+      "real_Z_main_donor": {
+        "mean": -0.00015763038576916682,
+        "lo": -0.00041942984960058566,
+        "hi": 0.0001221539138199109,
+        "n": 383,
+        "n_clusters": 18,
+        "cmp_nll": 3.4350632306845563,
+        "real_nll": 3.435220861070329
+      },
+      "ragged_rows_dropped": 50
+    },
+    "pg19_reading": "CAPACITY_ONLY",
+    "reading": "READ_HURTS"
+  },
+  "edrop": {
+    "vetoes": [],
+    "local_nll": 0.0025248110403989226,
+    "noread_eoff_carry_nll": 2.308200247429465,
+    "X_noread": {
+      "mean": 0.0002887974812564694,
+      "lo": -0.00042727963917446046,
+      "hi": 0.0010015433713881257,
+      "n": 300,
+      "n_clusters": 300,
+      "cmp_nll": 2.308200247429465,
+      "real_nll": 2.307911449948209
+    },
+    "real_Z_alone_donor": {
+      "mean": -4.203548532707065e-07,
+      "lo": -7.019055363051882e-07,
+      "hi": -1.2217710444388055e-07,
+      "n": 300,
+      "n_clusters": 300,
+      "cmp_nll": 2.307911029593356,
+      "real_nll": 2.307911449948209
+    },
+    "real_Z_alone_off": {
+      "mean": 3.8638635681775093e-05,
+      "lo": 2.8878443026014722e-05,
+      "hi": 4.847339067512705e-05,
+      "n": 300,
+      "n_clusters": 300,
+      "cmp_nll": 2.3079500885838886,
+      "real_nll": 2.307911449948209
+    },
+    "reading": "Z_CANNOT_LEARN"
+  },
+  "gates": {
+    "j1-a3z-tokens-real": {
+      "first_step": 91575,
+      "first": 0.09757732599973679,
+      "last_step": 93550,
+      "last": 0.0033814203925430775,
+      "collapsed": true
+    },
+    "j1-a3z-tokens-donor": {
+      "first_step": 91575,
+      "first": 0.09701009839773178,
+      "last_step": 93550,
+      "last": -0.003604216268286109,
+      "collapsed": true
+    },
+    "j1-a3z-tokens-edrop0.25-real": {
+      "first_step": 91575,
+      "first": 0.10080476850271225,
+      "last_step": 93550,
+      "last": 0.0006957862642593682,
+      "collapsed": true
+    }
+  },
+  "constants": {
+    "TASK_LEARNED_LOCAL_MAX": 1.151292546497023,
+    "MIN_EFFECT_CARRY": 0.05,
+    "HEADROOM_MIN": 0.1,
+    "LEAK_MARGIN": 0.25,
+    "GATE_COLLAPSE": 0.03,
+    "PAIR_MIN_FRAC": 0.9,
+    "STEP": 93552
+  }
+}
