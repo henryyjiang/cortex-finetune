@@ -1,0 +1,137 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-23-2026 12:46:40
+Job ID:    13489369
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j3_joint
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== J3 scratchpad run | limb=real | run=j3-a3z-scratch-real-smoke ===
+    branch:    cortex-retrofit/retro-b2-heal/checkpoint_91552_w16  (step 91552 -> stop 91562, horizon 305176)
+    data:      data/j1_pg19fw50_carry20_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:  gated W=16 K=64 cc=8 grad_chunks=4 mr=8 window_backward=1
+    read:      --cortex.latent_read scratch --cortex.latent_read_heads 8 --cortex.latent_read_znorm rms --cortex.latent_read_znorm_target 3.0 --cortex.latent_read_gate_lr_mult 0.1 --cortex.latent_scratch_forget_bias 1.0 --cortex.latent_read_scramble false --cortex.latent_carry_read true
+    e_dropout: 0.0   micro=2 batch=4   diag every 25
+NVIDIA H200, 143771 MiB
+
+[W923 12:46:55.145321978 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Wed Sep 23 12:46:53: Time to load libraries: 9.92 seconds.
+--------------------------------------------------------------------
+------------------ Launching run j3-a3z-scratch-real-smoke------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-02-012-9-0.pace.gatech.edu.
+GPU : NVIDIA H200. CUDA: 12.1.
+[cortex] memory ON: K=0 K_iter=0 ccot_direct=False accum_ccot=False (vecs=16/max=128) gated_accum=False prefix_memory=gated gate(K=64,route=ring,norm=tanh,init=zero,fill=grow) latent(Z on, rule=absolute,band=2..9,renorm=none,read=scratch,gate_lr_mult=0.1,scratch_fb=1.0,enc=scratch,znorm=3.0) prefix_pos=tail prefix_eos_reset=False cross_chunks=8 carry_grad_chunks=4 random_segments=False lora_rank=0
+[cortex] Z channel ON.  latent_depth_rule='absolute' is P0.7's question (evals/diag_depth_band.py): P0.1 measured the band at a SINGLE T and cannot say whether 'informative' tracks the absolute step or the fraction of the loop.  If P0.7 has not reported, this run is asserting an answer it does not have -- record which, in this run's sbatch header.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:15<00:15, 15.94s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:19<00:00,  8.44s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:19<00:00,  9.56s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_reader.gate', 'cortex.latent_reader.k_proj.weight', 'cortex.latent_reader.out_proj.weight', 'cortex.latent_reader.q_proj.weight', 'cortex.latent_reader.v_proj.weight', 'cortex.latent_scratch.forget_bias', 'cortex.latent_scratch.gate_proj_in.bias', 'cortex.latent_scratch.gate_proj_in.weight', 'cortex.latent_scratch.gate_proj_mem.bias', 'cortex.latent_scratch.gate_proj_mem.weight', 'cortex.latent_scratch.input_bias', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retrofit/wandb/run-20260923_124717-88o8226d
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run j3-a3z-scratch-real-smoke
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/88o8226d
+/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py:829: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  ckpt = torch.load(f"{path}/chkpt.pt", map_location=device)
+wandb: updating run metadata
+wandb: uploading output.log; uploading wandb-summary.json; uploading config.yaml
+wandb: 
+wandb: Run history:
+wandb:       train/elapsed_time ▁▂▃▄▄▅▆▇▇█
+wandb:              train/epoch ▁▁▁▁▁▁▁▁▁▁
+wandb:     train/grad_clip_coef ▁█▂▇▆▆▆▅▄▇
+wandb: train/grad_clip_max_norm ▁▁▁▁▁▁▁▁▁▁
+wandb:            train/log_ppl ▂▃▇▃▂▅█▁▄▇
+wandb:               train/loss ▄▅█▄▃▇█▁▅█
+wandb:                 train/lr ▁▁▁▁▁▁▁▁▁▁
+wandb:          train/lr_group0 ▁█████████
+wandb:          train/lr_group1 ▁█████████
+wandb:          train/lr_group2 ▁█████████
+wandb:                      +13 ...
+wandb: 
+wandb: Run summary:
+wandb:       train/elapsed_time 231014.99089
+wandb:              train/epoch 0
+wandb:     train/grad_clip_coef 0.43557
+wandb: train/grad_clip_max_norm 1
+wandb:            train/log_ppl 32.06584
+wandb:               train/loss 3.46306
+wandb:                 train/lr 0.001
+wandb:          train/lr_group0 0.001
+wandb:          train/lr_group1 5e-05
+wandb:          train/lr_group2 0.0005
+wandb:                      +13 ...
+wandb: 
+wandb: 🚀 View run j3-a3z-scratch-real-smoke at: https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/88o8226d
+wandb: ⭐️ View project at: https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: cortex-retrofit/wandb/run-20260923_124717-88o8226d/logs
+[cortex] reset 10 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_reader.[qkv,out~N(0,0.02) NOT zero -- see LatentRead]', 'latent_reader.gate=0.1', 'latent_reader.gate_lr_mult=0.1', 'latent_scratch.[gates=0 (EMA fg=0.731 ig=0.500), forget_bias=1.0]'] (undo post_init clobber)
+[branch] summary_emb was SLICED 32 -> 16 rows (first W_new rows (tail layout: slot j attends slots < j)), 2026-09-16T16:56:20, from cortex-retrofit/retro-b2-heal/checkpoint_91552
+[branch]   effective rank 10.90 of the parent's 20.02; kept-row centred cos -0.0652
+[branch] loaded weights from cortex-retrofit/retro-b2-heal/checkpoint_91552_w16; 23 new memory params start fresh: ['cortex.prefix.forget_bias', 'cortex.prefix.input_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.input_bias_z', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.latent_reader.gate', 'cortex.latent_reader.q_proj.weight', 'cortex.latent_reader.k_proj.weight', 'cortex.latent_reader.v_proj.weight', 'cortex.latent_reader.out_proj.weight', 'cortex.latent_scratch.forget_bias', 'cortex.latent_scratch.input_bias', 'cortex.latent_scratch.gate_proj_in.weight', 'cortex.latent_scratch.gate_proj_in.bias', 'cortex.latent_scratch.gate_proj_mem.weight', 'cortex.latent_scratch.gate_proj_mem.bias']
+[branch] optimizer state NOT restored (param set changed); LR schedule, recurrence ramp and step counter continue
+Branched from cortex-retrofit/retro-b2-heal/checkpoint_91552_w16
+[cortex] window_backward: one backward per 4-chunk carry window (2 per row), so the peak holds 4 of 8 chunks' activations.  Same gradient as one backward per row, to fp summation order.
+GPU: cuda:0 | Step:    2 | Updates: 91553 | Time/step: 2.2286 | Tok/sec=  3675.93 | Loss: 2.9261 / log-ppl: 18.6553 | Grad-Norm 14.9391 | ClipCoef 0.0669 | Peak-Mem 85.15GiB
+[timeout-save] walltime deadline resolved: 2529s from now
+GPU: cuda:0 | Step:    4 | Updates: 91554 | Time/step: 2.0266 | Tok/sec=  4042.31 | Loss: 3.2434 / log-ppl: 25.6211 | Grad-Norm 1.9115 | ClipCoef 0.5231 | Peak-Mem 92.33GiB
+GPU: cuda:0 | Step:    6 | Updates: 91555 | Time/step: 1.6437 | Tok/sec=  4984.03 | Loss: 3.3289 / log-ppl: 27.9073 | Grad-Norm 6.1406 | ClipCoef 0.1628 | Peak-Mem 92.20GiB
+GPU: cuda:0 | Step:    8 | Updates: 91556 | Time/step: 2.0691 | Tok/sec=  3959.19 | Loss: 2.2548 / log-ppl: 9.5335 | Grad-Norm 2.3499 | ClipCoef 0.4255 | Peak-Mem 92.33GiB
+GPU: cuda:0 | Step:   10 | Updates: 91557 | Time/step: 1.1440 | Tok/sec=  7160.94 | Loss: 3.2977 / log-ppl: 27.0504 | Grad-Norm 2.5305 | ClipCoef 0.3952 | Peak-Mem 61.47GiB
+GPU: cuda:0 | Step:   12 | Updates: 91558 | Time/step: 1.5949 | Tok/sec=  5136.30 | Loss: 3.2634 / log-ppl: 26.1392 | Grad-Norm 2.5800 | ClipCoef 0.3876 | Peak-Mem 92.20GiB
+GPU: cuda:0 | Step:   14 | Updates: 91559 | Time/step: 1.3845 | Tok/sec=  5916.73 | Loss: 3.8603 / log-ppl: 47.4789 | Grad-Norm 2.6811 | ClipCoef 0.3730 | Peak-Mem 76.92GiB
+GPU: cuda:0 | Step:   16 | Updates: 91560 | Time/step: 1.9345 | Tok/sec=  4234.72 | Loss: 1.3092 / log-ppl: 3.7034 | Grad-Norm 3.0683 | ClipCoef 0.3259 | Peak-Mem 92.33GiB
+GPU: cuda:0 | Step:   18 | Updates: 91561 | Time/step: 1.1642 | Tok/sec=  7036.40 | Loss: 2.6082 / log-ppl: 13.5743 | Grad-Norm 3.9574 | ClipCoef 0.2527 | Peak-Mem 69.26GiB
+GPU: cuda:0 | Step:   20 | Updates: 91562 | Time/step: 1.6508 | Tok/sec=  4962.57 | Loss: 3.5604 / log-ppl: 35.1787 | Grad-Norm 2.2959 | ClipCoef 0.4356 | Peak-Mem 92.33GiB
+[stop_at_step] reached 91562 — ending this phase (schedule horizon max_steps=305176 unchanged)
+[rank 0] Saved checkpoint @ step 91,562
+--------------------------------------------------------------------
+Training time: 0:03:32.745251 
+Max. Mem allocated: 12.563 GB. Max. Mem reserved: 92.775 GB.
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Run None finished without error.
+---------Total time: 0:03:46.368240 ---------
+-----------------Shutdown complete.--------------------------
+
+J3 real DONE -> cortex-retrofit/j3-a3z-scratch-real-smoke
+  In-flight record: cortex-retrofit/j3-a3z-scratch-real-smoke/cortex_diag.jsonl
+  (read_gate, read_ratio = the read's effective strength, own_share,
+   scratch_row_norm, write_grad_frac, e_dropped, E rank).
+  Read-out: EXPERIMENT=j3 pace/j1_readout.sbatch, then EXPERIMENT=j3
+  pace/j1_verdict.sbatch -- and only under J3's pre-registration.
+---------------------------------------
+Begin Slurm Epilog: Sep-23-2026 12:50:32
+Job ID:        13489369
+Array Job ID:  13487422_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j3_joint
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=00:31:36,vmem=0,walltime=00:03:57,mem=14132244K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-9-0
+---------------------------------------
