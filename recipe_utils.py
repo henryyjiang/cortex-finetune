@@ -91,6 +91,33 @@ def reduce_chunk_losses(
     return (stacked * w).sum() / w.sum()
 
 
+def chunk_loss_weights(chunk_tokens: Sequence[int], mode: str = "token") -> list:
+    """Per-chunk weights w_i, fixed BEFORE any loss exists, such that
+    sum_i w_i * loss_i == reduce_chunk_losses(kept losses, kept tokens, mode),
+    where "kept" is the chunks with at least one unmasked label.
+
+    Exists for `window_backward` (train.py cortex_fwd_bwd): backpropagating each
+    carry window as it closes needs that window's share of the row loss before
+    the later chunks have run, and reduce_chunk_losses only knows its
+    normaliser at the end.  A fully-masked chunk gets 0.0 -- it is dropped from
+    both the numerator and the denominator there, so 0 here is the same
+    arithmetic, not an approximation.  All weights are 0.0 when every chunk is
+    masked (the caller's no-backward guard).
+    """
+    if mode not in ("token", "chunk"):
+        raise ValueError(f"chunk_loss_reduction must be 'token' or 'chunk', got {mode!r}")
+    tokens = [int(n) for n in chunk_tokens]
+    if any(n < 0 for n in tokens):
+        raise ValueError(f"negative token count in {tokens}")
+    kept = [n for n in tokens if n > 0]
+    if not kept:
+        return [0.0] * len(tokens)
+    if mode == "chunk":
+        return [1.0 / len(kept) if n > 0 else 0.0 for n in tokens]
+    total = float(sum(kept))
+    return [n / total for n in tokens]
+
+
 def worst_case_num_steps(
     mean_recurrence: int, mean_backprop_depth: int
 ) -> tuple[int, int]:

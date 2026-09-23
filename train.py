@@ -29,6 +29,7 @@ from cortex_graft import set_read_only_trainable as _set_read_only_trainable
 from cortex_memory.chunking import random_chunk_sizes, detach_old_vecs
 from cortex_memory.health import training_diag
 from recipe_utils import (
+    chunk_loss_weights,
     control_has_memory,
     fast_forward_indices,
     reduce_chunk_losses,
@@ -411,6 +412,24 @@ class CLISettings:
             # EOS-separated packed data.  See CortexMemory._carried_state.
             prefix_eos_reset=False,
             carry_grad_chunks=0, random_segments=False,
+            # window_backward (J1, 2026-09-22): call backward once per carry
+            # WINDOW instead of once per row.  cortex_fwd_bwd keeps every
+            # chunk's loss -- and with it that chunk's whole activation graph --
+            # until the single backward at the end, so carry_grad_chunks cuts
+            # gradient paths but frees NOTHING: cc16 OOMed at carry_grad_chunks
+            # 2 and 1 alike (13304813/13304814), and J1 at micro 2 OOMed on the
+            # no-read limb too (13456835, 138.71 of 139.80 GiB).  On a GATED
+            # buffer the whole carry detaches every carry_grad_chunks chunks,
+            # which splits the row's graph into independent windows; backprop
+            # each as it closes and the peak holds one window, not the row.
+            # EXACT: the row loss is a weighted sum over chunks with weights
+            # fixed up front (recipe_utils.chunk_loss_weights), so the window
+            # gradients add up to the one-backward gradient, to fp summation
+            # order.  Refused at startup where it cannot apply (accum's slice
+            # detach overlaps windows; carry_grad_chunks 0 has none) and under
+            # DDP, whose reducer expects one backward per sync step.  Default
+            # off, so every arm on record keeps its exact code path.
+            window_backward=False,
             # chunk_loss_reduction: how the per-chunk losses in cortex_fwd_bwd
             # combine into the row's loss.
             #   "token" (default since 2026-09-14) — weight each chunk by its
@@ -1936,6 +1955,33 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                       "batch (latent_read_grad_frac 1.0 by construction, not "
                       "by the sampler's ~0.55 at mr8).")
 
+    # window_backward: refuse every geometry where it would silently do nothing
+    # or do the wrong thing.  A memory flag that no-ops prices one run and
+    # trains another -- the OOM comes back at step N of a queued job.
+    if cfg.cortex["window_backward"]:
+        _gc = int(cfg.cortex["carry_grad_chunks"])
+        _why = None
+        if not cfg.cortex["use_memory"]:
+            _why = "use_memory is false, so there is no carry to window"
+        elif bool(cfg.cortex["accum_ccot"]) or cfg.cortex["prefix_memory"] == "accum":
+            _why = ("the accum buffer slice-detaches row by row, so its "
+                    "gradient windows OVERLAP and there is no point at which a "
+                    "window's graph is unreachable")
+        elif _gc <= 0:
+            _why = ("carry_grad_chunks is 0 (full-chain BPTT): there is no "
+                    "detach, so the whole row is one window")
+        elif state["distributed"]:
+            _why = ("DDP all-reduces on the first backward of a sync step; a "
+                    "second backward in the same step would miss it")
+        if _why is not None:
+            raise ValueError(f"--cortex.window_backward true cannot apply here: {_why}.")
+        if is_main_process():
+            _cc = int(cfg.cortex["cross_chunks"])
+            print(f"[cortex] window_backward: one backward per {_gc}-chunk carry "
+                  f"window ({-(-_cc // _gc)} per row), so the peak holds "
+                  f"{min(_gc, _cc)} of {_cc} chunks' activations.  Same gradient "
+                  f"as one backward per row, to fp summation order.")
+
     # The resume cursor is only meaningful within one pass over the data:
     # data_step restarts at 1 on every epoch, so "resume at item N" does not name
     # a position once there is more than one epoch.  Before 2026-09-14 this
@@ -2057,6 +2103,12 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                                or cfg.cortex["prefix_memory"] == "accum")
                 # Rows appended per chunk: prefix buffers use accum_vecs too.
                 vecs_per_chunk = int(cfg.cortex["accum_vecs"])
+                # window_backward (J1): backprop each carry window as it closes.
+                # Only on the whole-carry detach below -- that detach is what
+                # makes the windows independent.  Validated at startup, so a
+                # geometry where it cannot apply never gets this far.
+                window_bwd = (bool(cfg.cortex["window_backward"])
+                              and grad_chunks > 0 and not accum_on)
                 with model.no_sync() if is_accumulating and state["distributed"] else nullcontext():
                     # .contiguous(): torch.chunk/split return non-contiguous views
                     # and the model's loss does labels.view(-1), which requires
@@ -2076,6 +2128,14 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                     chunk_losses = []
                     chunk_tokens = []       # unmasked labels per kept chunk
                     n_ng = n_wg = 0
+                    if window_bwd:
+                        # The row loss's weights, fixed before any chunk runs,
+                        # so each window's share is known when it closes.
+                        chunk_w = chunk_loss_weights(
+                            [int((yc != -100).sum()) for yc in y_chunks],
+                            mode=cfg.cortex["chunk_loss_reduction"])
+                        window = []         # w_i * loss_i, graph attached
+                        total = None        # detached sum of flushed windows
                     for gi, (xc, yc) in enumerate(zip(x_chunks, y_chunks)):
                         # Stop-gradient horizon (AutoCompressor: predicting the
                         # adjacent segment suffices to learn compression).
@@ -2086,6 +2146,16 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                                 m_cross = detach_old_vecs(
                                     m_cross, vecs_per_chunk, grad_chunks)
                             elif gi % grad_chunks == 0:
+                                if window_bwd and window:
+                                    # Nothing from chunk gi on can reach this
+                                    # window's graph once the carry detaches on
+                                    # the next line, so backprop it now and let
+                                    # its activations go before the next window
+                                    # is built.
+                                    part = torch.stack(window).sum()
+                                    (part / accumulation_steps).backward()
+                                    total = part.detach() if total is None else total + part.detach()
+                                    window = []
                                 # gated/overwritten state (rows not separable):
                                 # detach the whole carry every grad_chunks
                                 # chunks = truncated BPTT with window N
@@ -2104,8 +2174,23 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         n_ng, n_wg = int(num_steps[0]), int(num_steps[1])
                         n_valid = int((yc != -100).sum())
                         if n_valid:                             # skip fully-masked chunks
-                            chunk_losses.append(out["loss"])
-                            chunk_tokens.append(n_valid)
+                            if window_bwd:
+                                window.append(out["loss"] * chunk_w[gi])
+                            else:
+                                chunk_losses.append(out["loss"])
+                                chunk_tokens.append(n_valid)
+                    if window_bwd:
+                        if cfg.cortex["diag_interval"] and m_cross is not None:
+                            cortex_diag_state["carry"] = m_cross.detach()
+                        if window:
+                            part = torch.stack(window).sum()
+                            (part / accumulation_steps).backward()
+                            total = part.detach() if total is None else total + part.detach()
+                        if total is None:
+                            # every chunk fully masked -- same guard as below
+                            z = torch.zeros((), device=input_ids.device)
+                            return z, z, n_ng, n_wg
+                        return total, total.exp(), n_ng, n_wg
                     if not chunk_losses:
                         # Every chunk fully label-masked (-100): unreachable with
                         # one-doc-per-sequence data, guarded so torch.stack([])

@@ -27,8 +27,21 @@
 #
 # READ: the status column.  FITS on `real` means all three limbs launch at
 # MICRO_BS=2.  An OOM on `real` means the donor control cannot run as designed
-# -- do NOT drop to micro 1 (the roll would return the same row); lower
-# carry_grad_chunks first and re-price.  Record the numbers in j1_joint.sbatch.
+# -- do NOT drop to micro 1 (the roll would return the same row).  Record the
+# numbers in j1_joint.sbatch.
+#
+# JOB 13456835 (2026-09-22), one backward per row: BOTH limbs OOM at 138.71 of
+# 139.80 GiB -- the no-read limb too, so it is not the read module.  The
+# printed advice then was "lower CARRY_GRAD_CHUNKS and re-price", and it was
+# WRONG: cortex_fwd_bwd holds every chunk's loss (and its graph) until one
+# backward at the end, so the horizon frees nothing -- cc16 OOMed at
+# carry_grad_chunks 2 and 1 alike (13304813/13304814).  The fix is
+# --window_backward (default ON here, WINDOW_BACKWARD=0 prices the old path):
+# one backward per whole-carry detach window, so the peak holds 4 of 8 chunks.
+# Expected ~115 GiB (the micro-1 P1 rows were ~110.7 at the same activations).
+#
+#   REQUIRE_FIT=1   exit 3 unless the real limb FITS, so this job can gate the
+#                   launch:  sbatch --dependency=afterok:<this job> ...
 
 cd $SLURM_SUBMIT_DIR
 
@@ -45,9 +58,12 @@ MODEL=${MODEL:-ckpts/olmo-retrofit-cortex}
 ENCODING=${ENCODING:-endpoint}
 MICRO_BS=${MICRO_BS:-2}
 CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-4}
+WINDOW_BACKWARD=${WINDOW_BACKWARD:-1}
 JSON=logs/j1_oom_${SLURM_JOB_ID}.jsonl
+WB_ARG=""
+if [ "$WINDOW_BACKWARD" = "1" ]; then WB_ARG="--window_backward"; fi
 
-echo "=== J1 memory price | micro=$MICRO_BS | encoding=$ENCODING | grad_chunks=$CARRY_GRAD_CHUNKS ==="
+echo "=== J1 memory price | micro=$MICRO_BS | encoding=$ENCODING | grad_chunks=$CARRY_GRAD_CHUNKS | window_backward=$WINDOW_BACKWARD ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 if ! grep -q "read_into(x, current_step)" "$MODEL/raven_modeling_minimal_cortex.py" 2>/dev/null; then
     echo "ERROR: $MODEL carries a PRE-P3.0 modeling file -- this would price a"
@@ -61,6 +77,7 @@ COMMON="--model_name $MODEL --max_length 4096 --cross_chunks 8
         --mean_recurrence 8 --prefix_memory gated --accum_vecs 16
         --gate_slots 64 --gate_route ring --gate_norm tanh --gate_init zero
         --gate_fill grow --latent_carry --carry_grad_chunks $CARRY_GRAD_CHUNKS
+        $WB_ARG
         --use_memory true --with_optimizer true --json_out $JSON
         --set latent_encoding=$ENCODING --set latent_s0_read=false"
 
@@ -79,21 +96,28 @@ echo ""
 python - "$JSON" <<'SUMMARY'
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1])]
-print(f"{'limb':>7} {'micro':>5} {'status':>6} {'alloc':>8} {'reserved':>9} {'%dev':>5} {'s/step':>7}")
+print(f"{'limb':>7} {'micro':>5} {'window':>6} {'status':>6} {'alloc':>8} {'reserved':>9} {'%dev':>5} {'s/step':>7}")
 for r in rows:
     sets = " ".join(r.get("sets", []))
     limb = "real" if "latent_read=xattn" in sets else "noread"
     pct = 100 * r["peak_res_gib"] / r["total_gib"]
-    print(f"{limb:>7} {r.get('micro_batch_size', '?'):>5} {r['status']:>6} "
+    print(f"{limb:>7} {r.get('micro_batch_size', '?'):>5} "
+          f"{('yes' if r.get('window_backward') else 'no'):>6} {r['status']:>6} "
           f"{r['peak_alloc_gib']:>8.2f} {r['peak_res_gib']:>9.2f} {pct:>5.0f} "
           f"{r['step_s']:>7.1f}")
 real = [r for r in rows if "latent_read=xattn" in " ".join(r.get("sets", []))]
 print("")
 if real and real[0]["status"] == "FITS":
     print("J1: the real/donor limb FITS at this micro-batch -- all three limbs can launch.")
+    print("    Training peaks ran ~5 GiB above this gate on the P1 cells (115.4 vs")
+    print("    110.7): under ~130 here is the margin to want.")
 elif real:
     print("J1: the real/donor limb DOES NOT FIT.  Do NOT drop to micro 1 (the donor")
-    print("    roll would return the same row).  Lower CARRY_GRAD_CHUNKS and re-price.")
+    print("    roll would return the same row).  carry_grad_chunks is NOT the lever")
+    print("    without window_backward (every chunk's graph lives until the end);")
+    print("    with it, CARRY_GRAD_CHUNKS=2 halves the window again -- but check the")
+    print("    gradient story first: at 2, the read in chunk n+1 reaches the write")
+    print("    in chunk n for only half the chunk pairs.")
 else:
     print("J1: no real-limb row in the json -- the measurement did not run.")
 SUMMARY
@@ -103,4 +127,19 @@ if [ $BROKEN -ne 0 ]; then
     echo "NOTE: a row failed for a NON-OOM reason (the script exits 0 on an OOM)."
     echo "      Read the traceback above; the table is incomplete."
     exit 1
+fi
+
+if [ -n "$REQUIRE_FIT" ]; then
+    if ! python - "$JSON" <<'GATE'
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])]
+real = [r for r in rows if "latent_read=xattn" in " ".join(r.get("sets", []))]
+sys.exit(0 if real and real[0]["status"] == "FITS" else 1)
+GATE
+    then
+        echo ""
+        echo "REQUIRE_FIT: the real limb did not fit -- exit 3, so any job queued"
+        echo "             --dependency=afterok on this one will NOT start."
+        exit 3
+    fi
 fi

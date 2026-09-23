@@ -37,23 +37,36 @@
 # ===== BEFORE THE FIRST LAUNCH ===============================================
 #   1. ENCODING comes from Step 0 (pace/z2_diag_content.sbatch).  There is no
 #      default on purpose: launching before D1/D2 would pick one silently.
-#   2. PRICE THE MEMORY.  MICRO_BS=2 (the donor roll needs two rows) doubles
-#      activations against the P2.3 cells' micro 1, and the read module adds
-#      16.8M parameters with optimizer state:
-#        python tools/smoke_geometry_oom.py --max_length 4096 --cross_chunks 8 \
-#            --micro_batch_size 2 --batch_size 4 --mean_recurrence 8 \
-#            --prefix_memory gated --accum_vecs 16 --gate_slots 64 \
-#            --latent_carry --carry_grad_chunks 4 \
-#            --set latent_read=xattn --set latent_s0_read=false \
-#            --set latent_read_heads=8 --set latent_encoding=$ENCODING \
-#            --set latent_read_znorm=rms
-#      (on a GPU node).  If it does not fit, the donor limb cannot run at micro
-#      2 and the control needs redesigning -- do NOT drop to micro 1, where the
-#      roll returns the same row and the donor limb IS the real limb.
+#   2. PRICE THE MEMORY: `ENCODING=... REQUIRE_FIT=1 sbatch pace/j1_price_oom.sbatch`
+#      (same geometry, same --window_backward path as this launcher).  MICRO_BS=2
+#      (the donor roll needs two rows) doubles activations against the P2.3
+#      cells' micro 1, and the read module adds 16.8M parameters with optimizer
+#      state.  If it does not fit, the donor limb cannot run at micro 2 and the
+#      control needs redesigning -- do NOT drop to micro 1, where the roll
+#      returns the same row and the donor limb IS the real limb.
 #   3. The data.  Default is the prose + synthetic mix (Step 1,
 #      pace/prepare_carry_task.sbatch).  PROSE_ONLY=1 runs on data/pg19_fw50
 #      alone, which tests the design but not the positive control.
 #   4. Write J1's own pre-registration before reading any number off it.
+#
+# ===== DECISIONS RECORDED 2026-09-22 (night) =================================
+# ENCODING = tokens.  Step 0 (job 13456334, eval_results/z2_content/{a2,a3z}),
+#   the rule written before the run: the lowest-D1-ratio Z encoding that also
+#   HOLDS CONTENT on D2 bow_next.  Vetoes clear on both arms (50 books by
+#   document ends, reseed OK, probe health R^2(E->bow_self) 0.049 / 0.054).
+#   D1: every encoding is content-determined (ratios <= 0.002); Z_tok is lowest
+#   on both (0.000).  D2 bow_next: Z_tok is the ONLY encoding that holds content
+#   beyond E on BOTH arms -- over donor +0.0040 [+0.0030,+0.0055] (a2) /
+#   +0.0030 [+0.0022,+0.0042] (a3z), over E +0.0030 [+0.0020,+0.0036] /
+#   +0.0018 [+0.0006,+0.0026].  Small: E alone is 0.022-0.025 on the same
+#   target.  delta holds on a3z nll_next only; endpoint holds nowhere.
+# MEMORY: at micro 2 BOTH limbs OOMed at 138.71 of 139.80 GiB (job 13456835),
+#   the no-read limb too.  carry_grad_chunks cannot fix that -- every chunk's
+#   loss holds its graph until one backward per row -- so WINDOW_BACKWARD=1
+#   (default) backprops each 4-chunk carry window as it closes.  Exact (same
+#   gradient to fp summation order, tests/test_window_backward.py), and the
+#   windows are the ones carry_grad_chunks 4 already cut, so the recipe is
+#   unchanged.  Priced by pace/j1_price_oom.sbatch on the same path.
 #
 # DATA PROVENANCE, stated so nobody rediscovers it: the heal parent trained on
 # FineWeb-Edu, and pg19_fw50's FineWeb half is drawn from the same pack, so some
@@ -100,6 +113,9 @@ ZNORM=${ZNORM:-rms}                        # encodings differ in content, not sc
 ZNORM_TARGET=${ZNORM_TARGET:-3.0}          # the measured delta row norm, P3.0
 TOK_POOL=${TOK_POOL:-4}
 E_DROPOUT=${E_DROPOUT:-0.0}
+WINDOW_BACKWARD=${WINDOW_BACKWARD:-1}      # micro 2 does not fit without it (13456835)
+WB_ARGS=""
+if [ "$WINDOW_BACKWARD" = "1" ]; then WB_ARGS="--cortex.window_backward true"; fi
 
 if [ -z "$ENCODING" ]; then
     echo "ERROR: ENCODING is unset.  Step 0 (pace/z2_diag_content.sbatch) picks"
@@ -150,7 +166,7 @@ ACCUM_MAX=$(( ACCUM_VECS * CROSS_CHUNKS ))
 echo "=== J1 joint run | limb=$LIMB | encoding=$ENCODING | run=$RUN_NAME ==="
 echo "    branch:    $BRANCH_PATH  (step $PARENT_STEP -> stop $STOP_AT_STEP, horizon $MAX_STEPS)"
 echo "    data:      $ARM_DATA   (READ THIS LINE -- the only proof the pack arrived)"
-echo "    geometry:  gated W=$ACCUM_VECS K=$GATE_SLOTS cc=$CROSS_CHUNKS grad_chunks=$CARRY_GRAD_CHUNKS mr=$MAX_MEAN_REC"
+echo "    geometry:  gated W=$ACCUM_VECS K=$GATE_SLOTS cc=$CROSS_CHUNKS grad_chunks=$CARRY_GRAD_CHUNKS mr=$MAX_MEAN_REC window_backward=$WINDOW_BACKWARD"
 echo "    read:      $READ_ARGS"
 echo "    e_dropout: $E_DROPOUT   micro=$MICRO_BS batch=$BATCH_SIZE   diag every $DIAG_INTERVAL"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
@@ -205,6 +221,7 @@ python train.py \
     --cortex.e_dropout $E_DROPOUT \
     --cortex.diag_interval $DIAG_INTERVAL \
     --cortex.carry_grad_chunks $CARRY_GRAD_CHUNKS \
+    $WB_ARGS \
     --cortex.cross_chunks $CROSS_CHUNKS \
     --cortex.eos_from_tokens true \
     --cortex.prefix_eos_reset false \

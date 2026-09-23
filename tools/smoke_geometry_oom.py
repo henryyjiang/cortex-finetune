@@ -62,6 +62,7 @@ import torch  # noqa: E402
 from cortex_memory.chunking import detach_old_vecs  # noqa: E402
 from recipe_utils import (  # noqa: E402
     carry_rows,
+    chunk_loss_weights,
     gated_carry_rows,
     reduce_chunk_losses,
     worst_case_num_steps,
@@ -117,9 +118,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--gate_fill", default="grow", choices=["grow", "init"])
     p.add_argument("--carry_grad_chunks", type=int, default=0,
                    help="0 = cross_chunks // 2, B2's 50%% convention (4 of 8 in "
-                        "the arm).  This is a MEMORY parameter, not only a "
-                        "gradient one: it sets how many chunks of carry keep "
-                        "their graph, so 8 of 16 retains twice what 4 of 8 did.")
+                        "the arm).  NOT a memory parameter under one backward "
+                        "per row: every chunk's graph lives until the end "
+                        "(cc16 OOMed at 2 and 1 alike).  It becomes one under "
+                        "--window_backward, where it is the window size.")
+    p.add_argument("--window_backward", action="store_true",
+                   help="mirror --cortex.window_backward: one backward per "
+                        "whole-carry detach window, so the peak holds "
+                        "carry_grad_chunks chunks instead of the whole row.  "
+                        "Gated buffer only.")
     # optimizer (b2_retrofit.sbatch:478-486)
     p.add_argument("--with_optimizer", default="true", choices=["true", "false"],
                    help="false measures the framework's literal spec (fwd+bwd "
@@ -232,28 +239,48 @@ def init_trivial_process_group():
 
 def micro_step(model, x, y, eos_id, n_chunks, num_steps, carry_grad_chunks,
                accum_vecs, accumulation_steps, amp_args, use_memory,
-               write_once=True):
-    """Mirror of train.py's `cortex_fwd_bwd` (1701-1785), minus DDP and the
-    all-masked guard (synthetic rows carry no -100 labels).
+               write_once=True, window_backward=False):
+    """Mirror of train.py's `cortex_fwd_bwd`, minus DDP and the all-masked
+    guard (synthetic rows carry no -100 labels).
 
     `random_segments` is off and `accum_on` is True for the prefix accum buffer,
     both as B2 ran them.  The autocast placement matters: it wraps the forward
-    only, exactly as at train.py:1755, so the loss reduction and the backward
-    run outside it.
+    only, exactly as in train.py, so the loss reduction and the backward run
+    outside it.
+
+    `window_backward` mirrors `--cortex.window_backward`: one backward per
+    whole-carry detach window instead of one per row.  Gated (write_once=False)
+    only, as train.py refuses it elsewhere.
     """
+    if window_backward and (write_once or carry_grad_chunks <= 0):
+        raise ValueError(
+            "window_backward needs a whole-carry detach: a gated buffer "
+            "(write_once=False) with carry_grad_chunks > 0.  train.py refuses "
+            "the same geometries at startup.")
     x_chunks = [c.contiguous() for c in torch.chunk(x, n_chunks, dim=1)]
     y_chunks = [c.contiguous() for c in torch.chunk(y, n_chunks, dim=1)]
     m_cross, chunk_losses, chunk_tokens = None, [], []
+    if window_backward:
+        chunk_w = chunk_loss_weights(
+            [int((yc != -100).sum()) for yc in y_chunks], mode="token")
+        window, total = [], None
     for gi, (xc, yc) in enumerate(zip(x_chunks, y_chunks)):
-        # train.py's `accum_on` dispatch.  It is a MEMORY fact here, not just a
-        # correctness one: a slice detach frees the older chunks' graphs one
-        # block at a time, while a gated buffer's whole-state detach keeps every
-        # chunk since the last detach alive at once.  Pricing the gated arm with
-        # the accum branch would under-count the peak by most of a lap.
+        # train.py's `accum_on` dispatch.  NOT a memory fact under one backward
+        # per row: every chunk's loss is held in chunk_losses until the end, and
+        # each loss holds its own chunk's graph, so a detach cuts gradient paths
+        # and frees nothing (cc16 OOMed at carry_grad_chunks 2 and 1 alike,
+        # 13304813/13304814).  It becomes one under window_backward, where the
+        # gated detach is also the point a window's graph is backpropagated and
+        # released.
         if carry_grad_chunks > 0 and m_cross is not None:
             if write_once:
                 m_cross = detach_old_vecs(m_cross, accum_vecs, carry_grad_chunks)
             elif gi % carry_grad_chunks == 0:
+                if window_backward and window:
+                    part = torch.stack(window).sum()
+                    (part / accumulation_steps).backward()
+                    total = part.detach() if total is None else total + part.detach()
+                    window = []
                 m_cross = m_cross.detach()
         with torch.autocast(**amp_args):
             out = model(xc, labels=yc, num_steps=num_steps,
@@ -273,8 +300,18 @@ def micro_step(model, x, y, eos_id, n_chunks, num_steps, carry_grad_chunks,
                 "failure smoke_prefix_real.py exists to catch; here a memory run "
                 "that secretly has no memory would measure the CONTROL's "
                 "footprint and green-light a geometry that cannot fit.)")
+        if window_backward:
+            if chunk_w[gi]:                 # train.py skips fully-masked chunks
+                window.append(out["loss"] * chunk_w[gi])
+            continue
         chunk_losses.append(out["loss"])
         chunk_tokens.append(int((yc != -100).sum()))
+    if window_backward:
+        if window:
+            part = torch.stack(window).sum()
+            (part / accumulation_steps).backward()
+            total = part.detach() if total is None else total + part.detach()
+        return (0.0 if total is None else float(total)), m_cross
     total = reduce_chunk_losses(chunk_losses, chunk_tokens, mode="token")
     (total / accumulation_steps).backward()
     return float(total.detach()), m_cross
@@ -362,12 +399,20 @@ def main() -> int:
     print(f"  recurrence: mean {args.mean_recurrence}, backprop depth {depth} "
           f"(from {src}) -> worst-case num_steps "
           f"[{n_ng} no-grad, {k_wg} with-grad]")
+    if args.window_backward and not (use_memory and gated):
+        print("  FAIL: --window_backward needs the gated buffer (its whole-carry "
+              "detach is what makes the windows independent); train.py refuses "
+              "this geometry at startup, so pricing it would price nothing.")
+        return 1
     if gated:
         print(f"  buffer: GATED ring, W {n_vec}, K {n_slots}, "
               f"route {args.gate_route}, norm {args.gate_norm}, "
               f"init {args.gate_init}, fill {args.gate_fill}, "
               f"carry_grad_chunks {args.carry_grad_chunks} of "
-              f"{args.cross_chunks}")
+              f"{args.cross_chunks}"
+              + (f", WINDOW BACKWARD (peak holds {args.carry_grad_chunks} "
+                 f"chunks)" if args.window_backward else
+                 ", one backward per row (peak holds every chunk)"))
     else:
         print(f"  buffer: accum_vecs {n_vec}, accum_max {args.accum_max}, "
               f"carry_grad_chunks {args.carry_grad_chunks} of "
@@ -437,7 +482,8 @@ def main() -> int:
         t = time.time()
         loss, _ = micro_step(model, x, y, eos_id, args.cross_chunks, num_steps,
                              args.carry_grad_chunks, n_vec, args.batch_size,
-                             amp_args, use_memory, write_once=not gated)
+                             amp_args, use_memory, write_once=not gated,
+                             window_backward=args.window_backward)
         if optimizer is not None:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
             optimizer.step()
@@ -512,6 +558,7 @@ def main() -> int:
                 "latent_carry": bool(args.latent_carry),
                 "sets": list(getattr(args, "set", [])),
                 "carry_grad_chunks": args.carry_grad_chunks,
+                "window_backward": bool(args.window_backward),
                 "peak_alloc_gib": round(peak_alloc / GIB, 2),
                 "peak_res_gib": round(peak_res / GIB, 2),
                 "total_gib": round(total_mem / GIB, 2),
