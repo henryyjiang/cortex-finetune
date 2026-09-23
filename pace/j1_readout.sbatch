@@ -16,10 +16,15 @@
 # J1's PRE-REGISTERED READ-OUT -- ../j1_prereg.md.  One eval_carry_2x2 run per
 # array task; evals/score_j1.py pairs them across limbs and applies the rules.
 #
-#   R=$(ENCODING=tokens sbatch --parsable --dependency=afterok:$J pace/j1_readout.sbatch)
+#   R=$(ENCODING=tokens sbatch --parsable --dependency=afterany:$J pace/j1_readout.sbatch)
 #   RE=$(ENCODING=tokens SET=edrop sbatch --parsable --array=0-3 \
-#        --dependency=afterok:$E pace/j1_readout.sbatch)       # the E-dropout pair
+#        --dependency=afterany:$E pace/j1_readout.sbatch)      # the E-dropout pair
 #   then pace/j1_verdict.sbatch (CPU) with --dependency=afterany on both.
+#
+# afterany, not afterok: every task refuses on its own when its limb has no
+# checkpoint_$STEP, so a limb that crashed costs a one-minute refusal and a
+# verdict that names it -- where afterok would hold EVERY read-out, including
+# the limbs that finished, behind one failure.
 #
 # EACH LIMB IN ITS OWN TRAINED CONDITION, E on (score_j1.py's header):
 #   real E1Z1 | donor E1Z0 under --z_null donor | noread E1Z1.
