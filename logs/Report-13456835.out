@@ -1,0 +1,96 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-22-2026 20:44:38
+Job ID:    13456835
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j1_oom
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== J1 memory price | micro=2 | encoding=endpoint | grad_chunks=4 ===
+NVIDIA H200, 143771 MiB
+
+######## real limb: LatentRead xattn + znorm ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  9.29it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 18.23it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_reader.gate', 'cortex.latent_reader.k_proj.weight', 'cortex.latent_reader.out_proj.weight', 'cortex.latent_reader.q_proj.weight', 'cortex.latent_reader.v_proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W922 20:45:23.375059960 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 31.6s (1.41B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: GATED ring, W 16, K 64, route ring, norm tanh, init zero, fill grow, carry_grad_chunks 4 of 8
+  max packed sequence: 512 + 64 carry rows = 576 (max_position_embeddings=4096)
+  note: lap is 4 chunks; the gate fires from chunk 4 on, and the read block is PINNED at 64 columns from there. Against a no-trim accum on the same chain (128 columns) this is 50% of the read cost -- the pair is 'cheaper AND?', never 'equal cost AND?'.
+  note: +33.6M buffer parameters, which the optimizer holds two moments for. That is the one axis on which the gated arm is the LARGER of the two, and the reason this gate is not a formality.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 18a)
+  OOM: CUDA out of memory. Tried to allocate 64.00 MiB. GPU 0 has a total capacity of 139.80 GiB of which 45.12 MiB is free. Including non-PyTorch memory, this process has 139.75 GiB memory in use. Of the allocated memory 138.48 GiB is allocated by PyTorch, and 211.02 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+-- result --
+  peak reserved before OOM: 138.71 GiB of 139.80 GiB
+
+RESULT OOM max_length=4096 cross_chunks=8 chunk_len=512 memory=True optimizer=True peak_alloc_gib=0.00 peak_res_gib=138.71 step_s=0.0
+[rank0]:[W922 20:45:29.588507702 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+######## noread limb: write only ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 29.82it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W922 20:45:58.132525437 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 20.4s (1.39B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: GATED ring, W 16, K 64, route ring, norm tanh, init zero, fill grow, carry_grad_chunks 4 of 8
+  max packed sequence: 512 + 64 carry rows = 576 (max_position_embeddings=4096)
+  note: lap is 4 chunks; the gate fires from chunk 4 on, and the read block is PINNED at 64 columns from there. Against a no-trim accum on the same chain (128 columns) this is 50% of the read cost -- the pair is 'cheaper AND?', never 'equal cost AND?'.
+  note: +33.6M buffer parameters, which the optimizer holds two moments for. That is the one axis on which the gated arm is the LARGER of the two, and the reason this gate is not a formality.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 13a)
+  OOM: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 139.80 GiB of which 21.12 MiB is free. Including non-PyTorch memory, this process has 139.77 GiB memory in use. Of the allocated memory 138.59 GiB is allocated by PyTorch, and 116.78 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+-- result --
+  peak reserved before OOM: 138.71 GiB of 139.80 GiB
+
+RESULT OOM max_length=4096 cross_chunks=8 chunk_len=512 memory=True optimizer=True peak_alloc_gib=0.00 peak_res_gib=138.71 step_s=0.0
+[rank0]:[W922 20:46:03.858635824 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+   limb micro status    alloc  reserved  %dev  s/step
+   real     2    OOM     0.00    138.71    99     0.0
+ noread     2    OOM     0.00    138.71    99     0.0
+
+J1: the real/donor limb DOES NOT FIT.  Do NOT drop to micro 1 (the donor
+    roll would return the same row).  Lower CARRY_GRAD_CHUNKS and re-price.
+---------------------------------------
+Begin Slurm Epilog: Sep-22-2026 20:46:07
+Job ID:        13456835
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j1_oom
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:12:08,vmem=0,walltime=00:01:31,mem=2672432K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-23-0
+---------------------------------------

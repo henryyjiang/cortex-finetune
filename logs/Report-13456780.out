@@ -1,0 +1,47 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-22-2026 20:38:38
+Job ID:    13456780
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  carry_task
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== carry task | R=16 ops/line=1 | train 4000 (seed 1) | val 1000 (seed 2) ===
+    tokenizer: ckpts/olmo-retrofit-cortex   features like: data/pg19_fw50_olmo_len4096
+    mix:       data/j1_pg19fw50_carry20_len4096  (0.2 of 16000 rows)
+pieces -> ids: {'A': 32, 'B': 33, 'C': 34, 'D': 35, 'E': 36, 'F': 37, 'G': 38, 'H': 39, 'I': 40, 'J': 41, 'K': 42, 'L': 43, 'M': 44, 'N': 45, 'O': 46, 'P': 47, '0': 15, '1': 16, '2': 17, '3': 18, '4': 19, '5': 20, '6': 21, '7': 22, '8': 23, '9': 24, '+': 10, '=': 28, '\n': 198}
+4000 rows x 4097 ids | at 8 equal chunks: 109.5 carry-dependent and 573.5 local answers per row
+Saving the dataset (0/1 shards):   0%|          | 0/4000 [00:00<?, ? examples/s]Saving the dataset (0/1 shards):  75%|███████▌  | 3000/4000 [00:02<00:00, 1120.87 examples/s]Saving the dataset (1/1 shards): 100%|██████████| 4000/4000 [00:02<00:00, 1120.87 examples/s]Saving the dataset (1/1 shards): 100%|██████████| 4000/4000 [00:02<00:00, 1446.35 examples/s]
+wrote data/carry_task_r16_len4096  features={'input_ids': List(Value('int32')), 'attention_mask': List(Value('int8'))}
+pieces -> ids: {'A': 32, 'B': 33, 'C': 34, 'D': 35, 'E': 36, 'F': 37, 'G': 38, 'H': 39, 'I': 40, 'J': 41, 'K': 42, 'L': 43, 'M': 44, 'N': 45, 'O': 46, 'P': 47, '0': 15, '1': 16, '2': 17, '3': 18, '4': 19, '5': 20, '6': 21, '7': 22, '8': 23, '9': 24, '+': 10, '=': 28, '\n': 198}
+1000 rows x 4097 ids | at 8 equal chunks: 109.5 carry-dependent and 573.5 local answers per row
+Saving the dataset (0/1 shards):   0%|          | 0/1000 [00:00<?, ? examples/s]Saving the dataset (0/1 shards): 100%|██████████| 1000/1000 [00:02<00:00, 450.68 examples/s]Saving the dataset (1/1 shards): 100%|██████████| 1000/1000 [00:02<00:00, 450.68 examples/s]Saving the dataset (1/1 shards): 100%|██████████| 1000/1000 [00:02<00:00, 436.93 examples/s]
+wrote data/carry_task_r16_len4096_val  features={'input_ids': List(Value('int32')), 'attention_mask': List(Value('int8')), 'answer_dep': List(Value('int32'))}
+A data/pg19_fw50_olmo_len4096: 940,000 rows -> taking 12,800
+B data/carry_task_r16_len4096: 4,000 rows -> taking 3,200
+mix: 16,000 rows x 4097 tokens = 65.6M tokens (B share 0.200 of ROWS, requested 0.2)
+  real-token fill: A 0.988, B 1.000  ->  B share of SUPERVISED TOKENS 0.202 (not 0.200).  Quote this one, or re-run with --ratio adjusted, if the mix ratio is load-bearing.
+Flattening the indices (num_proc=8):   0%|          | 0/16000 [00:00<?, ? examples/s]Flattening the indices (num_proc=8):   6%|▋         | 1000/16000 [00:32<08:14, 30.33 examples/s]Flattening the indices (num_proc=8):  12%|█▎        | 2000/16000 [00:33<03:12, 72.67 examples/s]Flattening the indices (num_proc=8):  25%|██▌       | 4000/16000 [00:33<01:03, 190.32 examples/s]Flattening the indices (num_proc=8):  38%|███▊      | 6000/16000 [00:34<00:28, 347.97 examples/s]Flattening the indices (num_proc=8):  44%|████▍     | 7000/16000 [00:34<00:20, 433.34 examples/s]Flattening the indices (num_proc=8):  50%|█████     | 8000/16000 [00:44<00:18, 433.34 examples/s]Flattening the indices (num_proc=8):  56%|█████▋    | 9000/16000 [01:04<00:53, 130.24 examples/s]Flattening the indices (num_proc=8):  62%|██████▎   | 10000/16000 [01:05<00:36, 166.03 examples/s]Flattening the indices (num_proc=8):  75%|███████▌  | 12000/16000 [01:06<00:15, 262.48 examples/s]Flattening the indices (num_proc=8):  81%|████████▏ | 13000/16000 [01:06<00:09, 329.89 examples/s]Flattening the indices (num_proc=8):  94%|█████████▍| 15000/16000 [01:07<00:02, 490.12 examples/s]Flattening the indices (num_proc=8): 100%|██████████| 16000/16000 [01:08<00:00, 565.44 examples/s]Flattening the indices (num_proc=8): 100%|██████████| 16000/16000 [01:08<00:00, 233.72 examples/s]
+Saving the dataset (0/8 shards):   0%|          | 0/16000 [00:00<?, ? examples/s]Saving the dataset (0/8 shards):  12%|█▎        | 2000/16000 [00:02<00:17, 800.73 examples/s]Saving the dataset (1/8 shards):  25%|██▌       | 4000/16000 [00:02<00:14, 800.73 examples/s]Saving the dataset (2/8 shards):  25%|██▌       | 4000/16000 [00:02<00:14, 800.73 examples/s]Saving the dataset (3/8 shards):  62%|██████▎   | 10000/16000 [00:02<00:07, 800.73 examples/s]Saving the dataset (4/8 shards):  62%|██████▎   | 10000/16000 [00:02<00:07, 800.73 examples/s]Saving the dataset (5/8 shards):  75%|███████▌  | 12000/16000 [00:02<00:04, 800.73 examples/s]Saving the dataset (6/8 shards):  75%|███████▌  | 12000/16000 [00:02<00:04, 800.73 examples/s]Saving the dataset (7/8 shards):  88%|████████▊ | 14000/16000 [00:02<00:02, 800.73 examples/s]Saving the dataset (8/8 shards): 100%|██████████| 16000/16000 [00:02<00:00, 800.73 examples/s]Saving the dataset (8/8 shards): 100%|██████████| 16000/16000 [00:02<00:00, 5791.32 examples/s]
+wrote data/j1_pg19fw50_carry20_len4096
+
+DONE.  J1 trains on ARM_DATA=data/j1_pg19fw50_carry20_len4096 (its default).
+Score any carry model on the task with, e.g.:
+  DATA=data/carry_task_r16_len4096_val SCORE=carry Z_NULL=donor ... sbatch pace/eval_carry_2x2.sbatch
+and ALWAYS read SCORE=local next to it: it is the task's own positive control.
+---------------------------------------
+Begin Slurm Epilog: Sep-22-2026 20:41:53
+Job ID:        13456780
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      carry_task
+Resources:     cpu=8,mem=64G,node=1
+Rsrc Used:     cput=00:26:00,vmem=0,walltime=00:03:15,mem=3397480K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-002-26-2
+---------------------------------------

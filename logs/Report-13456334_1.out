@@ -1,0 +1,167 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-22-2026 20:44:06
+Job ID:    13456334
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  z2_content
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== z2 D1+D2 | arm=a3z | T=8 | n_chunks=8 ===
+NVIDIA H200, 143771 MiB
+    checkpoint: cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952
+    data:       data/pg19_olmo_validation_len4096_strided
+    sets:       --set use_memory=true --set memory_slots=0 --set prefix_memory=gated --set accum_vecs=16 --set gate_slots=64 --set gate_route=ring --set gate_norm=tanh --set gate_init=zero --set gate_fill=grow --set latent_carry=true --set latent_depth_rule=absolute --set latent_depth_lo=2 --set latent_depth_hi=9 --set latent_renorm=none
+    out:        eval_results/z2_content/a3z
+
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.23s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.57it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/probe-p1-a3z-gated-w16k64-cc8-z/checkpoint_91952/chkpt.pt: 0 missing / 0 unexpected keys
+[z2] eos for book ends: from the pack's padding
+[z2] pack data/pg19_olmo_validation_len4096_strided: 1059 rows read, 50 ragged skipped, 1009 used | books: document ends: 50 books
+  25/1009 rows
+  50/1009 rows
+  75/1009 rows
+  100/1009 rows
+  125/1009 rows
+  150/1009 rows
+  175/1009 rows
+  200/1009 rows
+  225/1009 rows
+  250/1009 rows
+  275/1009 rows
+  300/1009 rows
+  325/1009 rows
+  350/1009 rows
+  375/1009 rows
+  400/1009 rows
+  425/1009 rows
+  450/1009 rows
+  475/1009 rows
+  500/1009 rows
+  525/1009 rows
+  550/1009 rows
+  575/1009 rows
+  600/1009 rows
+  625/1009 rows
+  650/1009 rows
+  675/1009 rows
+  700/1009 rows
+  725/1009 rows
+  750/1009 rows
+  775/1009 rows
+  800/1009 rows
+  825/1009 rows
+  850/1009 rows
+  875/1009 rows
+  900/1009 rows
+  925/1009 rows
+  950/1009 rows
+  975/1009 rows
+  1000/1009 rows
+[z2] reseed check: same seed reproduces, a new seed moves every Z encoding -- OK
+  fit E
+  fit Z_delta
+  fit E+Z_delta
+  fit E+donor:Z_delta
+  fit Z_end
+  fit E+Z_end
+  fit E+donor:Z_end
+  fit Z_tok
+  fit E+Z_tok
+  fit E+donor:Z_tok
+
+==============================================================================
+D1 -- seed vs document | 1600 samples, 48 books | ratio = seed_var / doc_var
+     ~1 = the encoding is s0 noise; ~0 = it is the document
+==============================================================================
+  encoding       ||X||    seed_var     doc_var    ratio  95% CI              reading
+  E           113.4946  8.6785e-01  1.2740e+03    0.001  [0.000, 0.001]      CONTENT-DETERMINED
+  Z_delta       4.0947  3.3625e-02  1.5842e+01    0.002  [0.002, 0.002]      CONTENT-DETERMINED
+  Z_end        16.4367  5.9072e-02  9.5767e+01    0.001  [0.000, 0.001]      CONTENT-DETERMINED
+  Z_tok        11.1077  1.0546e-04  8.1503e+01    0.000  [0.000, 0.000]      CONTENT-DETERMINED
+
+  per loop depth, summary columns (the tape Z_delta samples from):
+  t      ||d_t||    ratio  95% CI
+  1      11.1795    0.005  [0.005, 0.005]
+  2       7.4424    0.002  [0.002, 0.002]
+  3       4.7672    0.002  [0.002, 0.002]
+  4       3.1868    0.002  [0.002, 0.003]
+  5       2.4489    0.004  [0.003, 0.005]
+  6       2.3062    0.006  [0.005, 0.008]
+  7       2.5416    0.006  [0.004, 0.009]
+  8       3.5624    0.003  [0.002, 0.004]
+
+  lowest-ratio Z encoding: Z_tok  (cuts 0.1/0.5 are chosen, not measured)
+
+==============================================================================
+D2 -- what Z holds beyond E | train 5670 samples / 40 books, test 1393 / 10 books, vocab 2048
+==============================================================================
+  features              bow_self    bow_next    nll_next   (held-out R^2)
+  E                       0.0543      0.0250      0.3044
+  Z_delta                 0.0280      0.0152      0.3123
+  E+Z_delta               0.0500      0.0252      0.3421
+  E+donor:Z_delta         0.0445      0.0236      0.2849
+  Z_end                   0.0432      0.0226      0.3215
+  E+Z_end                 0.0513      0.0239      0.3088
+  E+donor:Z_end           0.0413      0.0205      0.2676
+  Z_tok                   0.0300      0.0187      0.2959
+  E+Z_tok                 0.0510      0.0268      0.3386
+  E+donor:Z_tok           0.0444      0.0238      0.2825
+
+  content gain = R^2(E+Z) - R^2(E + another book's Z); over E = R^2(E+Z) - R^2(E)
+  book-cluster 95% CIs.  HOLDS CONTENT needs BOTH above zero.
+  Z_delta  bow_self     +0.0055  [+0.0035, +0.0096]   over E -0.0043 [-0.0054, -0.0023]
+  Z_delta  bow_next     +0.0016  [+0.0008, +0.0026]   over E +0.0002 [-0.0012, +0.0010]
+  Z_delta  nll_next     +0.0572  [+0.0338, +0.0915]   over E +0.0377 [+0.0100, +0.0751]  * HOLDS CONTENT BEYOND E
+  Z_end    bow_self     +0.0100  [+0.0088, +0.0115]   over E -0.0031 [-0.0043, -0.0025]
+  Z_end    bow_next     +0.0034  [+0.0021, +0.0052]   over E -0.0011 [-0.0021, -0.0006]
+  Z_end    nll_next     +0.0412  [-0.0055, +0.0998]   over E +0.0044 [-0.0181, +0.0452]
+  Z_tok    bow_self     +0.0067  [+0.0044, +0.0113]   over E -0.0033 [-0.0044, -0.0010]
+  Z_tok    bow_next     +0.0030  [+0.0022, +0.0042]   over E +0.0018 [+0.0006, +0.0026]  * HOLDS CONTENT BEYOND E
+  Z_tok    nll_next     +0.0561  [+0.0183, +0.0919]   over E +0.0342 [-0.0030, +0.0620]
+
+  probe health: R^2(E -> bow_self) = 0.0543 (the probe's positive control)
+
+wrote eval_results/z2_content/a3z/results.json
+
+z2 (a3z) DONE -> eval_results/z2_content/a3z/results.json
+---------------------------------------
+Begin Slurm Epilog: Sep-22-2026 21:10:41
+Job ID:        13456334
+Array Job ID:  13456334_1
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      z2_content
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=03:33:28,vmem=,walltime=00:26:41,mem=,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-23-0
+---------------------------------------
