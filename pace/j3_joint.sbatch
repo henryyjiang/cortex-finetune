@@ -81,6 +81,11 @@
 #   range and directly comparable to J1's pair (j3_prereg.md S1).
 # ENCODING = scratch, fixed: J3 carries the scratchpad at J1's Step-0 winner's
 #   positions (the last 64 real tokens pooled x4 to 16 rows).
+# MEMORY: job 13483998 (pace/j3_price_oom.sbatch, micro 2, window_backward):
+#   real 92.12 alloc / 92.42 reserved GiB (66%), 1.7 s/micro; noread 91.20 /
+#   91.69 (66%), 1.6 s.  FITS.  +3.6 GiB and ~+5% time over J1's 88.48 / 88.89
+#   GiB and 1.62 s (job 13459697) -- the scratchpad is in the priced graph.
+#   J1 trained ~4% slower than it priced, so expect ~1.77 s/micro, ~2.0 h/limb.
 
 cd $SLURM_SUBMIT_DIR
 
