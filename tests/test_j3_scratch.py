@@ -598,3 +598,28 @@ class TestTheScorerReadsJ3:
         assert not score_j1.audit_reasons([], live_gate, dead_read)   # no positive: descriptive
         assert score_j1.audit_reasons(
             [run], {run: {"collapsed": True, "last": 0.01}}, live_read)
+
+    @staticmethod
+    def _eff(mean, lo, hi):
+        return {"mean": mean, "lo": lo, "hi": hi, "n": 300}
+
+    def test_a_between_limb_gain_needs_the_within_model_contrast(self):
+        """J1's lesson: limbs drift 0.26 nats apart with the read doing nothing,
+        so Z_ADDS_CONTENT must also show when the real limb's own Z is removed."""
+        sys.path.insert(0, os.path.join(REPO, "evals"))
+        import score_j1
+        base = {"carry_reading": "Z_ADDS_CONTENT", "carry": {}}
+        drift = dict(base, carry={"real_Z_main_off": self._eff(0.0001, -0.0002, 0.0003)})
+        read = dict(base, carry={"real_Z_main_off": self._eff(0.08, 0.06, 0.10)})
+        tiny = dict(base, carry={"real_Z_main_off": self._eff(0.02, 0.01, 0.03)})
+        assert score_j1.within_model_audit(drift)
+        assert score_j1.within_model_audit(tiny)
+        assert not score_j1.within_model_audit(read)
+        assert not score_j1.within_model_audit(
+            {"carry_reading": "NO_GAIN", "carry": drift["carry"]})
+
+    def test_an_audit_changes_the_answer_line(self):
+        sys.path.insert(0, os.path.join(REPO, "evals"))
+        import score_j1
+        assert score_j1.answer_with_audit("YES", []) == "YES"
+        assert score_j1.answer_with_audit("YES", ["x"]).startswith("AUDIT")

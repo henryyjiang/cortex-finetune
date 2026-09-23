@@ -373,6 +373,36 @@ def read_trajectory(diag_path: str) -> Optional[dict]:
             "collapsed": lof is not None and lof < READ_COLLAPSE_FRAC}
 
 
+def within_model_audit(main_v: dict) -> list:
+    """J3 (j3_prereg.md S4.5).  Z_ADDS_CONTENT is a BETWEEN-limb reading, and
+    J1 showed the limbs' E-carry skill can drift 0.26 nats apart along three
+    same-seed trajectories while the read itself does nothing (the real limb's
+    own Z removed: +0.0001).  So a main-limb Z_ADDS_CONTENT must also show up
+    WITHIN the real limb -- its own Z removed (Z_main off) costs at least
+    MIN_EFFECT_CARRY with CI_lo > 0 -- or the gain is the trajectory, not the
+    read.  The E-dropout pair needs no such rule: Z_CAN_LEARN already requires
+    its within-model donor contrast."""
+    if main_v.get("carry_reading") != "Z_ADDS_CONTENT":
+        return []
+    w = (main_v.get("carry") or {}).get("real_Z_main_off")
+    if w and w["mean"] >= MIN_EFFECT_CARRY and w["lo"] > 0:
+        return []
+    got = "n/a" if not w else f"{w['mean']:+.4f} [{w['lo']:+.4f}, {w['hi']:+.4f}]"
+    return [f"AUDIT: main-limb Z_ADDS_CONTENT without the within-model contrast "
+            f"(real limb, own Z removed: {got}; needs >= {MIN_EFFECT_CARRY} with "
+            f"CI_lo > 0) -- the between-limb gain is not coming through the read"]
+
+
+def answer_with_audit(answer: str, audit: list) -> str:
+    """j1_prereg.md S5 and j3_prereg.md S5: a positive reading that trips an
+    audit IS an AUDIT, so the ANSWER line says so.  (Until 2026-09-23 the audit
+    lines printed beside an unchanged ANSWER; J1 tripped none, so its recorded
+    verdict is the same either way.)"""
+    if not audit:
+        return answer
+    return f"AUDIT (the table alone would read: {answer})"
+
+
 def audit_reasons(deciding: list, gates: dict, reads: dict) -> list:
     """A positive reading beside a read that is OFF on the same limb is a
     contradiction: a read that is off cannot be the one doing the work.  Off =
@@ -600,7 +630,8 @@ def main() -> int:
         deciding.append(run_name("real", a.encoding, "", exp))
     if edrop_v and edrop_v.get("reading") == "Z_CAN_LEARN":
         deciding.append(run_name("real", a.encoding, a.edrop, exp))
-    audit = audit_reasons(deciding, gates, reads)
+    audit = audit_reasons(deciding, gates, reads) + within_model_audit(main_v)
+    answer = answer_with_audit(answer, audit)
 
     print("=" * 78)
     print(f"{exp.upper()} VERDICT (pre-registered: evals/score_j1.py, "
