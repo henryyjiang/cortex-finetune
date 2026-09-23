@@ -304,7 +304,34 @@ def latent_runtime(cortex) -> dict:
         "read_znorm": str(getattr(cortex, "latent_read_znorm", "none")),
         "e_dropout": float(getattr(cortex, "e_dropout", 0.0)),
         "e_dropped": int(getattr(cortex, "_e_dropped", 0)),
+        # J3.  With the gate's LR slowed (gate_lr_mult < 1) the gate can no
+        # longer close the read -- but out_proj / v_proj still can.  So the
+        # READ STRENGTH is the injected delta against the field it lands in,
+        # `read_ratio`, and a held-open gate beside a read_ratio falling to
+        # zero is the same collapse moved to other parameters.  `own_share`
+        # says how the read splits between the carry and the position's own
+        # scratchpad row (1.0 when no carried row is live).
+        "carry_read": bool(getattr(cortex, "latent_carry_read", True)),
+        "gate_lr_mult": float(getattr(cortex, "latent_read_gate_lr_mult", 1.0)),
+        "x_read_norm": _opt_float(getattr(cortex, "_x_read_norm", None)),
+        "read_delta_norm": _opt_float(getattr(cortex, "_z_read_delta_norm", None)),
+        "read_ratio": _ratio(getattr(cortex, "_z_read_delta_norm", None),
+                             getattr(cortex, "_x_read_norm", None)),
+        "scratch_row_norm": _opt_float(getattr(cortex, "_scratch_row_norm", None)),
+        "own_share": (getattr(cortex.latent_reader, "own_share", None)
+                      if getattr(cortex, "latent_reader", None) is not None
+                      else None),
     }
+
+
+def _opt_float(v) -> Optional[float]:
+    return None if v is None else float(v)
+
+
+def _ratio(num, den) -> Optional[float]:
+    if num is None or den is None or not float(den):
+        return None
+    return float(num) / float(den)
 
 
 #: MEASURED 2026-09-16 from the real sampler, 50,000 draws per cell, five seeds

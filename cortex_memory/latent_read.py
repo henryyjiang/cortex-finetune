@@ -120,16 +120,44 @@ class LatentRead(nn.Module):
     """
 
     def __init__(self, hidden_size: int, n_heads: int = 8,
-                 gate_init: float = 0.1, proj_std: float = 0.02) -> None:
+                 gate_init: float = 0.1, proj_std: float = 0.02,
+                 gate_lr_mult: float = 1.0) -> None:
         super().__init__()
         if hidden_size % n_heads:
             raise ValueError(
                 f"LatentRead hidden_size ({hidden_size}) must divide by "
                 f"n_heads ({n_heads}).")
+        if not (gate_lr_mult > 0 and math.isfinite(gate_lr_mult)):
+            raise ValueError(
+                f"LatentRead gate_lr_mult must be finite and > 0; got "
+                f"{gate_lr_mult!r}.  To freeze the gate, use a small value -- "
+                "zero would divide the stored parameter by zero.")
         self.hidden_size = int(hidden_size)
         self.n_heads = int(n_heads)
         self.head_dim = self.hidden_size // self.n_heads
         self.gate_init = float(gate_init)
+        # THE GATE'S LEARNING RATE, AS A REPARAMETERISATION.  The effective
+        # gate is `gate_lr_mult * self.gate`, with `self.gate` stored at
+        # gate_init / gate_lr_mult.  Adam's step on a parameter is ~lr whatever
+        # the gradient's magnitude, so scaling the parameterisation by c scales
+        # the gate's per-step movement by c: this IS an LR multiplier on the
+        # one scalar, under the optimizer every cortex parameter uses.
+        #
+        # Why it exists (J1, j1_prereg.md S10): the gate fell 0.10 -> 0.00 in
+        # ~270 updates on every read limb, LINEARLY, at ~3.9e-4 per update --
+        # i.e. Adam at memory_lr 5e-4 stepping at full speed on a sign-stable
+        # gradient.  The collapse speed was the optimizer's, not a measure of
+        # how much the read hurt, and it shut the write's gradient (which
+        # scales with the gate) before the write could learn.
+        #
+        # Why not a param group with its own LR: a branch restores the
+        # parent's LambdaLR, which carries one lr_lambda per group, and
+        # load_checkpoint refuses a group-count mismatch.  A new group would
+        # force --ignore_past_scheduler, i.e. a different LR schedule -- a
+        # second variable.  1.0 (the default) is bit-identical to every arm
+        # on record.  It MUST persist into config.json: a checkpoint rebuilt
+        # at a different value reads the stored parameter at the wrong scale.
+        self.gate_lr_mult = float(gate_lr_mult)
 
         self.q_proj = nn.Linear(hidden_size, hidden_size, bias=False)
         self.k_proj = nn.Linear(hidden_size, hidden_size, bias=False)
@@ -137,21 +165,46 @@ class LatentRead(nn.Module):
         self.out_proj = nn.Linear(hidden_size, hidden_size, bias=False)
         for proj in (self.q_proj, self.k_proj, self.v_proj, self.out_proj):
             nn.init.normal_(proj.weight, std=proj_std)
-        self.gate = nn.Parameter(torch.full((1,), float(gate_init)))
+        self.gate = nn.Parameter(
+            torch.full((1,), float(gate_init) / self.gate_lr_mult))
+        # J3 diagnostic: mean attention mass on the position's OWN scratchpad
+        # key, set only on the `own` path.  Detached, last call wins.
+        self._own_share_t: Optional[torch.Tensor] = None
+
+    @property
+    def own_share(self) -> Optional[float]:
+        """Share of the read's attention on the own scratchpad key (J3), 1.0
+        when no carried row is live.  None until the `own` path has run."""
+        t = self._own_share_t
+        return None if t is None else float(t)
+
+    def effective_gate(self) -> torch.Tensor:
+        """The gate the forward multiplies by (see gate_lr_mult)."""
+        if self.gate_lr_mult == 1.0:
+            return self.gate
+        return self.gate * self.gate_lr_mult
 
     @property
     def gate_value(self) -> float:
-        return float(self.gate.detach().float().reshape(-1)[0])
+        return float(self.effective_gate().detach().float().reshape(-1)[0])
 
-    def forward(self, x: torch.Tensor, z: torch.Tensor,
-                read_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, z: Optional[torch.Tensor],
+                read_mask: Optional[torch.Tensor] = None,
+                own: Optional[torch.Tensor] = None) -> torch.Tensor:
         """x [B,S,D] queries, z [B,K,D] keys/values -> delta [B,S,D].
 
         `read_mask` is [B,S,1] over the PACKED layout: zero at positions that
         must not read the previous document's carry.  Returns the delta rather
         than x+delta so the caller owns the residual and a test can assert the
         contribution is exactly zero.
+
+        `own` [B,S,D] is J3's per-position scratchpad: ONE extra key per query
+        position, that position's own row, sharing the softmax with the carried
+        rows.  With `own=None` this is exactly the J1 read (the branch below is
+        untouched); see `_forward_with_own` for how the mask changes meaning.
         """
+        if own is not None:
+            return self._forward_with_own(x, z, read_mask, own)
         B, S, D = x.shape
         K = z.shape[1]
         if z.shape[0] != B or z.shape[-1] != D:
@@ -185,10 +238,81 @@ class LatentRead(nn.Module):
         # are all -inf, so scrub their NaN instead of letting it travel.
         attn = torch.nan_to_num(attn, nan=0.0)
         out = (attn @ v).transpose(1, 2).contiguous().view(B, S, D)
-        delta = self.gate.to(x.dtype) * self.out_proj(out)
+        delta = self.effective_gate().to(x.dtype) * self.out_proj(out)
         if read_mask is not None:
             delta = delta * read_mask.to(delta.dtype)
         return delta
+
+    def _forward_with_own(self, x: torch.Tensor, z: Optional[torch.Tensor],
+                          read_mask: Optional[torch.Tensor],
+                          own: torch.Tensor) -> torch.Tensor:
+        """The J3 read: carried rows [B,K,D] (or None) plus one OWN key per
+        query position [B,S,D], in one softmax.
+
+        CAUSAL BY CONSTRUCTION.  Position i's extra key is position i's own
+        scratchpad row, never another position's, so nothing inside the chunk
+        crosses the causal mask through this read.  That is the whole reason
+        the scratchpad is per-position: a pooled row written from the chunk's
+        tokens and read back by those same tokens would hand every position
+        the future.
+
+        THE EOS MASK REMOVES CARRIED KEYS, NOT THE READ.  On the J1 path a
+        masked position's whole delta is zeroed, because the carry was all it
+        read.  Here a position past the first EOS must still read its OWN row
+        (that is its own current document), so the mask sets the carried
+        logits to -inf at those positions and leaves the own key alone.
+
+        A position with no live key at all (own row exactly zero -- the first
+        iteration -- and no carried rows it may read) gets exactly zero, via
+        the same nan scrub as the J1 path.
+        """
+        B, S, D = x.shape
+        if own.shape != x.shape:
+            raise ValueError(
+                f"LatentRead own rows {tuple(own.shape)} must match x "
+                f"{tuple(x.shape)}: one scratchpad row per packed position.")
+        nh, hd = self.n_heads, self.head_dim
+        own = own.to(dtype=x.dtype)
+        q = self.q_proj(x).view(B, S, nh, hd).transpose(1, 2)          # [B,nh,S,hd]
+        ko = self.k_proj(own).view(B, S, nh, hd).transpose(1, 2)
+        vo = self.v_proj(own).view(B, S, nh, hd).transpose(1, 2)
+        own_logit = (q * ko).sum(-1, keepdim=True) / math.sqrt(hd)     # [B,nh,S,1]
+        own_live = own.detach().abs().sum(dim=-1) != 0                 # [B,S]
+        own_logit = own_logit.masked_fill(
+            ~own_live[:, None, :, None].expand_as(own_logit), float("-inf"))
+
+        K = 0
+        if z is not None:
+            written = written_row_mask(z)                              # [B,K]
+            if bool(written.any()):
+                if z.shape[0] != B or z.shape[-1] != D:
+                    raise ValueError(
+                        f"LatentRead got x {tuple(x.shape)} and z "
+                        f"{tuple(z.shape)}; batch and hidden size must agree.")
+                K = z.shape[1]
+                z = z.to(dtype=x.dtype)
+                kc = self.k_proj(z).view(B, K, nh, hd).transpose(1, 2)
+                vc = self.v_proj(z).view(B, K, nh, hd).transpose(1, 2)
+                lc = (q @ kc.transpose(-2, -1)) / math.sqrt(hd)        # [B,nh,S,K]
+                keep = written[:, None, None, :].expand_as(lc)
+                if read_mask is not None:
+                    pos_ok = read_mask[..., 0].to(torch.bool)          # [B,S]
+                    keep = keep & pos_ok[:, None, :, None]
+                lc = lc.masked_fill(~keep, float("-inf"))
+                logits = torch.cat([lc, own_logit], dim=-1)
+            else:
+                logits = own_logit
+        else:
+            logits = own_logit
+        attn = torch.nan_to_num(F.softmax(logits, dim=-1), nan=0.0)
+        out = attn[..., K:] * vo                                       # own share
+        if K:
+            out = out + attn[..., :K] @ vc
+        # Kept as a tensor: float() here would sync the GPU on every loop
+        # iteration of every chunk.  `own_share` converts on demand (diag).
+        self._own_share_t = attn[..., K:].detach().float().mean()
+        out = out.transpose(1, 2).contiguous().view(B, S, D)
+        return self.effective_gate().to(x.dtype) * self.out_proj(out)
 
 
 def apply_designed_init(reader: Optional[nn.Module]) -> list:
@@ -213,7 +337,13 @@ def apply_designed_init(reader: Optional[nn.Module]) -> list:
         for proj in (reader.q_proj, reader.k_proj, reader.v_proj,
                      reader.out_proj):
             nn.init.normal_(proj.weight, std=0.02)
-        nn.init.constant_(reader.gate, reader.gate_init)
-        return ["latent_reader.[qkv,out~N(0,0.02) NOT zero -- see LatentRead]",
+        # The STORED parameter is gate_init / gate_lr_mult; the effective gate
+        # is gate_init either way.  Re-initialising the stored value to
+        # gate_init would start a gate_lr_mult=0.01 arm at 100x its gate.
+        nn.init.constant_(reader.gate, reader.gate_init / reader.gate_lr_mult)
+        tags = ["latent_reader.[qkv,out~N(0,0.02) NOT zero -- see LatentRead]",
                 f"latent_reader.gate={reader.gate_init}"]
+        if reader.gate_lr_mult != 1.0:
+            tags.append(f"latent_reader.gate_lr_mult={reader.gate_lr_mult}")
+        return tags
     raise TypeError(f"unknown latent read module {type(reader).__name__}")

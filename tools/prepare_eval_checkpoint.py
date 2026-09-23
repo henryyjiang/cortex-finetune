@@ -79,6 +79,11 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 # latent_write_only, and latent_encoding changes what Z is.
                 "latent_encoding", "latent_tok_pool", "latent_read_znorm",
                 "latent_read_znorm_target", "latent_write_only", "e_dropout",
+                # J3.  latent_read_gate_lr_mult changes how the STORED gate
+                # parameter is read (gate = mult x param): an eval rebuilt at
+                # 1.0 would score a 0.01-mult gate at 100x its trained value.
+                "latent_carry_read", "latent_read_gate_lr_mult",
+                "latent_scratch_forget_bias",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

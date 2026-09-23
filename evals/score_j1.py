@@ -62,6 +62,16 @@ LEAK_MARGIN = 0.25
 #: read (the tier-1.5 oracle ended at 0.014 / 0.028).  Descriptive, except that
 #: a collapsed gate beside a positive verdict is a contradiction -> AUDIT.
 GATE_COLLAPSE = 0.03
+#: J3 (j3_prereg.md S5).  The read's EFFECTIVE strength, z_read_ratio =
+#: ||delta|| / ||x|| at the read site, can collapse through out_proj / v_proj
+#: even with the gate slowed.  Collapsed = the mean of the LAST READ_WINDOW
+#: diag rows below READ_COLLAPSE_FRAC x the mean of the FIRST READ_WINDOW.
+#: 0.30 is the gate rule's own fraction (GATE_COLLAPSE 0.03 of the 0.1 init).
+#: Windowed, not single rows: the ratio is an ACTIVATION measure off the last
+#: forward before each diag row, so one row is one chunk's noise.  Same role
+#: as the gate rule: descriptive, except beside a positive verdict -> AUDIT.
+READ_COLLAPSE_FRAC = 0.30
+READ_WINDOW = 4
 #: rows paired across limbs / rows requested.  Below this the pairing lost
 #: rows silently and the comparison is not the one registered.
 PAIR_MIN_FRAC = 0.90
@@ -101,15 +111,28 @@ EDROP_TASKS = (
 PACKS = {"carry": CARRY_PACK, "pg19": PG19_PACK}
 
 
-def run_name(limb: str, encoding: str = "tokens", edrop: str = "") -> str:
-    """The TRAINING run's name, exactly as pace/j1_joint.sbatch builds it."""
+#: Experiments this scorer reads.  J3 (the in-loop scratchpad) runs the SAME
+#: limbs, packs, cells and decision table as J1 -- its launcher and read-out
+#: are pace/j3_joint.sbatch and pace/j1_readout.sbatch EXPERIMENT=j3 -- so the
+#: rules stay one piece of code.  J3's own thresholds, if its pre-registration
+#: adds any, go here as constants BEFORE any J3 number exists.
+EXPERIMENTS = ("j1", "j3")
+
+
+def run_name(limb: str, encoding: str = "tokens", edrop: str = "",
+             experiment: str = "j1") -> str:
+    """The TRAINING run's name, exactly as pace/j1_joint.sbatch (j1) and
+    pace/j3_joint.sbatch (j3) build it."""
+    if experiment not in EXPERIMENTS:
+        raise ValueError(f"experiment must be one of {EXPERIMENTS}; got {experiment!r}")
     tag = f"-edrop{edrop}" if edrop else ""
-    return f"j1-a3z-{encoding}{tag}-{limb}"
+    return f"{experiment}-a3z-{encoding}{tag}-{limb}"
 
 
-def task_dir(root: str, task: tuple, encoding: str, edrop: str) -> str:
+def task_dir(root: str, task: tuple, encoding: str, edrop: str,
+             experiment: str = "j1") -> str:
     _, limb, pack, score, znull, _, _ = task
-    return os.path.join(root, run_name(limb, encoding, edrop),
+    return os.path.join(root, run_name(limb, encoding, edrop, experiment),
                         f"{pack}-{score}-{znull}")
 
 
@@ -313,6 +336,63 @@ def gate_trajectory(diag_path: str) -> Optional[dict]:
             "collapsed": pts[-1][1] < GATE_COLLAPSE}
 
 
+def read_trajectory(diag_path: str) -> Optional[dict]:
+    """First and last z_read_ratio (||injected delta|| / ||x|| at the read
+    site) from a run's cortex_diag.jsonl, or None when the run did not record
+    it (every J1 run: the field was added for J3).
+
+    With the gate's LR slowed (J3's gate_lr_mult), the gate cannot close the
+    read quickly, but out_proj / v_proj still can -- so this is the read's
+    effective strength and the number a collapse would show up in.  `first` /
+    `last` are MEANS over READ_WINDOW rows at each end (see READ_COLLAPSE_FRAC);
+    `collapsed` feeds the same AUDIT rule as the gate (audit_reasons).
+    """
+    if not os.path.exists(diag_path):
+        return None
+    pts = []
+    with open(diag_path, encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            v = r.get("z_read_ratio")
+            if v is not None:
+                pts.append((int(r.get("step", 0)), float(v)))
+    if not pts:
+        return None
+    pts.sort()
+    w = max(1, min(READ_WINDOW, len(pts) // 2 or 1))
+    head, tail = pts[:w], pts[-w:]
+    first = sum(v for _, v in head) / len(head)
+    last = sum(v for _, v in tail) / len(tail)
+    lof = (last / first) if first else None
+    return {"first_step": head[0][0], "first": first,
+            "last_step": tail[-1][0], "last": last, "window": w,
+            "last_over_first": lof,
+            "collapsed": lof is not None and lof < READ_COLLAPSE_FRAC}
+
+
+def audit_reasons(deciding: list, gates: dict, reads: dict) -> list:
+    """A positive reading beside a read that is OFF on the same limb is a
+    contradiction: a read that is off cannot be the one doing the work.  Off =
+    a collapsed gate (GATE_COLLAPSE, J1's rule) or a collapsed effective read
+    strength (READ_COLLAPSE_FRAC, J3's -- the gate can be held open while
+    out_proj closes the read instead)."""
+    out = []
+    for run in deciding:
+        g = gates.get(run)
+        if g is not None and g["collapsed"]:
+            out.append(f"AUDIT: {run} reads positive beside a COLLAPSED read "
+                       f"gate ({g['last']:.4f} < {GATE_COLLAPSE})")
+        rt = reads.get(run)
+        if rt is not None and rt.get("collapsed"):
+            out.append(f"AUDIT: {run} reads positive beside a COLLAPSED read "
+                       f"strength (|delta|/|x| x{rt['last_over_first']:.2f} "
+                       f"< {READ_COLLAPSE_FRAC})")
+    return out
+
+
 def pg19_books(pack_path: str) -> tuple:
     """(row -> book id, ragged rows) for the strided PG-19 pack.
 
@@ -343,11 +423,11 @@ def pg19_books(pack_path: str) -> tuple:
 # ─── main ───────────────────────────────────────────────────────────────────
 
 def score_main(root: str, encoding: str, books: Optional[tuple],
-               n_boot: int) -> dict:
+               n_boot: int, experiment: str = "j1") -> dict:
     reps, vetoes = {}, []
     for t in MAIN_TASKS:
-        run = run_name(t[1], encoding)
-        reps[t[0]] = load_results(task_dir(root, t, encoding, ""))
+        run = run_name(t[1], encoding, "", experiment)
+        reps[t[0]] = load_results(task_dir(root, t, encoding, "", experiment))
         vetoes += veto_reasons(reps[t[0]], t, run)
     out: dict = {"vetoes": vetoes}
     if vetoes:
@@ -411,14 +491,16 @@ def score_main(root: str, encoding: str, books: Optional[tuple],
     return out
 
 
-def score_edrop(root: str, encoding: str, edrop: str, n_boot: int) -> Optional[dict]:
-    paths = [task_dir(root, t, encoding, edrop) for t in EDROP_TASKS]
+def score_edrop(root: str, encoding: str, edrop: str, n_boot: int,
+                experiment: str = "j1") -> Optional[dict]:
+    paths = [task_dir(root, t, encoding, edrop, experiment) for t in EDROP_TASKS]
     if not any(os.path.exists(os.path.join(p, "results.json")) for p in paths):
         return None
     reps, vetoes = {}, []
     for t, p in zip(EDROP_TASKS, paths):
         reps[t[0]] = load_results(p)
-        vetoes += veto_reasons(reps[t[0]], t, run_name(t[1], encoding, edrop))
+        vetoes += veto_reasons(reps[t[0]], t,
+                               run_name(t[1], encoding, edrop, experiment))
     out: dict = {"vetoes": vetoes}
     if vetoes:
         out["reading"] = "VETOED"
@@ -476,7 +558,11 @@ def fmt(e: Optional[dict]) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default="eval_results/j1_readout")
+    ap.add_argument("--experiment", default="j1", choices=EXPERIMENTS,
+                    help="j1 (joint xattn read) or j3 (in-loop scratchpad); "
+                         "sets the run-name prefix and the default --root")
+    ap.add_argument("--root", default="",
+                    help="default: eval_results/<experiment>_readout")
     ap.add_argument("--encoding", default="tokens")
     ap.add_argument("--edrop", default="0.25",
                     help="the E-dropout pair's tag; scored if its results exist")
@@ -488,34 +574,37 @@ def main() -> int:
     ap.add_argument("--boot", type=int, default=BOOT)
     ap.add_argument("--out", default="")
     a = ap.parse_args()
+    exp = a.experiment
+    a.root = a.root or f"eval_results/{exp}_readout"
 
     books = pg19_books(a.pg19) if a.pg19 else None
-    main_v = score_main(a.root, a.encoding, books, a.boot)
-    edrop_v = score_edrop(a.root, a.encoding, a.edrop, a.boot)
-    gates = {}
+    main_v = score_main(a.root, a.encoding, books, a.boot, exp)
+    edrop_v = score_edrop(a.root, a.encoding, a.edrop, a.boot, exp)
+    gates, reads = {}, {}
     for limb, tag in (("real", ""), ("donor", ""), ("real", a.edrop)):
-        run = run_name(limb, a.encoding, tag)
-        g = gate_trajectory(os.path.join(a.runs_root, run, "cortex_diag.jsonl"))
+        run = run_name(limb, a.encoding, tag, exp)
+        diag = os.path.join(a.runs_root, run, "cortex_diag.jsonl")
+        g = gate_trajectory(diag)
         if g is not None:
             gates[run] = g
+        rt = read_trajectory(diag)
+        if rt is not None:
+            reads[run] = rt
 
     answer = overall(main_v.get("carry_reading"),
                      edrop_v.get("reading") if edrop_v else None)
     # A positive reading beside a collapsed gate on the SAME limb is a
     # contradiction: a read that is off cannot be the one doing the work.
-    audit, deciding = [], []
+    deciding = []
     if main_v.get("carry_reading") == "Z_ADDS_CONTENT":
-        deciding.append(run_name("real", a.encoding))
+        deciding.append(run_name("real", a.encoding, "", exp))
     if edrop_v and edrop_v.get("reading") == "Z_CAN_LEARN":
-        deciding.append(run_name("real", a.encoding, a.edrop))
-    for run in deciding:
-        g = gates.get(run)
-        if g is not None and g["collapsed"]:
-            audit.append(f"AUDIT: {run} reads positive beside a COLLAPSED read "
-                         f"gate ({g['last']:.4f} < {GATE_COLLAPSE})")
+        deciding.append(run_name("real", a.encoding, a.edrop, exp))
+    audit = audit_reasons(deciding, gates, reads)
 
     print("=" * 78)
-    print(f"J1 VERDICT (pre-registered: evals/score_j1.py, ../j1_prereg.md)")
+    print(f"{exp.upper()} VERDICT (pre-registered: evals/score_j1.py, "
+          f"../{exp}_prereg.md)")
     print("  D = NLL(other limb) - NLL(real limb); POSITIVE = real is better")
     print("=" * 78)
     for v in main_v.get("vetoes", []):
@@ -557,16 +646,24 @@ def main() -> int:
         print(f"  read gate {run}: {g['first']:.4f} @ {g['first_step']} -> "
               f"{g['last']:.4f} @ {g['last_step']}"
               + ("  COLLAPSED" if g["collapsed"] else ""))
+    for run, rt in reads.items():
+        lof = rt["last_over_first"]
+        print(f"  read strength {run}: |delta|/|x| {rt['first']:.4f} @ "
+              f"{rt['first_step']} -> {rt['last']:.4f} @ {rt['last_step']}"
+              + (f"  (x{lof:.2f})" if lof is not None else "")
+              + ("  COLLAPSED" if rt["collapsed"] else ""))
     for x in audit:
         print(f"  {x}")
     print("-" * 78)
     print(f"  ANSWER: {answer}")
-    rec = {"answer": answer, "audit": audit, "main": main_v, "edrop": edrop_v,
-           "gates": gates,
+    rec = {"experiment": exp, "answer": answer, "audit": audit, "main": main_v,
+           "edrop": edrop_v, "gates": gates, "read_strength": reads,
            "constants": {"TASK_LEARNED_LOCAL_MAX": TASK_LEARNED_LOCAL_MAX,
                          "MIN_EFFECT_CARRY": MIN_EFFECT_CARRY,
                          "HEADROOM_MIN": HEADROOM_MIN, "LEAK_MARGIN": LEAK_MARGIN,
                          "GATE_COLLAPSE": GATE_COLLAPSE,
+                         "READ_COLLAPSE_FRAC": READ_COLLAPSE_FRAC,
+                         "READ_WINDOW": READ_WINDOW,
                          "PAIR_MIN_FRAC": PAIR_MIN_FRAC, "STEP": STEP}}
     out = a.out or os.path.join(a.root, "verdict.json")
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)

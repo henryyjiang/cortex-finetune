@@ -372,6 +372,16 @@ class CLISettings:
             latent_encoding="delta", latent_tok_pool=4,
             latent_read_znorm="none", latent_read_znorm_target=3.0,
             latent_write_only=False, e_dropout=0.0,
+            # Z ATTEMPT 2 (J3), cortex_memory/scratchpad.py.  latent_read
+            # 'scratch' + latent_encoding 'scratch' is the in-loop scratchpad;
+            #   latent_carry_read          False = J3's no-read limb (carry
+            #                              unread, scratchpad read kept)
+            #   latent_read_gate_lr_mult   the read gate's LR multiplier, as a
+            #                              reparameterisation (a param group
+            #                              would break the branch's LambdaLR)
+            #   latent_scratch_forget_bias the scratchpad's per-iteration fg
+            latent_carry_read=True, latent_read_gate_lr_mult=1.0,
+            latent_scratch_forget_bias=1.0,
             # diag_interval: every N optimizer steps, log the architecture's
             # health (carry rank + per-channel norms, whether either gate has
             # left its exactly-zero init, the Z read/write gradient fractions)
@@ -1116,7 +1126,14 @@ def startup(cfg: CLISettings):
                    # so the checkpoint records the condition it trained under.
                    "latent_encoding", "latent_tok_pool", "latent_read_znorm",
                    "latent_read_znorm_target", "latent_write_only",
-                   "e_dropout"):
+                   "e_dropout",
+                   # J3.  latent_read_gate_lr_mult persists HARDEST of these:
+                   # the stored gate parameter is gate/mult, so a checkpoint
+                   # rebuilt at mult 1.0 would read a 0.01-mult gate at 100x.
+                   # latent_carry_read is the only thing that lets the no-read
+                   # limb rebuild as itself; the forget bias records the arm.
+                   "latent_carry_read", "latent_read_gate_lr_mult",
+                   "latent_scratch_forget_bias"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -1144,6 +1161,12 @@ def startup(cfg: CLISettings):
                         if cfg.cortex['latent_read_scramble'] else "")
                      + (",WRITE-ONLY(no-read limb)"
                         if cfg.cortex['latent_write_only'] else "")
+                     + (",CARRY-UNREAD(J3 no-read limb)"
+                        if not cfg.cortex['latent_carry_read'] else "")
+                     + (f",gate_lr_mult={cfg.cortex['latent_read_gate_lr_mult']}"
+                        if cfg.cortex['latent_read_gate_lr_mult'] != 1.0 else "")
+                     + (f",scratch_fb={cfg.cortex['latent_scratch_forget_bias']}"
+                        if cfg.cortex['latent_read'] == 'scratch' else "")
                      + f",enc={cfg.cortex['latent_encoding']}"
                      + (f",znorm={cfg.cortex['latent_read_znorm_target']}"
                         if cfg.cortex['latent_read_znorm'] == 'rms' else "")

@@ -21,6 +21,16 @@
 #        --dependency=afterany:$E pace/j1_readout.sbatch)      # the E-dropout pair
 #   then pace/j1_verdict.sbatch (CPU) with --dependency=afterany on both.
 #
+# J3 (the in-loop scratchpad, pace/j3_joint.sbatch) is read out by THIS file
+# with EXPERIMENT=j3: same limbs, packs, cells and task table, so the decision
+# rules stay one piece of code.  ENCODING defaults to scratch there, and the
+# limbs get J3's flags (latent_read=scratch; no-read = latent_carry_read=false).
+#   R3=$(EXPERIMENT=j3 sbatch --parsable --dependency=afterany:$J3 pace/j1_readout.sbatch)
+#   R3E=$(EXPERIMENT=j3 SET=edrop sbatch --parsable --array=0-3 \
+#         --dependency=afterany:$J3E pace/j1_readout.sbatch)
+# GATE_LR_MULT MUST equal the training run's (the stored gate is gate/mult);
+# each task checks it against the run's cortex_diag.jsonl and refuses.
+#
 # afterany, not afterok: every task refuses on its own when its limb has no
 # checkpoint_$STEP, so a limb that crashed costs a one-minute refusal and a
 # verdict that names it -- where afterok would hold EVERY read-out, including
@@ -68,7 +78,14 @@ EDROP_TASKS=(
 
 MODEL=${MODEL:-ckpts/olmo-retrofit-cortex}
 OUT_ROOT=${OUT_ROOT:-cortex-retrofit}
-ENCODING=${ENCODING:-tokens}
+EXPERIMENT=${EXPERIMENT:-j1}
+case "$EXPERIMENT" in
+    j1) ENCODING=${ENCODING:-tokens} ;;
+    j3) ENCODING=${ENCODING:-scratch}
+        GATE_LR_MULT=${GATE_LR_MULT:-0.1}      # pace/j3_joint.sbatch's default
+        SCRATCH_FB=${SCRATCH_FB:-1.0} ;;
+    *) echo "ERROR: EXPERIMENT must be j1|j3; got '$EXPERIMENT'"; exit 1 ;;
+esac
 SET=${SET:-main}
 E_DROPOUT=${E_DROPOUT:-0.25}
 STEP=${STEP:-93552}               # 91552 + CELL_STEPS 2000: the stop_at_step save
@@ -91,13 +108,13 @@ if [ "$IDX" -ge "${#TASKS[@]}" ]; then
 fi
 read KEY LIMB PACK SCORE ZNULL N CELLS <<< "${TASKS[$IDX]}"
 
-RUN=j1-a3z-${ENCODING}${TAG}-${LIMB}
+RUN=${EXPERIMENT}-a3z-${ENCODING}${TAG}-${LIMB}
 CKPT=$OUT_ROOT/$RUN/checkpoint_$STEP
 case "$PACK" in
     carry) DATA=$CARRY_DATA ;;
     pg19)  DATA=$PG19_DATA ;;
 esac
-OUT=eval_results/j1_readout/$RUN/${PACK}-${SCORE}-${ZNULL}
+OUT=eval_results/${EXPERIMENT}_readout/$RUN/${PACK}-${SCORE}-${ZNULL}
 
 # The graft has to be FORCED to the trained build: --model_name loads the base
 # dir's config, which carries no cortex flags at all.  Same geometry as
@@ -110,6 +127,19 @@ SETS="$SETS --set latent_depth_lo=2 --set latent_depth_hi=9 --set latent_renorm=
 SETS="$SETS --set latent_encoding=$ENCODING --set latent_tok_pool=$TOK_POOL"
 SETS="$SETS --set latent_s0_read=false"
 ALLOW=""
+if [ "$EXPERIMENT" = "j3" ]; then
+    # J3: every limb reads the scratchpad; the limbs differ in the CARRY alone.
+    SETS="$SETS --set latent_read=scratch --set latent_read_heads=$READ_HEADS"
+    SETS="$SETS --set latent_read_znorm=rms --set latent_read_znorm_target=$ZNORM_TARGET"
+    SETS="$SETS --set latent_read_gate_lr_mult=$GATE_LR_MULT"
+    SETS="$SETS --set latent_scratch_forget_bias=$SCRATCH_FB"
+    case "$LIMB" in
+        real)   ;;
+        donor)  SETS="$SETS --set latent_read_scramble=true"
+                ALLOW="--allow_scrambled" ;;
+        noread) SETS="$SETS --set latent_carry_read=false" ;;
+    esac
+else
 case "$LIMB" in
     real)   SETS="$SETS --set latent_read=xattn --set latent_read_heads=$READ_HEADS"
             SETS="$SETS --set latent_read_znorm=rms --set latent_read_znorm_target=$ZNORM_TARGET" ;;
@@ -119,10 +149,11 @@ case "$LIMB" in
             ALLOW="--allow_scrambled" ;;
     noread) SETS="$SETS --set latent_read=none --set latent_write_only=true" ;;
 esac
+fi
 CELLS_ARG=""
 if [ "$CELLS" != "-" ]; then CELLS_ARG="--cells $CELLS"; fi
 
-echo "=== J1 read-out | SET=$SET task $IDX = $KEY ==="
+echo "=== $EXPERIMENT read-out | SET=$SET task $IDX = $KEY ==="
 echo "    run:        $RUN"
 echo "    checkpoint: $CKPT"
 echo "    data:       $DATA   (score $SCORE, z_null $ZNULL, n $N, cells ${CELLS})"
@@ -134,6 +165,23 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
     ls -d $OUT_ROOT/$RUN/checkpoint_* 2>/dev/null || echo "  (no checkpoint dirs at all)"
     exit 1; }
 [ -d "$DATA" ] || { echo "ERROR: no such pack: $DATA"; exit 1; }
+if [ "$EXPERIMENT" = "j3" ]; then
+    # The stored gate parameter is gate/mult: rebuilt at another mult, the
+    # eval would score the read at the wrong strength and say nothing.  The
+    # run's own diag rows record the mult it trained with.
+    DIAG=$OUT_ROOT/$RUN/cortex_diag.jsonl
+    [ -f "$DIAG" ] || { echo "ERROR: no $DIAG -- cannot confirm the trained gate_lr_mult"; exit 1; }
+    python - "$DIAG" "$GATE_LR_MULT" <<'MULT' || exit 1
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+got = {r.get("z_gate_lr_mult") for r in rows} - {None}
+want = float(sys.argv[2])
+if got != {want}:
+    sys.exit(f"ERROR: the run trained with gate_lr_mult {sorted(got)} but this "
+             f"read-out sets {want}.  Pass GATE_LR_MULT=<the run's value>.")
+print(f"    gate_lr_mult {want} matches the run's diag rows")
+MULT
+fi
 if ! grep -q "read_into(x, current_step)" "$MODEL/raven_modeling_minimal_cortex.py" 2>/dev/null; then
     echo "ERROR: $MODEL carries a PRE-P3.0 modeling file.  Refresh it:"
     echo "         python tools/prepare_cortex_checkpoint.py --src $MODEL --dst $MODEL --variant olmo"
@@ -148,9 +196,9 @@ python evals/eval_carry_2x2.py \
 RC=$?
 echo ""
 if [ $RC -eq 0 ]; then
-    echo "J1 read-out $KEY ($RUN) DONE -> $OUT/results.json"
+    echo "$EXPERIMENT read-out $KEY ($RUN) DONE -> $OUT/results.json"
     echo "  Numbers are READ ONLY through evals/score_j1.py (pace/j1_verdict.sbatch)."
 else
-    echo "J1 read-out $KEY ($RUN) FAILED rc=$RC"
+    echo "$EXPERIMENT read-out $KEY ($RUN) FAILED rc=$RC"
 fi
 exit $RC

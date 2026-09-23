@@ -365,7 +365,10 @@ class TestTheLauncher:
         assert f"PG19_DATA=${{PG19_DATA:-{S.PG19_PACK}}}" in self.SRC
 
     def test_the_run_names_are_j1s(self):
-        assert "RUN=j1-a3z-${ENCODING}${TAG}-${LIMB}" in self.SRC
+        # Parameterised for J3 (EXPERIMENT=j3) on 2026-09-23; the DEFAULT is
+        # still J1's prefix, so an unqualified submission reads J1's runs.
+        assert "RUN=${EXPERIMENT}-a3z-${ENCODING}${TAG}-${LIMB}" in self.SRC
+        assert "EXPERIMENT=${EXPERIMENT:-j1}" in self.SRC
         assert 'RUN_NAME=j1-a3z-${ENCODING}${TAG}-${LIMB}${RUN_SUFFIX:-}' in _read("pace/j1_joint.sbatch")
         assert S.run_name("real", "tokens", "0.25") == "j1-a3z-tokens-edrop0.25-real"
 

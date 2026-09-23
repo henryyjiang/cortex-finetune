@@ -128,6 +128,7 @@ from cortex_memory.buffers import (AccumCCoT, DirectCCoT, GatedAccumBuffer,
 from cortex_memory.eos import compute_eos_masks, apply_write_reset, apply_valid_write
 from cortex_memory.latent_read import (LatentRead, LatentRefresh,
                                        apply_designed_init as apply_latent_read_init)
+from cortex_memory.scratchpad import LatentScratchpad
 
 
 def _row_norm(t: torch.Tensor) -> float:
@@ -414,10 +415,88 @@ class CortexMemory(nn.Module):
             getattr(config, "latent_read_znorm_target", 3.0) or 3.0)
         self.latent_write_only = bool(getattr(config, "latent_write_only", False))
         self.e_dropout = float(getattr(config, "e_dropout", 0.0) or 0.0)
-        if self.latent_encoding not in ("delta", "endpoint", "tokens"):
+        # Z ATTEMPT 2 (J3) -- the in-loop scratchpad, cortex_memory/scratchpad.py.
+        #
+        #   latent_read='scratch'      a per-position gated latent state,
+        #                              written at iter_write every iteration and
+        #                              read at read_into on the next, beside the
+        #                              carried Z rows in ONE softmax.
+        #   latent_encoding='scratch'  what is CARRIED: the scratchpad at the
+        #                              last W * latent_tok_pool real tokens,
+        #                              pooled to W rows -- 'tokens' with the
+        #                              scratchpad in place of s_T.  The two
+        #                              flags go together; either alone raises.
+        #   latent_carry_read          J3's NO-READ limb (False): the carried
+        #                              rows are written every chunk and never
+        #                              read, while the within-chunk scratchpad
+        #                              read stays -- so the limbs differ in the
+        #                              carry and nothing else.
+        #   latent_read_gate_lr_mult   the read gate's LR multiplier (see
+        #                              LatentRead.gate_lr_mult for why it is a
+        #                              reparameterisation).  1.0 = every arm on
+        #                              record.
+        #   latent_scratch_forget_bias the scratchpad's per-ITERATION forget
+        #                              bias at init (fg = 0.731 at 1.0, LM2's).
+        self.latent_carry_read = bool(getattr(config, "latent_carry_read", True))
+        _glm = getattr(config, "latent_read_gate_lr_mult", 1.0)
+        self.latent_read_gate_lr_mult = float(1.0 if _glm is None else _glm)
+        _sfb = getattr(config, "latent_scratch_forget_bias", 1.0)
+        self.latent_scratch_forget_bias = float(1.0 if _sfb is None else _sfb)
+        if self.latent_encoding not in ("delta", "endpoint", "tokens", "scratch"):
             raise ValueError(
-                f"cortex.latent_encoding must be 'delta', 'endpoint' or "
-                f"'tokens'; got {self.latent_encoding!r}.")
+                f"cortex.latent_encoding must be 'delta', 'endpoint', 'tokens' "
+                f"or 'scratch'; got {self.latent_encoding!r}.")
+        if self.latent_encoding == "scratch" and self.latent_read != "scratch":
+            raise ValueError(
+                "cortex.latent_encoding='scratch' carries the J3 scratchpad, "
+                "which only exists under --cortex.latent_read scratch.")
+        if self.latent_read == "scratch":
+            if self.latent_encoding != "scratch":
+                raise ValueError(
+                    "cortex.latent_read='scratch' (J3) carries the scratchpad: "
+                    "pass --cortex.latent_encoding scratch.  A scratch read "
+                    f"beside a {self.latent_encoding!r} carry is two designs at "
+                    "once, and neither J1 nor J3.")
+            if self.latent_s0_read:
+                raise ValueError(
+                    "cortex.latent_read='scratch' reads in-loop only; pass "
+                    "--cortex.latent_s0_read false.  The s0 site is measured "
+                    "dead, and substituting scratchpad rows into s0 would add "
+                    "a second read site to the arm.")
+            if self.latent_write_only:
+                raise ValueError(
+                    "cortex.latent_write_only is J1's no-read limb.  J3's is "
+                    "--cortex.latent_carry_read false: the carried rows go "
+                    "unread while the within-chunk scratchpad read stays, so "
+                    "the limbs differ in the carry alone.")
+        if not self.latent_carry_read:
+            if self.latent_read != "scratch":
+                raise ValueError(
+                    "cortex.latent_carry_read=false is J3's no-read limb and "
+                    "needs latent_read='scratch'.  On an xattn arm the carry IS "
+                    "the whole read; that limb is --cortex.latent_write_only.")
+            if self.latent_read_scramble:
+                raise ValueError(
+                    "cortex.latent_read_scramble with latent_carry_read=false "
+                    "rolls carried rows that nothing reads: a control arm that "
+                    "is a duplicate of the no-read limb.")
+        if not (self.latent_read_gate_lr_mult > 0
+                and math.isfinite(self.latent_read_gate_lr_mult)):
+            raise ValueError(
+                f"cortex.latent_read_gate_lr_mult must be finite and > 0; got "
+                f"{self.latent_read_gate_lr_mult!r}")
+        if self.latent_read_gate_lr_mult != 1.0 \
+                and self.latent_read not in ("xattn", "scratch"):
+            raise ValueError(
+                "cortex.latent_read_gate_lr_mult reparameterises LatentRead's "
+                "gate; it needs latent_read='xattn' or 'scratch'.  The refresh "
+                "has a different parameter and no read has none.")
+        if not math.isfinite(self.latent_scratch_forget_bias):
+            raise ValueError("cortex.latent_scratch_forget_bias must be finite")
+        if self.latent_scratch_forget_bias != 1.0 and self.latent_read != "scratch":
+            raise ValueError(
+                "cortex.latent_scratch_forget_bias sets the J3 scratchpad's "
+                "gate; without latent_read='scratch' there is no scratchpad.")
         if self.latent_encoding != "delta" and not self.latent_carry:
             raise ValueError(
                 "cortex.latent_encoding selects what the Z channel writes; "
@@ -429,9 +508,11 @@ class CortexMemory(nn.Module):
             raise ValueError(
                 f"cortex.latent_read_znorm must be 'none' or 'rms'; got "
                 f"{self.latent_read_znorm!r}.")
-        if self.latent_read_znorm == "rms" and self.latent_read != "xattn":
+        if self.latent_read_znorm == "rms" \
+                and self.latent_read not in ("xattn", "scratch"):
             raise ValueError(
-                "cortex.latent_read_znorm='rms' needs latent_read='xattn'.  With "
+                "cortex.latent_read_znorm='rms' needs latent_read='xattn' (or "
+                "'scratch', which reads through the same module).  With "
                 "no read it normalises nothing; with the refresh it would re-add "
                 "a row of norm latent_read_znorm_target straight into x, which "
                 "is a different arm, not a normalisation.")
@@ -458,10 +539,11 @@ class CortexMemory(nn.Module):
                 "in-loop read arm; without the read it changes nothing and the "
                 "cell would be labelled a control while being a duplicate of "
                 "the baseline.")
-        if self.latent_read not in ("none", "refresh", "xattn"):
+        if self.latent_read not in ("none", "refresh", "xattn", "scratch"):
             raise ValueError(
-                f"cortex.latent_read must be 'none', 'refresh' or 'xattn'; got "
-                f"{self.latent_read!r}.  See p30_readinto_prereg.md S2.")
+                f"cortex.latent_read must be 'none', 'refresh', 'xattn' or "
+                f"'scratch'; got {self.latent_read!r}.  See "
+                f"p30_readinto_prereg.md S2 and cortex_memory/scratchpad.py.")
         if self.latent_read_depth not in ("none", "matched"):
             raise ValueError(
                 f"cortex.latent_read_depth must be 'none' or 'matched'; got "
@@ -578,15 +660,23 @@ class CortexMemory(nn.Module):
         # the same reason latent_carry is read here and not lazily: it changes
         # the PARAMETER SET, and a flag that added parameters after the
         # optimizer was built would leave them untrained with no symptom.
-        if self.latent_read == "xattn":
+        if self.latent_read in ("xattn", "scratch"):
+            # J3 reads through the SAME module as J1, with one extra key per
+            # position (LatentRead._forward_with_own), so the read side of the
+            # two designs differs in the scratchpad key and nothing else.
             self.latent_reader = LatentRead(
                 D, n_heads=self.latent_read_heads,
-                gate_init=self.latent_read_gate_init)
+                gate_init=self.latent_read_gate_init,
+                gate_lr_mult=self.latent_read_gate_lr_mult)
         elif self.latent_read == "refresh":
             self.latent_reader = LatentRefresh(
                 D, alpha_init=self.latent_read_gate_init)
         else:
             self.latent_reader = None
+        # J3's write.  Built here for the same reason: it adds parameters.
+        self.latent_scratch = (
+            LatentScratchpad(D, forget_bias_init=self.latent_scratch_forget_bias)
+            if self.latent_read == "scratch" else None)
 
         # R4 dual-role mitigation: project h_T before the M_cross write so the
         # buffer path and the coda path see independent representations.
@@ -886,6 +976,9 @@ class CortexMemory(nn.Module):
         self._z_read_delta_norm: Optional[float] = None  # ||injected delta||, fp32
         self._z_last_x: Optional[torch.Tensor] = None  # final loop state, NOT detached
         self._e_dropped: int = 0                       # E rows blanked this forward
+        # --- J3 scratchpad per-call runtime ------------------------------
+        self._scratch: Optional[torch.Tensor] = None   # [B,S_packed,D] m_t, NOT detached
+        self._scratch_row_norm: Optional[float] = None  # ||m row|| at the read, fp32
 
     def begin(
         self,
@@ -951,6 +1044,12 @@ class CortexMemory(nn.Module):
 
     def _latent_read_into(self, x: torch.Tensor,
                           current_step: Optional[int]) -> torch.Tensor:
+        if self.latent_scratch is not None:
+            # J3 reads on EVERY chunk, chunk 1 included: its own scratchpad
+            # row exists whether or not anything is carried, so the n_pre
+            # early-out below would switch the within-chunk read off exactly
+            # where the design needs it.
+            return self._scratch_read_into(x, current_step)
         n_pre = self._n_pre
         if not n_pre:
             return x
@@ -1045,6 +1144,63 @@ class CortexMemory(nn.Module):
         self._z_read_delta_norm = _row_norm(delta)
         return x + delta
 
+    def _scratch_read_into(self, x: torch.Tensor,
+                           current_step: Optional[int]) -> torch.Tensor:
+        """J3's read: the carried Z rows AND this position's own scratchpad
+        row, in one softmax (LatentRead._forward_with_own).
+
+        Keys, per query position i at iteration t:
+          * the carried rows (the ring's Z half), unless there are none (chunk
+            1), the ablation null removed them (`latent_read_null='off'`), the
+            limb does not read them (`latent_carry_read=false`), or the EOS
+            mask says position i is past the previous document;
+          * m_{t-1}[i], the scratchpad row iteration t-1 wrote -- None at the
+            first iteration, which then reads the carry alone (J1's formula,
+            unchanged).
+        The donor roll and every null act on the CARRIED rows only, through
+        `_latent_z_rows`: the own row is the current document's current chunk
+        and is never swapped, so the three limbs differ in the carry alone.
+        """
+        if current_step is None:
+            raise RuntimeError(
+                "read_into was called WITHOUT current_step, so this "
+                "checkpoint's copy of raven_modeling_minimal_cortex.py "
+                "predates P3.0 (and J3).  Re-run tools/prepare_cortex_"
+                "checkpoint.py against the base to refresh it.")
+        n_pre = self._n_pre
+        z = None
+        if n_pre and self.latent_carry_read:
+            z = self._latent_z_rows(x)
+            if z is not None and z.shape[1] != n_pre:
+                raise ValueError(
+                    f"carried Z has {z.shape[1]} rows but {n_pre} carried "
+                    "columns were spliced; E and Z share the ring pointer and "
+                    "must share the row count.")
+        own = self._scratch
+        if z is None and own is None:
+            return x
+        self._z_inloop_n += 1
+        self._x_read_norm = _row_norm(x)
+        if z is not None:
+            self._z_row_norm = _row_norm(z)
+        if own is not None:
+            self._scratch_row_norm = _row_norm(own)
+        if self.latent_read_znorm == "rms":
+            # BOTH key sets at the same row norm, so the softmax between the
+            # carry and the own row is decided on content, not on which one
+            # happens to be bigger.  Zero rows stay exactly zero (masked).
+            if z is not None:
+                z = rescale_rows(z, self.latent_read_znorm_target)
+            if own is not None:
+                own = rescale_rows(own, self.latent_read_znorm_target)
+        mask = self._packed_read_mask(x)
+        if own is None:
+            delta = self.latent_reader(x, z, read_mask=mask)
+        else:
+            delta = self.latent_reader(x, z, read_mask=mask, own=own)
+        self._z_read_delta_norm = _row_norm(delta)
+        return x + delta
+
     def iter_write(self, x: torch.Tensor,
                    current_step: Optional[int] = None) -> None:
         """Write each position's state into its own M_iter slots, and tape the
@@ -1063,6 +1219,12 @@ class CortexMemory(nn.Module):
                 self._iter_buf = x.new_zeros(B * S, self.memory_slots_iter, D)
             self._iter_buf = self.m_iter.write(x.reshape(B * S, 1, D),
                                                self._iter_buf)
+        if self.latent_scratch is not None:
+            # J3's write, every iteration, NOT detached: the read at t+1 is its
+            # within-chunk consumer.  Inside the no-grad prefix this runs under
+            # torch.no_grad() like the loop itself, so the state entering the
+            # gradient window is detached exactly as x is.
+            self._scratch = self.latent_scratch(x, self._scratch)
         self._tape_latent(x)
 
     # ── the Z channel ──────────────────────────────────────────────────────
@@ -1494,11 +1656,17 @@ class CortexMemory(nn.Module):
                     mean-pooled in consecutive groups to W rows.  Packed layout
                     is [carry | tokens | summary], so the real tokens end at
                     -n_sum.
+        'scratch'   J3: the same positions and pooling as 'tokens', taken from
+                    the scratchpad m_T instead of s_T.
 
         Live (not detached): the last iteration is always inside the gradient
         window, so this write is on the loss for every training batch.
         """
         x = self._z_last_x
+        if self.latent_encoding == "scratch":
+            # J3: the scratchpad the last iteration wrote, at the same
+            # positions and pooling as 'tokens' -- one variable changed.
+            x = self._scratch
         if x is None:
             raise RuntimeError(
                 "latent_encoding is a state encoding but the final loop state "
@@ -1810,6 +1978,12 @@ def reset_cortex_graft_init(model, log=None):
     reader = getattr(cortex, "latent_reader", None)
     if reader is not None:
         fixed += apply_latent_read_init(reader)
+    # J3's scratchpad write: step (1) put kaiming into both gate projections,
+    # which would replace the designed constant EMA with millions of untrained
+    # per-channel keep/drop decisions -- the ring's gate_init story again.
+    scratch = getattr(cortex, "latent_scratch", None)
+    if scratch is not None:
+        fixed += scratch.apply_designed_init()
     # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
     #     some module lacked reset_parameters and slipped through.
     bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]

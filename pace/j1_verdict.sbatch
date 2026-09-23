@@ -15,6 +15,8 @@
 # PG-19 pack's row masks for book clusters; no checkpoint is opened).
 #
 #   sbatch --dependency=afterany:$R[:$RE] pace/j1_verdict.sbatch
+#   EXPERIMENT=j3 sbatch --dependency=afterany:$R3[:$R3E] pace/j1_verdict.sbatch
+#       (J3, the in-loop scratchpad: same rules, run prefix j3-, ENCODING scratch)
 #
 # afterany, not afterok, ON PURPOSE: a failed read-out task must still produce
 # a verdict that NAMES the missing piece, not a job that never starts.
@@ -30,21 +32,27 @@ export SCRATCH=${SCRATCH:-$HOME/scratch}
 export HF_HOME=$SCRATCH/hf_cache
 export HF_HUB_OFFLINE=1
 
-ENCODING=${ENCODING:-tokens}
+EXPERIMENT=${EXPERIMENT:-j1}
+case "$EXPERIMENT" in
+    j1) ENCODING=${ENCODING:-tokens} ;;
+    j3) ENCODING=${ENCODING:-scratch} ;;
+    *) echo "ERROR: EXPERIMENT must be j1|j3; got '$EXPERIMENT'"; exit 1 ;;
+esac
 E_DROPOUT=${E_DROPOUT:-0.25}
 OUT_ROOT=${OUT_ROOT:-cortex-retrofit}
 
-mkdir -p logs/j1_diag
-for d in $OUT_ROOT/j1-a3z-${ENCODING}-* $OUT_ROOT/j1-a3z-${ENCODING}-edrop*; do
+mkdir -p logs/${EXPERIMENT}_diag
+for d in $OUT_ROOT/${EXPERIMENT}-a3z-${ENCODING}-* $OUT_ROOT/${EXPERIMENT}-a3z-${ENCODING}-edrop*; do
     case "$d" in *-smoke) continue ;; esac
-    [ -f "$d/cortex_diag.jsonl" ] && cp "$d/cortex_diag.jsonl" "logs/j1_diag/$(basename $d).jsonl"
+    [ -f "$d/cortex_diag.jsonl" ] && cp "$d/cortex_diag.jsonl" "logs/${EXPERIMENT}_diag/$(basename $d).jsonl"
 done
-ls -la logs/j1_diag/ 2>/dev/null
+ls -la logs/${EXPERIMENT}_diag/ 2>/dev/null
 
-python evals/score_j1.py --root eval_results/j1_readout --encoding "$ENCODING" \
+python evals/score_j1.py --experiment "$EXPERIMENT" \
+    --root eval_results/${EXPERIMENT}_readout --encoding "$ENCODING" \
     --edrop "$E_DROPOUT" --runs_root "$OUT_ROOT"
 RC=$?
 echo ""
 echo "Push for the next session:"
-echo "  git add eval_results/j1_readout logs/j1_diag logs/Report-*.out && git commit -m 'j1 readout' && git push"
+echo "  git add eval_results/${EXPERIMENT}_readout logs/${EXPERIMENT}_diag logs/Report-*.out && git commit -m '${EXPERIMENT} readout' && git push"
 exit $RC
