@@ -143,7 +143,8 @@ esac
 TAG=""
 if [ "$E_DROPOUT" != "0.0" ] && [ "$E_DROPOUT" != "0" ]; then TAG="-edrop${E_DROPOUT}"; fi
 if [ -n "$PROSE_ONLY" ]; then TAG="$TAG-prose"; fi
-RUN_NAME=j1-a3z-${ENCODING}${TAG}-${LIMB}
+# RUN_SUFFIX keeps a smoke (e.g. RUN_SUFFIX=-smoke) out of the real run's dir.
+RUN_NAME=j1-a3z-${ENCODING}${TAG}-${LIMB}${RUN_SUFFIX:-}
 ACCUM_MAX=$(( ACCUM_VECS * CROSS_CHUNKS ))
 
 echo "=== J1 joint run | limb=$LIMB | encoding=$ENCODING | run=$RUN_NAME ==="
