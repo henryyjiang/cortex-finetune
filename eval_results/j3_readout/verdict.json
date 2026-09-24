@@ -1,0 +1,190 @@
+{
+  "experiment": "j3",
+  "answer": "NO: the jointly trained read/write did not learn to carry content even with E removed",
+  "audit": [],
+  "main": {
+    "vetoes": [],
+    "local_nll": {
+      "real": 0.0008509810548889969,
+      "noread": 0.0006583166214442573
+    },
+    "task_learned": true,
+    "noread_carry_nll": 0.8501267523707894,
+    "carry": {
+      "D_noread": {
+        "mean": 0.23887231672918693,
+        "lo": 0.23353504704907707,
+        "hi": 0.244092031084439,
+        "n": 300,
+        "n_clusters": 300,
+        "cmp_nll": 0.8501267523707894,
+        "real_nll": 0.6112544356416016
+      },
+      "D_donor": {
+        "mean": -0.23923210094392183,
+        "lo": -0.2459302179410734,
+        "hi": -0.23283856184642063,
+        "n": 300,
+        "n_clusters": 300,
+        "cmp_nll": 0.37202233469768015,
+        "real_nll": 0.6112544356416016
+      },
+      "real_Z_main_off": {
+        "mean": -0.011020683412667098,
+        "lo": -0.013451806251827098,
+        "hi": -0.008741444728858528,
+        "n": 300,
+        "n_clusters": 300,
+        "cmp_nll": 0.6002337522289348,
+        "real_nll": 0.6112544356416016
+      },
+      "real_Z_main_donor": {
+        "mean": 0.0003753962534555096,
+        "lo": -0.00013605150273289938,
+        "hi": 0.0009173275943854672,
+        "n": 300,
+        "n_clusters": 300,
+        "cmp_nll": 0.6116298318950572,
+        "real_nll": 0.6112544356416016
+      }
+    },
+    "carry_reading": "CAPACITY_ONLY",
+    "pg19": {
+      "D_noread": {
+        "mean": -0.0012948656206654035,
+        "lo": -0.0030280577633044737,
+        "hi": 0.00011036580873749661,
+        "n": 383,
+        "n_clusters": 18,
+        "cmp_nll": 3.434342998793126,
+        "real_nll": 3.4356378644137884
+      },
+      "D_donor": {
+        "mean": 0.002465048684686117,
+        "lo": -0.004717349416607038,
+        "hi": 0.009561917762631192,
+        "n": 383,
+        "n_clusters": 18,
+        "cmp_nll": 3.438102913098473,
+        "real_nll": 3.4356378644137884
+      },
+      "real_Z_main_off": {
+        "mean": 0.0018156163508391385,
+        "lo": 0.0013321678422977912,
+        "hi": 0.0022008062058049066,
+        "n": 383,
+        "n_clusters": 18,
+        "cmp_nll": 3.437453480764627,
+        "real_nll": 3.4356378644137884
+      },
+      "real_Z_main_donor": {
+        "mean": -0.0003429890923960899,
+        "lo": -0.0005597941408030944,
+        "hi": -8.980806797942349e-05,
+        "n": 383,
+        "n_clusters": 18,
+        "cmp_nll": 3.435294875321397,
+        "real_nll": 3.4356378644137884
+      },
+      "ragged_rows_dropped": 50
+    },
+    "pg19_reading": "NO_GAIN",
+    "reading": "CAPACITY_ONLY"
+  },
+  "edrop": {
+    "vetoes": [],
+    "local_nll": 0.0007884752498612236,
+    "noread_eoff_carry_nll": 2.3095356989616613,
+    "X_noread": {
+      "mean": 0.0002694272247605219,
+      "lo": -0.0005928650084131497,
+      "hi": 0.0011276594530652848,
+      "n": 300,
+      "n_clusters": 300,
+      "cmp_nll": 2.3095356989616613,
+      "real_nll": 2.309266271736901
+    },
+    "real_Z_alone_donor": {
+      "mean": 1.4135319734818926e-05,
+      "lo": 6.558638474135255e-06,
+      "hi": 2.171772319237153e-05,
+      "n": 300,
+      "n_clusters": 300,
+      "cmp_nll": 2.3092804070566353,
+      "real_nll": 2.309266271736901
+    },
+    "real_Z_alone_off": {
+      "mean": 0.00045919992385512476,
+      "lo": 0.00036487418187974185,
+      "hi": 0.000557603850215167,
+      "n": 300,
+      "n_clusters": 300,
+      "cmp_nll": 2.3097254716607565,
+      "real_nll": 2.309266271736901
+    },
+    "reading": "Z_CANNOT_LEARN"
+  },
+  "gates": {
+    "j3-a3z-scratch-real": {
+      "first_step": 91575,
+      "first": 0.0997905284166336,
+      "last_step": 93550,
+      "last": 0.04259262606501579,
+      "collapsed": false
+    },
+    "j3-a3z-scratch-donor": {
+      "first_step": 91575,
+      "first": 0.0997089371085167,
+      "last_step": 93550,
+      "last": 0.04945965111255646,
+      "collapsed": false
+    },
+    "j3-a3z-scratch-edrop0.25-real": {
+      "first_step": 91575,
+      "first": 0.10008519887924194,
+      "last_step": 93550,
+      "last": 0.04575052857398987,
+      "collapsed": false
+    }
+  },
+  "read_strength": {
+    "j3-a3z-scratch-real": {
+      "first_step": 91575,
+      "first": 0.01938823207348574,
+      "last_step": 93550,
+      "last": 0.014623027209399468,
+      "window": 4,
+      "last_over_first": 0.7542217956735262,
+      "collapsed": false
+    },
+    "j3-a3z-scratch-donor": {
+      "first_step": 91575,
+      "first": 0.013319485363820122,
+      "last_step": 93550,
+      "last": 0.011906080854846911,
+      "window": 4,
+      "last_over_first": 0.893884450459891,
+      "collapsed": false
+    },
+    "j3-a3z-scratch-edrop0.25-real": {
+      "first_step": 91575,
+      "first": 0.045690076450739775,
+      "last_step": 93550,
+      "last": 0.026149688307337316,
+      "window": 4,
+      "last_over_first": 0.5723275235822881,
+      "collapsed": false
+    }
+  },
+  "constants": {
+    "TASK_LEARNED_LOCAL_MAX": 1.151292546497023,
+    "MIN_EFFECT_CARRY": 0.05,
+    "HEADROOM_MIN": 0.1,
+    "LEAK_MARGIN": 0.25,
+    "GATE_COLLAPSE": 0.03,
+    "READ_COLLAPSE_FRAC": 0.3,
+    "READ_WINDOW": 4,
+    "PAIR_MIN_FRAC": 0.9,
+    "STEP": 93552
+  }
+}

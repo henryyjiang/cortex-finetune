@@ -1,0 +1,64 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-24-2026 09:16:46
+Job ID:    13528077
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j1_verdict
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+total 668
+drwxr-xr-x. 2 hjiang420 pace-aivanova7   4096 Sep 24 09:16 .
+drwxr-xr-x. 5 hjiang420 pace-aivanova7  28672 Sep 24 09:16 ..
+-rw-r--r--. 1 hjiang420 pace-aivanova7 126384 Sep 24 09:16 j3-a3z-scratch-donor.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 121532 Sep 24 09:16 j3-a3z-scratch-edrop0.25-noread.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 126564 Sep 24 09:16 j3-a3z-scratch-edrop0.25-real.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 121426 Sep 24 09:16 j3-a3z-scratch-noread.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 126429 Sep 24 09:16 j3-a3z-scratch-real.jsonl
+==============================================================================
+J3 VERDICT (pre-registered: evals/score_j1.py, ../j3_prereg.md)
+  D = NLL(other limb) - NLL(real limb); POSITIVE = real is better
+==============================================================================
+  carry task (main limbs, E on)   -> CAPACITY_ONLY
+    local-answer NLL  real 0.0009  noread 0.0007  (learned <= 1.1513)
+    noread carry NLL  0.8501  (no information = 2.3026; E saturates below 0.1)
+    D_noread          +0.2389 [+0.2335, +0.2441] n=300
+    D_donor           -0.2392 [-0.2459, -0.2328] n=300
+    real Z_main off   -0.0110 [-0.0135, -0.0087] n=300
+    real Z_main donor +0.0004 [-0.0001, +0.0009] n=300
+  PG-19 val (secondary, book-clustered, 50 ragged rows dropped) -> NO_GAIN
+    D_noread          -0.0013 [-0.0030, +0.0001] n=383 / 18 books
+    D_donor           +0.0025 [-0.0047, +0.0096] n=383 / 18 books
+    real Z_main off   +0.0018 [+0.0013, +0.0022] n=383 / 18 books
+    real Z_main donor -0.0003 [-0.0006, -0.0001] n=383 / 18 books
+  E-dropout pair, carry task, E OFF -> Z_CANNOT_LEARN
+    local-answer NLL  0.0008
+    no-carry floor    2.3095 (ln10 2.3026)
+    X_noread          +0.0003 [-0.0006, +0.0011] n=300
+    real Z_alone donor +0.0000 [+0.0000, +0.0000] n=300
+    real Z_alone off   +0.0005 [+0.0004, +0.0006] n=300
+  read gate j3-a3z-scratch-real: 0.0998 @ 91575 -> 0.0426 @ 93550
+  read gate j3-a3z-scratch-donor: 0.0997 @ 91575 -> 0.0495 @ 93550
+  read gate j3-a3z-scratch-edrop0.25-real: 0.1001 @ 91575 -> 0.0458 @ 93550
+  read strength j3-a3z-scratch-real: |delta|/|x| 0.0194 @ 91575 -> 0.0146 @ 93550  (x0.75)
+  read strength j3-a3z-scratch-donor: |delta|/|x| 0.0133 @ 91575 -> 0.0119 @ 93550  (x0.89)
+  read strength j3-a3z-scratch-edrop0.25-real: |delta|/|x| 0.0457 @ 91575 -> 0.0261 @ 93550  (x0.57)
+------------------------------------------------------------------------------
+  ANSWER: NO: the jointly trained read/write did not learn to carry content even with E removed
+
+wrote eval_results/j3_readout/verdict.json
+
+Push for the next session:
+  git add eval_results/j3_readout logs/j3_diag logs/Report-*.out && git commit -m 'j3 readout' && git push
+---------------------------------------
+Begin Slurm Epilog: Sep-24-2026 09:17:18
+Job ID:        13528077
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j1_verdict
+Resources:     cpu=4,mem=16G,node=1
+Rsrc Used:     cput=00:02:20,vmem=0,walltime=00:00:35,mem=862172K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-002-25-1
+---------------------------------------
