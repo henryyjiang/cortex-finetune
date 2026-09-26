@@ -16,6 +16,7 @@ Run: /c/Users/henry/miniconda3/envs/cortex-retro/python.exe -m pytest tests/test
 from __future__ import annotations
 
 import os
+import re
 import random
 import sys
 
@@ -480,6 +481,60 @@ class TestCaptureEndToEnd:
 
 
 # ─── the launcher ───────────────────────────────────────────────────────────
+
+# ─── the cluster's Python ────────────────────────────────────────────────────
+
+def _fstring_brace_hazards(path):
+    """Lines whose f-string literal opens a replacement field it does not close.
+
+    PEP 701 (Python 3.12) let a replacement field span physical lines and hold
+    implicitly concatenated literals.  PACE runs **3.11.15**, where an f-string
+    is one STRING token that must close on its own line -- so that construct is
+    a SyntaxError there and the module will not even import.  A 3.13 dev box
+    accepts it, and ast.parse(feature_version=(3, 11)) does NOT catch it: the
+    change is in the tokenizer, which feature_version does not reach.
+    """
+    bad, in_doc = [], False
+    for n, line in enumerate(open(path, encoding="utf-8"), 1):
+        if line.count('"""') % 2:
+            in_doc = not in_doc
+            continue
+        if in_doc:
+            continue
+        for m in re.finditer(r'\b(?:f|fr|rf)(["\'])', line):
+            q = m.group(1)
+            rest = line[m.end():]
+            end = rest.find(q)
+            if end < 0:                       # literal does not close on this line
+                bad.append((n, line.rstrip()))
+                break
+            body = rest[:end].replace("{{", "").replace("}}", "")
+            if body.count("{") != body.count("}"):
+                bad.append((n, line.rstrip()))
+                break
+    return bad
+
+
+class TestClusterPython:
+    def test_no_312_only_fstrings_in_the_probe(self):
+        for f in ("evals/diag_z_registers.py", "evals/score_j1.py",
+                  "tests/test_z3_registers.py"):
+            bad = _fstring_brace_hazards(os.path.join(REPO, f))
+            assert not bad, f"{f}: 3.12-only f-string(s) -- PACE is 3.11: {bad}"
+
+    def test_the_check_catches_the_bug_it_was_written_for(self):
+        import tempfile
+        src = ('x = 1\n'
+               'print(f"a {\'Y\' if x else \'N -- the \'\n'
+               '      \'rest of it\'}")\n')
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:
+            fh.write(src)
+            name = fh.name
+        try:
+            assert _fstring_brace_hazards(name)
+        finally:
+            os.unlink(name)
+
 
 class TestTheLauncher:
     SB = os.path.join(REPO, "pace", "diag_z_registers.sbatch")

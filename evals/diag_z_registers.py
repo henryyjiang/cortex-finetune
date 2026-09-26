@@ -754,9 +754,10 @@ def print_report(rep: dict) -> None:
                  f"  < {RESID_FRAC_MIN}: Z_end's retained subspace lies INSIDE "
                  "E's, so it is a linear re-coding and the margin above it is "
                  "not readable (a scale-free probe decodes a 1e-6 residual too)"))
+        keeps = ("YES" if inc["pca_retains_E"] else
+                 "NO -- the residual line is not readable, raise pca_k")
         print(f"      the reduction keeps E's signal ({HOLDS_FRAC} x E's "
-              f"margin): {'YES' if inc['pca_retains_E'] else 'NO -- the '
-              'residual line is not readable, raise pca_k'}")
+              f"margin): {keeps}")
         if inc["residual_disagrees"]:
             print("      NOTE: the residual and the increment DISAGREE.  The "
                   "label follows the increment (registered); the disagreement "
