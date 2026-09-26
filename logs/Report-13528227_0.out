@@ -1,0 +1,121 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-24-2026 09:47:30
+Job ID:    13528794
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  z3_registers
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== z3 register probe | task 0 = j3-a3z-scratch-real ===
+    checkpoint: cortex-retrofit/j3-a3z-scratch-real/checkpoint_93552
+    data:       data/carry_task_r16_len4096_val (first 300 rows)
+    out:        eval_results/z3_registers/j3-a3z-scratch-real
+NVIDIA H200, 143771 MiB
+    gate_lr_mult 0.1 matches the run's diag rows
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'scratch'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'scratch'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_heads: '<absent>' -> 8  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '3.0'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_gate_lr_mult: '<absent>' -> '0.1'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_scratch_forget_bias: '<absent>' -> '1.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.49s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.30it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_reader.gate', 'cortex.latent_reader.k_proj.weight', 'cortex.latent_reader.out_proj.weight', 'cortex.latent_reader.q_proj.weight', 'cortex.latent_reader.v_proj.weight', 'cortex.latent_scratch.forget_bias', 'cortex.latent_scratch.gate_proj_in.bias', 'cortex.latent_scratch.gate_proj_in.weight', 'cortex.latent_scratch.gate_proj_mem.bias', 'cortex.latent_scratch.gate_proj_mem.weight', 'cortex.latent_scratch.input_bias', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 10 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_reader.[qkv,out~N(0,0.02) NOT zero -- see LatentRead]', 'latent_reader.gate=0.1', 'latent_reader.gate_lr_mult=0.1', 'latent_scratch.[gates=0 (EMA fg=0.731 ig=0.500), forget_bias=1.0]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/j3-a3z-scratch-real/checkpoint_93552/chkpt.pt: 0 missing / 0 unexpected keys
+[z3] data/carry_task_r16_len4096_val: 300 rows, answer_dep checked | encoding scratch | T=8
+  25/300 rows
+  50/300 rows
+  75/300 rows
+  100/300 rows
+  125/300 rows
+  150/300 rows
+  175/300 rows
+  200/300 rows
+  225/300 rows
+  250/300 rows
+  275/300 rows
+  300/300 rows
+  probed E: acc 0.762 vs baseline 0.097
+  probed Z_write: acc 0.101 vs baseline 0.097
+  probed Z_tok: acc 0.101 vs baseline 0.097
+  probed Z_end: acc 0.242 vs baseline 0.097
+  probed E_ring: acc 0.337 vs baseline 0.103
+  probed Z_ring: acc 0.101 vs baseline 0.103
+==============================================================================
+D3 REGISTER PROBE -- cortex-retrofit/j3-a3z-scratch-real/checkpoint_93552
+  encoding scratch | 300 rows, 2400 (row, chunk) samples | cells by last update: recent 19110, chunk 19126, older 146, never 18
+==============================================================================
+  WRITE (all registers | recent | chunk)
+    E        control  all    0.762 (base 0.097) margin +0.665 [+0.662,+0.668]
+                      recent 0.769 (base 0.094) margin +0.675 [+0.669,+0.681]
+                      chunk  0.761 (base 0.100) margin +0.661 [+0.654,+0.666]
+    Z_write  PARTIAL  all    0.101 (base 0.097) margin +0.004 [+0.000,+0.007]
+                      recent 0.101 (base 0.094) margin +0.007 [+0.002,+0.012]
+                      chunk  0.101 (base 0.100) margin +0.001 [-0.004,+0.005]
+    Z_tok    PARTIAL  all    0.101 (base 0.097) margin +0.004 [+0.000,+0.007]
+                      recent 0.101 (base 0.094) margin +0.007 [+0.003,+0.012]
+                      chunk  0.100 (base 0.100) margin -0.000 [-0.005,+0.005]
+    Z_end    PARTIAL  all    0.242 (base 0.097) margin +0.145 [+0.140,+0.149]
+                      recent 0.245 (base 0.094) margin +0.151 [+0.144,+0.158]
+                      chunk  0.240 (base 0.100) margin +0.140 [+0.132,+0.147]
+  RING (all registers | recent | chunk)
+    E_ring   control  all    0.337 (base 0.103) margin +0.234 [+0.228,+0.240]
+                      recent 0.345 (base 0.100) margin +0.245 [+0.236,+0.254]
+                      chunk  0.329 (base 0.105) margin +0.224 [+0.215,+0.234]
+    Z_ring   NONE     all    0.101 (base 0.103) margin -0.002 [-0.004,+0.001]
+                      recent 0.097 (base 0.100) margin -0.003 [-0.007,+0.001]
+                      chunk  0.105 (base 0.105) margin +0.000 [-0.004,+0.004]
+------------------------------------------------------------------------------
+  PROBE HEALTH (E margin >= 0.15, CI_lo > 0): OK
+  READING: NO_LATENT_HOLDS -- the loop state at the chunk end does not hold the register file -> the WRITE must change before J4
+
+wrote eval_results/z3_registers/j3-a3z-scratch-real/results.json
+
+z3 j3-a3z-scratch-real DONE -> eval_results/z3_registers/j3-a3z-scratch-real/results.json
+---------------------------------------
+Begin Slurm Epilog: Sep-24-2026 09:58:40
+Job ID:        13528794
+Array Job ID:  13528227_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      z3_registers
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=01:29:36,vmem=0,walltime=00:11:12,mem=15803708K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-11-0
+---------------------------------------
