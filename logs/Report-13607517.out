@@ -1,0 +1,64 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-26-2026 12:37:07
+Job ID:    13607517
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j1_verdict
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+total 884
+drwxr-xr-x. 2 hjiang420 pace-aivanova7   4096 Sep 26 09:10 .
+drwxr-xr-x. 7 hjiang420 pace-aivanova7  32768 Sep 26 12:37 ..
+-rw-r--r--. 1 hjiang420 pace-aivanova7 120217 Sep 26 12:37 j4-a3z-endpoint-donor.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 114521 Sep 26 12:37 j4-a3z-endpoint-edrop0.25-noread.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 120300 Sep 26 12:37 j4-a3z-endpoint-edrop0.25-real.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 114503 Sep 26 12:37 j4-a3z-endpoint-edrop0.95-noread.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 120232 Sep 26 12:37 j4-a3z-endpoint-edrop0.95-real.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 114443 Sep 26 12:37 j4-a3z-endpoint-noread.jsonl
+-rw-r--r--. 1 hjiang420 pace-aivanova7 120232 Sep 26 12:37 j4-a3z-endpoint-real.jsonl
+==============================================================================
+J4 VERDICT (pre-registered: evals/score_j1.py, ../j4_prereg.md)
+  D = NLL(other limb) - NLL(real limb); POSITIVE = real is better
+==============================================================================
+  carry task (main limbs, E on)   -> READ_HURTS
+    local-answer NLL  real 0.0016  noread 0.0009  (learned <= 1.1513)
+    noread carry NLL  0.3599  (no information = 2.3026; E saturates below 0.1; E-health band 0.37-0.85, max 1.2)
+    D_noread          -0.3882 [-0.3953, -0.3812] n=300
+    D_donor           -0.3113 [-0.3170, -0.3055] n=300
+    real Z_main off   +0.4716 [+0.4655, +0.4778] n=300
+    real Z_main donor +0.0001 [-0.0000, +0.0004] n=300
+  PG-19 val (secondary, book-clustered, 50 ragged rows dropped) -> NO_GAIN
+    D_noread          +0.0042 [-0.0053, +0.0141] n=383 / 18 books
+    D_donor           -0.0028 [-0.0071, +0.0011] n=383 / 18 books
+    real Z_main off   +0.2330 [+0.2113, +0.2510] n=383 / 18 books
+    real Z_main donor -0.0001 [-0.0002, +0.0001] n=383 / 18 books
+  E-dropout pair, carry task, E OFF -> Z_CANNOT_LEARN
+    local-answer NLL  0.0012
+    no-carry floor    2.3114 (ln10 2.3026)
+    X_noread          +0.0054 [+0.0043, +0.0063] n=300
+    real Z_alone donor +0.3569 [+0.3458, +0.3678] n=300
+    real Z_alone off   +0.1800 [+0.1590, +0.2026] n=300
+    E_margin (within)  +0.2364 [+0.2155, +0.2585] n=300  (E off minus E on, Z off in both; > 0 = E still carries)
+  embed ratio j4-a3z-endpoint-real: ||Z col||/||E col|| 2.2604 @ 91575 -> 3.3691 @ 93550  (x1.49)
+  embed ratio j4-a3z-endpoint-donor: ||Z col||/||E col|| 2.2399 @ 91575 -> 3.6623 @ 93550  (x1.64)
+  embed ratio j4-a3z-endpoint-edrop0.95-real: ||Z col||/||E col|| 1.8149 @ 91575 -> 2.1722 @ 93550  (x1.20)
+------------------------------------------------------------------------------
+  ANSWER: NO: the jointly trained read/write did not learn to carry content even with E removed
+
+wrote eval_results/j4_readout/verdict_edrop0.95.json
+
+Push for the next session:
+  git add eval_results/j4_readout logs/j4_diag logs/Report-*.out && git commit -m 'j4 readout' && git push
+---------------------------------------
+Begin Slurm Epilog: Sep-26-2026 12:37:53
+Job ID:        13607517
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j1_verdict
+Resources:     cpu=4,mem=16G,node=1
+Rsrc Used:     cput=00:03:12,vmem=0,walltime=00:00:48,mem=863064K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-002-23-2
+---------------------------------------
