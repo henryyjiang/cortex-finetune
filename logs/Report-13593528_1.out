@@ -1,0 +1,139 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-26-2026 00:16:24
+Job ID:    13593822
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j4_joint
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== J4 embeds run | limb=donor | run=j4-a3z-endpoint-donor-smoke ===
+    branch:    cortex-retrofit/retro-b2-heal/checkpoint_91552_w16  (step 91552 -> stop 91562, horizon 305176)
+    data:      data/j1_pg19fw50_carry20_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:  gated W=16 K=64 cc=8 grad_chunks=4 mr=8 window_backward=1
+    packed:    64 E + 64 Z + 512 tokens + 16 summary = 656 columns (was 592)
+    read:      --cortex.latent_read embeds --cortex.latent_read_znorm rms --cortex.latent_read_znorm_target 171.0 --cortex.latent_read_scramble true  --cortex.latent_carry_read true
+    e_dropout: 0.0   micro=2 batch=4   diag every 1
+NVIDIA H200, 143771 MiB
+
+[W926 00:16:37.587845328 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Sat Sep 26 00:16:35: Time to load libraries: 9.00 seconds.
+--------------------------------------------------------------------
+------------------ Launching run j4-a3z-endpoint-donor-smoke------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-02-012-2-0.pace.gatech.edu.
+GPU : NVIDIA H200. CUDA: 12.1.
+[cortex] memory ON: K=0 K_iter=0 ccot_direct=False accum_ccot=False (vecs=16/max=128) gated_accum=False prefix_memory=gated gate(K=64,route=ring,norm=tanh,init=zero,fill=grow) latent(Z on, rule=absolute,band=2..9,renorm=none,read=embeds,SCRAMBLED(control arm),EMBEDS(J4: Z as its own input_embeds columns),enc=endpoint,znorm=171.0) prefix_pos=tail prefix_eos_reset=False cross_chunks=8 carry_grad_chunks=4 random_segments=False lora_rank=0
+[cortex] Z channel ON.  latent_depth_rule='absolute' is P0.7's question (evals/diag_depth_band.py): P0.1 measured the band at a SINGLE T and cannot say whether 'informative' tracks the absolute step or the fraction of the loop.  If P0.7 has not reported, this run is asserting an answer it does not have -- record which, in this run's sbatch header.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:50<01:50, 110.34s/it]Loading checkpoint shards: 100%|██████████| 2/2 [02:08<00:00, 56.34s/it] Loading checkpoint shards: 100%|██████████| 2/2 [02:08<00:00, 64.44s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retrofit/wandb/run-20260926_001849-787uvcxm
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run j4-a3z-endpoint-donor-smoke
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/787uvcxm
+/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py:840: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  ckpt = torch.load(f"{path}/chkpt.pt", map_location=device)
+wandb: updating run metadata
+wandb: uploading output.log
+wandb: 
+wandb: Run history:
+wandb:              cortex/channels ▁▁▁▁▁▁▁▁▁▁
+wandb:      cortex/e_centred_cosine ▅▂▇▅▄█▄▇▁▄
+wandb:    cortex/e_eff_rank_entropy ▃▆▆▄▆▅▆▁█▆
+wandb: cortex/e_eff_rank_entropy_sq ▃▅▅▃▅▄▅▁█▄
+wandb:         cortex/e_eff_rank_pr ▃▄▄▃▅▄▄▁█▃
+wandb:            cortex/e_row_norm ▄▄▁▃▆▇███▇
+wandb:          cortex/e_top1_share ▅▄▄▅▃▄▅█▁▆
+wandb:            cortex/fg_at_bias ▁▂▃▄▅▆▆▇██
+wandb:          cortex/fg_z_at_bias ▁▃▄▄▆▇▇███
+wandb:        cortex/gate_in_w_norm ▁▃▃▄▅▆▆▇▇█
+wandb:                          +63 ...
+wandb: 
+wandb: Run summary:
+wandb:              cortex/channels 2
+wandb:      cortex/e_centred_cosine -0.01269
+wandb:    cortex/e_eff_rank_entropy 49.1813
+wandb: cortex/e_eff_rank_entropy_sq 23.58362
+wandb:         cortex/e_eff_rank_pr 12.21267
+wandb:            cortex/e_row_norm 170.01805
+wandb:          cortex/e_top1_share 0.22139
+wandb:            cortex/fg_at_bias 0.73153
+wandb:          cortex/fg_z_at_bias 0.73142
+wandb:        cortex/gate_in_w_norm 4.86263
+wandb:                          +63 ...
+wandb: 
+wandb: 🚀 View run j4-a3z-endpoint-donor-smoke at: https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/787uvcxm
+wandb: ⭐️ View project at: https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: cortex-retrofit/wandb/run-20260926_001849-787uvcxm/logs
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]'] (undo post_init clobber)
+[branch] summary_emb was SLICED 32 -> 16 rows (first W_new rows (tail layout: slot j attends slots < j)), 2026-09-16T16:56:20, from cortex-retrofit/retro-b2-heal/checkpoint_91552
+[branch]   effective rank 10.90 of the parent's 20.02; kept-row centred cos -0.0652
+[branch] loaded weights from cortex-retrofit/retro-b2-heal/checkpoint_91552_w16; 13 new memory params start fresh: ['cortex.prefix.forget_bias', 'cortex.prefix.input_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.input_bias_z', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.latent_embed.proj.weight']
+[branch] optimizer state NOT restored (param set changed); LR schedule, recurrence ramp and step counter continue
+Branched from cortex-retrofit/retro-b2-heal/checkpoint_91552_w16
+[cortex] window_backward: one backward per 4-chunk carry window (2 per row), so the peak holds 4 of 8 chunks' activations.  Same gradient as one backward per row, to fp summation order.
+GPU: cuda:0 | Step:    2 | Updates: 91553 | Time/step: 2.0265 | Tok/sec=  4042.43 | Loss: 3.1421 / log-ppl: 23.1513 | Grad-Norm 14.3201 | ClipCoef 0.0698 | Peak-Mem 83.87GiB
+[timeout-save] walltime deadline resolved: 2478s from now
+GPU: cuda:0 | Step:    4 | Updates: 91554 | Time/step: 1.8431 | Tok/sec=  4444.61 | Loss: 3.8650 / log-ppl: 47.7035 | Grad-Norm 15.3203 | ClipCoef 0.0653 | Peak-Mem 90.75GiB
+GPU: cuda:0 | Step:    6 | Updates: 91555 | Time/step: 1.5112 | Tok/sec=  5421.00 | Loss: 4.7682 / log-ppl: 117.7020 | Grad-Norm 93.3823 | ClipCoef 0.0107 | Peak-Mem 90.63GiB
+GPU: cuda:0 | Step:    8 | Updates: 91556 | Time/step: 1.9728 | Tok/sec=  4152.50 | Loss: 2.3459 / log-ppl: 10.4423 | Grad-Norm 3.6316 | ClipCoef 0.2754 | Peak-Mem 90.75GiB
+GPU: cuda:0 | Step:   10 | Updates: 91557 | Time/step: 0.9774 | Tok/sec=  8381.01 | Loss: 3.5681 / log-ppl: 35.4497 | Grad-Norm 4.4399 | ClipCoef 0.2252 | Peak-Mem 60.91GiB
+GPU: cuda:0 | Step:   12 | Updates: 91558 | Time/step: 1.3820 | Tok/sec=  5927.59 | Loss: 3.3955 / log-ppl: 29.8294 | Grad-Norm 3.3156 | ClipCoef 0.3016 | Peak-Mem 90.63GiB
+GPU: cuda:0 | Step:   14 | Updates: 91559 | Time/step: 1.3137 | Tok/sec=  6235.86 | Loss: 3.9279 / log-ppl: 50.7985 | Grad-Norm 3.7978 | ClipCoef 0.2633 | Peak-Mem 75.89GiB
+GPU: cuda:0 | Step:   16 | Updates: 91560 | Time/step: 1.8115 | Tok/sec=  4522.21 | Loss: 1.3617 / log-ppl: 3.9027 | Grad-Norm 4.2641 | ClipCoef 0.2345 | Peak-Mem 90.75GiB
+GPU: cuda:0 | Step:   18 | Updates: 91561 | Time/step: 1.0754 | Tok/sec=  7617.38 | Loss: 2.6640 / log-ppl: 14.3540 | Grad-Norm 4.1285 | ClipCoef 0.2422 | Peak-Mem 68.46GiB
+GPU: cuda:0 | Step:   20 | Updates: 91562 | Time/step: 1.5819 | Tok/sec=  5178.63 | Loss: 3.6404 / log-ppl: 38.1083 | Grad-Norm 2.6239 | ClipCoef 0.3811 | Peak-Mem 90.75GiB
+[stop_at_step] reached 91562 — ending this phase (schedule horizon max_steps=305176 unchanged)
+[rank 0] Saved checkpoint @ step 91,562
+--------------------------------------------------------------------
+Training time: 0:04:12.542621 
+Max. Mem allocated: 12.162 GB. Max. Mem reserved: 91.148 GB.
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Run None finished without error.
+---------Total time: 0:04:24.889947 ---------
+-----------------Shutdown complete.--------------------------
+
+=== SMOKE GATE | j4-a3z-endpoint-donor-smoke | limb=donor ===
+  ok   10 diag rows, steps 91553..91562
+  ok   z_n_zpre max 64 of 64
+  ok   z_e_carried_norm mean 142.83 vs target 171.00 (84%)
+  ok   z_embed_ratio 1.3039 -> 1.8363
+  ok   z_read_grad_frac 1.0 (live on every batch, as E is)
+  ok   z_write_grad_frac max 1.000
+  ok   loss 3.1421 -> 3.6404, all finite
+  FAIL ||E|| measures 142.83 but ZNORM_TARGET is 171.00 -- more than 15% apart.  j4_prereg.md S1.1 says STOP: the rescale target is the wrong number for this branch, and every limb would train with Z at the wrong scale.
+
+SMOKE GATE FAILED (1): do NOT launch the real limbs until this is understood.  j4_prereg.md S1.1 / S5.
+J4 donor SMOKE GATE FAILED -- exit 1, so anything queued
+  --dependency=afterok on this job will NOT start.
+---------------------------------------
+Begin Slurm Epilog: Sep-26-2026 00:20:53
+Job ID:        13593822
+Array Job ID:  13593528_1
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j4_joint
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=00:36:32,vmem=0,walltime=00:04:34,mem=18916960K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------
