@@ -121,11 +121,22 @@
 #   reading a dead channel through a better reader would re-run attempt 2.
 #   ('delta' at these same columns is the one genuinely unexamined write and is
 #   j4_prereg.md S3's named alternative -- a different arm, not a flag to flip.)
-# ZNORM_TARGET = 171.0, E's MEASURED carried row norm (fp32, B2).  Z_end rows
-#   are ~10-11, so spliced as carried they would enter 17x under the field they
-#   compete with -- which IS the s0 site's measured failure (flat out to 45x
-#   ||s0||, turning on only at an injected 175.8 against ||E|| = 171, i.e. when
-#   it drowns E rather than being read).  The rescale runs BEFORE the
+# ZNORM_TARGET = 136.0, E's MEASURED carried row norm ON THIS BRANCH.
+#   CORRECTED 2026-09-25 from 171.0 after the first smoke (job 13593528) --
+#   which is exactly what the smoke gate exists for.  171.0 was measured on the
+#   B2 checkpoint; this arm branches from retro-b2-heal/checkpoint_91552_w16,
+#   91,552 updates of healing later, where ||E|| measures 128.95 (noread),
+#   135.77 (real) and 142.83 (donor), mean 135.85, spread +/-5.1%.  At 171 the
+#   spliced Z entered 1.20-1.33x over E instead of at parity, and the gate's
+#   15% band caught it on all three limbs.  ONE FIXED VALUE FOR ALL SEVEN RUNS,
+#   not per limb: the limbs must differ in the carry and in nothing else.
+#   (The limb-to-limb spread is itself a small finding -- E's norm already
+#   moves with what the Z read does, inside ten updates.)
+#   Z_end rows are ~10-11, so spliced as carried they would enter ~13x under
+#   the field they compete with -- which IS the s0 site's measured failure
+#   (flat out to 45x ||s0||, turning on only at an injected 175.8 against the
+#   then-||E|| of 171, i.e. when it drowns E rather than being read).  The
+#   rescale runs BEFORE the
 #   projection, so the entering norm is exactly right at step 0 and is then free
 #   to MOVE: z_embed_ratio is the readable negative, standing where J1's gate
 #   and J3's read_ratio stood.  CONFIRM IT ON THE SMOKE: the diag's
@@ -177,7 +188,7 @@ DIAG_INTERVAL=${DIAG_INTERVAL:-25}
 MICRO_BS=${MICRO_BS:-2}
 BATCH_SIZE=${BATCH_SIZE:-4}
 ZNORM=${ZNORM:-rms}                        # the rescale; the graft refuses 'none'
-ZNORM_TARGET=${ZNORM_TARGET:-171.0}        # ||E|| measured -- see DECISIONS
+ZNORM_TARGET=${ZNORM_TARGET:-136.0}        # ||E|| MEASURED ON THIS BRANCH -- see DECISIONS
 E_DROPOUT=${E_DROPOUT:-0.0}
 WINDOW_BACKWARD=${WINDOW_BACKWARD:-1}      # micro 2 did not fit without it (13456835)
 WB_ARGS=""
@@ -322,6 +333,23 @@ def vals(key):
 
 notes.append(f"{len(rows)} diag rows, steps {rows[0]['step']}..{rows[-1]['step']}")
 
+# 0. ONE CONFIG PER FILE.  cortex_diag.jsonl is opened in APPEND mode, so a
+# re-run into a surviving run dir silently interleaves two configs' rows -- and
+# the checks below would then average across them and read the FIRST row (the
+# old run's) for the ratio.  A changed rescale target is the case that matters:
+# it is the one thing a re-smoke is most likely to be changing.
+tg = set(vals("z_znorm_target"))
+if len(tg) > 1:
+    fails.append(f"this diag holds rows from MORE THAN ONE config "
+                 f"(z_znorm_target {sorted(tg)}).  cortex_diag.jsonl appends, so "
+                 f"the run dir survived an earlier smoke: rm -rf the -smoke run "
+                 f"dirs and re-run, or every number below mixes two runs.")
+elif tg and abs(next(iter(tg)) - target) > 1e-6:
+    fails.append(f"the run trained with znorm_target {next(iter(tg))} but this "
+                 f"gate was told {target} -- the launcher and the gate disagree.")
+elif tg:
+    notes.append(f"z_znorm_target {next(iter(tg))} on every row")
+
 # 1. the columns exist at all
 zpre = vals("z_n_zpre")
 if not zpre:
@@ -411,10 +439,14 @@ GATE
         # Keep the evidence, drop the bulk: a 10-step checkpoint is worthless
         # and three of them are ~50 GB of scratch overnight.
         mkdir -p logs/j4_smoke
+        # JOB-SCOPED name: a re-smoke after a fix must not overwrite the diag of
+        # the smoke that FOUND the fix -- that first file is the measurement the
+        # correction was derived from (j4_prereg.md S10).
         cp "cortex-retrofit/$RUN_NAME/cortex_diag.jsonl" \
-           "logs/j4_smoke/${RUN_NAME}.jsonl" 2>/dev/null
+           "logs/j4_smoke/${RUN_NAME}-${SLURM_ARRAY_JOB_ID:-$SLURM_JOB_ID}.jsonl" 2>/dev/null
         rm -rf cortex-retrofit/$RUN_NAME/checkpoint_*
-        echo "  diag kept at logs/j4_smoke/${RUN_NAME}.jsonl; checkpoints removed"
+        echo "  diag kept at logs/j4_smoke/${RUN_NAME}-${SLURM_ARRAY_JOB_ID:-$SLURM_JOB_ID}.jsonl"
+        echo "  checkpoints removed; DELETE THE RUN DIR before any re-smoke"
         du -sh "cortex-retrofit/$RUN_NAME" 2>/dev/null
     fi
 fi

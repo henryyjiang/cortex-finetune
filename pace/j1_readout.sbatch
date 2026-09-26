@@ -98,7 +98,7 @@ case "$EXPERIMENT" in
         GATE_LR_MULT=${GATE_LR_MULT:-0.1}      # pace/j3_joint.sbatch's default
         SCRATCH_FB=${SCRATCH_FB:-1.0} ;;
     j4) ENCODING=${ENCODING:-endpoint}         # D3's vindicated write
-        ZNORM_TARGET=${ZNORM_TARGET:-171.0} ;; # ||E||, pace/j4_joint.sbatch's
+        ZNORM_TARGET=${ZNORM_TARGET:-136.0} ;; # ||E||, pace/j4_joint.sbatch's
     *) echo "ERROR: EXPERIMENT must be j1|j3|j4; got '$EXPERIMENT'"; exit 1 ;;
 esac
 SET=${SET:-main}

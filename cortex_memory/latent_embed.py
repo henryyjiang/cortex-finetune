@@ -41,9 +41,14 @@ does not change this module; it changes how a PASS is read.
 
 THE DESIGN, AND WHY EACH PART IS FORCED
 ---------------------------------------
-* SCALE FIRST, BEFORE ANYTHING ELSE.  E's carried rows enter at row norm ~171
-  (measured, B2, fp32).  `Z_end` rows are PRE-coda loop states at norm ~10-11
-  -- 17x smaller.  The s0 site's whole failure was a 0.39-norm row competing
+* SCALE FIRST, BEFORE ANYTHING ELSE.  E's carried rows enter at row norm ~136
+  -- MEASURED ON THE ARM'S OWN BRANCH (retro-b2-heal/checkpoint_91552_w16, job
+  13593528: 128.95 / 135.77 / 142.83 across the three limbs).  The ~171 this
+  file and cortex_graft.py quoted until 2026-09-25 was measured on B2, 91,552
+  updates of healing earlier, and is stale for any arm branching from the heal
+  parent -- which the first J4 smoke caught, because ||E|| IS A PER-BRANCH
+  QUANTITY and the target has to be re-measured whenever the branch moves.
+  `Z_end` rows are PRE-coda loop states at norm ~10-11 -- ~13x smaller.  The s0 site's whole failure was a 0.39-norm row competing
   with a 171-norm one inside the same concatenation: attention did not see it,
   and the sweep only "turned on" at an injected norm of 175.8, which is
   drowning E rather than being read.  So every Z row is rescaled to

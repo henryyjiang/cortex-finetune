@@ -9,9 +9,11 @@ rests on, pinned before any of it trains.
      total -- prefix_unpack (via the modeling file's round-trip), the EOS mask
      lift, and `_latent_state_write`'s real-token count.  Getting this wrong is
      silent: the write would pool 64 columns of the Z block as "real tokens".
-  2. Z ENTERS AT E's ROW NORM.  The s0 site's measured failure was a 0.39-norm
-     row against 171; spliced as carried, Z_end would be 17x under E.  So the
-     rows are rescaled first and the entering ratio is ~1.0 at init.
+  2. Z ENTERS AT E's ROW NORM -- MEASURED ON THE ARM'S OWN BRANCH (136, not
+     B2's 171; the first smoke caught that).  The s0 site's measured failure was
+     a 0.39-norm row against the field it competed with; spliced as carried,
+     Z_end would be ~13x under E.  So the rows are rescaled first and the
+     entering ratio is ~1.0 at init.
   3. THE NULLS ARE ZEROS AT THE SAME COLUMNS, NEVER OMISSION -- for the no-read
      LIMB, the 2x2's z_null='off' CELL, and unwritten ring rows alike.  Omitting
      them would change the sequence length, the position ids and the memory
@@ -53,10 +55,13 @@ from cortex_memory.latent_embed import LatentEmbedRead  # noqa: E402
 
 W, K, CL, EOS, D = 4, 16, 16, VOCAB - 1, 64
 B, S, T = 2, 12, 4
-#: E's MEASURED carried row norm on the B2 checkpoint (cortex_graft.prefix_pack's
-#: `_e_carried_norm`, and the number latent_read.py quotes as ||E|| = 171.0).
-#: The tests use it as the rescale target because the real runs do.
-E_NORM = 171.0
+#: E's MEASURED carried row norm on the arm's own branch, retro-b2-heal/
+#: checkpoint_91552_w16 (cortex_graft.prefix_pack's `_e_carried_norm`; job
+#: 13593528 measured 128.95 / 135.77 / 142.83 across the three limbs, mean
+#: 135.85).  The tests use it as the rescale target because the real runs do.
+#: NOT the 171.0 that latent_read.py quotes -- that is B2's, 91,552 updates
+#: earlier, and the first J4 smoke is what caught the difference.
+E_NORM = 136.0
 
 
 def _flags(limb="real", **kw):
@@ -512,7 +517,7 @@ class TestTheLaunchers:
         assert "ENCODING=endpoint" in s                 # D3's write, not a variable
         assert "--cortex.latent_read embeds" in s
         assert "--cortex.latent_s0_read false" in s
-        assert "ZNORM_TARGET=${ZNORM_TARGET:-171.0}" in s
+        assert "ZNORM_TARGET=${ZNORM_TARGET:-136.0}" in s
         # the no-read limb must blank the columns, never omit them
         assert "--cortex.latent_carry_read false" in s
         assert "--cortex.latent_write_only" not in s.replace(
@@ -527,9 +532,9 @@ class TestTheLaunchers:
         s = _src("pace/j1_readout.sbatch")
         assert "j4) ENCODING=${ENCODING:-endpoint}" in s
         assert "--set latent_read=embeds" in s
-        assert "ZNORM_TARGET=${ZNORM_TARGET:-171.0}" in s
+        assert "ZNORM_TARGET=${ZNORM_TARGET:-136.0}" in s
         # the guard: a read-out rebuilt at another rescale target scores a model
-        # nobody trained (171 vs the 3.0 default is a factor of 57)
+        # nobody trained (136 vs the 3.0 default is a factor of 45)
         assert "z_znorm_target" in s
         assert "EXPERIMENT must be j1|j3|j4" in s
 
@@ -553,15 +558,15 @@ class TestTheLaunchers:
 
     def test_the_rescale_target_survives_a_set_override(self):
         """`--set` values are typed by evals/model_utils.parse_config_overrides,
-        which parses bools and ints but NOT floats -- so 171.0 arrives as the
-        STRING "171.0".  The graft coerces it; pin that, because a target that
-        silently fell back to the 3.0 default would put Z in 57x too small."""
+        which parses bools and ints but NOT floats -- so 136.0 arrives as the
+        STRING "136.0".  The graft coerces it; pin that, because a target that
+        silently fell back to the 3.0 default would put Z in 45x too small."""
         import importlib
         sys.path.insert(0, os.path.join(REPO, "evals"))
         mu = importlib.import_module("model_utils")
-        over = mu.parse_config_overrides(["latent_read_znorm_target=171.0"])
+        over = mu.parse_config_overrides(["latent_read_znorm_target=136.0"])
         g = _cortex("real", **{k: v for k, v in over.items()})
-        assert g.latent_read_znorm_target == 171.0
+        assert g.latent_read_znorm_target == 136.0
 
 
 # ─── 10. the smoke gate, which is what lets the real limbs be queued ────────
@@ -579,7 +584,7 @@ class TestTheSmokeGate:
         assert "<<'GATE'" in s, "the smoke gate heredoc is gone from the launcher"
         return s.split("<<'GATE'\n", 1)[1].split("\nGATE\n", 1)[0]
 
-    def _run(self, tmp_path, rows, limb="real", target="171.0", k="64"):
+    def _run(self, tmp_path, rows, limb="real", target="136.0", k="64"):
         import subprocess
         import json as _json
         gate = tmp_path / "gate.py"
@@ -593,8 +598,9 @@ class TestTheSmokeGate:
     @staticmethod
     def _row(step, **kw):
         r = dict(step=91552 + step, loss=2.31 - 0.01 * step, z_n_zpre=64,
-                 z_e_carried_norm=171.2, z_embed_ratio=1.0,
-                 z_read_grad_frac=1.0, z_write_grad_frac=0.55)
+                 z_e_carried_norm=135.8, z_embed_ratio=1.0,
+                 z_read_grad_frac=1.0, z_write_grad_frac=0.55,
+                 z_znorm_target=136.0)
         r.update(kw)
         return r
 
@@ -612,8 +618,12 @@ class TestTheSmokeGate:
         assert rc != 0 and "veto 6" in out, out
 
     @pytest.mark.parametrize("kw, needle", [
-        # the failure the gate exists for: 171 is wrong for this branch
+        # the failure the gate DID catch on 2026-09-25: a stale target from
+        # another checkpoint (171 quoted, 136 measured).  3.0 is the extreme
+        # version -- the znorm default leaking through.
         (dict(z_e_carried_norm=3.0), "STOP"),
+        # and the actual miss, to scale: 171 quoted against 136 measured
+        (dict(z_e_carried_norm=171.0), "STOP"),
         # the rescale silently not running -> Z enters 17x under E
         (dict(z_embed_ratio=0.058), "17x under E"),
         # the columns never spliced -- every other number is then meaningless
@@ -626,6 +636,23 @@ class TestTheSmokeGate:
     def test_each_failure_is_named_and_blocks(self, tmp_path, kw, needle):
         rc, out = self._run(tmp_path, [self._row(i, **kw) for i in range(1, 11)])
         assert rc != 0 and needle in out, out
+
+    def test_a_diag_mixing_two_configs_is_refused(self, tmp_path):
+        """`cortex_diag.jsonl` is opened in APPEND mode, so re-running into a
+        surviving run dir interleaves two configs' rows -- and the checks would
+        then average across them and take the OLD run's first row for the ratio.
+        A changed rescale target is the likeliest thing a re-smoke is changing,
+        which is exactly when this must not pass quietly."""
+        rows = ([self._row(i, z_znorm_target=171.0, z_embed_ratio=1.31)
+                 for i in range(1, 11)]
+                + [self._row(i) for i in range(1, 11)])
+        rc, out = self._run(tmp_path, rows)
+        assert rc != 0 and "MORE THAN ONE config" in out, out
+
+    def test_a_launcher_gate_target_skew_is_refused(self, tmp_path):
+        rc, out = self._run(tmp_path, [self._row(i, z_znorm_target=171.0)
+                                       for i in range(1, 11)])
+        assert rc != 0 and "disagree" in out, out
 
     def test_an_empty_diag_is_a_failure_not_a_pass(self, tmp_path):
         """The DIAG_INTERVAL trap: the counter is absolute and 91552 % 25 = 2, so

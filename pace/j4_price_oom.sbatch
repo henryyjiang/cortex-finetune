@@ -59,7 +59,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 MODEL=${MODEL:-ckpts/olmo-retrofit-cortex}
 MICRO_BS=${MICRO_BS:-2}
 CARRY_GRAD_CHUNKS=${CARRY_GRAD_CHUNKS:-4}
-ZNORM_TARGET=${ZNORM_TARGET:-171.0}
+ZNORM_TARGET=${ZNORM_TARGET:-136.0}
 JSON=logs/j4_oom_${SLURM_JOB_ID}.jsonl
 
 echo "=== J4 memory price | micro=$MICRO_BS | grad_chunks=$CARRY_GRAD_CHUNKS | window_backward=1 ==="
