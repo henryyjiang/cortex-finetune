@@ -35,6 +35,14 @@
 #   INCREMENTAL=1 sbatch pace/diag_z_registers.sbatch
 # It reports the INCREMENT (registered), resid_frac and E_pca beside D3's table.
 #
+# PROBE (c), j4_prereg.md S9.1's heal parent -- the clean NO-J-TRAINING baseline
+# for Z_end, the one array task that says whether Z_end's register content (and
+# probe (b)'s ~1% increment) is anything J training created:
+#   INCREMENTAL=1 sbatch --array=4 pace/diag_z_registers.sbatch
+# It probes cortex-retrofit/retro-b2-heal/checkpoint_91552_w16 -- the SLICED w16
+# parent every J arm branched from (pace/j1_joint.sbatch BRANCH_PATH), not the
+# W=32 checkpoint_91552 beside it -- and lands as a fifth row in --summarize.
+#
 # The graft is built with EXACTLY the read-out's flags (pace/j1_readout.sbatch):
 # the probe reads the writes the trained model makes, so the read that shapes
 # the loop state has to be the trained one -- gate_lr_mult included.
@@ -74,12 +82,24 @@ TASKS=(
     "j1 tokens real"
     "j1 tokens noread"
     "j3 scratch edrop0.25-real"
+    "heal tokens parent"
 )
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 if [ "$IDX" -ge "${#TASKS[@]}" ]; then echo "no task at index $IDX (use --array=0-3)"; exit 0; fi
 read EXP ENCODING LIMB <<< "${TASKS[$IDX]}"
-RUN=${EXP}-a3z-${ENCODING}-${LIMB}
-CKPT=$OUT_ROOT/$RUN/checkpoint_$STEP
+if [ "$EXP" = "heal" ]; then
+    # PROBE (c), j4_prereg.md S9.1 -- the heal parent, the clean no-J-training
+    # baseline for Z_end.  Not an -a3z- run name and not STEP 93552, so both come
+    # from their own defaults and THE FOUR REGISTERED TASKS ARE UNTOUCHED: a bare
+    # `sbatch pace/diag_z_registers.sbatch` still runs exactly D3 (--array=0-3).
+    # This row is a BASELINE, not a fifth registered checkpoint -- its READING
+    # line is descriptive and decides nothing on its own.
+    RUN=${PARENT_RUN:-retro-b2-heal}
+    CKPT=$OUT_ROOT/$RUN/${PARENT_CKPT:-checkpoint_91552_w16}
+else
+    RUN=${EXP}-a3z-${ENCODING}-${LIMB}
+    CKPT=$OUT_ROOT/$RUN/checkpoint_$STEP
+fi
 OUT=eval_results/z3_registers/$RUN
 
 SETS="--set use_memory=true --set memory_slots=0 --set prefix_memory=gated"
@@ -97,6 +117,12 @@ case "$EXP:$LIMB" in
     j1:real)    SETS="$SETS --set latent_read=xattn --set latent_read_heads=$READ_HEADS"
                 SETS="$SETS --set latent_read_znorm=rms --set latent_read_znorm_target=$ZNORM_TARGET" ;;
     j1:noread)  SETS="$SETS --set latent_read=none --set latent_write_only=true" ;;
+    heal:parent) # (c): the parent has no trained read, so it must read NOTHING --
+                # write_only exercises no untrained module.  Z_end and E are pure
+                # forward properties of the branch; the encoding only names the
+                # (meaningless here) Z_write column, and `tokens` keeps the
+                # write_equals_z_tok self-check live.
+                SETS="$SETS --set latent_read=none --set latent_write_only=true" ;;
     *) echo "ERROR: no flag set for $EXP:$LIMB"; exit 1 ;;
 esac
 

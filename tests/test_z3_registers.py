@@ -557,6 +557,30 @@ class TestTheLauncher:
                   '"j3 scratch edrop0.25-real"'):
             assert t in s
 
+    def test_probe_c_does_not_disturb_the_registered_four(self):
+        """(c), the heal parent, is index 4 and nothing below it moves.
+
+        A bare `sbatch pace/diag_z_registers.sbatch` must still be exactly D3:
+        the default array is 0-3, the four entries keep their order (the index
+        IS the task, and eval_results dirs are named from it), and the parent's
+        own path comes from its own defaults rather than STEP.
+        """
+        s = self._src()
+        assert "#SBATCH --array=0-3" in s
+        tasks = s.split("TASKS=(")[1].split(")")[0].strip().splitlines()
+        assert [t.strip() for t in tasks] == ['"j3 scratch real"',
+                                              '"j1 tokens real"',
+                                              '"j1 tokens noread"',
+                                              '"j3 scratch edrop0.25-real"',
+                                              '"heal tokens parent"']
+        # the SLICED w16 parent every J arm branched from, not checkpoint_91552
+        assert "${PARENT_CKPT:-checkpoint_91552_w16}" in s
+        assert "RUN=${PARENT_RUN:-retro-b2-heal}" in s
+        # and it reads NOTHING: the parent has no trained read module
+        heal = s.split("heal:parent)")[1].split(";;")[0]
+        assert "--set latent_read=none --set latent_write_only=true" in heal
+        assert "latent_read=xattn" not in heal and "latent_read=scratch" not in heal
+
     def test_the_window_matches_the_write(self):
         s = self._src()
         assert "--tok_rows 64 --tok_pool \"$TOK_POOL\"" in s and "TOK_POOL=${TOK_POOL:-4}" in s
