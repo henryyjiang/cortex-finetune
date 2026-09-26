@@ -15,6 +15,7 @@ import os
 import random
 import re
 import sys
+import zlib
 
 import pytest
 
@@ -60,6 +61,16 @@ def _noise(n, sd, seed):
     return [rng.gauss(0.0, sd) for _ in range(n)]
 
 
+def _seed(key: str) -> int:
+    """A STABLE per-task seed.  `hash(str)` is salted per process
+    (PYTHONHASHSEED), so seeding the planted noise with it made this file's
+    decision-table tests depend on which process ran them: all-equal limbs
+    would occasionally draw noise whose paired CI cleared zero and read
+    READ_HURTS instead of NO_GAIN.  Flaky in the one suite that has to be
+    trustworthy -- it is the pre-registered verdict's own test."""
+    return zlib.crc32(key.encode()) % 97
+
+
 def _world(tmp, carry, local=0.2, pg19=None, edrop=None, enc="tokens"):
     """Write every read-out file for a planted outcome.
 
@@ -79,7 +90,7 @@ def _world(tmp, carry, local=0.2, pg19=None, edrop=None, enc="tokens"):
             mu = local
         else:
             mu = pg19[limb]
-        own = [mu + base[i] + 0.01 * e for i, e in enumerate(_noise(n, 1, hash(key) % 97))]
+        own = [mu + base[i] + 0.01 * e for i, e in enumerate(_noise(n, 1, _seed(key)))]
         if limb == "noread":
             cells = {"E1Z1": own, "E1Z0": list(own)}          # no read: identical
         elif limb == "donor":

@@ -31,6 +31,19 @@
 # GATE_LR_MULT MUST equal the training run's (the stored gate is gate/mult);
 # each task checks it against the run's cortex_diag.jsonl and refuses.
 #
+# J4 (Z as its own input_embeds columns, pace/j4_joint.sbatch) is read out the
+# same way with EXPERIMENT=j4.  ENCODING defaults to endpoint and ZNORM_TARGET
+# to 171.0 -- E's MEASURED carried row norm, which is the rescale J4's read
+# depends on.  Like GATE_LR_MULT it is a CONFIG FLAG and not a stored
+# parameter, so each task checks it against the run's own diag rows and refuses
+# on a mismatch: rebuilt at the 3.0 default, Z would enter 57x too small and
+# the read-out would score a model nobody trained.
+#   R4=$(EXPERIMENT=j4 sbatch --parsable --dependency=afterany:$J4 pace/j1_readout.sbatch)
+#   R4E=$(EXPERIMENT=j4 SET=edrop sbatch --parsable --array=0-3 \
+#         --dependency=afterany:$J4E pace/j1_readout.sbatch)
+#   R4Z=$(EXPERIMENT=j4 SET=edrop E_DROPOUT=0.95 sbatch --parsable --array=0-3 \
+#         --dependency=afterany:$J4Z pace/j1_readout.sbatch)   # the Z-only limb
+#
 # afterany, not afterok: every task refuses on its own when its limb has no
 # checkpoint_$STEP, so a limb that crashed costs a one-minute refusal and a
 # verdict that names it -- where afterok would hold EVERY read-out, including
@@ -84,7 +97,9 @@ case "$EXPERIMENT" in
     j3) ENCODING=${ENCODING:-scratch}
         GATE_LR_MULT=${GATE_LR_MULT:-0.1}      # pace/j3_joint.sbatch's default
         SCRATCH_FB=${SCRATCH_FB:-1.0} ;;
-    *) echo "ERROR: EXPERIMENT must be j1|j3; got '$EXPERIMENT'"; exit 1 ;;
+    j4) ENCODING=${ENCODING:-endpoint}         # D3's vindicated write
+        ZNORM_TARGET=${ZNORM_TARGET:-171.0} ;; # ||E||, pace/j4_joint.sbatch's
+    *) echo "ERROR: EXPERIMENT must be j1|j3|j4; got '$EXPERIMENT'"; exit 1 ;;
 esac
 SET=${SET:-main}
 E_DROPOUT=${E_DROPOUT:-0.25}
@@ -139,6 +154,20 @@ if [ "$EXPERIMENT" = "j3" ]; then
                 ALLOW="--allow_scrambled" ;;
         noread) SETS="$SETS --set latent_carry_read=false" ;;
     esac
+elif [ "$EXPERIMENT" = "j4" ]; then
+    # J4: the carried Z is spliced as its own columns of input_embeds.  Every
+    # limb has the columns; the limbs differ in what is IN them.
+    SETS="$SETS --set latent_read=embeds"
+    SETS="$SETS --set latent_read_znorm=rms --set latent_read_znorm_target=$ZNORM_TARGET"
+    case "$LIMB" in
+        real)   ;;
+        donor)  SETS="$SETS --set latent_read_scramble=true"
+                ALLOW="--allow_scrambled" ;;
+        # NOT latent_write_only: that omits the columns.  The no-read limb keeps
+        # them and they are zero, so it differs from the real limb in the carry
+        # and not in the geometry (cortex_graft.prefix_pack).
+        noread) SETS="$SETS --set latent_carry_read=false" ;;
+    esac
 else
 case "$LIMB" in
     real)   SETS="$SETS --set latent_read=xattn --set latent_read_heads=$READ_HEADS"
@@ -181,6 +210,28 @@ if got != {want}:
              f"read-out sets {want}.  Pass GATE_LR_MULT=<the run's value>.")
 print(f"    gate_lr_mult {want} matches the run's diag rows")
 MULT
+fi
+if [ "$EXPERIMENT" = "j4" ]; then
+    # The rescale target is a CONFIG FLAG, not a stored parameter: rebuilt at
+    # another value the read enters at another strength and the read-out scores
+    # a model nobody trained.  Same failure class as J3's gate_lr_mult, and the
+    # gap here is 171 vs the 3.0 default -- a factor of 57.
+    DIAG=$OUT_ROOT/$RUN/cortex_diag.jsonl
+    [ -f "$DIAG" ] || { echo "ERROR: no $DIAG -- cannot confirm the trained znorm target"; exit 1; }
+    python - "$DIAG" "$ZNORM_TARGET" <<'ZNORM' || exit 1
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+got = {r.get("z_znorm_target") for r in rows} - {None}
+want = float(sys.argv[2])
+if not got:
+    sys.exit("ERROR: the run's diag rows carry no z_znorm_target.  That field "
+             "was added with J4; a run without it predates the build this "
+             "read-out assumes.  Re-check the training run.")
+if got != {want}:
+    sys.exit(f"ERROR: the run trained with znorm_target {sorted(got)} but this "
+             f"read-out sets {want}.  Pass ZNORM_TARGET=<the run's value>.")
+print(f"    znorm_target {want} matches the run's diag rows")
+ZNORM
 fi
 if ! grep -q "read_into(x, current_step)" "$MODEL/raven_modeling_minimal_cortex.py" 2>/dev/null; then
     echo "ERROR: $MODEL carries a PRE-P3.0 modeling file.  Refresh it:"

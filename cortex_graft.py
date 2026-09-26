@@ -129,6 +129,7 @@ from cortex_memory.eos import compute_eos_masks, apply_write_reset, apply_valid_
 from cortex_memory.latent_read import (LatentRead, LatentRefresh,
                                        apply_designed_init as apply_latent_read_init)
 from cortex_memory.scratchpad import LatentScratchpad
+from cortex_memory.latent_embed import LatentEmbedRead
 
 
 def _row_norm(t: torch.Tensor) -> float:
@@ -437,6 +438,17 @@ class CortexMemory(nn.Module):
         #                              record.
         #   latent_scratch_forget_bias the scratchpad's per-ITERATION forget
         #                              bias at init (fg = 0.731 at 1.0, LM2's).
+        # Z ATTEMPT 2 (J4), cortex_memory/latent_embed.py.  latent_read
+        #   'embeds'  THE CARRIED Z GETS ITS OWN K COLUMNS IN `input_embeds`,
+        #             beside E's, rescaled to E's row norm
+        #             (latent_read_znorm/_target) and mapped by one
+        #             identity-initialised D x D projection.  No new reader:
+        #             the base model's own pretrained attention does the
+        #             reading, on every one of the T loop iterations, through
+        #             `adapter(cat([x, input_embeds]))` -- the same path E's
+        #             columns are read by.  latent_carry_read=false is J4's
+        #             NO-READ limb and splices ZEROS at those columns, so every
+        #             limb keeps one sequence length (see prefix_pack).
         self.latent_carry_read = bool(getattr(config, "latent_carry_read", True))
         _glm = getattr(config, "latent_read_gate_lr_mult", 1.0)
         self.latent_read_gate_lr_mult = float(1.0 if _glm is None else _glm)
@@ -470,11 +482,12 @@ class CortexMemory(nn.Module):
                     "unread while the within-chunk scratchpad read stays, so "
                     "the limbs differ in the carry alone.")
         if not self.latent_carry_read:
-            if self.latent_read != "scratch":
+            if self.latent_read not in ("scratch", "embeds"):
                 raise ValueError(
-                    "cortex.latent_carry_read=false is J3's no-read limb and "
-                    "needs latent_read='scratch'.  On an xattn arm the carry IS "
-                    "the whole read; that limb is --cortex.latent_write_only.")
+                    "cortex.latent_carry_read=false is the no-read limb of J3 "
+                    "(scratch) and J4 (embeds) and needs one of those reads.  "
+                    "On an xattn arm the carry IS the whole read; that limb is "
+                    "--cortex.latent_write_only.")
             if self.latent_read_scramble:
                 raise ValueError(
                     "cortex.latent_read_scramble with latent_carry_read=false "
@@ -487,6 +500,9 @@ class CortexMemory(nn.Module):
                 f"{self.latent_read_gate_lr_mult!r}")
         if self.latent_read_gate_lr_mult != 1.0 \
                 and self.latent_read not in ("xattn", "scratch"):
+            # 'embeds' has NO gate on purpose (its read-strength number is
+            # z_embed_ratio, not a scalar), so the multiplier has nothing to
+            # reparameterise there either.
             raise ValueError(
                 "cortex.latent_read_gate_lr_mult reparameterises LatentRead's "
                 "gate; it needs latent_read='xattn' or 'scratch'.  The refresh "
@@ -504,12 +520,60 @@ class CortexMemory(nn.Module):
         if self.latent_tok_pool < 1:
             raise ValueError(f"cortex.latent_tok_pool must be >= 1; got "
                              f"{self.latent_tok_pool}")
+        # THE VALUE CHECK COMES FIRST, before anything that reasons about
+        # what latent_read IS.  A typo ('embed' for 'embeds') otherwise trips
+        # the znorm combination check instead and is reported as a scale
+        # problem, which is the wrong thing to go looking for.
+        if self.latent_read not in ("none", "refresh", "xattn", "scratch",
+                                   "embeds"):
+            raise ValueError(
+                f"cortex.latent_read must be 'none', 'refresh', 'xattn', "
+                f"'scratch' or 'embeds'; got {self.latent_read!r}.  See "
+                f"p30_readinto_prereg.md S2, cortex_memory/scratchpad.py and "
+                f"cortex_memory/latent_embed.py.")
+        if self.latent_read == "embeds":
+            # J4.  Each clause below is a design that would silently become a
+            # DIFFERENT design, so each raises instead of being tolerated.
+            if self.latent_encoding != "endpoint":
+                raise ValueError(
+                    f"cortex.latent_read='embeds' (J4) is the read for the "
+                    f"write D3 vindicated: pass --cortex.latent_encoding "
+                    f"endpoint, not {self.latent_encoding!r}.  D3 measured the "
+                    "last-tokens writes ('tokens', 'scratch') holding ~1% of "
+                    "E's register margin -- reading them through a better "
+                    "reader would re-run attempt 2's NO with a new read and "
+                    "the same empty channel.  'delta' at these columns is a "
+                    "live alternative (j4_prereg.md S3) but a different arm; "
+                    "state it there before passing it here.")
+            if self.latent_s0_read:
+                raise ValueError(
+                    "cortex.latent_read='embeds' needs --cortex.latent_s0_read "
+                    "false.  The s0 site is measured dead, and with both on the "
+                    "SAME carried Z enters twice -- substituted into E's "
+                    "carried columns and spliced as its own -- so a positive "
+                    "result could not be attributed to either site.")
+            if self.latent_read_znorm != "rms":
+                raise ValueError(
+                    "cortex.latent_read='embeds' needs --cortex.latent_read_"
+                    "znorm rms with a target at E's measured row norm.  Z_end "
+                    "rows are ~10 and E's carried rows are ~171; spliced as "
+                    "carried, Z would enter 17x below the field it competes "
+                    "with, which IS the s0 site's measured failure "
+                    "(flat to 45x ||s0||, turning on only at 175.8 vs "
+                    "||E||=171 -- i.e. when it drowns E rather than being "
+                    "read).  Pass the scale explicitly.")
+            # latent_read_scramble is DELIBERATELY not restricted here: it is
+            # J4's donor limb and it already works, because the roll lives in
+            # `_latent_z_rows` (upstream of every read site) and the embeds
+            # splice fetches through that function like the others.  The roll
+            # needs micro-batch >= 2 or it returns the same row -- enforced by
+            # _latent_z_rows and again by pace/j4_joint.sbatch.
         if self.latent_read_znorm not in ("none", "rms"):
             raise ValueError(
                 f"cortex.latent_read_znorm must be 'none' or 'rms'; got "
                 f"{self.latent_read_znorm!r}.")
         if self.latent_read_znorm == "rms" \
-                and self.latent_read not in ("xattn", "scratch"):
+                and self.latent_read not in ("xattn", "scratch", "embeds"):
             raise ValueError(
                 "cortex.latent_read_znorm='rms' needs latent_read='xattn' (or "
                 "'scratch', which reads through the same module).  With "
@@ -522,9 +586,14 @@ class CortexMemory(nn.Module):
                                        or self.latent_s0_read
                                        or not self.latent_carry):
             raise ValueError(
-                "cortex.latent_write_only is the NO-READ limb: it needs "
+                "cortex.latent_write_only is J1's NO-READ limb: it needs "
                 "latent_carry=true, latent_read='none' and latent_s0_read=false. "
-                "With any read on, the flag contradicts the arm it labels.")
+                "With any read on, the flag contradicts the arm it labels.  "
+                "J3's and J4's no-read limb is a DIFFERENT flag, "
+                "--cortex.latent_carry_read false: under those designs the read "
+                "module (J3) or the Z columns (J4) must stay in place and see "
+                "nothing, or the limb would differ from the real one in its "
+                "parameters and geometry as well as in the carry.")
         if not 0.0 <= self.e_dropout < 1.0:
             raise ValueError(f"cortex.e_dropout must be in [0, 1); got "
                              f"{self.e_dropout}")
@@ -539,11 +608,6 @@ class CortexMemory(nn.Module):
                 "in-loop read arm; without the read it changes nothing and the "
                 "cell would be labelled a control while being a duplicate of "
                 "the baseline.")
-        if self.latent_read not in ("none", "refresh", "xattn", "scratch"):
-            raise ValueError(
-                f"cortex.latent_read must be 'none', 'refresh', 'xattn' or "
-                f"'scratch'; got {self.latent_read!r}.  See "
-                f"p30_readinto_prereg.md S2 and cortex_memory/scratchpad.py.")
         if self.latent_read_depth not in ("none", "matched"):
             raise ValueError(
                 f"cortex.latent_read_depth must be 'none' or 'matched'; got "
@@ -673,6 +737,16 @@ class CortexMemory(nn.Module):
                 D, alpha_init=self.latent_read_gate_init)
         else:
             self.latent_reader = None
+        # J4's read (cortex_memory/latent_embed.py).  Built here, beside the
+        # others and for the same reason: it adds D^2 parameters, and a flag
+        # that added parameters after the optimizer was built would leave them
+        # untrained with no symptom.  A SEPARATE attribute from latent_reader:
+        # that name is the in-loop read module, `set_read_only_trainable`
+        # freezes on its path, and the diag's read_gate/own_share read off it --
+        # J4 has no gate and no in-loop read, so reporting it there would print
+        # J3's fields for a design that has none of them.
+        self.latent_embed = (LatentEmbedRead(D)
+                             if self.latent_read == "embeds" else None)
         # J3's write.  Built here for the same reason: it adds parameters.
         self.latent_scratch = (
             LatentScratchpad(D, forget_bias_init=self.latent_scratch_forget_bias)
@@ -727,7 +801,8 @@ class CortexMemory(nn.Module):
                     read: bool = True):
         """Splice the carry into the token stream, AutoCompressor-style.
 
-        Layout: [carried vectors | real tokens | summary slots].  Under the
+        Layout: [carried E | carried Z (J4 only) | real tokens | summary
+        slots].  Under the
         model's causal mask this reproduces auto_compressor.py:85 exactly —
         real tokens see every carried vector, and the summary slots at the end
         see the whole chunk.  The summary slots also see each other causally,
@@ -802,19 +877,26 @@ class CortexMemory(nn.Module):
             return input_embeds, position_ids, 0, 0
 
         B, S, _ = input_embeds.shape
-        parts, n_pre, n_sum = [], 0, 0
+        parts, n_pre, n_z, n_sum = [], 0, 0, 0
 
         if read:
             state = self._carried_state()
             if state is not None and state.shape[1] > 0:
                 state = state.to(device=input_embeds.device, dtype=input_embeds.dtype)
-                # ONLY THE E HALF ENTERS THE TOKEN STREAM.  Z is not an
-                # embedding and is never spliced as a column: it is read by
-                # substitution into `s0` at these very columns (latent_init),
-                # which is what makes the read free.  Splicing it here instead
-                # would double the sequence length and put trajectory deltas at
-                # norm ~0.35 next to hidden states at norm ~171, where attention
-                # would simply not see them.
+                # ONLY THE E HALF ENTERS HERE.  Until J4 the Z half was
+                # never spliced as a column at all: it was read by substitution
+                # into `s0` at these very columns (latent_init), which is what
+                # made that read free.  Both objections to splicing it stood on
+                # the encoding of the day -- "would double the sequence length"
+                # and "trajectory deltas at norm ~0.35 next to hidden states at
+                # norm ~171, where attention would simply not see them" -- and
+                # J4 answers both rather than ignoring them: it splices K
+                # columns, not S (64 of 592, +11%), and it rescales the rows to
+                # E's own measured norm first.  What it cannot answer is that
+                # the s0 substitution was free and this is not; that is the
+                # price, and pace/j4_price_oom.sbatch is where it is paid.  The
+                # Z block is appended BELOW, after E-dropout, so the two blocks
+                # never interleave.
                 e_state, _ = self.prefix.split_channels(state)
                 parts.append(e_state)
                 n_pre = e_state.shape[1]
@@ -845,6 +927,61 @@ class CortexMemory(nn.Module):
                             >= self.e_dropout).to(e_state.dtype)
                     parts[-1] = e_state * keep
                     self._e_dropped = int((keep == 0).sum())
+                # ── J4: THE Z HALF, AS ITS OWN COLUMNS ────────────────────
+                # Appended AFTER the E block (and after E-dropout, which
+                # addresses parts[-1]), so the layout is [E | Z | tokens |
+                # summary] and E-dropout can never reach the Z rows -- the
+                # E-off cell must blank E and LEAVE Z, which is the whole point
+                # of the limb.
+                #
+                # ZEROS, NOT OMISSION, wherever the read is off, and the reason
+                # is geometric rather than aesthetic.  Three conditions land
+                # here: the no-read LIMB (latent_carry_read=false, a training
+                # condition), the 2x2's z_null='off' CELL (`_latent_z_rows`
+                # returns None), and rows the gated ring has not reached yet
+                # (exactly zero already).  Omitting the columns in any of them
+                # would change the sequence length, the position ids and the
+                # activation footprint between limbs and between cells, so a
+                # difference in the numbers could no longer be attributed to
+                # the carry -- and the chunk-1 veto in eval_carry_2x2 would not
+                # catch it, because chunk 1 carries nothing and splices no
+                # columns either way.  Zeros keep one geometry everywhere.
+                # They are also E's OWN null (evals/eval_carry_2x2.null_e) and
+                # E's own treatment of an unwritten ring row, so the two
+                # channels are handled identically and the known imperfection
+                # -- a zero key still scores a mid-range logit and takes ~3-5%
+                # of the softmax mass -- is the one already written down for E,
+                # not a new one.
+                if self.latent_embed is not None:
+                    z_rows = (self._latent_z_rows(e_state)
+                              if self.latent_carry_read else None)
+                    if z_rows is None:
+                        z_rows = torch.zeros_like(e_state)
+                    elif z_rows.shape != e_state.shape:
+                        raise ValueError(
+                            f"carried Z is {tuple(z_rows.shape)} but E is "
+                            f"{tuple(e_state.shape)}.  The two channels share "
+                            "the ring pointer and are spliced as equal blocks; "
+                            "a mismatch means they were merged at different "
+                            "widths.")
+                    if self.latent_read_znorm == "rms":
+                        # SCALE BEFORE ROTATE -- cortex_memory/latent_embed.py.
+                        # Exact-zero rows survive it (rescale_rows clamps the
+                        # divisor), so the nulls above stay exactly zero.
+                        z_rows = rescale_rows(z_rows,
+                                              self.latent_read_znorm_target)
+                    z_emb = self.latent_embed(z_rows.to(input_embeds.dtype))
+                    parts.append(z_emb.to(dtype=input_embeds.dtype))
+                    n_z = parts[-1].shape[1]
+                    # J4's READ-STRENGTH NUMBER, and the only one it has: with
+                    # no gate and no injected delta, the way this read turns
+                    # itself off is the projection shrinking, so the diag
+                    # carries the spliced rows' norm against E's.  Same role as
+                    # J1's read_gate and J3's read_ratio, and read by the same
+                    # collapse rule (evals/score_j1.embed_trajectory).
+                    self._z_embed_norm = float(
+                        parts[-1].detach().float()
+                        .flatten(0, -2).norm(dim=-1).mean())
         parts.append(input_embeds)
 
         if write:
@@ -865,13 +1002,44 @@ class CortexMemory(nn.Module):
                 1, n_sum + 1, device=pos.device, dtype=pos.dtype).unsqueeze(0)
         else:
             sum_pos = pos.new_zeros(pos.shape[0], n_sum)
-        pos = torch.cat([pos.new_zeros(pos.shape[0], n_pre), pos, sum_pos], dim=1)
+        # The Z block sits at position 0 with E's, for E's own reason: it is
+        # at the FRONT, so every real token queries it at a POSITIVE offset
+        # (+1..+S) and never in the negative-offset regime a causal LM has
+        # never trained on.  E's 64 columns already share one position, so
+        # sharing it with Z's 64 adds no new untrained geometry -- and the two
+        # blocks are told apart by CONTENT, which is what the attention reads
+        # them with.  (A distinct position band for Z is a live alternative and
+        # an unmeasured one, exactly as the carry's lack of recency order is
+        # for E; j4_prereg.md S2 records the choice.)
+        pos = torch.cat([pos.new_zeros(pos.shape[0], n_pre + n_z), pos, sum_pos],
+                        dim=1)
         packed = parts[0] if len(parts) == 1 else torch.cat(parts, dim=1)
         # The Z read and the Z write both address the packed layout by column,
         # and iterate_forward does not receive it -- so record it here, in the
         # one function that computes it.
-        self._n_pre, self._n_sum = n_pre, n_sum
-        return packed, pos, n_pre, n_sum
+        #
+        # `_n_pre` STAYS THE E BLOCK ALONE and `n_prefix` (returned) is the
+        # WHOLE prepended width.  They differ only under J4, and the split is
+        # deliberate: the substitution sites address E's columns through
+        # `_n_pre` (latent_init's `s0[:, :n_pre]`, read_into's `x[:, :n_pre]`),
+        # while prefix_unpack and the EOS-mask lift need everything that was
+        # prepended.  Returning the total is what keeps the MODELING FILE
+        # unchanged -- it round-trips `n_prefix` into prefix_unpack as an opaque
+        # count -- and `_n_carry_cols` is that total for in-graft consumers.
+        self._n_pre, self._n_zpre, self._n_sum = n_pre, n_z, n_sum
+        return packed, pos, n_pre + n_z, n_sum
+
+    @property
+    def _n_carry_cols(self) -> int:
+        """Every column `prefix_pack` PREPENDED: E's, plus J4's Z block.
+
+        One name for the total, because three call sites need it and each of
+        them is a silent-wrong-answer site if it uses `_n_pre` instead: the EOS
+        mask lift would be 64 short and raise, and `_latent_state_write`'s
+        `n_real` would be 64 too long and pool 64 columns of the Z block into
+        the 'tokens' write.  Equal to `_n_pre` on every arm before J4.
+        """
+        return int(self._n_pre) + int(self._n_zpre)
 
     def prefix_unpack(self, x: torch.Tensor, n_pre: int, n_sum: int):
         """Split the post-ln_f states back apart.
@@ -962,12 +1130,14 @@ class CortexMemory(nn.Module):
         self._iter_buf:        Optional[torch.Tensor] = None  # [B*S,Ki,D]
         # --- Z channel per-call runtime ---------------------------------
         self._n_pre = self._n_sum = 0     # packed layout, set by prefix_pack
+        self._n_zpre = 0                  # J4's Z columns (0 on every other arm)
         self._z_prev:  Optional[torch.Tensor] = None   # [B,n_sum,D], s_{t-1}
         self._z_tape:  list = []          # index t-1 -> d_t at the summary cols
         self._z_grad:  list = []          # was step t inside the gradient window
         self._z_s0_scale: Optional[float] = None       # ||s0|| per TOKEN (row L2), fp32
         self._z_s0_rms:   Optional[float] = None       # s0 per-ELEMENT rms, fp32
         self._e_carried_norm: Optional[float] = None   # ||E carried row||, fp32
+        self._z_embed_norm: Optional[float] = None    # ||Z spliced row||, J4
         self._z_loop_T:   Optional[int] = None         # T, from latent_init
         self._z_inloop_n: int = 0                      # read_into Z-read count
         self._z_matched_rows: Optional[int] = None     # rows the last matched read took
@@ -1348,7 +1518,16 @@ class CortexMemory(nn.Module):
             # >= 1 always, and `read_into` fires on every one of those steps --
             # so the fraction is 1.0 and that is the whole point of P3.0.  If
             # both sites are on, the read as a whole is live whenever either is.
+            # J4 ('embeds') belongs with the in-loop reads, not with s0: its
+            # columns sit in `input_embeds`, which `core_block_forward` feeds to
+            # `adapter(cat([x, input_embeds]))` on EVERY iteration, so the read
+            # is refreshed inside the gradient window however long the no-grad
+            # prefix is -- the exact structural reason E's read gradient is
+            # ~4e-2 at every split while s0's is 0.0 at any split with n >= 1.
+            # Reporting it as dead (0.0, which is what this returned before the
+            # branch) would put a false number in J4's pre-registration.
             self._z_read_live = (self.latent_reader is not None
+                                 or self.latent_embed is not None
                                  or (self.latent_s0_read
                                      and int(num_steps_no_grad) == 0))
             self._z_read_n += 1
@@ -1509,7 +1688,7 @@ class CortexMemory(nn.Module):
         crm = self._cross_read_mask
         if crm is None:
             return None
-        n_pre, n_sum = self._n_pre, self._n_sum
+        n_pre, n_sum = self._n_carry_cols, self._n_sum
         if crm.shape[1] + n_pre + n_sum != x.shape[1]:
             raise ValueError(
                 f"EOS read mask is {crm.shape[1]} long and the packed sequence "
@@ -1672,7 +1851,8 @@ class CortexMemory(nn.Module):
                 "latent_encoding is a state encoding but the final loop state "
                 "was never recorded: iter_write did not fire.  Same cause as "
                 "the empty-tape error above -- a stale modeling file.")
-        W, n_sum, n_pre = self.prefix.n_vec, self._n_sum, self._n_pre
+        W, n_sum = self.prefix.n_vec, self._n_sum
+        n_pre = self._n_carry_cols          # E's block AND J4's Z block
         if n_sum != W:
             raise RuntimeError(
                 f"{n_sum} summary columns but the buffer writes {W}; the packed "
@@ -1984,6 +2164,12 @@ def reset_cortex_graft_init(model, log=None):
     scratch = getattr(cortex, "latent_scratch", None)
     if scratch is not None:
         fixed += scratch.apply_designed_init()
+    # J4's read projection: step (1) put KAIMING where an IDENTITY belongs,
+    # which is not a no-op but a random rotation of Z at the right scale -- a
+    # control arm wearing the treatment's name, and invisible in the loss.
+    embed = getattr(cortex, "latent_embed", None)
+    if embed is not None:
+        fixed += embed.apply_designed_init()
     # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
     #     some module lacked reset_parameters and slipped through.
     bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]

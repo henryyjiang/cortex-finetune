@@ -276,6 +276,7 @@ def latent_runtime(cortex) -> dict:
         "write_grad_frac": float(cortex.latent_write_grad_frac),
         "tape_len": len(getattr(cortex, "_z_tape", [])),
         "n_pre": int(getattr(cortex, "_n_pre", 0)),
+        "n_zpre": int(getattr(cortex, "_n_zpre", 0)),
         "n_sum": int(getattr(cortex, "_n_sum", 0)),
         "s0_scale": (float(cortex._z_s0_scale)
                      if getattr(cortex, "_z_s0_scale", None) is not None
@@ -302,6 +303,12 @@ def latent_runtime(cortex) -> dict:
         "encoding": str(getattr(cortex, "latent_encoding", "delta")),
         "write_only": bool(getattr(cortex, "latent_write_only", False)),
         "read_znorm": str(getattr(cortex, "latent_read_znorm", "none")),
+        # THE RESCALE TARGET, recorded for the same reason gate_lr_mult is: it
+        # is a CONFIG FLAG and not a stored parameter, so a read-out rebuilt at
+        # another target would score the read at the wrong strength and say
+        # nothing about it.  Under J4 the gap is 171 vs the 3.0 default -- a
+        # factor of 57 -- and pace/j1_readout.sbatch checks this field.
+        "znorm_target": float(getattr(cortex, "latent_read_znorm_target", 0.0)),
         "e_dropout": float(getattr(cortex, "e_dropout", 0.0)),
         "e_dropped": int(getattr(cortex, "_e_dropped", 0)),
         # J3.  With the gate's LR slowed (gate_lr_mult < 1) the gate can no
@@ -321,6 +328,25 @@ def latent_runtime(cortex) -> dict:
         "own_share": (getattr(cortex.latent_reader, "own_share", None)
                       if getattr(cortex, "latent_reader", None) is not None
                       else None),
+        # J4.  There is no gate and no injected delta here -- the read is 64
+        # extra columns of `input_embeds` -- so the way this read turns itself
+        # OFF is the projection shrinking until the pretrained attention stops
+        # scoring those columns.  `z_embed_ratio` is that number, the spliced Z
+        # rows' norm against the E rows they sit beside, and it stands where
+        # J1's `read_gate` and J3's `read_ratio` stand: descriptive, except
+        # beside a positive verdict, where a collapse is an AUDIT
+        # (evals/score_j1.embed_trajectory, READ_COLLAPSE_FRAC).
+        # At step 0 it is ~1.0 by construction (rows rescaled to E's measured
+        # norm, identity projection), so unlike a gate it has no designed
+        # starting value to quote -- the trajectory is the reading.
+        # NO z_ PREFIX HERE: training_diag rewrites every key of this dict as
+        # z_<key>, so "embed_ratio" is the field spelled `z_embed_ratio` in
+        # cortex_diag.jsonl -- which is what evals/score_j1.embed_trajectory
+        # reads, exactly as `read_ratio` here is `z_read_ratio` there.
+        "e_carried_norm": _opt_float(getattr(cortex, "_e_carried_norm", None)),
+        "embed_norm": _opt_float(getattr(cortex, "_z_embed_norm", None)),
+        "embed_ratio": _ratio(getattr(cortex, "_z_embed_norm", None),
+                              getattr(cortex, "_e_carried_norm", None)),
     }
 
 

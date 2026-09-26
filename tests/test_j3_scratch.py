@@ -115,7 +115,7 @@ class TestTheSwitchesRefuseNonsense:
         (dict(latent_s0_read=True), "reads in-loop only"),
         (dict(latent_write_only=True), "latent_carry_read false"),
         (dict(latent_read="xattn", latent_encoding="tokens",
-              latent_carry_read=False), "needs latent_read='scratch'"),
+              latent_carry_read=False), "no-read limb of J3"),
         (dict(latent_carry_read=False, latent_read_scramble=True),
          "duplicate of the no-read limb"),
         (dict(latent_read_gate_lr_mult=0.0), "gate_lr_mult must be"),

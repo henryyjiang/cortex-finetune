@@ -17,6 +17,13 @@
 #   sbatch --dependency=afterany:$R[:$RE] pace/j1_verdict.sbatch
 #   EXPERIMENT=j3 sbatch --dependency=afterany:$R3[:$R3E] pace/j1_verdict.sbatch
 #       (J3, the in-loop scratchpad: same rules, run prefix j3-, ENCODING scratch)
+#   EXPERIMENT=j4 sbatch --dependency=afterany:$R4[:$R4E] pace/j1_verdict.sbatch
+#       (J4, Z as its own input_embeds columns: run prefix j4-, ENCODING endpoint)
+#   EXPERIMENT=j4 E_DROPOUT=0.95 VERDICT_OUT=eval_results/j4_readout/verdict_edrop0.95.json \
+#       sbatch --dependency=afterany:$R4Z pace/j1_verdict.sbatch
+#       (J4's Z-ONLY pair.  VERDICT_OUT is REQUIRED on this pass: without it the
+#        0.95 run would overwrite the 0.25 run's verdict.json, and the two
+#        answers are different experiments on the same main limbs.)
 #
 # afterany, not afterok, ON PURPOSE: a failed read-out task must still produce
 # a verdict that NAMES the missing piece, not a job that never starts.
@@ -36,10 +43,17 @@ EXPERIMENT=${EXPERIMENT:-j1}
 case "$EXPERIMENT" in
     j1) ENCODING=${ENCODING:-tokens} ;;
     j3) ENCODING=${ENCODING:-scratch} ;;
-    *) echo "ERROR: EXPERIMENT must be j1|j3; got '$EXPERIMENT'"; exit 1 ;;
+    j4) ENCODING=${ENCODING:-endpoint} ;;
+    *) echo "ERROR: EXPERIMENT must be j1|j3|j4; got '$EXPERIMENT'"; exit 1 ;;
 esac
 E_DROPOUT=${E_DROPOUT:-0.25}
 OUT_ROOT=${OUT_ROOT:-cortex-retrofit}
+# Where the verdict json lands.  Empty = score_j1's default, <root>/verdict.json.
+# Set it whenever a SECOND E-dropout value is scored against the same main limbs
+# (J4's Z-only pair at 0.95), or the second pass silently replaces the first.
+VERDICT_OUT=${VERDICT_OUT:-}
+OUT_ARG=""
+if [ -n "$VERDICT_OUT" ]; then OUT_ARG="--out $VERDICT_OUT"; fi
 
 mkdir -p logs/${EXPERIMENT}_diag
 for d in $OUT_ROOT/${EXPERIMENT}-a3z-${ENCODING}-* $OUT_ROOT/${EXPERIMENT}-a3z-${ENCODING}-edrop*; do
@@ -50,7 +64,7 @@ ls -la logs/${EXPERIMENT}_diag/ 2>/dev/null
 
 python evals/score_j1.py --experiment "$EXPERIMENT" \
     --root eval_results/${EXPERIMENT}_readout --encoding "$ENCODING" \
-    --edrop "$E_DROPOUT" --runs_root "$OUT_ROOT"
+    --edrop "$E_DROPOUT" --runs_root "$OUT_ROOT" $OUT_ARG
 RC=$?
 echo ""
 echo "Push for the next session:"

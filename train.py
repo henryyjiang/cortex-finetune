@@ -382,6 +382,17 @@ class CLISettings:
             #   latent_scratch_forget_bias the scratchpad's per-iteration fg
             latent_carry_read=True, latent_read_gate_lr_mult=1.0,
             latent_scratch_forget_bias=1.0,
+            # Z ATTEMPT 2 (J4), cortex_memory/latent_embed.py.  NO NEW KEY:
+            # latent_read='embeds' splices the carried Z as its own K columns of
+            # `input_embeds` beside E's, so the base model's OWN pretrained
+            # attention does the reading -- the same path that already reads E
+            # selectively on every loop iteration.  It requires
+            # latent_encoding='endpoint' (D3's vindicated write),
+            # latent_s0_read=false, and latent_read_znorm='rms' with
+            # latent_read_znorm_target at E's MEASURED row norm (~171); the
+            # graft raises on each, because every one of them would otherwise
+            # run a different design under J4's name.  latent_carry_read=false
+            # is J4's no-read limb and splices zeros at the same columns.
             # diag_interval: every N optimizer steps, log the architecture's
             # health (carry rank + per-channel norms, whether either gate has
             # left its exactly-zero init, the Z read/write gradient fractions)
@@ -1161,12 +1172,14 @@ def startup(cfg: CLISettings):
                         if cfg.cortex['latent_read_scramble'] else "")
                      + (",WRITE-ONLY(no-read limb)"
                         if cfg.cortex['latent_write_only'] else "")
-                     + (",CARRY-UNREAD(J3 no-read limb)"
+                     + (",CARRY-UNREAD(no-read limb)"
                         if not cfg.cortex['latent_carry_read'] else "")
                      + (f",gate_lr_mult={cfg.cortex['latent_read_gate_lr_mult']}"
                         if cfg.cortex['latent_read_gate_lr_mult'] != 1.0 else "")
                      + (f",scratch_fb={cfg.cortex['latent_scratch_forget_bias']}"
                         if cfg.cortex['latent_read'] == 'scratch' else "")
+                     + (",EMBEDS(J4: Z as its own input_embeds columns)"
+                        if cfg.cortex['latent_read'] == 'embeds' else "")
                      + f",enc={cfg.cortex['latent_encoding']}"
                      + (f",znorm={cfg.cortex['latent_read_znorm_target']}"
                         if cfg.cortex['latent_read_znorm'] == 'rms' else "")

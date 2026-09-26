@@ -75,6 +75,25 @@ READ_WINDOW = 4
 #: rows paired across limbs / rows requested.  Below this the pairing lost
 #: rows silently and the comparison is not the one registered.
 PAIR_MIN_FRAC = 0.90
+#: J4 ONLY (j4_prereg.md S5), and the reason it exists is new to J4: under
+#: latent_encoding='endpoint' the Z write comes from the SAME summary columns
+#: that produce E, so a carry objective on Z pushes on the very columns E is
+#: read from.  J1's and J3's writes came from different positions and could not
+#: do this.  E's own carry skill drifts 0.37-0.85 nats across ten same-seed
+#: runs, which is more than enough to hide a regression, so the guard is the
+#: OBSERVED BAND and not a tight threshold: one observed spread (0.48) above
+#: the worst run on record (0.85), rounded to 1.20.  A noread limb whose carry
+#: NLL sits above this has lost E, and J4 would be trading E for Z.
+#:
+#: IT IS AN AUDIT LINE, NOT A VETO, and deliberately: E degrading does not make
+#: a NO on the E-off cell wrong (that cell has E off anyway), and it does not
+#: make a positive reading wrong either, since both limbs share the regression.
+#: What it changes is what J4 COSTS, which is a finding and has to be reported
+#: rather than swallowed.
+E_CARRY_MAX = 1.20
+#: The band itself, reported beside the number so the reader can see what the
+#: threshold was derived from rather than taking 1.20 on faith.
+E_CARRY_BAND = (0.37, 0.85)
 #: The no-read limb has no read, so its E1Z0 and E1Z1 cells are the SAME model
 #: and must agree to fp noise.  A larger |Z_main| means it reads something.
 NOREAD_ZMAIN_TOL = 1e-4
@@ -111,18 +130,29 @@ EDROP_TASKS = (
 PACKS = {"carry": CARRY_PACK, "pg19": PG19_PACK}
 
 
-#: Experiments this scorer reads.  J3 (the in-loop scratchpad) runs the SAME
-#: limbs, packs, cells and decision table as J1 -- its launcher and read-out
-#: are pace/j3_joint.sbatch and pace/j1_readout.sbatch EXPERIMENT=j3 -- so the
-#: rules stay one piece of code.  J3's own thresholds, if its pre-registration
-#: adds any, go here as constants BEFORE any J3 number exists.
-EXPERIMENTS = ("j1", "j3")
+#: Experiments this scorer reads.  J3 (the in-loop scratchpad) and J4 (the
+#: carried Z as its own input_embeds columns) run the SAME limbs, packs, cells
+#: and decision table as J1 -- their launchers are pace/j3_joint.sbatch and
+#: pace/j4_joint.sbatch, their read-out is pace/j1_readout.sbatch with
+#: EXPERIMENT=j3|j4 -- so the rules stay one piece of code.  Each design's own
+#: thresholds go here as constants BEFORE any of its numbers exist: J3 added
+#: READ_COLLAPSE_FRAC, J4 adds E_CARRY_MAX.
+#:
+#: WHAT IS DIFFERENT ABOUT J4, and all of it is bookkeeping rather than rules:
+#:   * the encoding is 'endpoint' (--encoding endpoint), so run names read
+#:     j4-a3z-endpoint-<limb>;
+#:   * there is no read GATE and no injected delta, so the collapse rule reads
+#:     `z_embed_ratio` instead (embed_trajectory), at the same fraction;
+#:   * a Z-ONLY limb runs as a second E-dropout pair at --edrop 0.95, scored by
+#:     score_edrop unchanged -- the limbs are still real/noread, so nothing in
+#:     the task list or the decision table moves.
+EXPERIMENTS = ("j1", "j3", "j4")
 
 
 def run_name(limb: str, encoding: str = "tokens", edrop: str = "",
              experiment: str = "j1") -> str:
-    """The TRAINING run's name, exactly as pace/j1_joint.sbatch (j1) and
-    pace/j3_joint.sbatch (j3) build it."""
+    """The TRAINING run's name, exactly as pace/j1_joint.sbatch (j1),
+    pace/j3_joint.sbatch (j3) and pace/j4_joint.sbatch (j4) build it."""
     if experiment not in EXPERIMENTS:
         raise ValueError(f"experiment must be one of {EXPERIMENTS}; got {experiment!r}")
     tag = f"-edrop{edrop}" if edrop else ""
@@ -373,6 +403,87 @@ def read_trajectory(diag_path: str) -> Optional[dict]:
             "collapsed": lof is not None and lof < READ_COLLAPSE_FRAC}
 
 
+def embed_trajectory(diag_path: str) -> Optional[dict]:
+    """J4's read strength: `z_embed_ratio` from a run's cortex_diag.jsonl, or
+    None on a run that never recorded it (every J1 and J3 run).
+
+    J4 HAS NO GATE AND NO INJECTED DELTA.  Its read is 64 extra columns of
+    `input_embeds`, read by the base model's own attention, so the only way the
+    model can turn the read off is to shrink the projection until those columns
+    stop being scored.  `z_embed_ratio` is the spliced Z rows' norm over the E
+    rows' norm at the same splice, which is ~1.0 at init by construction (rows
+    rescaled to E's measured norm, identity projection) -- so unlike a gate
+    there is no designed starting value to compare against and the TRAJECTORY
+    is the whole reading.
+
+    Same shape as `read_trajectory` on purpose, including READ_WINDOW and
+    READ_COLLAPSE_FRAC: this is the same rule ("the read turned itself off")
+    measured in the only place J4 leaves it visible, and inventing a second
+    fraction for it would be a threshold chosen after the design.
+    """
+    if not os.path.exists(diag_path):
+        return None
+    pts = []
+    with open(diag_path, encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            v = r.get("z_embed_ratio")
+            if v is not None:
+                pts.append((int(r.get("step", 0)), float(v)))
+    if not pts:
+        return None
+    pts.sort()
+    w = max(1, min(READ_WINDOW, len(pts) // 2 or 1))
+    head, tail = pts[:w], pts[-w:]
+    first = sum(v for _, v in head) / len(head)
+    last = sum(v for _, v in tail) / len(tail)
+    lof = (last / first) if first else None
+    return {"first_step": head[0][0], "first": first,
+            "last_step": tail[-1][0], "last": last, "window": w,
+            "last_over_first": lof,
+            "collapsed": lof is not None and lof < READ_COLLAPSE_FRAC}
+
+
+def e_health_audit(main_v: dict, edrop_v: Optional[dict]) -> list:
+    """J4 (j4_prereg.md S5): did training a Z carry on E's OWN columns cost E?
+
+    Two readings, and the second is the one that is actually within-model:
+
+      * the noread limb's carry NLL against E_CARRY_MAX.  Between-model (the
+        comparison is to J1's and J3's runs), so the threshold is the observed
+        drift band and not a tight one.
+      * on the E-dropout limbs, `E_margin` -- the real limb's own carry NLL with
+        E blanked minus with E on, Z off in both.  That IS within-model, it is
+        in distribution (the limb trained with E dropped), and it comes free
+        from cells the read-out already runs.  E_margin at or below zero on a
+        limb whose E is supposed to carry the task is the unambiguous version of
+        this finding.
+
+    Audit lines, never vetoes -- see E_CARRY_MAX.
+    """
+    out = []
+    head = main_v.get("noread_carry_nll")
+    if head is not None and head > E_CARRY_MAX:
+        out.append(
+            f"AUDIT (E-health): the noread limb scores carry answers at "
+            f"{head:.4f}, above E_CARRY_MAX {E_CARRY_MAX} -- J1/J3 sat at "
+            f"{E_CARRY_BAND[0]}-{E_CARRY_BAND[1]}.  Under 'endpoint' the Z "
+            f"write shares E's summary columns, so this is the shape a "
+            f"regression in E would take.  J4 may be trading E for Z")
+    m = (edrop_v or {}).get("E_margin")
+    if m is not None and not (m["mean"] > 0 and m["lo"] > 0):
+        out.append(
+            f"AUDIT (E-health): within the real E-dropout limb, E buys "
+            f"{m['mean']:+.4f} [{m['lo']:+.4f}, {m['hi']:+.4f}] on carry "
+            f"answers (E off minus E on, Z off in both).  Not CI-backed above "
+            f"zero: E is not carrying the task in the limb whose E-off cell "
+            f"decides the answer")
+    return out
+
+
 def within_model_audit(main_v: dict) -> list:
     """J3 (j3_prereg.md S4.5).  Z_ADDS_CONTENT is a BETWEEN-limb reading, and
     J1 showed the limbs' E-carry skill can drift 0.26 nats apart along three
@@ -403,12 +514,15 @@ def answer_with_audit(answer: str, audit: list) -> str:
     return f"AUDIT (the table alone would read: {answer})"
 
 
-def audit_reasons(deciding: list, gates: dict, reads: dict) -> list:
+def audit_reasons(deciding: list, gates: dict, reads: dict,
+                  embeds: Optional[dict] = None) -> list:
     """A positive reading beside a read that is OFF on the same limb is a
     contradiction: a read that is off cannot be the one doing the work.  Off =
-    a collapsed gate (GATE_COLLAPSE, J1's rule) or a collapsed effective read
+    a collapsed gate (GATE_COLLAPSE, J1's rule), a collapsed effective read
     strength (READ_COLLAPSE_FRAC, J3's -- the gate can be held open while
-    out_proj closes the read instead)."""
+    out_proj closes the read instead), or, under J4, a collapsed embed ratio
+    (the same fraction: J4 has neither a gate nor an injected delta, so the
+    only way its read turns off is the projection shrinking)."""
     out = []
     for run in deciding:
         g = gates.get(run)
@@ -420,6 +534,11 @@ def audit_reasons(deciding: list, gates: dict, reads: dict) -> list:
             out.append(f"AUDIT: {run} reads positive beside a COLLAPSED read "
                        f"strength (|delta|/|x| x{rt['last_over_first']:.2f} "
                        f"< {READ_COLLAPSE_FRAC})")
+        et = (embeds or {}).get(run)
+        if et is not None and et.get("collapsed"):
+            out.append(f"AUDIT: {run} reads positive beside a COLLAPSED embed "
+                       f"ratio (||Z col||/||E col|| x"
+                       f"{et['last_over_first']:.2f} < {READ_COLLAPSE_FRAC})")
     return out
 
 
@@ -482,6 +601,12 @@ def score_main(root: str, encoding: str, books: Optional[tuple],
                               for v in local.values())
     head = cell_mean(r["noread_carry_off"], "E1Z1")
     out["noread_carry_nll"] = head
+    # J4's E-health reading (j4_prereg.md S5).  The SAME number HEADROOM_MIN
+    # bounds from below, bounded from above: E saturating the task and E having
+    # lost the task are the two ways this one cell stops being informative.
+    out["e_health"] = {"noread_carry_nll": head, "band": list(E_CARRY_BAND),
+                       "max": E_CARRY_MAX,
+                       "degraded": head is not None and head > E_CARRY_MAX}
     d_noread = effect(r["noread_carry_off"], "E1Z1", r["real_carry_off"], "E1Z1",
                       n_boot=n_boot)
     d_donor = effect(r["donor_carry_donor"], "E1Z0", r["real_carry_off"], "E1Z1",
@@ -569,6 +694,13 @@ def score_edrop(root: str, encoding: str, edrop: str, n_boot: int,
     za_off = effect(r["real_carry_off"], "E0Z0", r["real_carry_off"], "E0Z1",
                     n_boot=n_boot)
     out.update(X_noread=x, real_Z_alone_donor=za_donor, real_Z_alone_off=za_off)
+    # J4's WITHIN-MODEL E-health contrast (j4_prereg.md S5), free from cells
+    # this read-out already runs: the real limb's carry NLL with E blanked minus
+    # with E on, Z off in BOTH, so the only thing that changes is E.  Reported
+    # for every experiment -- it costs nothing and it is the number that says
+    # whether the E-off cell is being read on a model whose E still works.
+    out["E_margin"] = effect(r["real_carry_off"], "E0Z0",
+                             r["real_carry_off"], "E1Z0", n_boot=n_boot)
     out["reading"] = edrop_reading(x, za_donor)
     return out
 
@@ -589,13 +721,19 @@ def fmt(e: Optional[dict]) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--experiment", default="j1", choices=EXPERIMENTS,
-                    help="j1 (joint xattn read) or j3 (in-loop scratchpad); "
-                         "sets the run-name prefix and the default --root")
+                    help="j1 (joint xattn read), j3 (in-loop scratchpad) or j4 "
+                         "(Z as its own input_embeds columns); sets the "
+                         "run-name prefix and the default --root")
     ap.add_argument("--root", default="",
                     help="default: eval_results/<experiment>_readout")
-    ap.add_argument("--encoding", default="tokens")
+    ap.add_argument("--encoding", default="",
+                    help="default: 'endpoint' for j4 (D3's vindicated write), "
+                         "'tokens' for j1/j3 -- the encoding each launcher "
+                         "builds its run names with")
     ap.add_argument("--edrop", default="0.25",
-                    help="the E-dropout pair's tag; scored if its results exist")
+                    help="the E-dropout pair's tag; scored if its results "
+                         "exist.  J4's Z-ONLY limb is this same machinery at "
+                         "--edrop 0.95, run as a second pass")
     ap.add_argument("--runs_root", default="cortex-retrofit",
                     help="where the training runs keep cortex_diag.jsonl")
     ap.add_argument("--pg19", default=PG19_PACK,
@@ -606,11 +744,16 @@ def main() -> int:
     a = ap.parse_args()
     exp = a.experiment
     a.root = a.root or f"eval_results/{exp}_readout"
+    # Defaulted here rather than in add_argument so the default can depend on
+    # the experiment: J4's write IS 'endpoint' (the graft refuses anything else
+    # under latent_read='embeds'), and scoring it under 'tokens' would look for
+    # run directories that cannot exist and report every task MISSING.
+    a.encoding = a.encoding or ("endpoint" if exp == "j4" else "tokens")
 
     books = pg19_books(a.pg19) if a.pg19 else None
     main_v = score_main(a.root, a.encoding, books, a.boot, exp)
     edrop_v = score_edrop(a.root, a.encoding, a.edrop, a.boot, exp)
-    gates, reads = {}, {}
+    gates, reads, embeds = {}, {}, {}
     for limb, tag in (("real", ""), ("donor", ""), ("real", a.edrop)):
         run = run_name(limb, a.encoding, tag, exp)
         diag = os.path.join(a.runs_root, run, "cortex_diag.jsonl")
@@ -620,6 +763,9 @@ def main() -> int:
         rt = read_trajectory(diag)
         if rt is not None:
             reads[run] = rt
+        et = embed_trajectory(diag)
+        if et is not None:
+            embeds[run] = et
 
     answer = overall(main_v.get("carry_reading"),
                      edrop_v.get("reading") if edrop_v else None)
@@ -630,7 +776,9 @@ def main() -> int:
         deciding.append(run_name("real", a.encoding, "", exp))
     if edrop_v and edrop_v.get("reading") == "Z_CAN_LEARN":
         deciding.append(run_name("real", a.encoding, a.edrop, exp))
-    audit = audit_reasons(deciding, gates, reads) + within_model_audit(main_v)
+    audit = (audit_reasons(deciding, gates, reads, embeds)
+             + within_model_audit(main_v)
+             + e_health_audit(main_v, edrop_v))
     answer = answer_with_audit(answer, audit)
 
     print("=" * 78)
@@ -646,7 +794,9 @@ def main() -> int:
               f"noread {f4(main_v['local_nll']['noread'])}  "
               f"(learned <= {TASK_LEARNED_LOCAL_MAX:.4f})")
         print(f"    noread carry NLL  {f4(main_v['noread_carry_nll'])}  "
-              f"(no information = {LN10:.4f}; E saturates below {HEADROOM_MIN})")
+              f"(no information = {LN10:.4f}; E saturates below {HEADROOM_MIN}; "
+              f"E-health band {E_CARRY_BAND[0]}-{E_CARRY_BAND[1]}, "
+              f"max {E_CARRY_MAX})")
         c = main_v["carry"]
         print(f"    D_noread          {fmt(c['D_noread'])}")
         print(f"    D_donor           {fmt(c['D_donor'])}")
@@ -673,6 +823,9 @@ def main() -> int:
             print(f"    X_noread          {fmt(edrop_v['X_noread'])}")
             print(f"    real Z_alone donor {fmt(edrop_v['real_Z_alone_donor'])}")
             print(f"    real Z_alone off   {fmt(edrop_v['real_Z_alone_off'])}")
+        if edrop_v.get("E_margin"):
+            print(f"    E_margin (within)  {fmt(edrop_v['E_margin'])}  "
+                  f"(E off minus E on, Z off in both; > 0 = E still carries)")
     for run, g in gates.items():
         print(f"  read gate {run}: {g['first']:.4f} @ {g['first_step']} -> "
               f"{g['last']:.4f} @ {g['last_step']}"
@@ -683,18 +836,30 @@ def main() -> int:
               f"{rt['first_step']} -> {rt['last']:.4f} @ {rt['last_step']}"
               + (f"  (x{lof:.2f})" if lof is not None else "")
               + ("  COLLAPSED" if rt["collapsed"] else ""))
+    for run, et in embeds.items():
+        lof = et["last_over_first"]
+        print(f"  embed ratio {run}: ||Z col||/||E col|| {et['first']:.4f} @ "
+              f"{et['first_step']} -> {et['last']:.4f} @ {et['last_step']}"
+              + (f"  (x{lof:.2f})" if lof is not None else "")
+              + ("  COLLAPSED" if et["collapsed"] else ""))
     for x in audit:
         print(f"  {x}")
     print("-" * 78)
     print(f"  ANSWER: {answer}")
-    rec = {"experiment": exp, "answer": answer, "audit": audit, "main": main_v,
+    # "edrop" KEEPS ITS MEANING (the pair's scored dict): J1's and J3's
+    # recorded verdicts are on disk under that key, and renaming it to add a
+    # scalar beside it would silently break any later reader of those.
+    rec = {"experiment": exp, "encoding": a.encoding, "edrop_tag": a.edrop,
+           "answer": answer, "audit": audit, "main": main_v,
            "edrop": edrop_v, "gates": gates, "read_strength": reads,
+           "embed_ratio": embeds,
            "constants": {"TASK_LEARNED_LOCAL_MAX": TASK_LEARNED_LOCAL_MAX,
                          "MIN_EFFECT_CARRY": MIN_EFFECT_CARRY,
                          "HEADROOM_MIN": HEADROOM_MIN, "LEAK_MARGIN": LEAK_MARGIN,
                          "GATE_COLLAPSE": GATE_COLLAPSE,
                          "READ_COLLAPSE_FRAC": READ_COLLAPSE_FRAC,
-                         "READ_WINDOW": READ_WINDOW,
+                         "READ_WINDOW": READ_WINDOW, "E_CARRY_MAX": E_CARRY_MAX,
+                         "E_CARRY_BAND": list(E_CARRY_BAND),
                          "PAIR_MIN_FRAC": PAIR_MIN_FRAC, "STEP": STEP}}
     out = a.out or os.path.join(a.root, "verdict.json")
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
