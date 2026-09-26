@@ -1,0 +1,29 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-26-2026 19:31:32
+Job ID:    13617586
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j5_joint
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+ERROR: ckpts/olmo8-cortex carries a modeling file without iter_write(x,
+       current_step) -- the Z write would never fire.  Refresh:
+         python tools/prepare_cortex_checkpoint.py --src ckpts/olmo8-cortex --dst ckpts/olmo8-cortex --variant olmo
+         rm -rf $SCRATCH/hf_cache/modules/transformers_modules/olmo8-cortex
+---------------------------------------
+Begin Slurm Epilog: Sep-26-2026 19:31:38
+Job ID:        13617586
+Array Job ID:  13617585_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j5_joint
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=00:00:48,vmem=0,walltime=00:00:06,mem=38852K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-014-2-0
+---------------------------------------

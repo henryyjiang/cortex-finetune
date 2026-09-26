@@ -1,0 +1,30 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-26-2026 19:31:25
+Job ID:    13617579
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j4_price
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== J4 memory price | micro=2 | grad_chunks=4 | window_backward=1 ===
+    packed: 64 E + 64 Z + 512 tokens + 16 summary = 656 columns (E-only: 592)
+NVIDIA H200, 143771 MiB
+ERROR: ckpts/olmo8-cortex carries a modeling file without iter_write(x, current_step)
+       -- this would price a model whose Z write never fires.  Refresh it:
+         python tools/prepare_cortex_checkpoint.py --src ckpts/olmo8-cortex --dst ckpts/olmo8-cortex --variant olmo
+---------------------------------------
+Begin Slurm Epilog: Sep-26-2026 19:31:31
+Job ID:        13617579
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j4_price
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=00:00:48,vmem=0,walltime=00:00:06,mem=39884K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-014-2-0
+---------------------------------------
