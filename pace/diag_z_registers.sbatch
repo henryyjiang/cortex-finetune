@@ -30,6 +30,11 @@
 # Cross-checkpoint table, after all four:
 #   python evals/diag_z_registers.py --summarize eval_results/z3_registers
 #
+# PROBE (b), j4_prereg.md S9.1's redundancy probe -- the one that bounds how a
+# J4 PASS is read.  Same four checkpoints, same capture, one extra flag:
+#   INCREMENTAL=1 sbatch pace/diag_z_registers.sbatch
+# It reports the INCREMENT (registered), resid_frac and E_pca beside D3's table.
+#
 # The graft is built with EXACTLY the read-out's flags (pace/j1_readout.sbatch):
 # the probe reads the writes the trained model makes, so the read that shapes
 # the loop state has to be the trained one -- gate_lr_mult included.
@@ -56,6 +61,13 @@ TOK_POOL=${TOK_POOL:-4}
 GATE_LR_MULT=${GATE_LR_MULT:-0.1}      # J3's trained value (pace/j3_joint.sbatch)
 SCRATCH_FB=${SCRATCH_FB:-1.0}
 BOOT=${BOOT:-2000}
+# Probe (b), the redundancy probe (j4_prereg.md S4.6/S9.1).  INCREMENTAL=1 adds
+# [E, Z_end] vs E alone (paired) and the projected residual, on the SAME capture
+# -- no extra forward pass, a few CPU-minutes of probing.  Off by default so a
+# D3 re-run reproduces the committed numbers exactly.
+INCREMENTAL=${INCREMENTAL:-}
+INC_ARGS=""
+[ -n "$INCREMENTAL" ] && INC_ARGS="--incremental"
 
 TASKS=(
     "j3 scratch real"
@@ -113,7 +125,7 @@ python evals/diag_z_registers.py \
     --model_name "$MODEL" --checkpoint "$CKPT" --data "$DATA" $SETS \
     --n_chunks 8 --T 8 --max_examples "$MAX_EXAMPLES" \
     --tok_rows 64 --tok_pool "$TOK_POOL" --boot "$BOOT" \
-    --dtype float32 --out_dir "$OUT"
+    --dtype float32 --out_dir "$OUT" $INC_ARGS
 RC=$?
 echo ""
 if [ $RC -eq 0 ]; then

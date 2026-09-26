@@ -187,6 +187,237 @@ class TestTheCuts:
         assert want in Z.TRIGGERS
 
 
+# ─── 3b. probe (b), the redundancy probe (j4_prereg.md S4.6) ────────────────
+
+def _planted_pair(kind, n_rows=100, chunks=4, seed=0, d=128, signal=1.0):
+    """E carries a planted register code.  `kind` decides what Z_end is:
+
+      recode  Z_end is a fixed linear re-coding of E, E @ W, and nothing else.
+              This is EXACTLY S4.6's objection ("the same conclusion twice in
+              two coordinate systems") and must read REDUNDANT.
+      extra   the same code plus a second, independent code the probe can only
+              get from Z_end -- must read ADDITIONAL.
+      noisy   an independent noisy view of the same code.  Reads ADDITIONAL,
+              and that is CORRECT: two noisy views of one signal do carry more
+              than one.  It cannot arise between E and Z_end -- E is coda+ln_f
+              applied to Z_end at the same columns, a DETERMINISTIC map, so E
+              holds no noise Z_end does not -- but it is pinned here so nobody
+              later reads "ADDITIONAL" as "statistically independent content".
+      noise   no signal at all -- Z_end is at chance, so Z_END_EMPTY.
+    """
+    g = torch.Generator().manual_seed(seed)
+    n = n_rows * chunks
+    Y = torch.randint(0, 10, (n, Z.N_REGS), generator=g)
+    rows = torch.arange(n_rows).repeat_interleave(chunks)
+    code = torch.nn.functional.one_hot(Y, 10).reshape(n, -1).float()
+    pe = torch.randn(code.shape[1], d, generator=g)
+    E = signal * (code @ pe) + torch.randn(n, d, generator=g)
+    if kind == "recode":
+        W = torch.randn(d, d, generator=g) / d ** 0.5
+        Zf = E @ W
+    elif kind == "noisy":
+        pz = torch.randn(code.shape[1], d, generator=g)
+        Zf = signal * (code @ pz) + torch.randn(n, d, generator=g)
+    elif kind == "extra":
+        # Half the registers are carried ONLY by Z_end.
+        half = code.reshape(n, Z.N_REGS, 10).clone()
+        half[:, : Z.N_REGS // 2] = 0
+        pz = torch.randn(code.shape[1], d, generator=g)
+        Zf = signal * (half.reshape(n, -1) @ pz) + torch.randn(n, d, generator=g)
+    elif kind == "noise":
+        Zf = torch.randn(n, d, generator=g)
+    else:
+        raise AssertionError(kind)
+    return E, Zf, Y, rows
+
+
+def _run_b(kind, **kw):
+    E, Zf, Y, rows = _planted_pair(kind, **kw)
+    dev = torch.device("cpu")
+    samples = [{"row": int(rows[i]), "values": Y[i].tolist(),
+                "cats": ["recent"] * Z.N_REGS,
+                "E": E[i], "Z_end": Zf[i]} for i in range(len(Y))]
+    return Z.report_incremental(samples, dev, 5, 500, 0)
+
+
+class TestProbeB:
+    def test_the_residual_kernel_matches_feature_space(self):
+        """The Gram-space residual is not an approximation: with few enough
+        dims the coefficient matrix can be formed, and the two must agree."""
+        torch.manual_seed(0)
+        dev = torch.device("cpu")
+        n, dc, dx = 40, 7, 5
+        C, X = torch.randn(n, dc), torch.randn(n, dx)
+        tr = torch.zeros(n, dtype=torch.bool)
+        tr[:27] = True
+        Xz, Cz = Z._zs(X, tr, dev).double(), Z._zs(C, tr, dev).double()
+        ti = torch.nonzero(tr)[:, 0]
+        Gc_tt = (Cz @ Cz.T).index_select(0, ti).index_select(1, ti)
+        lam = Z.RESID_LAM_REL * Gc_tt.diagonal().mean()
+        I = torch.eye(len(ti), dtype=torch.float64)
+        B = Cz[tr].T @ torch.linalg.inv(Cz[tr] @ Cz[tr].T + lam * I) @ Xz[tr]
+        R = Xz - Cz @ B
+        want = (R @ R.T) / dx
+        got = Z._resid_kernel(X, C, tr, dev).double()
+        assert (got - want).abs().max() < 1e-3 * want.abs().max()
+
+    def test_the_fit_uses_training_rows_only(self):
+        """Scrambling the TEST rows' features must not move the train block:
+        that is the whole no-leakage claim."""
+        torch.manual_seed(0)
+        dev = torch.device("cpu")
+        n, d = 40, 5
+        C, X = torch.randn(n, 7), torch.randn(n, d)
+        tr = torch.zeros(n, dtype=torch.bool)
+        tr[:27] = True
+        ti = torch.nonzero(tr)[:, 0]
+        blk = lambda K: K.index_select(0, ti).index_select(1, ti)
+        X2 = X.clone()
+        X2[~tr] = torch.randn(int((~tr).sum()), d) * 5
+        a = blk(Z._resid_kernel(X, C, tr, dev))
+        b = blk(Z._resid_kernel(X2, C, tr, dev))
+        assert torch.equal(a, b)
+
+    def test_a_perfect_copy_residualises_to_nothing(self):
+        dev = torch.device("cpu")
+        torch.manual_seed(0)
+        C = torch.randn(40, 7)
+        tr = torch.zeros(40, dtype=torch.bool)
+        tr[:27] = True
+        K = Z._resid_kernel(C, C, tr, dev, k=7)
+        plain = Z._pca_kernel(C, tr, dev, 7)
+        assert float(K.diagonal().mean()) < 1e-6 * float(plain.diagonal().mean())
+
+    def test_kernel_is_unchanged_for_the_D3_path(self):
+        """covar=None must be the D3 code path, or the committed D3 numbers
+        stop being reproducible."""
+        X, Y, rows = _planted(signal=1.0, d=64, n_rows=40)
+        dev = torch.device("cpu")
+        a = Z.probe(X, Y, rows, dev, n_folds=5)
+        b = Z.probe(X, Y, rows, dev, n_folds=5, covar=None)
+        assert torch.equal(a["pred"], b["pred"])
+
+    def test_the_pca_residual_cancels_a_linear_recoding(self):
+        """A projection, not a shrinkage: if X lies in C's retained subspace the
+        residual is ~0, so a re-coded copy cannot decode."""
+        torch.manual_seed(0)
+        dev = torch.device("cpu")
+        n, d = 60, 12
+        C = torch.randn(n, d)
+        W = torch.randn(d, d) / d ** 0.5
+        tr = torch.zeros(n, dtype=torch.bool)
+        tr[:40] = True
+        K = Z._resid_kernel(C @ W, C, tr, dev, k=d)
+        assert float(K.diagonal().mean()) < 1e-6 * float(
+            Z._pca_kernel(C @ W, tr, dev, d).diagonal().mean())
+
+    def test_the_pca_reduction_is_lossless_at_full_rank(self):
+        """The reduction is a rotation, and the linear kernel is invariant to
+        one: at k >= the features' rank the PCA probe must reproduce the full
+        probe exactly.  So E_pca below E's margin means k was too small -- which
+        is what pca_retains_E reports -- and never an artefact of reducing."""
+        dev = torch.device("cpu")
+        X, Y, rows = _planted(signal=1.0, d=64, n_rows=60)   # rank 64 < n_tr
+        full = Z.probe(X, Y, rows, dev, n_folds=5)
+        red = Z.probe(X, Y, rows, dev, n_folds=5, pca_k=64)
+        assert float((full["pred"] == red["pred"]).double().mean()) > 0.99
+
+    def test_too_few_components_lose_signal_and_the_control_says_so(self):
+        dev = torch.device("cpu")
+        X, Y, rows = _planted(signal=1.0, d=512, n_rows=60)
+        full = float((Z.probe(X, Y, rows, dev, n_folds=5)["pred"] == Y).double().mean())
+        few = float((Z.probe(X, Y, rows, dev, n_folds=5, pca_k=16)["pred"] == Y).double().mean())
+        assert few < full - 0.1
+
+    def test_resid_frac_separates_a_recoding_from_new_directions(self):
+        """The residual's honest quantity: a linear re-coding keeps ~none of its
+        own variance, independent features keep most of it."""
+        torch.manual_seed(0)
+        dev = torch.device("cpu")
+        n, d = 200, 32
+        rows = torch.arange(50).repeat_interleave(4)
+        C = torch.randn(n, d)
+        W = torch.randn(d, d) / d ** 0.5
+        recode = Z.resid_frac(C @ W, C, rows, dev, 5, d)
+        indep = Z.resid_frac(torch.randn(n, d), C, rows, dev, 5, d)
+        assert recode < Z.RESID_FRAC_MIN
+        assert indep > 0.5
+
+    def test_a_recoded_copy_reads_redundant(self):
+        """S4.6's objection, planted: Z_end carries E's content in another
+        coordinate system and nothing more.  It decodes well on its own, and
+        adds nothing over E."""
+        inc = _run_b("recode")
+        assert inc["increment"]["all"]["lo"] <= 0
+        # the residual keeps no direction of its own, so it is not readable --
+        # which is the sharpest REDUNDANT there is
+        assert inc["resid_frac"] < Z.RESID_FRAC_MIN
+        assert not inc["resid_readable"]
+        # ... and E is not the problem: it decodes, before and after reduction
+        assert inc["E"]["all"]["margin"] > 0.3 and inc["pca_retains_E"]
+
+    def test_an_independently_noisy_view_reads_additional(self):
+        """STATED LIMIT, not a defect.  Two independent noisy views of one code
+        do carry more than one, so this reads ADDITIONAL.  Between E and Z_end
+        it cannot happen (E is a deterministic function of Z_end), which is why
+        ADDITIONAL there means "the coda made content linearly inaccessible
+        that Z_end still exposes", not "independent content"."""
+        inc = _run_b("noisy")
+        assert inc["increment"]["all"]["lo"] > 0
+
+    def test_independent_content_reads_additional(self):
+        inc = _run_b("extra")
+        assert inc["increment"]["all"]["lo"] > 0
+        assert inc["increment_share"] > 0
+        # here the residual IS readable, and it agrees
+        assert inc["resid_frac"] > Z.RESID_FRAC_MIN and inc["resid_readable"]
+        assert inc["Z_end_resid_E"]["all"]["lo"] > 0
+        assert not inc["residual_disagrees"]
+
+    def test_noise_adds_nothing(self):
+        inc = _run_b("noise")
+        assert inc["increment"]["all"]["lo"] <= 0
+
+    def test_boot_delta_arithmetic_and_empty_mask(self):
+        a = torch.tensor([[True, True], [True, False]])
+        b = torch.tensor([[True, False], [False, False]])
+        rows = torch.tensor([0, 1])
+        d = Z.boot_delta(a, b, rows, torch.ones_like(a), 200, 0)
+        assert d["delta"] == 0.5 and d["cells"] == 4
+        assert Z.boot_delta(a, b, rows, torch.zeros_like(a), 200, 0) is None
+
+    def test_boot_delta_is_paired(self):
+        """Identical encodings have a ZERO-WIDTH interval when paired; two
+        unpaired bootstraps of the same margin would not."""
+        torch.manual_seed(0)
+        c = torch.rand(60, 4) > 0.5
+        rows = torch.arange(20).repeat_interleave(3)
+        d = Z.boot_delta(c, c, rows, torch.ones_like(c), 300, 0)
+        assert d["delta"] == 0 and d["lo"] == 0 and d["hi"] == 0
+
+    @pytest.mark.parametrize("e, zend_lo, inc_lo, res_lo, want", [
+        (0.40, 0.20, +0.02, +0.02, "ADDITIONAL"),
+        (0.40, 0.20, -0.01, -0.01, "REDUNDANT"),
+        # the RESIDUAL never moves the label -- the increment is registered
+        (0.40, 0.20, +0.02, -0.01, "ADDITIONAL"),
+        (0.40, 0.20, -0.01, +0.02, "REDUNDANT"),
+        (0.40, -0.01, +0.02, +0.02, "Z_END_EMPTY"),
+        (0.05, 0.20, +0.02, +0.02, "PROBE_BROKEN"),
+    ])
+    def test_redundancy_reading(self, e, zend_lo, inc_lo, res_lo, want):
+        rep = {"write": {"E": {"all": _m(e, e - 0.03)},
+                         "Z_end": {"all": _m(0.20, zend_lo)}},
+               "incremental": {"increment": {"all": {"delta": inc_lo + 0.01,
+                                                     "lo": inc_lo, "hi": 0.1}},
+                               "Z_end_resid_E": {"all": _m(0.05, res_lo)}}}
+        assert Z.redundancy(rep) == want
+        assert want in Z.TRIGGERS_B
+
+    def test_redundancy_is_not_run_without_the_block(self):
+        assert Z.redundancy({"write": {"E": {"all": _m(0.4, 0.37)}}}) == "NOT_RUN"
+        assert "NOT_RUN" in Z.TRIGGERS_B
+
+
 # ─── 4. the capture, end to end on a tiny model ─────────────────────────────
 
 NV, K, CL, D, T = 4, 16, 16, 64, 4
@@ -274,6 +505,14 @@ class TestTheLauncher:
     def test_the_window_matches_the_write(self):
         s = self._src()
         assert "--tok_rows 64 --tok_pool \"$TOK_POOL\"" in s and "TOK_POOL=${TOK_POOL:-4}" in s
+
+    def test_probe_b_is_opt_in_and_wired(self):
+        s = self._src()
+        assert "INCREMENTAL=${INCREMENTAL:-}" in s      # off by default
+        assert '[ -n "$INCREMENTAL" ] && INC_ARGS="--incremental"' in s
+        # the real invocation is the LAST occurrence; the earlier ones are the
+        # usage comments at the top of the file
+        assert "$INC_ARGS" in s.split("python evals/diag_z_registers.py")[-1]
 
     def test_no_var_assignment_prefix_on_the_python_line(self):
         for line in self._src().splitlines():
