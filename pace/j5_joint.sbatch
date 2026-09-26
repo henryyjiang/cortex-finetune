@@ -76,6 +76,17 @@
 #      --mean_recurrence_schedule.turn_on false
 #      --override_mean_recurrence 8  --override_mean_backprop_depth 8
 #    which is the (8, 8) J4 actually ran at 91552 once its ramp had finished.
+#    `max_mean_rec` IS SET TOO, and it is inert but not pointless.  train.py's
+#    frozen-write warning (train.py:608) reads mean_recurrence_schedule's
+#    max_mean_rec WITHOUT consulting turn_on, so at its default of 32 it
+#    computed 32 - 8 = 24 >= 9 and warned that the whole write band 2..9 was
+#    frozen -- on the enorm job (13617827), where the effective recurrence was
+#    8 and nothing was frozen.  A FALSE ALARM ABOUT THE EXACT FAILURE MODE THIS
+#    ARM IS ABOUT is worse than no alarm: it would sit in all three training
+#    logs and a later reader would be right to believe it.  Setting the dead
+#    field to agree with the live one makes the warning correct.  The scheduler
+#    is still never built (train.py:1722 gates on turn_on), so this changes no
+#    numbers -- confirmed by the enorm run's `override mean_recurrence 8 -> 8`.
 # 4. THE LR WARMUP IS ABSOLUTE, 250 UPDATES.  Same reason: entering the P2.3
 #    schedule at step 0 rather than 91552 would spend warmup=0.0025 x 305176 =
 #    763 of 4,000 updates below peak LR, a 19% budget tax the J arms never paid.
@@ -266,6 +277,7 @@ python train.py \
     --save_n_mins_before_timeout 20 \
     --seed 74 \
     --mean_recurrence_schedule.turn_on false \
+    --mean_recurrence_schedule.max_mean_rec $MEAN_REC \
     --override_mean_recurrence $MEAN_REC \
     --override_mean_backprop_depth $BACKPROP_DEPTH \
     --cortex.use_memory true \

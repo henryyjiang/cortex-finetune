@@ -342,6 +342,16 @@ class TestTheJointLauncher:
         assert "--override_mean_backprop_depth $BACKPROP_DEPTH" in s
         assert "MEAN_REC=${MEAN_REC:-8}" in s
 
+    def test_the_dead_ramp_field_agrees_with_the_live_depth(self):
+        # train.py:608's frozen-write warning reads
+        # mean_recurrence_schedule['max_mean_rec'] WITHOUT consulting turn_on, so
+        # at its default of 32 it warned that the write band 2..9 was frozen on a
+        # run whose effective recurrence was 8 (job 13617827).  A false alarm
+        # about the exact failure mode this arm is about would sit in every
+        # training log and a later reader would be right to believe it.
+        s = _read(self.SB)
+        assert "--mean_recurrence_schedule.max_mean_rec $MEAN_REC" in s
+
     def test_the_three_limbs_are_the_three_buffer_contents(self):
         s = _read(self.SB)
         assert "LIMBS=(zonly eonly both)" in s
