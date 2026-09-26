@@ -405,6 +405,22 @@ class CortexMemory(nn.Module):
         #                      the only carry on those chunks and an E-off eval
         #                      cell is not out of distribution.  The stored
         #                      buffer is untouched; only the read is blanked.
+        #   e_carry_read       THE Z-ONLY ARM (false).  The spliced E rows are
+        #                      ZEROS on every sequence, every chunk, in TRAINING
+        #                      AND IN EVAL -- so Z is not merely the only carry
+        #                      on a sampled 5% of rows (what e_dropout 0.25
+        #                      reaches) but the only carry that has ever
+        #                      existed.  The exact mirror of
+        #                      latent_carry_read=false for Z, and it is NOT
+        #                      e_dropout=1.0: that bound stays at [0, 1) because
+        #                      a dropout of 1 is a different arm written as a
+        #                      rate, and nothing downstream could tell them
+        #                      apart.  The buffer still MERGES E normally -- the
+        #                      write path keeps training and the ring keeps its
+        #                      geometry -- only the read is zeroed, which is
+        #                      what makes this comparable to J4's limbs rather
+        #                      than a different architecture.  Zeros, not
+        #                      omission: see the Z block's own note below.
         self.latent_encoding = str(
             getattr(config, "latent_encoding", "delta") or "delta")
         _pool = getattr(config, "latent_tok_pool", 4)
@@ -416,6 +432,10 @@ class CortexMemory(nn.Module):
             getattr(config, "latent_read_znorm_target", 3.0) or 3.0)
         self.latent_write_only = bool(getattr(config, "latent_write_only", False))
         self.e_dropout = float(getattr(config, "e_dropout", 0.0) or 0.0)
+        # No `or True`: that would turn an explicit False into True (the trap
+        # latent_tok_pool's `or 4` already sprang once, a few lines up).
+        _ecr = getattr(config, "e_carry_read", True)
+        self.e_carry_read = bool(True if _ecr is None else _ecr)
         # Z ATTEMPT 2 (J3) -- the in-loop scratchpad, cortex_memory/scratchpad.py.
         #
         #   latent_read='scratch'      a per-position gated latent state,
@@ -601,6 +621,28 @@ class CortexMemory(nn.Module):
             raise ValueError(
                 "cortex.e_dropout blanks the carried E rows of the prefix "
                 "splice; without --cortex.prefix_memory there are none.")
+        if not self.e_carry_read and not pmode:
+            raise ValueError(
+                "cortex.e_carry_read=false zeros the carried E rows of the "
+                "prefix splice; without --cortex.prefix_memory there are none. "
+                "A Z-only arm still needs the buffer -- Z rides in its carried "
+                "columns (see the latent_carry check below).")
+        if not self.e_carry_read and self.e_dropout > 0:
+            raise ValueError(
+                "cortex.e_carry_read=false with cortex.e_dropout > 0 drops rows "
+                "from a block that is already zeros.  The diag row would report "
+                "an E-dropout rate for an arm that never carried E, and a "
+                "read-out would score it as the dropout limb.  Pick one: "
+                "e_dropout for the sampled-pressure limbs, e_carry_read=false "
+                "for the Z-only arm.")
+        if not self.e_carry_read and not self.latent_carry:
+            raise ValueError(
+                "cortex.e_carry_read=false without --cortex.latent_carry true "
+                "zeros E's read and provides no Z, so the prefix buffer is "
+                "carried, merged and read by nothing -- the cost of memory with "
+                "none of it, which is almost certainly not the arm meant.  For "
+                "a no-carry floor use the 2x2's own cells at eval time; they "
+                "cost no training.  State the arm.")
         if self.latent_read_scramble and self.latent_read == "none":
             raise ValueError(
                 "cortex.latent_read_scramble with latent_read='none' scrambles "
@@ -921,12 +963,31 @@ class CortexMemory(nn.Module):
                 # already holds the tensor, and rebinding the local left the
                 # model reading full E while _e_dropped reported the drop
                 # (caught by test_j1_joint before it ever trained).
-                if self.training and self.e_dropout > 0:
+                # THE Z-ONLY ARM comes FIRST and the dropout is an `elif`, so
+                # the exclusivity the constructor refuses is also structural
+                # here: there is no order of flags that zeros E twice or drops
+                # rows from zeros.  Not gated on self.training -- that is the
+                # whole difference from e_dropout.  parts[-1] is REPLACED rather
+                # than e_state rebound, for the reason the dropout note below
+                # gives (rebinding left the model reading full E).
+                if not self.e_carry_read:
+                    parts[-1] = torch.zeros_like(e_state)
+                elif self.training and self.e_dropout > 0:
                     keep = (torch.rand(e_state.shape[0], 1, 1,
                                        device=e_state.device)
                             >= self.e_dropout).to(e_state.dtype)
                     parts[-1] = e_state * keep
                     self._e_dropped = int((keep == 0).sum())
+                # WHAT WAS ACTUALLY SPLICED, measured rather than asserted --
+                # the same instrument that let J4's no-read limb be confirmed by
+                # z_embed_ratio == 0 instead of by reading the flag back.  Zero
+                # here IS the proof that E is off; beside _e_carried_norm above
+                # it also makes a dropout visible as a fraction.  _e_carried_norm
+                # stays the PRE-blank norm on purpose: z_embed_ratio divides by
+                # it, so measuring it after the blank would make J4's only
+                # read-strength number undefined on exactly this arm.
+                self._e_spliced_norm = float(
+                    parts[-1].detach().float().flatten(0, -2).norm(dim=-1).mean())
                 # ── J4: THE Z HALF, AS ITS OWN COLUMNS ────────────────────
                 # Appended AFTER the E block (and after E-dropout, which
                 # addresses parts[-1]), so the layout is [E | Z | tokens |

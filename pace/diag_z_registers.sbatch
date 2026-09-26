@@ -35,6 +35,16 @@
 #   INCREMENTAL=1 sbatch pace/diag_z_registers.sbatch
 # It reports the INCREMENT (registered), resid_frac and E_pca beside D3's table.
 #
+# D3 ON THE J4 CHECKPOINTS -- never run, and the reason it matters now: D3's
+# four tasks are the j1/j3 (tokens/scratch) ones, whose WRITE was already dead,
+# so every Z_ring ~ 0 on record says nothing about a carried Z_end.  These two
+# tasks are the first measurement of the ring tax on Z_end (j4_prereg.md S8
+# lists it as unmeasured), which is what separates J4's NO into "the content did
+# not survive the ring" and "the read could not use it":
+#   INCREMENTAL=1 sbatch --array=5-6 pace/diag_z_registers.sbatch
+# On an 'endpoint' checkpoint the capture's own self-check requires Z_write ==
+# Z_end, so a mis-wired capture refuses instead of reporting.
+#
 # PROBE (c), j4_prereg.md S9.1's heal parent -- the clean NO-J-TRAINING baseline
 # for Z_end, the one array task that says whether Z_end's register content (and
 # probe (b)'s ~1% increment) is anything J training created:
@@ -65,6 +75,13 @@ STEP=${STEP:-93552}
 MAX_EXAMPLES=${MAX_EXAMPLES:-300}
 READ_HEADS=${READ_HEADS:-8}
 ZNORM_TARGET=${ZNORM_TARGET:-3.0}
+# J4 trained at a DIFFERENT read scale and it is not interchangeable with the
+# line above: pace/j4_joint.sbatch sets 136.0, ||E||'s MEASURED carried row norm
+# on the heal branch (j4_prereg.md S1.1, after the smoke corrected 171 -> 136).
+# Building a J4 graft at 3.0 would score the read at 1/45th of the strength the
+# checkpoint trained with, which is the error class this file's header warns
+# about two paragraphs down.  The j4 tasks check it against the run's diag rows.
+ZNORM_TARGET_J4=${ZNORM_TARGET_J4:-136.0}
 TOK_POOL=${TOK_POOL:-4}
 GATE_LR_MULT=${GATE_LR_MULT:-0.1}      # J3's trained value (pace/j3_joint.sbatch)
 SCRATCH_FB=${SCRATCH_FB:-1.0}
@@ -83,6 +100,8 @@ TASKS=(
     "j1 tokens noread"
     "j3 scratch edrop0.25-real"
     "heal tokens parent"
+    "j4 endpoint real"
+    "j4 endpoint noread"
 )
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 if [ "$IDX" -ge "${#TASKS[@]}" ]; then echo "no task at index $IDX (use --array=0-3)"; exit 0; fi
@@ -117,6 +136,19 @@ case "$EXP:$LIMB" in
     j1:real)    SETS="$SETS --set latent_read=xattn --set latent_read_heads=$READ_HEADS"
                 SETS="$SETS --set latent_read_znorm=rms --set latent_read_znorm_target=$ZNORM_TARGET" ;;
     j1:noread)  SETS="$SETS --set latent_read=none --set latent_write_only=true" ;;
+    j4:real)    # J4's OWN read: 64 extra input_embeds columns, no gate, no
+                # xattn module (pace/j4_joint.sbatch:225).  ZNORM_TARGET_J4, not
+                # ZNORM_TARGET -- see the note beside it.
+                SETS="$SETS --set latent_read=embeds"
+                SETS="$SETS --set latent_read_znorm=rms"
+                SETS="$SETS --set latent_read_znorm_target=$ZNORM_TARGET_J4" ;;
+    j4:noread)  # J4's no-read limb SPLICES ZEROS rather than omitting the
+                # columns (j4_prereg.md S1.3), which is latent_carry_read=false
+                # and NOT latent_write_only -- the columns stay, the content goes.
+                SETS="$SETS --set latent_read=embeds"
+                SETS="$SETS --set latent_read_znorm=rms"
+                SETS="$SETS --set latent_read_znorm_target=$ZNORM_TARGET_J4"
+                SETS="$SETS --set latent_carry_read=false" ;;
     heal:parent) # (c): the parent has no trained read, so it must read NOTHING --
                 # write_only exercises no untrained module.  Z_end and E are pure
                 # forward properties of the branch; the encoding only names the
@@ -133,6 +165,22 @@ echo "    out:        $OUT"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 [ -f "$CKPT/chkpt.pt" ] || { echo "ERROR: no $CKPT/chkpt.pt"; exit 1; }
 [ -d "$DATA" ] || { echo "ERROR: no such pack: $DATA"; exit 1; }
+if [ "$EXP" = "j4" ]; then
+    # The same guard as j3's below, on the flag that matters for J4: the read
+    # scale is a CONFIG value and not a stored parameter, so a graft rebuilt at
+    # the wrong target scores the read at the wrong strength and reports it as a
+    # property of the checkpoint (cortex_memory/health.py, "znorm_target").
+    DIAG=$OUT_ROOT/$RUN/cortex_diag.jsonl
+    [ -f "$DIAG" ] || { echo "ERROR: no $DIAG -- cannot confirm the trained znorm_target"; exit 1; }
+    python - "$DIAG" "$ZNORM_TARGET_J4" <<'ZN' || exit 1
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+got = {r.get("z_znorm_target") for r in rows} - {None}
+if got != {float(sys.argv[2])}:
+    sys.exit(f"ERROR: the run trained with znorm_target {sorted(got)}, not {sys.argv[2]}")
+print(f"    znorm_target {sys.argv[2]} matches the run's diag rows")
+ZN
+fi
 if [ "$EXP" = "j3" ]; then
     # Same guard as the read-out: the stored gate is gate/mult.
     DIAG=$OUT_ROOT/$RUN/cortex_diag.jsonl

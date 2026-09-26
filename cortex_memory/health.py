@@ -311,6 +311,16 @@ def latent_runtime(cortex) -> dict:
         "znorm_target": float(getattr(cortex, "latent_read_znorm_target", 0.0)),
         "e_dropout": float(getattr(cortex, "e_dropout", 0.0)),
         "e_dropped": int(getattr(cortex, "_e_dropped", 0)),
+        # THE Z-ONLY ARM, recorded for the reason znorm_target is recorded below:
+        # it is a CONFIG FLAG and not a stored parameter, so a read-out rebuilt
+        # with E on would splice real E rows into an arm that never trained with
+        # any and report the result as the arm's.  `e_spliced_norm` is the
+        # MEASURED half of the same fact -- 0.0 proves E was off, the way
+        # z_embed_ratio == 0 proved J4's no-read limb read nothing -- and it sits
+        # beside `e_carried_norm`, which stays the PRE-blank norm because
+        # embed_ratio divides by it.
+        "e_carry_read": bool(getattr(cortex, "e_carry_read", True)),
+        "e_spliced_norm": _opt_float(getattr(cortex, "_e_spliced_norm", None)),
         # J3.  With the gate's LR slowed (gate_lr_mult < 1) the gate can no
         # longer close the read -- but out_proj / v_proj still can.  So the
         # READ STRENGTH is the injected delta against the field it lands in,

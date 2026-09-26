@@ -34,7 +34,10 @@ ENCODINGS, per (row, chunk), each [W, D] and probed flattened:
     Z_write  the Z write this checkpoint was trained with (merge's new_latent):
              J1 = tokens (s_T pooled), J3 = scratch (m_T pooled)
     Z_tok    s_T at the last `tok_rows` real tokens, pooled by `tok_pool`
-    Z_end    s_T at the SUMMARY columns -- the latent twin of E, never yet carried
+    Z_end    s_T at the SUMMARY columns -- the latent twin of E.  On a J4
+             ('endpoint') checkpoint this IS the write, and Z_ring is then the
+             FIRST measurement of a carried Z_end -- the ring tax j4_prereg.md
+             S8 lists as unmeasured.  On j1/j3 it was never carried.
 and, from chunk RING_FROM_CHUNK on (the ring is full), the carried state the
 NEXT chunk reads:
     E_ring   the ring's E half [K, D]
@@ -289,7 +292,8 @@ def collect(model, cortex, rows: list, pt: dict, n_chunks: int, num_steps,
     from diag_z_content import capture
     D = int(cortex.prefix.hidden_size)
     enc = str(getattr(cortex, "latent_encoding", "delta"))
-    samples, check = [], {"tokens_write_equals_z_tok": None}
+    samples, check = [], {"tokens_write_equals_z_tok": None,
+                          "endpoint_write_equals_z_end": None}
     for n_done, (ri, ids, dep) in enumerate(rows):
         updates = replay(ids, pt)
         if dep is not None:
@@ -311,6 +315,21 @@ def collect(model, cortex, rows: list, pt: dict, n_chunks: int, num_steps,
                         "must equal s_T pooled at the last tok_rows tokens, and "
                         "it does not -- the capture is not reading the columns "
                         "the write reads (check --tok_rows/--tok_pool).")
+            if enc == "endpoint" and check["endpoint_write_equals_z_end"] is None:
+                # The mirror of the 'tokens' check above, for J4's encoding: an
+                # endpoint write IS s_T at the summary columns, so the capture
+                # must read the same columns the write reads.  Z_end is computed
+                # here independently of the write, so this is a real check and
+                # not a tautology -- it fails if either side moves.
+                ok = bool(torch.allclose(a["Z_delta"], a["Z_end"],
+                                         atol=1e-4, rtol=1e-4))
+                check["endpoint_write_equals_z_end"] = ok
+                if not ok:
+                    raise RuntimeError(
+                        "self-check failed: on an 'endpoint' checkpoint the Z "
+                        "write must equal s_T at the summary columns, and it "
+                        "does not -- the capture is not reading the columns the "
+                        "write reads (cortex_graft.py:1680, x[:, -n_sum:]).")
             values, cats = targets[i]
             rec = {"row": ri, "chunk": i, "values": values, "cats": cats,
                    "E": a["E"].half(), "Z_write": a["Z_delta"].half(),

@@ -367,6 +367,93 @@ class TestTheLimbs:
         assert abs(g._e_carried_norm - E_NORM) < 1.0
 
 
+# ─── 4b. the Z-only arm (e_carry_read=false) ─────────────────────────────────
+
+class TestTheZOnlyArm:
+    """`e_carry_read=false`: E's spliced rows are zeros ALWAYS, so Z is not the
+    only carry on a sampled ~5% of rows (e_dropout 0.25's reach) but the only
+    carry that ever existed.  The mirror of latent_carry_read=false for Z.
+
+    The buffer is untouched, exactly as under e_dropout: this addresses the
+    splice list's last entry, and the merge downstream still sees the real carry.
+    """
+
+    @pytest.mark.parametrize("mode", ["train", "eval"])
+    def test_e_is_zeros_and_z_survives_in_both_modes(self, mode):
+        """THE difference from e_dropout, which is `self.training`-gated: an arm
+        that trains without E must also be EVALUATED without it, or every cell
+        is out of distribution in the direction that flatters the channel."""
+        g = _cortex(e_carry_read=False)
+        g.train() if mode == "train" else g.eval()
+        torch.manual_seed(0)
+        p, _, _, _, _ = _pack(g, _carry())
+        assert float(_e_block(p).abs().sum()) == 0.0
+        assert float(_z_block(p).abs().sum()) > 0.0
+
+    def test_the_default_still_splices_e(self):
+        g = _cortex()
+        torch.manual_seed(0)
+        p, _, _, _, _ = _pack(g, _carry())
+        assert float(_e_block(p).abs().sum()) > 0.0
+        assert g.e_carry_read is True
+
+    def test_an_explicit_false_survives_the_getattr_default(self):
+        """`getattr(config, 'e_carry_read', True) or True` would turn the arm
+        back on -- the trap latent_tok_pool's `or 4` sprang once already."""
+        assert _cortex(e_carry_read=False).e_carry_read is False
+
+    def test_the_carried_norm_stays_the_pre_blank_row(self):
+        """z_embed_ratio = z_embed_norm / e_carried_norm.  Measuring E's norm
+        after the blank would make J4's ONLY read-strength number 0/0 on exactly
+        the arm that needs it most."""
+        g = _cortex(e_carry_read=False)
+        torch.manual_seed(0)
+        _pack(g, _carry())
+        assert abs(g._e_carried_norm - E_NORM) < 1.0
+
+    def test_the_spliced_norm_is_the_measured_proof(self):
+        """0.0 proves E is off the way z_embed_ratio == 0 proved the no-read limb
+        read nothing -- a measurement, not the flag read back."""
+        off = _cortex(e_carry_read=False)
+        torch.manual_seed(0)
+        _pack(off, _carry())
+        assert off._e_spliced_norm == 0.0
+        on = _cortex()
+        torch.manual_seed(0)
+        _pack(on, _carry())
+        assert abs(on._e_spliced_norm - E_NORM) < 1.0
+
+    def test_it_refuses_e_dropout_beside_it(self):
+        with pytest.raises(ValueError, match="already zeros"):
+            _cortex(e_carry_read=False, e_dropout=0.25)
+
+    def test_it_refuses_without_a_z_channel(self):
+        """Reached with the encoding left at its default: `latent_encoding !=
+        delta` already refuses a missing latent_carry (line 537), so the path
+        this guard covers is the one where E is turned off and the Z channel was
+        never turned ON -- a buffer carried, merged and read by nothing."""
+        with pytest.raises(ValueError, match="none of it"):
+            _cortex(e_carry_read=False, latent_carry=False,
+                    latent_encoding="delta", latent_read="none",
+                    latent_read_znorm="none", latent_s0_read=True)
+
+    def test_it_refuses_without_a_prefix_buffer(self):
+        with pytest.raises(ValueError, match="there are none"):
+            _cortex(e_carry_read=False, prefix_memory="")
+
+    def test_the_diag_row_carries_the_flag_and_the_measurement(self):
+        """A read-out rebuilt with E on would splice real rows into an arm that
+        never had any, so the checkpoint has to prove which arm trained."""
+        from cortex_memory.health import latent_runtime
+        g = _cortex(e_carry_read=False)
+        torch.manual_seed(0)
+        _pack(g, _carry())
+        row = latent_runtime(g)
+        assert row["e_carry_read"] is False
+        assert row["e_spliced_norm"] == 0.0
+        assert abs(row["e_carried_norm"] - E_NORM) < 1.0
+
+
 # ─── 5. the gradient property ───────────────────────────────────────────────
 
 class TestTheGradient:

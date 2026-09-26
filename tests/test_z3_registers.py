@@ -517,6 +517,12 @@ def _fstring_brace_hazards(path):
 
 class TestClusterPython:
     def test_no_312_only_fstrings_in_the_probe(self):
+        # NOT cortex_graft.py or cortex_memory/health.py, though the Z-only arm
+        # edits both: _fstring_brace_hazards scans raw lines, so prose in a
+        # COMMENT trips it -- "rm -rf'd" at cortex_graft.py:739 reads as an `rf'`
+        # prefix opening a literal that never closes.  Those two files are
+        # guarded by compiling them under a real 3.11 instead, which is the
+        # general check anyway; widening this scanner needs it to skip comments.
         for f in ("evals/diag_z_registers.py", "evals/score_j1.py",
                   "tests/test_z3_registers.py"):
             bad = _fstring_brace_hazards(os.path.join(REPO, f))
@@ -557,13 +563,13 @@ class TestTheLauncher:
                   '"j3 scratch edrop0.25-real"'):
             assert t in s
 
-    def test_probe_c_does_not_disturb_the_registered_four(self):
-        """(c), the heal parent, is index 4 and nothing below it moves.
+    def test_the_added_tasks_do_not_disturb_the_registered_four(self):
+        """(c) is index 4 and the J4 pair is 5-6; nothing below them moves.
 
         A bare `sbatch pace/diag_z_registers.sbatch` must still be exactly D3:
         the default array is 0-3, the four entries keep their order (the index
-        IS the task, and eval_results dirs are named from it), and the parent's
-        own path comes from its own defaults rather than STEP.
+        IS the task, and eval_results dirs are named from it), and the added rows
+        take their paths from their own defaults rather than from STEP.
         """
         s = self._src()
         assert "#SBATCH --array=0-3" in s
@@ -572,7 +578,9 @@ class TestTheLauncher:
                                               '"j1 tokens real"',
                                               '"j1 tokens noread"',
                                               '"j3 scratch edrop0.25-real"',
-                                              '"heal tokens parent"']
+                                              '"heal tokens parent"',
+                                              '"j4 endpoint real"',
+                                              '"j4 endpoint noread"']
         # the SLICED w16 parent every J arm branched from, not checkpoint_91552
         assert "${PARENT_CKPT:-checkpoint_91552_w16}" in s
         assert "RUN=${PARENT_RUN:-retro-b2-heal}" in s
@@ -580,6 +588,42 @@ class TestTheLauncher:
         heal = s.split("heal:parent)")[1].split(";;")[0]
         assert "--set latent_read=none --set latent_write_only=true" in heal
         assert "latent_read=xattn" not in heal and "latent_read=scratch" not in heal
+
+    def test_the_j4_tasks_read_at_j4s_own_scale(self):
+        """The whole point of probing a J4 checkpoint is to read the write it
+        trained with.  ZNORM_TARGET is J1/J3's 3.0; J4 trained at 136.0, so a
+        graft built at the shared default scores the read at 1/45th strength and
+        reports that as a property of the checkpoint."""
+        s = self._src()
+        assert "ZNORM_TARGET_J4=${ZNORM_TARGET_J4:-136.0}" in s
+        def flags(limb):
+            """The SETS lines of one case arm -- the comments explain the flags
+            and name the ones deliberately NOT set, so a substring test over the
+            whole block reads those too (it did, once)."""
+            block = s.split(limb)[1].split(";;")[0]
+            return "\n".join(l for l in block.splitlines() if "SETS=" in l)
+
+        for limb in ("j4:real)", "j4:noread)"):
+            f = flags(limb)
+            assert "--set latent_read=embeds" in f
+            assert "latent_read_znorm_target=$ZNORM_TARGET_J4" in f
+            assert f.count("latent_read_znorm_target=") == 1   # never the 3.0 one
+        # the no-read limb splices ZEROS (S1.3): carry_read=false, not write_only
+        noread = flags("j4:noread)")
+        assert "--set latent_carry_read=false" in noread
+        assert "latent_write_only" not in noread
+        # and the trained scale is confirmed against the run's own diag rows
+        assert "z_znorm_target" in s
+
+    def test_the_endpoint_capture_self_checks_the_write(self):
+        """On an 'endpoint' checkpoint the write IS s_T at the summary columns,
+        so Z_write must equal Z_end -- the mirror of the 'tokens' check, and the
+        thing that makes a mis-wired capture refuse instead of report."""
+        with open(os.path.join(REPO, "evals", "diag_z_registers.py"),
+                  encoding="utf-8") as fh:
+            src = fh.read()
+        assert '"endpoint_write_equals_z_end": None' in src
+        assert 'enc == "endpoint" and check["endpoint_write_equals_z_end"]' in src
 
     def test_the_window_matches_the_write(self):
         s = self._src()
