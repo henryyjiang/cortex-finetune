@@ -75,12 +75,35 @@
 #      92.4 GiB of 140, and drops J3's scratchpad state and its 16.8M gates.
 #      Expect it to land near J1's 88.5 GiB, not above J3's -- but the +11%
 #      sequence touches every loop iteration, so do not assume it.
-#   2. A 10-step smoke: `CELL_STEPS=10 RUN_SUFFIX=-smoke sbatch -t 0:45:00
-#      pace/j4_joint.sbatch` -- read Time/step, a FINITE loss, and the two
-#      lines this design lives or dies by in cortex_diag.jsonl:
-#        z_n_zpre      must be 64 from chunk 2 on (the columns are there)
-#        z_embed_ratio must be ~1.0 at step 0 (Z entering at E's scale)
-#      then DELETE the -smoke run dirs (~17 GB each).
+#   2. A 10-step smoke, WITH DIAG_INTERVAL=1 AND SMOKE_GATE=1:
+#        CELL_STEPS=10 DIAG_INTERVAL=1 SMOKE_GATE=1 RUN_SUFFIX=-smoke \
+#            sbatch -t 0:45:00 pace/j4_joint.sbatch
+#
+#      DIAG_INTERVAL=1 IS NOT OPTIONAL ON A SHORT RUN, and this is a trap J3's
+#      smoke fell into silently.  The diag fires on `optimizer_step % di == 0`
+#      against the RESUMED ABSOLUTE counter, and 91552 % 25 = 2 -- so the first
+#      row of every 25-interval run lands at 91575, i.e. 23 updates in.  A
+#      10-step smoke at the default DIAG_INTERVAL writes NO ROWS AT ALL, and the
+#      numbers below cannot be read (`logs/j3_diag/*.jsonl` all start at 91575).
+#      At 1 the smoke writes one row per update, for ten SVDs of a [64, 2048]
+#      matrix -- free.
+#
+#      SMOKE_GATE=1 then CHECKS those rows and exits nonzero if any of them is
+#      wrong, so this job can gate the real launch with --dependency=afterok.
+#      It is the only thing that can: `train.py` exits 0 on a run whose Z
+#      entered 57x too small, with a perfectly healthy loss curve.  What it
+#      requires, per limb (j4_prereg.md S1.1 and S5):
+#        z_n_zpre          64 -- the Z columns were spliced at all
+#        z_e_carried_norm  within 15% of ZNORM_TARGET -- S1.1's confirmation
+#                          that 171.0 is the right number ON THIS BRANCH
+#        z_embed_ratio     real/donor 0.5..2.0 (~1.0 by construction at init;
+#                          0.06 would mean the rescale never ran).  noread
+#                          EXACTLY 0 -- which is veto 6 measured directly
+#        z_read_grad_frac  1.0, the structural claim of the whole design
+#        z_write_grad_frac > 0, and a finite loss
+#      SMOKE_CLEAN=1 additionally copies each diag to logs/j4_smoke/ and deletes
+#      the smoke's CHECKPOINT dirs only (~17 GB each, worthless at 10 steps),
+#      leaving the run dir and its diag to read in the morning.
 #   3. J4's PRE-REGISTRATION is ../j4_prereg.md, written before any J4 run.
 #      Its rules are evals/score_j1.py --experiment j4, including the embed-
 #      ratio collapse audit (z_embed_ratio, READ_COLLAPSE_FRAC) and the
@@ -269,6 +292,132 @@ python train.py \
     --cortex.freeze_loop false \
     --branch_path $BRANCH_PATH
 RC=$?
+
+# ===== THE SMOKE GATE ========================================================
+# Only with SMOKE_GATE=1, so a real run is bit-identical without it.  Turns the
+# by-eye go/no-go of j4_prereg.md stage 2 into an exit code, which is what lets
+# the real limbs be queued --dependency=afterok on the smoke and left overnight.
+if [ -n "$SMOKE_GATE" ] && [ $RC -eq 0 ]; then
+    echo ""
+    echo "=== SMOKE GATE | $RUN_NAME | limb=$LIMB ==="
+    python - "cortex-retrofit/$RUN_NAME/cortex_diag.jsonl" "$LIMB" \
+             "$ZNORM_TARGET" "$GATE_SLOTS" <<'GATE'
+import json, math, sys
+
+path, limb, target, k = sys.argv[1], sys.argv[2], float(sys.argv[3]), int(sys.argv[4])
+try:
+    rows = [json.loads(l) for l in open(path) if l.strip()]
+except FileNotFoundError:
+    sys.exit(f"FAIL: no {path}.  At DIAG_INTERVAL 25 a 10-step run writes no "
+             f"rows at all (the counter is absolute: 91552 % 25 = 2, so the "
+             f"first row would be 91575).  Re-run the smoke with DIAG_INTERVAL=1.")
+if not rows:
+    sys.exit(f"FAIL: {path} is empty.")
+fails, notes = [], []
+
+
+def vals(key):
+    return [r[key] for r in rows if r.get(key) is not None]
+
+
+notes.append(f"{len(rows)} diag rows, steps {rows[0]['step']}..{rows[-1]['step']}")
+
+# 1. the columns exist at all
+zpre = vals("z_n_zpre")
+if not zpre:
+    fails.append("z_n_zpre absent from every row -- this build predates J4")
+elif max(zpre) != k:
+    fails.append(f"z_n_zpre max {max(zpre)}, expected {k}: the Z columns were "
+                 f"never spliced at full width")
+else:
+    notes.append(f"z_n_zpre max {max(zpre)} of {k}")
+
+# 2. ZNORM_TARGET is the right number on THIS branch (j4_prereg.md S1.1)
+en = vals("z_e_carried_norm")
+if not en:
+    fails.append("z_e_carried_norm absent -- cannot confirm ZNORM_TARGET")
+else:
+    m = sum(en) / len(en)
+    notes.append(f"z_e_carried_norm mean {m:.2f} vs target {target:.2f} "
+                 f"({100 * m / target:.0f}%)")
+    if not (0.85 * target <= m <= 1.15 * target):
+        fails.append(f"||E|| measures {m:.2f} but ZNORM_TARGET is {target:.2f} "
+                     f"-- more than 15% apart.  j4_prereg.md S1.1 says STOP: "
+                     f"the rescale target is the wrong number for this branch, "
+                     f"and every limb would train with Z at the wrong scale.")
+
+# 3. Z is entering at E's scale (real/donor) or not at all (noread)
+er = vals("z_embed_ratio")
+if not er:
+    fails.append("z_embed_ratio absent -- J4's only read-strength number")
+elif limb == "noread":
+    if max(abs(v) for v in er) != 0.0:
+        fails.append(f"noread limb has z_embed_ratio up to {max(er):.4g}, "
+                     f"expected EXACTLY 0.  Its Z columns must be zeros -- this "
+                     f"is veto 6 (the no-read limb reads something).")
+    else:
+        notes.append("z_embed_ratio exactly 0 (no-read limb reads nothing)")
+else:
+    first = er[0]
+    notes.append(f"z_embed_ratio {first:.4f} -> {er[-1]:.4f}")
+    if not (0.5 <= first <= 2.0):
+        fails.append(f"z_embed_ratio starts at {first:.4f}, outside 0.5..2.0.  "
+                     f"It is ~1.0 by construction when the rescale runs; ~0.06 "
+                     f"means it did not, and Z is entering 17x under E.")
+
+# 4. the design's structural claim: the read has gradient on EVERY batch
+rg = vals("z_read_grad_frac")
+if not rg:
+    fails.append("z_read_grad_frac absent")
+elif min(rg) < 1.0:
+    fails.append(f"z_read_grad_frac min {min(rg)}, expected 1.0.  J4's columns "
+                 f"live in input_embeds and are re-fed every iteration, so the "
+                 f"read is live however long the no-grad prefix is.  Below 1.0 "
+                 f"means the graft is not reporting the site it ran.")
+else:
+    notes.append("z_read_grad_frac 1.0 (live on every batch, as E is)")
+
+wg = vals("z_write_grad_frac")
+if wg and max(wg) <= 0:
+    fails.append(f"z_write_grad_frac max {max(wg)}: the write never trained")
+elif wg:
+    notes.append(f"z_write_grad_frac max {max(wg):.3f}")
+
+# 5. and the loss is a number
+losses = vals("loss")
+if not losses:
+    fails.append("no loss in any diag row")
+elif not all(math.isfinite(v) for v in losses):
+    fails.append("a non-finite loss")
+else:
+    notes.append(f"loss {losses[0]:.4f} -> {losses[-1]:.4f}, all finite")
+
+for n in notes:
+    print(f"  ok   {n}")
+for f in fails:
+    print(f"  FAIL {f}")
+if fails:
+    sys.exit(f"\nSMOKE GATE FAILED ({len(fails)}): do NOT launch the real limbs "
+             f"until this is understood.  j4_prereg.md S1.1 / S5.")
+print("\nSMOKE GATE PASSED -- the real limbs may launch.")
+GATE
+    RC=$?
+    if [ $RC -ne 0 ]; then
+        echo "J4 $LIMB SMOKE GATE FAILED -- exit $RC, so anything queued"
+        echo "  --dependency=afterok on this job will NOT start."
+        exit $RC
+    fi
+    if [ -n "$SMOKE_CLEAN" ]; then
+        # Keep the evidence, drop the bulk: a 10-step checkpoint is worthless
+        # and three of them are ~50 GB of scratch overnight.
+        mkdir -p logs/j4_smoke
+        cp "cortex-retrofit/$RUN_NAME/cortex_diag.jsonl" \
+           "logs/j4_smoke/${RUN_NAME}.jsonl" 2>/dev/null
+        rm -rf cortex-retrofit/$RUN_NAME/checkpoint_*
+        echo "  diag kept at logs/j4_smoke/${RUN_NAME}.jsonl; checkpoints removed"
+        du -sh "cortex-retrofit/$RUN_NAME" 2>/dev/null
+    fi
+fi
 
 echo ""
 if [ $RC -eq 0 ]; then

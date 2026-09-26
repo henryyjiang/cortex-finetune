@@ -562,3 +562,81 @@ class TestTheLaunchers:
         over = mu.parse_config_overrides(["latent_read_znorm_target=171.0"])
         g = _cortex("real", **{k: v for k, v in over.items()})
         assert g.latent_read_znorm_target == 171.0
+
+
+# ─── 10. the smoke gate, which is what lets the real limbs be queued ────────
+
+class TestTheSmokeGate:
+    """`SMOKE_GATE=1` turns j4_prereg.md stage 2's by-eye go/no-go into an exit
+    code, so the real limbs can be queued --dependency=afterok on the smoke and
+    left unattended.  It is the ONLY thing that can gate them: train.py exits 0
+    on a run whose Z entered 57x too small, behind a healthy loss curve.
+    """
+
+    @staticmethod
+    def _gate_src() -> str:
+        s = _src("pace/j4_joint.sbatch")
+        assert "<<'GATE'" in s, "the smoke gate heredoc is gone from the launcher"
+        return s.split("<<'GATE'\n", 1)[1].split("\nGATE\n", 1)[0]
+
+    def _run(self, tmp_path, rows, limb="real", target="171.0", k="64"):
+        import subprocess
+        import json as _json
+        gate = tmp_path / "gate.py"
+        gate.write_text(self._gate_src(), encoding="utf-8")
+        diag = tmp_path / "cortex_diag.jsonl"
+        diag.write_text("".join(_json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+        cp = subprocess.run([sys.executable, str(gate), str(diag), limb, target, k],
+                            capture_output=True, text=True)
+        return cp.returncode, cp.stdout + cp.stderr
+
+    @staticmethod
+    def _row(step, **kw):
+        r = dict(step=91552 + step, loss=2.31 - 0.01 * step, z_n_zpre=64,
+                 z_e_carried_norm=171.2, z_embed_ratio=1.0,
+                 z_read_grad_frac=1.0, z_write_grad_frac=0.55)
+        r.update(kw)
+        return r
+
+    def test_a_healthy_smoke_passes(self, tmp_path):
+        rc, out = self._run(tmp_path, [self._row(i) for i in range(1, 11)])
+        assert rc == 0 and "SMOKE GATE PASSED" in out, out
+
+    def test_the_noread_limb_must_read_exactly_nothing(self, tmp_path):
+        rows = [self._row(i, z_embed_ratio=0.0) for i in range(1, 11)]
+        rc, out = self._run(tmp_path, rows, limb="noread")
+        assert rc == 0, out
+        # and a no-read limb that reads ANYTHING is veto 6, caught here
+        rc, out = self._run(tmp_path, [self._row(i, z_embed_ratio=0.9)
+                                       for i in range(1, 11)], limb="noread")
+        assert rc != 0 and "veto 6" in out, out
+
+    @pytest.mark.parametrize("kw, needle", [
+        # the failure the gate exists for: 171 is wrong for this branch
+        (dict(z_e_carried_norm=3.0), "STOP"),
+        # the rescale silently not running -> Z enters 17x under E
+        (dict(z_embed_ratio=0.058), "17x under E"),
+        # the columns never spliced -- every other number is then meaningless
+        (dict(z_n_zpre=0), "never spliced"),
+        # the design's structural claim, violated
+        (dict(z_read_grad_frac=0.55), "reporting the site it ran"),
+        (dict(z_write_grad_frac=0.0), "write never trained"),
+        (dict(loss=float("nan")), "non-finite"),
+    ])
+    def test_each_failure_is_named_and_blocks(self, tmp_path, kw, needle):
+        rc, out = self._run(tmp_path, [self._row(i, **kw) for i in range(1, 11)])
+        assert rc != 0 and needle in out, out
+
+    def test_an_empty_diag_is_a_failure_not_a_pass(self, tmp_path):
+        """The DIAG_INTERVAL trap: the counter is absolute and 91552 % 25 = 2, so
+        a 10-step run at the default interval writes NO rows (its first would be
+        91575).  An empty diag must block, never pass vacuously."""
+        rc, out = self._run(tmp_path, [])
+        assert rc != 0 and "empty" in out, out
+
+    def test_the_launcher_tells_the_operator_about_the_interval(self):
+        s = _src("pace/j4_joint.sbatch")
+        assert "DIAG_INTERVAL=1 IS NOT OPTIONAL ON A SHORT RUN" in s
+        assert "91552 % 25 = 2" in s
+        # the gate is opt-in, so a real run is unaffected by all of this
+        assert 'if [ -n "$SMOKE_GATE" ] && [ $RC -eq 0 ]; then' in s
