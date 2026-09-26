@@ -1,0 +1,140 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-26-2026 19:37:37
+Job ID:    13617828
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j5_joint
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+  ok   vocab_size 100278 on both
+  ok   eos_token_id 100257 on both
+  ok   all 29 carry pieces keep their ids
+  ok   the 58-id probe string round-trips identically
+
+TOKENIZER MATCH -- the pack is safe under the model's tokenizer.
+=== J5 buffer-contents arm | limb=zonly | run=j5-a3z-endpoint-zonly-enorm ===
+    base:      ckpts/olmo8-cortex   (NO branch: step 0 -> stop 10, horizon 305176)
+    data:      data/j1_pg19fw50_carry20_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:  gated W=16 K=64 cc=8 grad_chunks=4 window_backward=1
+    depth:     mean_recurrence 8, backprop depth 8, RAMP OFF (see item 3)
+    packed:    64 E + 64 Z + 512 tokens + 16 summary = 656 columns
+    read:      --cortex.latent_read embeds --cortex.latent_read_znorm rms --cortex.latent_read_znorm_target 136.0 --cortex.latent_read_scramble false --cortex.e_carry_read false --cortex.latent_carry_read true
+    schedule:  warmup 250 updates (absolute), save every 2000, diag every 1
+NVIDIA H200, 143771 MiB
+
+[W926 19:37:57.046810129 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Sat Sep 26 19:37:55: Time to load libraries: 7.23 seconds.
+[cortex] WARNING: latent_carry with max_mean_rec 32 and mean_backprop_depth 8 (assumed; set --override_mean_backprop_depth to be sure) freezes the first 24 loop steps, which covers the whole write band 2..9.  Z becomes a FROZEN FEATURE EXTRACTOR: the model can learn to USE it, never to SHAPE it.  That is the mirror of the frozen-READ failure that cost x0.90 -> x1.33.  Raise mean_backprop_depth or accept it IN THE PRE-REGISTRATION -- it changes what a null result for Z means.
+--------------------------------------------------------------------
+------------------ Launching run j5-a3z-endpoint-zonly-enorm------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-03-018-14-0.pace.gatech.edu.
+GPU : NVIDIA H200. CUDA: 12.1.
+[cortex] memory ON: K=0 K_iter=0 ccot_direct=False accum_ccot=False (vecs=16/max=128) gated_accum=False prefix_memory=gated gate(K=64,route=ring,norm=tanh,init=zero,fill=grow) latent(Z on, rule=absolute,band=2..9,renorm=none,read=embeds,EMBEDS(J4: Z as its own input_embeds columns),enc=endpoint,znorm=136.0) prefix_pos=tail prefix_eos_reset=False cross_chunks=8 carry_grad_chunks=4 random_segments=False lora_rank=0
+[cortex] Z channel ON.  latent_depth_rule='absolute' is P0.7's question (evals/diag_depth_band.py): P0.1 measured the band at a SINGLE T and cannot say whether 'informative' tracks the absolute step or the fraction of the loop.  If P0.7 has not reported, this run is asserting an answer it does not have -- record which, in this run's sbatch header.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [03:55<03:55, 235.69s/it]Loading checkpoint shards: 100%|██████████| 2/2 [04:15<00:00, 108.80s/it]Loading checkpoint shards: 100%|██████████| 2/2 [04:15<00:00, 127.84s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo8-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retrofit/wandb/run-20260926_194216-n8x0s4np
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run j5-a3z-endpoint-zonly-enorm
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/n8x0s4np
+wandb: updating run metadata
+wandb: uploading config.yaml
+wandb: 
+wandb: Run history:
+wandb:              cortex/channels ▁▁▁▁▁▁▁▁▁▁
+wandb:      cortex/e_centred_cosine █▇▇▆▁▂▅▇█▃
+wandb:    cortex/e_eff_rank_entropy ▂▄▂▃▇█▄▁▃▆
+wandb: cortex/e_eff_rank_entropy_sq ▂▄▂▃██▃▁▃▆
+wandb:         cortex/e_eff_rank_pr ▁▃▂▂█▇▃▁▂▅
+wandb:            cortex/e_row_norm ▁▁▄▂▃▆▆▆▅█
+wandb:          cortex/e_top1_share █▇▇▇▁▂▇▇█▄
+wandb:            cortex/fg_at_bias ███▇▇▆▅▄▂▁
+wandb:          cortex/fg_z_at_bias ▁▁▁▂▃▃▄▅▇█
+wandb:        cortex/gate_in_w_norm ▁▁▂▂▃▄▅▆▇█
+wandb:                          +65 ...
+wandb: 
+wandb: Run summary:
+wandb:              cortex/channels 2
+wandb:      cortex/e_centred_cosine -0.00554
+wandb:    cortex/e_eff_rank_entropy 26.91785
+wandb: cortex/e_eff_rank_entropy_sq 6.72833
+wandb:         cortex/e_eff_rank_pr 3.51889
+wandb:            cortex/e_row_norm 119.73471
+wandb:          cortex/e_top1_share 0.49251
+wandb:            cortex/fg_at_bias 0.73104
+wandb:          cortex/fg_z_at_bias 0.73107
+wandb:        cortex/gate_in_w_norm 0.13428
+wandb:                          +65 ...
+wandb: 
+wandb: 🚀 View run j5-a3z-endpoint-zonly-enorm at: https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/n8x0s4np
+wandb: ⭐️ View project at: https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: cortex-retrofit/wandb/run-20260926_194216-n8x0s4np/logs
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]'] (undo post_init clobber)
+[cortex] override mean_backprop_depth 8 -> 8 (shorter TBPTT window)
+[cortex] override mean_recurrence 8 -> 8
+[cortex] window_backward: one backward per 4-chunk carry window (2 per row), so the peak holds 4 of 8 chunks' activations.  Same gradient as one backward per row, to fp summation order.
+GPU: cuda:0 | Step:    2 | Updates:    1 | Time/step: 2.1619 | Tok/sec=  3789.32 | Loss: 9.7830 / log-ppl: 17730.2031 | Grad-Norm 97.7347 | ClipCoef 0.0102 | Peak-Mem 83.88GiB
+[timeout-save] walltime deadline resolved: 2415s from now
+GPU: cuda:0 | Step:    4 | Updates:    2 | Time/step: 2.3788 | Tok/sec=  3443.77 | Loss: 9.4865 / log-ppl: 13180.5791 | Grad-Norm 118.5006 | ClipCoef 0.0084 | Peak-Mem 90.75GiB
+GPU: cuda:0 | Step:    6 | Updates:    3 | Time/step: 2.2025 | Tok/sec=  3719.46 | Loss: 9.8037 / log-ppl: 18100.0156 | Grad-Norm 94.0399 | ClipCoef 0.0106 | Peak-Mem 90.63GiB
+GPU: cuda:0 | Step:    8 | Updates:    4 | Time/step: 1.9122 | Tok/sec=  4284.16 | Loss: 9.5446 / log-ppl: 13968.9971 | Grad-Norm 87.5507 | ClipCoef 0.0114 | Peak-Mem 90.75GiB
+GPU: cuda:0 | Step:   10 | Updates:    5 | Time/step: 1.0122 | Tok/sec=  8093.37 | Loss: 9.5861 / log-ppl: 14560.8408 | Grad-Norm 88.8800 | ClipCoef 0.0113 | Peak-Mem 60.91GiB
+GPU: cuda:0 | Step:   12 | Updates:    6 | Time/step: 2.3279 | Tok/sec=  3519.05 | Loss: 9.1043 / log-ppl: 8994.0078 | Grad-Norm 81.4576 | ClipCoef 0.0123 | Peak-Mem 90.63GiB
+GPU: cuda:0 | Step:   14 | Updates:    7 | Time/step: 1.5134 | Tok/sec=  5413.15 | Loss: 9.1122 / log-ppl: 9065.5088 | Grad-Norm 53.7210 | ClipCoef 0.0186 | Peak-Mem 75.89GiB
+GPU: cuda:0 | Step:   16 | Updates:    8 | Time/step: 1.7715 | Tok/sec=  4624.29 | Loss: 8.5896 / log-ppl: 5375.7070 | Grad-Norm 134.3511 | ClipCoef 0.0074 | Peak-Mem 90.75GiB
+GPU: cuda:0 | Step:   18 | Updates:    9 | Time/step: 1.1394 | Tok/sec=  7189.81 | Loss: 9.2727 / log-ppl: 10642.9873 | Grad-Norm 50.3739 | ClipCoef 0.0199 | Peak-Mem 68.46GiB
+GPU: cuda:0 | Step:   20 | Updates:   10 | Time/step: 2.1328 | Tok/sec=  3841.01 | Loss: 8.8488 / log-ppl: 6966.1621 | Grad-Norm 56.8932 | ClipCoef 0.0176 | Peak-Mem 90.75GiB
+[stop_at_step] reached 10 — ending this phase (schedule horizon max_steps=305176 unchanged)
+[rank 0] Saved checkpoint @ step 10
+--------------------------------------------------------------------
+Training time: 0:06:03.409914 
+Max. Mem allocated: 12.162 GB. Max. Mem reserved: 91.145 GB.
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Run None finished without error.
+---------Total time: 0:06:13.889795 ---------
+-----------------Shutdown complete.--------------------------
+
+=== ||E|| ON ckpts/olmo8-cortex | limb=zonly ===
+zonly n=10 mean=116.583 min=115.862 max=117.807
+
+  When all three limbs have reported:
+    cat logs/j5_enorm/*.txt
+  Take ONE value (the mean across limbs, as J4 did: 128.95/135.77/
+  142.83 -> 136.0) and pass it as ZNORM_TARGET to every limb.  The
+  limbs must differ in the carry and in nothing else.
+---------------------------------------
+Begin Slurm Epilog: Sep-26-2026 19:44:03
+Job ID:        13617828
+Array Job ID:  13617827_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j5_joint
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=00:51:20,vmem=0,walltime=00:06:25,mem=15096588K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-018-14-0
+---------------------------------------
