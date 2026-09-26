@@ -1,0 +1,135 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-26-2026 15:40:08
+Job ID:    13612303
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  z3_registers
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== z3 register probe | task 6 = j4-a3z-endpoint-noread ===
+    checkpoint: cortex-retrofit/j4-a3z-endpoint-noread/checkpoint_93552
+    data:       data/carry_task_r16_len4096_val (first 300 rows)
+    out:        eval_results/z3_registers/j4-a3z-endpoint-noread
+NVIDIA H200, 143771 MiB
+    znorm_target 136.0 matches the run's diag rows
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'endpoint'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '136.0'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.84s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.44s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/j4-a3z-endpoint-noread/checkpoint_93552/chkpt.pt: 0 missing / 0 unexpected keys
+[z3] data/carry_task_r16_len4096_val: 300 rows, answer_dep checked | encoding endpoint | T=8
+  25/300 rows
+  50/300 rows
+  75/300 rows
+  100/300 rows
+  125/300 rows
+  150/300 rows
+  175/300 rows
+  200/300 rows
+  225/300 rows
+  250/300 rows
+  275/300 rows
+  300/300 rows
+  probed E: acc 0.859 vs baseline 0.097
+  probed Z_write: acc 0.112 vs baseline 0.097
+  probed Z_tok: acc 0.100 vs baseline 0.097
+  probed Z_end: acc 0.112 vs baseline 0.097
+  probed E_ring: acc 0.339 vs baseline 0.103
+  probed Z_ring: acc 0.102 vs baseline 0.103
+  probe (b): the redundancy probe (j4_prereg.md S4.6)
+  probed E: acc 0.859 vs baseline 0.097
+  probed E_plus_Z_end: acc 0.857 vs baseline 0.097
+  probed E_pca: acc 0.825 vs baseline 0.097
+  probed Z_end_resid_E: acc 0.158 vs baseline 0.097
+==============================================================================
+D3 REGISTER PROBE -- cortex-retrofit/j4-a3z-endpoint-noread/checkpoint_93552
+  encoding endpoint | 300 rows, 2400 (row, chunk) samples | cells by last update: recent 19110, chunk 19126, older 146, never 18
+==============================================================================
+  WRITE (all registers | recent | chunk)
+    E        control  all    0.859 (base 0.097) margin +0.762 [+0.758,+0.765]
+                      recent 0.873 (base 0.094) margin +0.779 [+0.773,+0.785]
+                      chunk  0.851 (base 0.100) margin +0.751 [+0.745,+0.756]
+    Z_write  PARTIAL  all    0.112 (base 0.097) margin +0.015 [+0.012,+0.018]
+                      recent 0.114 (base 0.094) margin +0.020 [+0.014,+0.025]
+                      chunk  0.111 (base 0.100) margin +0.011 [+0.006,+0.016]
+    Z_tok    NONE     all    0.100 (base 0.097) margin +0.002 [-0.001,+0.006]
+                      recent 0.099 (base 0.094) margin +0.005 [+0.000,+0.010]
+                      chunk  0.100 (base 0.100) margin -0.000 [-0.005,+0.004]
+    Z_end    PARTIAL  all    0.112 (base 0.097) margin +0.015 [+0.012,+0.018]
+                      recent 0.114 (base 0.094) margin +0.020 [+0.014,+0.025]
+                      chunk  0.111 (base 0.100) margin +0.011 [+0.006,+0.016]
+  RING (all registers | recent | chunk)
+    E_ring   control  all    0.339 (base 0.103) margin +0.236 [+0.230,+0.243]
+                      recent 0.355 (base 0.100) margin +0.256 [+0.247,+0.265]
+                      chunk  0.324 (base 0.105) margin +0.218 [+0.209,+0.228]
+    Z_ring   NONE     all    0.102 (base 0.103) margin -0.001 [-0.005,+0.003]
+                      recent 0.100 (base 0.100) margin +0.000 [-0.005,+0.006]
+                      chunk  0.104 (base 0.105) margin -0.001 [-0.007,+0.004]
+------------------------------------------------------------------------------
+  PROBE (b) REDUNDANCY -- is Z_end's content ADDITIONAL to E's?
+    E              all    0.859 (base 0.097) margin +0.762 [+0.758,+0.765]
+    E_plus_Z_end   all    0.857 (base 0.097) margin +0.759 [+0.756,+0.763]
+    E_pca          all    0.825 (base 0.097) margin +0.727 [+0.724,+0.731]
+    Z_end_resid_E  all    0.158 (base 0.097) margin +0.061 [+0.057,+0.065]
+    INCREMENT      [E,Z_end] - E  -0.002 [-0.003,-0.001] (paired)  = -0.3% of E's margin
+                   recent         -0.002 [-0.003,-0.000]
+                   chunk          -0.003 [-0.004,-0.001]
+    RESIDUAL diagnostic: E PROJECTED out inside the top-128 PCA subspace, fit on training rows only (lam_rel 1e-06)
+      Z_end variance surviving the projection, out of fold: 2.11e-01
+      the reduction keeps E's signal (0.5 x E's margin): YES
+      NOTE: the residual and the increment DISAGREE.  The label follows the increment (registered); the disagreement is itself the finding -- report both.
+------------------------------------------------------------------------------
+  PROBE HEALTH (E margin >= 0.15, CI_lo > 0): OK
+  READING: NO_LATENT_HOLDS -- the loop state at the chunk end does not hold the register file -> the WRITE must change before J4
+  PROBE (b): REDUNDANT -- no detectable information beyond E -- a J4 PASS reads as YES_BUT_REDUNDANT: an expensive re-coded copy, not a channel
+
+wrote eval_results/z3_registers/j4-a3z-endpoint-noread/results.json
+
+z3 j4-a3z-endpoint-noread DONE -> eval_results/z3_registers/j4-a3z-endpoint-noread/results.json
+---------------------------------------
+Begin Slurm Epilog: Sep-26-2026 15:54:38
+Job ID:        13612303
+Array Job ID:  13612303_6
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      z3_registers
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=01:56:00,vmem=0,walltime=00:14:30,mem=14782472K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------
