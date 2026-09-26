@@ -18,6 +18,8 @@ import sys
 import pytest
 import torch
 
+from types import SimpleNamespace
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,7 +27,7 @@ sys.path.insert(0, os.path.join(REPO, "evals"))
 
 from evals.diag_z_content import (  # noqa: E402
     CONTENT_CUT, ENCODINGS, NOISE_CUT, Z_ENCODINGS, book_ids, build_vocab,
-    is_book_end, pack_eos,
+    capture, is_book_end, pack_eos,
     collect, d1_reading, d1_report, d2_report, donor_index, print_report,
     reseed_verdict,
 )
@@ -343,6 +345,134 @@ def _rows(n=6):
     torch.manual_seed(0)
     return [(i, i // 2, torch.randint(0, VOCAB - 1, (CL * NC + 1,)))
             for i in range(n)]
+
+
+class TestTheColumnArithmeticOnAStub:
+    """The width check and the two slices, on a STUB -- no raven build needed.
+
+    The real-loop classes below skip on any box whose transformers cannot build
+    the base (this Mac: RavenConfig has no `rope_parameters`), so the arithmetic
+    that broke jobs 13611994_5/6 had no test that RUNS before a cluster submit.
+    This one does: it builds `latent_states` whose every column is labelled by
+    its own value, so a slice that is off by the Z block returns provably wrong
+    columns instead of merely different numbers.
+    """
+
+    NP, NZ, NS, S_, TR, TP = 3, 5, 4, 12, 4, 2
+
+    def _stub(self, n_z):
+        """(model, cortex) whose latent_states column j holds the value j."""
+        n_pre, n_sum, S = self.NP, self.NS, self.S_
+        width = n_pre + n_z + S + n_sum
+        ls = (torch.arange(width, dtype=torch.float32)
+              .unsqueeze(-1).expand(width, 2).unsqueeze(0).clone())
+
+        class Buf:
+            def merge(self, state, new_vecs, new_latent=None):
+                return state
+
+        class Cortex:
+            prefix = Buf()
+            _n_pre, _n_zpre, _n_sum = n_pre, n_z, n_sum
+            _n_carry_cols = n_pre + n_z
+            # the tape's last state IS the summary block, as the real loop's is
+            _z_prev = ls[:, n_pre + n_z + S:].clone()
+            _z_tape = [ls[:, n_pre + n_z + S:].clone()]
+
+        cx = Cortex()
+
+        def model(input_ids, num_steps, m_cross_in, return_m_cross,
+                  output_details):
+            cx.prefix.merge(None, torch.zeros(1, n_sum, 2),
+                            torch.zeros(1, n_sum, 2))
+            return SimpleNamespace(latent_states=ls, logits=torch.zeros(1, S, 4),
+                                   m_cross=None)
+
+        return model, cx
+
+    @pytest.mark.parametrize("n_z", [0, 5])
+    def test_the_summary_and_token_slices_land_past_the_z_block(self, n_z):
+        model, cx = self._stub(n_z)
+        a = capture(model, cx, torch.zeros(self.S_, dtype=torch.long), None,
+                    torch.tensor([2, 0]), torch.device("cpu"), 0,
+                    self.TR, self.TP)
+        first_real = self.NP + n_z
+        # the SUMMARY block is the last n_sum columns, whatever precedes it
+        assert a["Z_end"][:, 0].tolist() == [
+            float(first_real + self.S_ + i) for i in range(self.NS)]
+        # the token slice is the LAST tok_rows REAL tokens, pooled by tok_pool
+        want = torch.tensor([float(first_real + self.S_ - self.TR + i)
+                             for i in range(self.TR)])
+        assert torch.allclose(a["Z_tok"][:, 0],
+                              want.reshape(self.TR // self.TP, self.TP).mean(1))
+
+    def test_a_wrong_width_still_refuses_and_names_the_four_blocks(self):
+        model, cx = self._stub(5)
+        cx._n_carry_cols = cx._n_pre          # the pre-J4 arithmetic, on a J4 pack
+        with pytest.raises(RuntimeError, match=r"E \| Z \| tokens \| summary"):
+            capture(model, cx, torch.zeros(self.S_, dtype=torch.long), None,
+                    torch.tensor([2, 0]), torch.device("cpu"), 0,
+                    self.TR, self.TP)
+
+
+class TestTheJ4LayoutIsFourBlocks:
+    """J4 splices its Z rows as a FOURTH block: [E | Z | tokens | summary].
+
+    `capture` sliced from `_n_pre` (E's block alone), so on a J4 checkpoint the
+    'summary' columns it read were 16 short of true.  It did not report that --
+    the width check refused, 10 minutes into jobs 13611994_5 and _6.  The fix is
+    `_n_carry_cols`, whose own docstring names the three other call sites with
+    this failure mode.
+    """
+
+    def _j4_model(self):
+        torch.manual_seed(1234)
+        return _build_raven(
+            use_memory=True, memory_slots=0, accum_vecs=NV, eos_token_id=EOS,
+            prefix_memory="gated", gate_slots=K, gate_route="ring",
+            gate_init="zero", gate_fill="grow",
+            latent_carry=True, latent_encoding="endpoint",
+            latent_read="embeds", latent_s0_read=False,
+            latent_read_znorm="rms", latent_read_znorm_target=136.0).eval()
+
+    def test_the_z_block_is_really_spliced_so_this_test_is_not_vacuous(self):
+        m = self._j4_model()
+        rows = _rows(2)
+        collect(m, m.cortex, rows, NC, torch.tensor([T, 0]),
+                torch.device("cpu"), 1234, set(), 8, 2, log_every=0)
+        assert int(m.cortex._n_zpre) > 0
+        assert int(m.cortex._n_carry_cols) > int(m.cortex._n_pre)
+
+    def test_the_capture_runs_and_its_own_tape_check_agrees(self):
+        """capture()'s tape self-check compares `_z_prev` to the columns it calls
+        'summary', so it fails loudly if the offset is off by the Z block."""
+        m = self._j4_model()
+        samples, _ = collect(m, m.cortex, _rows(4), NC, torch.tensor([T, 0]),
+                             torch.device("cpu"), 1234, set(), 8, 2, log_every=0)
+        assert len(samples) == 4 * NC
+
+    def test_the_endpoint_write_equals_the_summary_columns(self):
+        """The independent check on the offset: under 'endpoint' the WRITE is
+        s_T at the summary columns (cortex_graft.py, x[:, -n_sum:]), so the
+        merge's new_latent must equal the columns capture sliced.  A wrong
+        offset makes these two different tensors.  This is also the self-check
+        evals/diag_z_registers.py applies per run."""
+        m = self._j4_model()
+        samples, _ = collect(m, m.cortex, _rows(2), NC, torch.tensor([T, 0]),
+                             torch.device("cpu"), 1234, set(), 8, 2, log_every=0)
+        for s in samples:
+            assert torch.allclose(s["Z_write"], s["Z_end"],
+                                  atol=1e-4, rtol=1e-4), (s["row"], s["chunk"])
+
+    @pytest.mark.parametrize("gated", [True, False])
+    def test_a_pre_j4_arm_has_no_z_block_so_d3s_numbers_cannot_move(self, gated):
+        """The four committed D3 results must stay reproducible: with no Z block
+        `_n_carry_cols == _n_pre`, so every slice is the arithmetic they ran."""
+        m = _model(gated)
+        collect(m, m.cortex, _rows(2), NC, torch.tensor([T, 0]),
+                torch.device("cpu"), 1234, set(), 8, 2, log_every=0)
+        assert int(m.cortex._n_zpre) == 0
+        assert int(m.cortex._n_carry_cols) == int(m.cortex._n_pre)
 
 
 @pytest.mark.parametrize("gated", [True, False])

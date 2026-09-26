@@ -163,17 +163,27 @@ def capture(model, cortex, xc: torch.Tensor, m_in: Optional[torch.Tensor],
         raise RuntimeError("merge received no Z write (new_latent is None). "
                            "latent_carry is off on this build -- check the "
                            "--set flags (RED 12).")
+    # EVERY PREPENDED COLUMN, not E's block alone.  `_n_carry_cols` is
+    # `_n_pre + _n_zpre` and equals `_n_pre` on every arm before J4, which
+    # splices its Z rows as a FOURTH block: [E | Z | tokens | summary].  Its
+    # docstring names three call sites that are silent-wrong-answer sites if
+    # they use `_n_pre` here; this capture was a fourth, and it was not silent
+    # -- the width check below refused two J4 tasks 10 minutes in (job
+    # 13611994_5/6) rather than slicing 16 columns off true.
     n_pre, n_sum = int(cortex._n_pre), int(cortex._n_sum)
+    n_car = int(cortex._n_carry_cols)
+    n_z = n_car - n_pre
     S = int(xc.numel())
     ls = getattr(out, "latent_states", None)
     if ls is None:
         raise RuntimeError("the forward returned no latent_states.")
-    if ls.shape[1] != n_pre + S + n_sum:
+    if ls.shape[1] != n_car + S + n_sum:
         raise RuntimeError(
-            f"latent_states has {ls.shape[1]} columns, expected n_pre + S + "
-            f"n_sum = {n_pre} + {S} + {n_sum}.  The packed layout is not "
-            "[carry | tokens | summary] and every column slice below is wrong.")
-    z_end = ls[0, S + n_pre:].float()
+            f"latent_states has {ls.shape[1]} columns, expected n_pre + n_z + "
+            f"S + n_sum = {n_pre} + {n_z} + {S} + {n_sum}.  The packed layout "
+            "is not [E | Z | tokens | summary] and every column slice below is "
+            "wrong.")
+    z_end = ls[0, S + n_car:].float()
     # SELF-CHECK: the tape's last state is s_T at the summary columns, so it
     # must equal latent_states' last n_sum columns.  If not, the columns this
     # tool calls "summary" are not the ones the write reads.
@@ -184,7 +194,7 @@ def capture(model, cortex, xc: torch.Tensor, m_in: Optional[torch.Tensor],
     if tok_rows > S or tok_rows % tok_pool:
         raise ValueError(f"tok_rows={tok_rows} must be <= S={S} and divisible "
                          f"by tok_pool={tok_pool}")
-    tok = ls[0, n_pre + S - tok_rows:n_pre + S].float()
+    tok = ls[0, n_car + S - tok_rows:n_car + S].float()
     tok = tok.reshape(tok_rows // tok_pool, tok_pool, -1).mean(dim=1)
     tape = torch.stack([d[0].float() for d in cortex._z_tape])   # [T, n_sum, D]
     return {
