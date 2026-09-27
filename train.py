@@ -360,6 +360,16 @@ class CLISettings:
             # differ in CONTENT CORRESPONDENCE and nothing else -- same
             # module, same capacity, same seed, same data order.
             latent_read_scramble=False,
+            # J6 `mix` (option 1): the same roll on a Bernoulli(p) SUBSET of
+            # the micro-batch instead of all of it.  p=1.0 is the bool above
+            # and is a different arm -- at p=1 Z is noise on every row and the
+            # optimum is to ignore it, which is what J4's donor limb did.  The
+            # two refuse each other in cortex_graft.
+            latent_read_scramble_p=0.0,
+            # J6 `slow` (option 3): Z's ring pointer advances once per N
+            # chunks, writing that window's mean, so Z reaches further back
+            # than E over the same 64 shared rows.  1 = J4's shared pointer.
+            latent_stride=1,
             # Z ATTEMPT 2 (J1).  Defaults reproduce every arm on record; see
             # CortexMemory.__init__ for what each switch does and why.
             #   latent_encoding    'delta' | 'endpoint' | 'tokens' (Step 0 picks)
@@ -591,6 +601,29 @@ class CLISettings:
                         "fires during training and receives zero gradient.  "
                         "Lower gate_slots, raise accum_vecs, or raise "
                         "cross_chunks.")
+        if int(self.cortex["latent_stride"]) > 1:
+            _st = int(self.cortex["latent_stride"])
+            assert self.cortex["latent_carry"], (
+                f"cortex.latent_stride ({_st}) without latent_carry: there is "
+                "no Z channel to give a slower pointer to.")
+            # The pooling window holds un-detached candidates until it closes.
+            # If a window straddles the stop-gradient boundary it pins the
+            # earlier chunk's activations past the detach that was supposed to
+            # free them -- the memory the horizon exists to bound.  Requiring
+            # the boundary to be a multiple of the stride makes every window
+            # nest inside one gradient window.  At the J4 geometry
+            # (carry_grad_chunks 4, stride 2) the windows are (5,6) and (7,8)
+            # and the boundary falls between them.
+            _gc = int(self.cortex["carry_grad_chunks"])
+            assert _gc % _st == 0, (
+                f"cortex.carry_grad_chunks ({_gc}) must be a multiple of "
+                f"latent_stride ({_st}), or a Z pooling window straddles the "
+                "stop-gradient boundary and holds the detached chunk's "
+                "activations alive.")
+            assert int(self.cortex["cross_chunks"]) % _st == 0, (
+                f"cortex.cross_chunks ({self.cortex['cross_chunks']}) must be "
+                f"a multiple of latent_stride ({_st}), or the last pooling "
+                "window never closes and that chunk's Z is silently dropped.")
         if self.cortex["latent_carry"]:
             assert self.cortex["prefix_memory"] in ("accum", "gated"), (
                 "cortex.latent_carry needs --cortex.prefix_memory accum|gated. "
@@ -1174,7 +1207,17 @@ def startup(cfg: CLISettings):
                    # latent_carry_read is the only thing that lets the no-read
                    # limb rebuild as itself; the forget bias records the arm.
                    "latent_carry_read", "latent_read_gate_lr_mult",
-                   "latent_scratch_forget_bias"):
+                   "latent_scratch_forget_bias",
+                   # J6.  Same class as e_carry_read above, and the same
+                   # failure if omitted: latent_read_scramble_p and
+                   # latent_stride each define a limb, and a limb rebuilt at
+                   # the default is the CONTROL wearing the limb's name.
+                   # latent_stride persists hardest of the two -- it changes
+                   # which rows hold which chunk, so an eval that rebuilt
+                   # without it would read Z's long-horizon rows on the
+                   # short-horizon schedule and report the mismatch as the
+                   # arm's result.
+                   "latent_read_scramble_p", "latent_stride"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "

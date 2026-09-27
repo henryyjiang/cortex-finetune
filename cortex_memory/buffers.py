@@ -397,7 +397,8 @@ class PrefixGatedBuffer(_PrefixBufferBase):
                  gate_norm: str = "tanh", gate_init: str = "zero",
                  fill: str = "grow", route_init_std: float = 0.02,
                  carries_latent: bool = False,
-                 forget_bias_init: float = 1.0) -> None:
+                 forget_bias_init: float = 1.0,
+                 latent_stride: int = 1) -> None:
         super().__init__(hidden_size, n_vec, carries_latent)
         self.n_slots = int(n_slots) if n_slots else int(n_vec)
         if self.n_slots < n_vec:
@@ -425,6 +426,42 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         if not math.isfinite(float(forget_bias_init)):
             raise ValueError(
                 f"forget_bias_init must be finite; got {forget_bias_init!r}")
+        # J6 `slow` -- the SHORT-TERM / LONG-TERM split, on the ring.
+        #
+        # E and Z are the two halves of ONE [B, K, 2D] tensor, so they share
+        # rows and Z cannot be given more of them.  A longer horizon therefore
+        # has to come from a SLOWER POINTER over the same K rows: Z advances
+        # its write block once every `latent_stride` chunks and writes the MEAN
+        # of that window's candidates, so its 64 columns reach back
+        # `latent_stride` times as far as E's at proportionally coarser
+        # resolution.  Pooling rather than skipping is deliberate -- a skipping
+        # Z would never see the odd chunks at all, and a carry answer whose
+        # dependency lived in one would be unanswerable BY CONSTRUCTION, which
+        # would confound the very thing the limb measures.
+        #
+        # FORCED, and worth stating: the stride cannot apply during a `grow`
+        # fill.  While the buffer is still filling, every chunk must append
+        # exactly n_vec rows to keep the tensor rectangular, and Z has no way
+        # to append fewer.  So the stride engages only once the ring is full.
+        # At the J4 geometry (K=64, W=16, cross_chunks=8) that means chunks
+        # 1-4 fill with per-chunk pairs and chunks 5-8 ring: E ends holding
+        # chunks 5-8, Z ends holding pooled(5,6), pooled(7,8) and the
+        # still-unoverwritten chunks 3-4 -- a 6-chunk span against E's 4.
+        # Real and measurable, but not the clean 2x, and the reading has to
+        # say so.
+        if int(latent_stride) < 1:
+            raise ValueError(
+                f"latent_stride must be >= 1; got {latent_stride!r}.")
+        if int(latent_stride) > 1 and not carries_latent:
+            raise ValueError(
+                "latent_stride > 1 on an E-only buffer: there is no Z channel "
+                "to give a slower pointer to.")
+        if int(latent_stride) > 1 and route != "ring":
+            raise ValueError(
+                f"latent_stride > 1 needs route='ring'; got {route!r}.  The "
+                "stride IS a ring-pointer rate, and the other routes do not "
+                "have one.")
+        self.latent_stride = int(latent_stride)
         self.route = route
         self.forget_bias_init = float(forget_bias_init)
         self.gate_norm = gate_norm
@@ -486,6 +523,12 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         # graft having to reach in.  A stale value would only rotate WHICH rows a
         # chunk writes, never how many.
         self._chunk = 0
+        # J6 `slow`: Z candidates awaiting their pooled write.  Per-SEQUENCE
+        # runtime like `_chunk`, and cleared by the same `state is None`
+        # signal, so a sequence never pools another sequence's chunks.
+        self._z_pending: list = []
+        # Z write blocks completed, the pointer `latent_stride` slows down.
+        self._z_chunk = 0
 
     def apply_gate_init(self) -> None:
         """(Re-)apply the designed gate initialisation.
@@ -662,6 +705,8 @@ class PrefixGatedBuffer(_PrefixBufferBase):
 
         if state is None:                       # chunk 1: adopt whole
             self._chunk = 1
+            self._z_pending = []                # new sequence: drop any pool
+            self._z_chunk = 0
             if self.route != "ring":
                 return self.route_candidate(cand_full)
             if K == W or self.fill == "grow":
@@ -693,10 +738,50 @@ class PrefixGatedBuffer(_PrefixBufferBase):
         # applied with fg == 1.
         idx = ((self._chunk * W) % K
                + torch.arange(W, device=state.device)) % K
+        if self.latent_stride > 1:
+            out = self._ring_split_pointers(state, cand_full, idx, W, K)
+            self._chunk += 1
+            return out
         sub, _, _ = self.gate_pair(state.index_select(1, idx), cand_full)
         out = state.index_copy(1, idx, sub)
         self._chunk += 1
         return out
+
+    def _ring_split_pointers(self, state: torch.Tensor,
+                             cand_full: torch.Tensor,
+                             idx_e: torch.Tensor, W: int,
+                             K: int) -> torch.Tensor:
+        """J6 `slow`: E on the per-chunk pointer, Z on the strided one.
+
+        E's half is gated and written exactly as it is on the shared path --
+        same rows, same gate, same order -- so the `slow` limb differs from
+        the control in the Z channel and nothing else.  Z's half is gated only
+        on the chunks that close a pooling window, and at its OWN block, which
+        advances once per window.  On every other chunk Z's rows pass through
+        untouched; index_copy is out-of-place, so autograd sees a pass-through
+        rather than a gate applied with fg == 1 (the same reason the shared
+        path gates only the W rows it touches).
+        """
+        e_s, z_s = self.split_channels(state)
+        e_c, z_c = self.split_channels(cand_full)
+        e_sub, _, _ = self.gate(e_s.index_select(1, idx_e), e_c)
+        out_e = e_s.index_copy(1, idx_e, e_sub)
+
+        self._z_pending.append(z_c)
+        if len(self._z_pending) >= self.latent_stride:
+            # MEAN, not sum: the pooled candidate has to enter the gate at the
+            # same scale a single chunk's would, or the `slow` limb would also
+            # be a scale change and veto 4's whole point would be lost.
+            pooled = torch.stack(self._z_pending, dim=0).mean(dim=0)
+            self._z_pending = []
+            idx_z = ((self._z_chunk * W)
+                     % K + torch.arange(W, device=state.device)) % K
+            z_sub, _, _ = self.gate_latent(z_s.index_select(1, idx_z), pooled)
+            out_z = z_s.index_copy(1, idx_z, z_sub)
+            self._z_chunk += 1
+        else:
+            out_z = z_s
+        return self.join_channels(out_e, out_z)
 
     def _slot_init_block(self) -> torch.Tensor:
         """`slot_init` widened to the carried width.

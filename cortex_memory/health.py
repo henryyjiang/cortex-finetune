@@ -197,6 +197,21 @@ def gate_param_health(buf, init_ref: Optional[dict] = None) -> dict:
         out["gate_z_left_init"] = bool(
             out["gate_in_z_w_norm"] > GATE_MOVED_MIN
             or out["gate_mem_z_w_norm"] > GATE_MOVED_MIN)
+        # J6 `slow`: the stride the buffer WAS BUILT WITH, and how many pooled
+        # Z blocks it has actually written this sequence.  z_blocks == 0 on a
+        # strided limb means the ring never filled, so the stride never
+        # engaged and the limb is the control -- the J5 failure mode, caught
+        # by a measured number instead of a passed flag.
+        # `z_buf_stride`, not `z_stride`: training_diag prefixes latent_runtime's
+        # keys with "z_" and merges them AFTER this dict, so a key named
+        # z_stride here would be silently overwritten by the cortex-side value.
+        # Keeping the two under different names makes them a CROSS-CHECK --
+        # the buffer was built with one and the graft configured with the
+        # other, and a disagreement means the flag reached one and not both.
+        out["z_buf_stride"] = int(getattr(buf, "latent_stride", 1))
+        if out["z_buf_stride"] > 1:
+            out["z_blocks"] = int(getattr(buf, "_z_chunk", 0))
+            out["z_pending"] = len(getattr(buf, "_z_pending", ()))
     out["summary_emb_norm"] = float(buf.summary_emb.detach().float().norm())
     if init_ref:
         for k, v in list(out.items()):
@@ -274,6 +289,15 @@ def latent_runtime(cortex) -> dict:
         "read_measured": bool(cortex.latent_read_measured),
         "read_grad_frac": float(cortex.latent_read_grad_frac),
         "write_grad_frac": float(cortex.latent_write_grad_frac),
+        # J6 `mix`.  The CONFIGURED rate and the MEASURED one, side by side and
+        # deliberately both: e_carry_read proved that a flag can parse, print
+        # and persist while doing nothing, and the only thing that catches
+        # that class of failure is a number the forward pass had to produce.
+        # mix_frac ~ 0 on a limb configured with p > 0 means the roll never
+        # fired and the limb IS the control.
+        "mix_p": float(getattr(cortex, "latent_read_scramble_p", 0.0)),
+        "mix_frac": float(getattr(cortex, "latent_mix_frac", 0.0)),
+        "stride": int(getattr(cortex, "latent_stride", 1)),
         "tape_len": len(getattr(cortex, "_z_tape", [])),
         "n_pre": int(getattr(cortex, "_n_pre", 0)),
         "n_zpre": int(getattr(cortex, "_n_zpre", 0)),

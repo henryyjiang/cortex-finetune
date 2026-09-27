@@ -84,6 +84,21 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 # 1.0 would score a 0.01-mult gate at 100x its trained value.
                 "latent_carry_read", "latent_read_gate_lr_mult",
                 "latent_scratch_forget_bias",
+                # J5.  e_carry_read was persisted by train.py but never copied
+                # here, so any eval that did not re-pass it on the command line
+                # rebuilt the Z-only limb WITH E's rows live and scored it as
+                # the treatment.  J5's read-outs happened to pass it
+                # explicitly; nothing made them.
+                "e_carry_read",
+                # J6.  latent_stride is the one that fails most quietly: it
+                # decides which rows hold which chunk, so an eval rebuilt
+                # without it reads the long-horizon limb's Z on the
+                # short-horizon schedule and reports the mismatch as the arm's
+                # result.  latent_read_scramble_p is training-only in effect
+                # (the mix is gated on self.training) but persists so the
+                # checkpoint records the condition it trained under, exactly
+                # as e_dropout does.
+                "latent_read_scramble_p", "latent_stride",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

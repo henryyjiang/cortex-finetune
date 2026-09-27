@@ -525,7 +525,19 @@ class TestTheSwitchesRefuseNeighbouringDesigns:
         # margin; reading one of those through a better reader re-runs attempt
         # 2's NO with a new read and the same empty channel.
         (dict(latent_encoding="tokens"), "latent_encoding endpoint"),
-        (dict(latent_encoding="delta"), "latent_encoding endpoint"),
+        # 'delta' was refused here until 2026-09-27 and is now J6's option-2
+        # limb.  D3 ranked the candidates by how well each DECODES the register
+        # file, which selects for overlap with E -- 'endpoint' won it by being
+        # the pre-coda twin of E, and adds ~1% over E for its trouble.  'delta'
+        # is the only candidate carrying the loop's INTERMEDIATE computation,
+        # and attempt 1 failed it on scale (deltas ~0.35 vs E's ~136), not on
+        # content.  'tokens' and 'scratch' stay refused: D3 measured those
+        # empty on content, which is a different verdict from untested.
+        # 'scratch' is refused one guard EARLIER (it needs latent_read
+        # 'scratch'), so it never reaches the embeds check and the message is
+        # a different one.  Asserted against the message it actually raises,
+        # not the one it would raise if the order changed.
+        (dict(latent_encoding="scratch"), "J3 scratchpad"),
         # both read sites on = the same Z entering twice, unattributable
         (dict(latent_s0_read=True), "latent_s0_read"),
         # J1's no-read flag would omit the columns, not blank them

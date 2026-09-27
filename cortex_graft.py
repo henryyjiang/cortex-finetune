@@ -378,6 +378,29 @@ class CortexMemory(nn.Module):
         # confuse with the treatment arm after the fact.
         self.latent_read_scramble = bool(
             getattr(config, "latent_read_scramble", False))
+        #   latent_read_scramble_p   J6's `mix` limb: the SAME roll, applied to
+        #                      a Bernoulli(p) subset of the micro-batch's rows
+        #                      instead of all of them.  The distinction is the
+        #                      whole arm.  At p=1.0 (`latent_read_scramble`)
+        #                      the carried Z is noise on every row, so the
+        #                      optimum is to IGNORE it -- J4's donor limb did
+        #                      exactly that and landed at carry 0.4367 against
+        #                      the real limb's 0.7481.  At 0 < p < 1 the rows
+        #                      are mixed, so "lean on the columns as capacity"
+        #                      is penalised on the rolled rows while "read the
+        #                      contents" pays on the rest: content-reading
+        #                      becomes the profitable strategy rather than a
+        #                      free one.  TRAINING ONLY -- see _latent_z_rows.
+        self.latent_read_scramble_p = float(
+            getattr(config, "latent_read_scramble_p", 0.0) or 0.0)
+        #   latent_stride      J6's `slow` limb: Z's ring pointer advances once
+        #                      per `latent_stride` chunks, writing that
+        #                      window's MEAN, so Z spans proportionally more
+        #                      history than E at coarser resolution -- the
+        #                      short-term / long-term split.  1 = J4's shared
+        #                      pointer.  See PrefixGatedBuffer for why the
+        #                      stride cannot engage during a `grow` fill.
+        self.latent_stride = int(getattr(config, "latent_stride", 1) or 1)
         # Z ATTEMPT 2 (J1) -- findings doc, "Attempt 2", Step 2.  Each is a
         # single-variable switch whose default reproduces every arm on record.
         #
@@ -574,7 +597,7 @@ class CortexMemory(nn.Module):
         if self.latent_read == "embeds":
             # J4.  Each clause below is a design that would silently become a
             # DIFFERENT design, so each raises instead of being tolerated.
-            if self.latent_encoding != "endpoint":
+            if self.latent_encoding not in ("endpoint", "delta"):
                 raise ValueError(
                     f"cortex.latent_read='embeds' (J4) is the read for the "
                     f"write D3 vindicated: pass --cortex.latent_encoding "
@@ -582,9 +605,28 @@ class CortexMemory(nn.Module):
                     "last-tokens writes ('tokens', 'scratch') holding ~1% of "
                     "E's register margin -- reading them through a better "
                     "reader would re-run attempt 2's NO with a new read and "
-                    "the same empty channel.  'delta' at these columns is a "
-                    "live alternative (j4_prereg.md S3) but a different arm; "
-                    "state it there before passing it here.")
+                    "the same empty channel.  'delta' IS now allowed here "
+                    "(J6's option-2 limb); 'tokens' and 'scratch' stay shut.")
+            # 'delta' admitted 2026-09-27, J6's `delta` limb.  WHY, given that
+            # D3 ranked `endpoint` first: D3 ranked the candidates by how well
+            # each DECODES THE REGISTER FILE, and that criterion selects for
+            # overlap with E -- decoding the registers well is exactly what E
+            # already does at +0.72.  `endpoint` won it by being s_T at the
+            # SUMMARY columns, i.e. the pre-coda twin of E, and the redundancy
+            # numbers say so: Z_end adds ~1% over E (increment_share -0.003 to
+            # +0.019 across six checkpoints) with only 15-27% of its norm
+            # outside E's span.  `delta` is the one candidate that samples the
+            # loop's INTERMEDIATE computation -- staggered trajectory deltas
+            # across depths, which the coda's output cannot contain by
+            # construction.  Attempt 1 tried it and failed on SCALE, not on
+            # content: deltas are ~0.35 in norm against E's ~136, and the s0
+            # site turned on only when Z drowned E.  The rms rescale below is
+            # what that arm never had, so this is the first fair test of the
+            # write.  Depth staggering is live here and inert under
+            # 'endpoint': latent_write() short-circuits to the single-slice
+            # _latent_state_write() for every encoding but 'delta', so
+            # latent_depth_{rule,lo,hi} are carried in the config and do
+            # NOTHING on J4/J5's arms.
             if self.latent_s0_read:
                 raise ValueError(
                     "cortex.latent_read='embeds' needs --cortex.latent_s0_read "
@@ -670,6 +712,34 @@ class CortexMemory(nn.Module):
                 "in-loop read arm; without the read it changes nothing and the "
                 "cell would be labelled a control while being a duplicate of "
                 "the baseline.")
+        # J6 `mix`.  Every way this flag can silently become another arm.
+        if not (0.0 <= self.latent_read_scramble_p <= 1.0
+                and math.isfinite(self.latent_read_scramble_p)):
+            raise ValueError(
+                f"cortex.latent_read_scramble_p must be in [0, 1]; got "
+                f"{self.latent_read_scramble_p!r}.")
+        if self.latent_read_scramble_p > 0.0:
+            if self.latent_read_scramble:
+                raise ValueError(
+                    "cortex.latent_read_scramble (p=1.0, J4's donor limb) and "
+                    "latent_read_scramble_p are the same mechanism at two "
+                    "rates and refuse each other.  Pass ONE: the bool for the "
+                    "always-rolled control, the float for J6's mixed limb.")
+            if self.latent_read == "none":
+                raise ValueError(
+                    "cortex.latent_read_scramble_p with latent_read='none' "
+                    "mixes a channel nothing reads.")
+            if not self.latent_carry_read:
+                raise ValueError(
+                    "cortex.latent_read_scramble_p with latent_carry_read="
+                    "false mixes carried rows that nothing reads.")
+            if self.latent_read_scramble_p == 1.0:
+                raise ValueError(
+                    "cortex.latent_read_scramble_p=1.0 IS "
+                    "latent_read_scramble, and the point of J6's `mix` limb is "
+                    "that it is not: at p=1 the carried Z is noise on every "
+                    "row and the optimum is to ignore it (J4's donor limb).  "
+                    "Pass the bool if that is the arm meant.")
         if self.latent_read_depth not in ("none", "matched"):
             raise ValueError(
                 f"cortex.latent_read_depth must be 'none' or 'matched'; got "
@@ -732,7 +802,8 @@ class CortexMemory(nn.Module):
                 fill=str(getattr(config, "gate_fill", "grow") or "grow"),
                 forget_bias_init=float(
                     getattr(config, "gate_forget_bias", 1.0) or 1.0),
-                carries_latent=self.latent_carry)
+                carries_latent=self.latent_carry,
+                latent_stride=self.latent_stride)
         elif pmode:
             raise ValueError(f"prefix_memory must be '', 'accum' or 'gated'; got {pmode!r}")
         else:
@@ -840,6 +911,14 @@ class CortexMemory(nn.Module):
         self._z_read_live = False
         self._z_read_n = 0
         self._z_read_live_n = 0
+        # J6 `mix`: rows actually rolled / rows offered.  RUN TOTALS, and they
+        # belong here beside _z_read_n rather than in _reset_runtime for the
+        # same reason that one does -- the quantity that matters is a
+        # training-run average, and a per-forward counter would report only
+        # the last batch.  The flag has to be PROVEN to have fired: e_carry_read
+        # parsed, printed and persisted correctly while doing nothing.
+        self._z_mixed_rows = 0
+        self._z_mix_rows = 0
         self._reset_runtime()
 
     @property
@@ -1745,6 +1824,34 @@ class CortexMemory(nn.Module):
                     "differ by nothing.  Raise per_device_bs or lower "
                     "accumulation.")
             z = torch.roll(z, shifts=1, dims=0)
+        elif self.latent_read_scramble_p > 0.0 and self.training:
+            # J6 `mix`: the same roll on a Bernoulli(p) SUBSET of the rows.
+            #
+            # TRAINING ONLY, and the guard is `self.training` rather than a
+            # flag the eval has to remember to clear.  Every read-out cell
+            # reaches this function with `latent_read_null` set and returns
+            # above; the OPERATING cell (E1Z1) sets no null and would fall
+            # through to here, so an un-gated mix would silently score the
+            # treatment limb on mixed Z and report it as the arm's own number.
+            #
+            # PER ROW, not per batch: both conditions then appear in every
+            # micro-batch, so the gradient that says "own Z pays, donor Z does
+            # not" is present in each step rather than alternating between
+            # steps.  Rows are drawn from the global RNG, so the draw is
+            # reproducible under the run's seed and shared with
+            # random_segments' convention.
+            if z.shape[0] < 2:
+                raise ValueError(
+                    "latent_read_scramble_p needs batch >= 2 -- a roll of a "
+                    "single row returns that same row, so the mixed limb would "
+                    "silently BE the control.  Raise per_device_bs or lower "
+                    "accumulation.")
+            rolled = torch.roll(z, shifts=1, dims=0)
+            take = (torch.rand(z.shape[0], device=z.device)
+                    < self.latent_read_scramble_p)
+            self._z_mixed_rows += int(take.sum().item())
+            self._z_mix_rows += int(take.numel())
+            z = torch.where(take.view(-1, *([1] * (z.dim() - 1))), rolled, z)
         return z
 
     def _packed_read_mask(self, x: torch.Tensor) -> Optional[torch.Tensor]:
@@ -1994,6 +2101,20 @@ class CortexMemory(nn.Module):
         """False when the modeling file never told us the split, so
         latent_read_grad_frac's 0.0 means 'unknown' and not 'dead'."""
         return self._z_read_n > 0
+
+    @property
+    def latent_mix_frac(self) -> float:
+        """Share of offered rows whose carried Z was actually rolled (J6 `mix`).
+
+        The MEASURED rate, not the configured one.  `latent_read_scramble_p`
+        is a request; this is what the run did.  Reads 0.0 on every other
+        limb, which is the same value a limb whose flag never reached the
+        model config would report -- so the smoke gate checks this against the
+        configured p rather than checking that the flag was passed.
+        """
+        if not self._z_mix_rows:
+            return 0.0
+        return self._z_mixed_rows / self._z_mix_rows
 
     @property
     def latent_write_grad_frac(self) -> float:
