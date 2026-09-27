@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --account=gts-aivanova7-lab
-#SBATCH -N 1 --gres=gpu:H100:1
+#SBATCH -N 1
+#SBATCH --gres=gpu:H200:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64GB
 #SBATCH -t 3:00:00

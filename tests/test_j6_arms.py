@@ -316,6 +316,33 @@ class TestTheFlagsSurviveEveryGate:
             f"{flag} is absent from the allowlist -- it would parse, print, "
             "persist and do nothing, and the limb would BE the control")
 
+    def test_j6_asks_for_the_gpu_j4_needed(self):
+        """Jobs 13641622_0..3: CUDA OOM at 79.16 of 79.18 GiB, six minutes in.
+
+        J6 asked for an H100 (80GB).  J4 and J5 both ask for an H200 (141GB),
+        and j4_joint.sbatch says why on the line next to it: "micro 2 did not
+        fit without it (13456835)" -- micro-batch 2 at this geometry was
+        already tight on the LARGER card WITH window_backward on.  J6 inherits
+        the geometry unchanged, so it inherits the requirement.
+
+        Also worth keeping: expandable_segments, which the allocator config
+        asks for, is NOT supported on these nodes ("expandable_segments not
+        supported on this platform"), so there is no fragmentation relief to
+        fall back on.  The card has to be big enough outright.
+        """
+        def gres(path):
+            m = re.search(r"^#SBATCH\s+.*--gres=(\S+)", _read(path), re.M)
+            return m.group(1) if m else None
+        def mem_gb(path):
+            m = re.search(r"^#SBATCH\s+--mem=(\d+)GB", _read(path), re.M)
+            return int(m.group(1)) if m else None
+        want, got = gres("pace/j4_joint.sbatch"), gres("pace/j6_arms.sbatch")
+        assert got == want, (
+            f"j6_arms.sbatch asks for {got}, j4_joint.sbatch for {want}.  J6 "
+            "runs J4's geometry at J4's micro-batch; a smaller card OOMs.")
+        assert mem_gb("pace/j6_arms.sbatch") >= mem_gb("pace/j4_joint.sbatch")
+        assert gres("pace/j6_readout.sbatch") == gres("pace/j5_readout.sbatch")
+
     def test_every_train_flag_j6_passes_is_one_j4_passes(self):
         """Jobs 13641080_0..3: all four limbs died in 29 seconds on
 
