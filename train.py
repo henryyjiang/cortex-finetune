@@ -369,9 +369,25 @@ class CLISettings:
             #   latent_write_only  J1's no-read limb, deliberately
             #   e_dropout          blank the spliced E rows of this share of
             #                      sequences per forward (training only)
+            #   e_carry_read       J5's Z-ONLY limb (false): the spliced E rows
+            #                      are ZEROS on every sequence, every chunk, in
+            #                      training and in eval.  DECLARING IT HERE IS
+            #                      NOT BOOKKEEPING -- it is what gives
+            #                      jsonargparse the bool type for
+            #                      `--cortex.e_carry_read false`.  Undeclared,
+            #                      that value reached the graft as the STRING
+            #                      "false", which is TRUTHY, so J5's treatment
+            #                      limb trained with E fully ON and only the
+            #                      smoke gate's z_e_spliced_norm caught it (job
+            #                      13618150_0).  Same hazard
+            #                      evals/model_utils.parse_config_overrides was
+            #                      written to close on the eval side; the
+            #                      training side closes it by declaring a typed
+            #                      default, and cortex_graft.py now refuses a
+            #                      str outright so it cannot reopen silently.
             latent_encoding="delta", latent_tok_pool=4,
             latent_read_znorm="none", latent_read_znorm_target=3.0,
-            latent_write_only=False, e_dropout=0.0,
+            latent_write_only=False, e_dropout=0.0, e_carry_read=True,
             # Z ATTEMPT 2 (J3), cortex_memory/scratchpad.py.  latent_read
             # 'scratch' + latent_encoding 'scratch' is the in-loop scratchpad;
             #   latent_carry_read          False = J3's no-read limb (carry

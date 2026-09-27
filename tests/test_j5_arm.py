@@ -463,3 +463,49 @@ class TestTheTokenizerPreflight:
         assert set("0123456789") <= set(m.CARRY_PIECES)
         assert "+" in m.CARRY_PIECES and "=" in m.CARRY_PIECES
         assert "A" in m.CARRY_PIECES and "P" in m.CARRY_PIECES
+
+
+class TestTheFlagSurvivesTheCommandLine:
+    """The bug the smoke gate caught on job 13618150_0.
+
+    `e_carry_read` was implemented in cortex_graft.py and unit-tested with a real
+    Python `False`, but never DECLARED in train.py's cortex default dict -- so
+    jsonargparse had no type for it, `--cortex.e_carry_read false` arrived as the
+    string "false", `bool("false")` is True, and J5's treatment limb trained with
+    E fully on.  Nothing in the loss curve showed it.  These tests are the two
+    halves of the fix, and they are here rather than in test_j4_embeds.py because
+    J5 is the arm that pays for it.
+    """
+
+    def test_train_py_declares_it_so_jsonargparse_can_type_it(self):
+        tp = _read("train.py")
+        blk = tp[tp.index("cortex: dict[str, Any] = field("):]
+        blk = blk[:blk.index("\n    )")]
+        body = "\n".join(l.split("#")[0] for l in blk.splitlines())
+        assert re.search(r"\be_carry_read\s*=\s*True\b", body), (
+            "e_carry_read must be declared in train.py's cortex default dict: "
+            "that declaration IS the type information jsonargparse uses to turn "
+            "--cortex.e_carry_read false into a real False.")
+
+    def test_every_cortex_flag_the_launcher_passes_is_declared(self):
+        # The systematic version: any undeclared flag has the same hole, and a
+        # future launcher adding one should fail here rather than on a GPU.
+        tp = _read("train.py")
+        blk = tp[tp.index("cortex: dict[str, Any] = field("):]
+        blk = blk[:blk.index("\n    )")]
+        body = "\n".join(l.split("#")[0] for l in blk.splitlines())
+        declared = set(re.findall(r"\b([a-z0-9_]+)\s*=", body))
+        sb = _read("pace/j5_joint.sbatch")
+        cmd = "\n".join(l for l in sb.splitlines() if not l.lstrip().startswith("#"))
+        passed = set(re.findall(r"--cortex\.([a-z0-9_]+)", cmd))
+        assert not (passed - declared), (
+            f"undeclared cortex flags: {sorted(passed - declared)} -- each one "
+            f"reaches the graft as a raw string")
+
+    def test_the_graft_refuses_a_string_instead_of_coercing_it(self):
+        import cortex_graft
+        assert "isinstance(_ecr, str)" in _read("cortex_graft.py")
+        # and the message has to name the trap, not just the type
+        src = _read("cortex_graft.py")
+        i = src.index("isinstance(_ecr, str)")
+        assert "bool('false') is True" in src[i:i + 900]

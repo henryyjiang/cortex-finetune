@@ -435,6 +435,26 @@ class CortexMemory(nn.Module):
         # No `or True`: that would turn an explicit False into True (the trap
         # latent_tok_pool's `or 4` already sprang once, a few lines up).
         _ecr = getattr(config, "e_carry_read", True)
+        # AND NO bool() ON A str, WHICH IS THE TRAP THAT ACTUALLY SPRANG.
+        # `bool("false")` is True, so when this flag was missing from train.py's
+        # cortex default dict jsonargparse had no type for it and handed the
+        # graft the STRING "false" -- and J5's Z-only limb trained with E fully
+        # ON, with a healthy loss curve and no symptom anywhere except the smoke
+        # gate's z_e_spliced_norm (job 13618150_0, 117 where 0 was required).
+        # The flag is declared now, so this branch should be unreachable from the
+        # CLI; it RAISES rather than coercing because a flag that silently
+        # inverts a limb's entire condition must never be guessable, and the next
+        # entry point (a hand-edited config.json, a new launcher) would otherwise
+        # reopen the hole in exactly the same shape.
+        if isinstance(_ecr, str):
+            raise TypeError(
+                f"cortex.e_carry_read arrived as the string {_ecr!r}, not a "
+                f"bool.  bool('false') is True, so this would run the E-ON "
+                f"condition under a Z-only limb's name.  Pass a real boolean: "
+                f"declare it in train.py's cortex dict (jsonargparse types it "
+                f"from the default) or route it through "
+                f"evals/model_utils.parse_config_overrides, which coerces "
+                f"'true'/'false' for exactly this reason.")
         self.e_carry_read = bool(True if _ecr is None else _ecr)
         # Z ATTEMPT 2 (J3) -- the in-loop scratchpad, cortex_memory/scratchpad.py.
         #
