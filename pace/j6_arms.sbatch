@@ -192,10 +192,10 @@ echo "         printed correctly for two runs while doing nothing.  The smoke"
 echo "         gate reads cortex_diag; that is the proof."
 
 python train.py \
-    --model_name_or_path $MODEL \
     --run_name $RUN_NAME \
-    --output_dir cortex-retrofit \
-    --dataset_path $ARM_DATA \
+    --out_path cortex-retrofit \
+    --model_name $MODEL \
+    --preprocessed_data_path $ARM_DATA \
     --max_length $MAX_LENGTH \
     --epochs 1 \
     --max_steps $MAX_STEPS \

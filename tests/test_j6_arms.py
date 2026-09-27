@@ -316,6 +316,37 @@ class TestTheFlagsSurviveEveryGate:
             f"{flag} is absent from the allowlist -- it would parse, print, "
             "persist and do nothing, and the limb would BE the control")
 
+    def test_every_train_flag_j6_passes_is_one_j4_passes(self):
+        """Jobs 13641080_0..3: all four limbs died in 29 seconds on
+
+            error: unrecognized arguments: --model_name_or_path ...
+                   --output_dir ... --dataset_path ...
+
+        because the invocation was copied from J4 starting at --max_length and
+        the three argument names above it were GUESSED.  train.py takes
+        --model_name, --out_path and --preprocessed_data_path.  jsonargparse
+        rejects unknown flags, so this failed loudly rather than silently --
+        but it burned a submission, and the launcher echo printed a correct
+        banner first, which is exactly how the e_carry_read bug read too.
+
+        J6 is a J4 clone plus arm flags, so any TOP-LEVEL flag it passes that
+        J4 does not is a typo until proven otherwise.  The cortex.* read flags
+        are exempt: J4 passes them through $READ_ARGS, where this parse cannot
+        see them.
+        """
+        exempt = {"--cortex.latent_read", "--cortex.latent_read_znorm",
+                  "--cortex.latent_read_znorm_target"}
+        def flags(path):
+            src = _read(path)
+            body = src[src.index("\npython train.py"):]
+            body = body[:body.index("\nRC=$?")]
+            return set(re.findall(r"^\s+(--[A-Za-z0-9_.]+)", body, re.M))
+        extra = flags("pace/j6_arms.sbatch") - flags("pace/j4_joint.sbatch") - exempt
+        assert not extra, (
+            f"j6_arms.sbatch passes {sorted(extra)} to train.py and "
+            "j4_joint.sbatch does not.  Either it is a typo (the 13641080 "
+            "failure) or it is new and belongs in this test's exempt set.")
+
     @pytest.mark.parametrize("flag", FLAGS + ("e_carry_read",))
     def test_it_reaches_the_eval_config(self, flag):
         src = _read("tools/prepare_eval_checkpoint.py")
