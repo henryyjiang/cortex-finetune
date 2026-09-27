@@ -1,0 +1,164 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-26-2026 20:08:32
+Job ID:    13618578
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j5_joint
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+  ok   vocab_size 100278 on both
+  ok   eos_token_id 100257 on both
+  ok   all 29 carry pieces keep their ids
+  ok   the 58-id probe string round-trips identically
+
+TOKENIZER MATCH -- the pack is safe under the model's tokenizer.
+=== J5 buffer-contents arm | limb=eonly | run=j5-a3z-endpoint-eonly-smoke ===
+    base:      ckpts/olmo8-cortex   (NO branch: step 0 -> stop 10, horizon 305176)
+    data:      data/j1_pg19fw50_carry20_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:  gated W=16 K=64 cc=8 grad_chunks=4 window_backward=1
+    depth:     mean_recurrence 8, backprop depth 8, RAMP OFF (see item 3)
+    packed:    64 E + 64 Z + 512 tokens + 16 summary = 656 columns
+    read:      --cortex.latent_read embeds --cortex.latent_read_znorm rms --cortex.latent_read_znorm_target 116.0 --cortex.latent_read_scramble false --cortex.e_carry_read true  --cortex.latent_carry_read false
+    schedule:  warmup 250 updates (absolute), save every 2000, diag every 1
+NVIDIA H200, 143771 MiB
+
+[W926 20:08:54.373027784 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Sat Sep 26 20:08:52: Time to load libraries: 5.88 seconds.
+--------------------------------------------------------------------
+------------------ Launching run j5-a3z-endpoint-eonly-smoke------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-03-020-18-0.pace.gatech.edu.
+GPU : NVIDIA H200. CUDA: 12.1.
+[cortex] memory ON: K=0 K_iter=0 ccot_direct=False accum_ccot=False (vecs=16/max=128) gated_accum=False prefix_memory=gated gate(K=64,route=ring,norm=tanh,init=zero,fill=grow) latent(Z on, rule=absolute,band=2..9,renorm=none,read=embeds,CARRY-UNREAD(no-read limb),EMBEDS(J4: Z as its own input_embeds columns),enc=endpoint,znorm=116.0) prefix_pos=tail prefix_eos_reset=False cross_chunks=8 carry_grad_chunks=4 random_segments=False lora_rank=0
+[cortex] Z channel ON.  latent_depth_rule='absolute' is P0.7's question (evals/diag_depth_band.py): P0.1 measured the band at a SINGLE T and cannot say whether 'informative' tracks the absolute step or the fraction of the loop.  If P0.7 has not reported, this run is asserting an answer it does not have -- record which, in this run's sbatch header.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:06<01:06, 66.98s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:09<00:00, 28.79s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:09<00:00, 34.52s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo8-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run yvdngvnm
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retrofit/wandb/run-20260926_201007-yvdngvnm
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run j5-a3z-endpoint-eonly-smoke
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/yvdngvnm
+wandb: updating run metadata
+wandb: uploading config.yaml; uploading output.log; uploading wandb-summary.json
+wandb: 
+wandb: Run history:
+wandb:              cortex/channels ▁▁▁▁▁▁▁▁▁▁
+wandb:      cortex/e_centred_cosine ▂▄▂▄█▁▆▃▃▅
+wandb:    cortex/e_eff_rank_entropy ▇▄▇▄▁▇▃█▇▅
+wandb: cortex/e_eff_rank_entropy_sq █▅█▄▁▇▃█▇▄
+wandb:         cortex/e_eff_rank_pr ▇▅▇▄▁▆▃▇█▃
+wandb:            cortex/e_row_norm ▃▇▅▃█▄▅▁▃▄
+wandb:          cortex/e_top1_share ▄▆▆▅▇▄█▅▁▇
+wandb:            cortex/fg_at_bias █████▇▆▅▃▁
+wandb:          cortex/fg_z_at_bias ▁▁▁▁▁▁▁▁▁▁
+wandb:        cortex/gate_in_w_norm ▁▁▂▂▃▄▅▆▇█
+wandb:                          +65 ...
+wandb: 
+wandb: Run summary:
+wandb:              cortex/channels 2
+wandb:      cortex/e_centred_cosine -0.00957
+wandb:    cortex/e_eff_rank_entropy 23.80628
+wandb: cortex/e_eff_rank_entropy_sq 5.37585
+wandb:         cortex/e_eff_rank_pr 3.34353
+wandb:            cortex/e_row_norm 114.18961
+wandb:          cortex/e_top1_share 0.45834
+wandb:            cortex/fg_at_bias 0.73105
+wandb:          cortex/fg_z_at_bias 0.73106
+wandb:        cortex/gate_in_w_norm 0.09439
+wandb:                          +65 ...
+wandb: 
+wandb: 🚀 View run j5-a3z-endpoint-eonly-smoke at: https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/yvdngvnm
+wandb: ⭐️ View project at: https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: cortex-retrofit/wandb/run-20260926_201007-yvdngvnm/logs
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]'] (undo post_init clobber)
+[cortex] override mean_backprop_depth 8 -> 8 (shorter TBPTT window)
+[cortex] override mean_recurrence 8 -> 8
+[cortex] window_backward: one backward per 4-chunk carry window (2 per row), so the peak holds 4 of 8 chunks' activations.  Same gradient as one backward per row, to fp summation order.
+GPU: cuda:0 | Step:    2 | Updates:    1 | Time/step: 19.0529 | Tok/sec=   429.96 | Loss: 10.1204 / log-ppl: 24845.2383 | Grad-Norm 461.4356 | ClipCoef 0.0022 | Peak-Mem 83.85GiB
+[timeout-save] walltime deadline resolved: 2565s from now
+GPU: cuda:0 | Step:    4 | Updates:    2 | Time/step: 2.3021 | Tok/sec=  3558.47 | Loss: 9.8897 / log-ppl: 19726.8164 | Grad-Norm 578.6584 | ClipCoef 0.0017 | Peak-Mem 90.73GiB
+GPU: cuda:0 | Step:    6 | Updates:    3 | Time/step: 1.8844 | Tok/sec=  4347.20 | Loss: 10.1758 / log-ppl: 26259.7012 | Grad-Norm 491.5285 | ClipCoef 0.0020 | Peak-Mem 90.60GiB
+GPU: cuda:0 | Step:    8 | Updates:    4 | Time/step: 1.9716 | Tok/sec=  4154.92 | Loss: 9.8980 / log-ppl: 19890.2207 | Grad-Norm 425.7288 | ClipCoef 0.0023 | Peak-Mem 90.73GiB
+GPU: cuda:0 | Step:   10 | Updates:    5 | Time/step: 1.1230 | Tok/sec=  7294.61 | Loss: 10.0602 / log-ppl: 23392.7773 | Grad-Norm 424.4073 | ClipCoef 0.0024 | Peak-Mem 60.88GiB
+GPU: cuda:0 | Step:   12 | Updates:    6 | Time/step: 1.8185 | Tok/sec=  4504.93 | Loss: 9.5059 / log-ppl: 13439.3252 | Grad-Norm 340.8887 | ClipCoef 0.0029 | Peak-Mem 90.60GiB
+GPU: cuda:0 | Step:   14 | Updates:    7 | Time/step: 1.8862 | Tok/sec=  4343.04 | Loss: 9.6190 / log-ppl: 15047.3691 | Grad-Norm 548.0889 | ClipCoef 0.0018 | Peak-Mem 75.87GiB
+GPU: cuda:0 | Step:   16 | Updates:    8 | Time/step: 1.8006 | Tok/sec=  4549.47 | Loss: 9.5310 / log-ppl: 13780.7607 | Grad-Norm 592.9469 | ClipCoef 0.0017 | Peak-Mem 90.72GiB
+GPU: cuda:0 | Step:   18 | Updates:    9 | Time/step: 1.1200 | Tok/sec=  7314.55 | Loss: 9.9597 / log-ppl: 21156.0977 | Grad-Norm 284.5125 | ClipCoef 0.0035 | Peak-Mem 68.44GiB
+GPU: cuda:0 | Step:   20 | Updates:   10 | Time/step: 1.5449 | Tok/sec=  5302.62 | Loss: 9.5986 / log-ppl: 14743.6670 | Grad-Norm 249.8348 | ClipCoef 0.0040 | Peak-Mem 90.73GiB
+[stop_at_step] reached 10 — ending this phase (schedule horizon max_steps=305176 unchanged)
+[rank 0] Saved checkpoint @ step 10
+--------------------------------------------------------------------
+Training time: 0:02:53.114157 
+Max. Mem allocated: 12.162 GB. Max. Mem reserved: 91.104 GB.
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Run None finished without error.
+---------Total time: 0:03:02.446926 ---------
+-----------------Shutdown complete.--------------------------
+
+=== SMOKE GATE | j5-a3z-endpoint-eonly-smoke | limb=eonly ===
+  ok   10 diag rows, steps 1..10
+  ok   z_znorm_target 116.0 on every row
+  ok   z_e_carry_read 1 on every row
+  ok   z_e_spliced_norm 114.56..115.20 (E is on)
+  ok   z_n_zpre max 64 of 64
+  ok   z_e_carried_norm mean 114.88 vs target 116.00 (99%)
+  ok   z_embed_ratio exactly 0 (the E-only limb reads no Z)
+  ok   z_read_grad_frac min 1.0
+  ok   z_write_grad_frac max 1.000
+  ok   loop iterations 3..13, mean 7.7
+  ok   loss 10.1204 -> 9.5986, all finite
+
+SMOKE GATE PASSED -- the real limbs may launch.
+  diag kept at logs/j5_smoke/j5-a3z-endpoint-eonly-smoke-13618573.jsonl
+  checkpoints removed; DELETE THE RUN DIR before any re-smoke
+5.2G	cortex-retrofit/j5-a3z-endpoint-eonly-smoke
+
+J5 eonly DONE -> cortex-retrofit/j5-a3z-endpoint-eonly-smoke
+  In-flight record: cortex-retrofit/j5-a3z-endpoint-eonly-smoke/cortex_diag.jsonl
+  READ THESE FIRST:
+    z_e_spliced_norm  0 on zonly, > 0 on eonly/both -- the MEASURED
+                      proof each limb ran its own condition
+    z_embed_ratio     ||Z col||/||E col||, ~1.0 at step 0 on
+                      zonly/both, EXACTLY 0 on eonly; the trajectory
+                      is the read-strength reading
+    z_e_carried_norm  confirms ZNORM_TARGET was right on this base
+    num_steps_*       the loop must be running near 8, not 1
+    z_write_grad_frac on zonly the write is the ONLY thing the loss
+                      can improve through the memory
+  Read-out: STEP=2000 sbatch pace/j5_readout.sbatch, then STEP=4000,
+  then pace/j5_verdict.sbatch -- under ../j5_prereg.md and nothing else.
+---------------------------------------
+Begin Slurm Epilog: Sep-26-2026 20:11:50
+Job ID:        13618578
+Array Job ID:  13618573_1
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j5_joint
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=00:26:40,vmem=0,walltime=00:03:20,mem=15148672K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-18-0
+---------------------------------------
