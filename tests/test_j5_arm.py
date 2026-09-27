@@ -509,3 +509,74 @@ class TestTheFlagSurvivesTheCommandLine:
         src = _read("cortex_graft.py")
         i = src.index("isinstance(_ecr, str)")
         assert "bool('false') is True" in src[i:i + 900]
+
+
+class TestTheFlagReachesTheModelConfig:
+    """The bug that survived the first fix (jobs 13618150_0 AND 13618573_0).
+
+    train.py has TWO independent gates a cortex flag must pass, and
+    e_carry_read failed the second one for both smoke runs:
+
+      1. the `cortex` default dict -- what jsonargparse types the CLI value from
+      2. the ALLOWLIST at train.py's `for _k in (...): setattr(config, _k, ...)`
+         -- the only thing that copies a cortex flag onto the model config
+
+    Passing (1) and failing (2) is silent: `getattr(config, "e_carry_read", True)`
+    falls through to its default, so the Z-only limb spliced full-norm E rows
+    with a perfectly healthy loss curve.  Only the smoke gate's
+    z_e_spliced_norm caught it.
+    """
+
+    #: Flags the launcher passes that legitimately do NOT persist onto the
+    #: config: training-time behaviour, or re-supplied at eval.  Named
+    #: individually so adding a flag here is a decision, not an oversight.
+    NEED_NOT_PERSIST = {
+        "carry_grad_chunks",   # TBPTT window: training only
+        "window_backward",     # backward scheduling: training only
+        "freeze_loop",         # which params get gradient: training only
+        "memory_lr",           # an optimizer group: training only
+        "diag_interval",       # how often health rows are written
+        "cross_chunks",        # the eval sets its own --n_chunks
+        "eos_from_tokens",     # re-supplied by the read-out's --set flags
+    }
+
+    @staticmethod
+    def _allowlist():
+        tp = _read("train.py")
+        i = tp.index('    if cfg.cortex["use_memory"]:')
+        j = tp.index("setattr(config, _k, cfg.cortex[_k])", i)
+        blk = "\n".join(l.split("#")[0] for l in tp[i:j].splitlines())
+        return set(re.findall(r'"([a-z0-9_]+)"', blk))
+
+    @staticmethod
+    def _passed():
+        sb = _read("pace/j5_joint.sbatch")
+        cmd = "\n".join(l for l in sb.splitlines()
+                        if not l.lstrip().startswith("#"))
+        return set(re.findall(r"--cortex\.([a-z0-9_]+)", cmd))
+
+    def test_e_carry_read_is_persisted(self):
+        assert "e_carry_read" in self._allowlist(), (
+            "e_carry_read must be in train.py's setattr allowlist or it never "
+            "reaches the model config and the Z-only limb trains with E ON")
+
+    def test_the_flags_the_limbs_differ_in_are_all_persisted(self):
+        # These two ARE the limb set.  A flag missing here does not degrade the
+        # arm, it merges two limbs into one model under two names.
+        allow = self._allowlist()
+        for flag in ("e_carry_read", "latent_carry_read"):
+            assert flag in allow, f"{flag} does not reach the model config"
+
+    def test_every_passed_flag_either_persists_or_is_named_exempt(self):
+        gap = self._passed() - self._allowlist() - self.NEED_NOT_PERSIST
+        assert not gap, (
+            f"cortex flags the launcher passes that neither persist nor are "
+            f"listed as exempt: {sorted(gap)}.  Either add them to train.py's "
+            f"allowlist or add them to NEED_NOT_PERSIST with a reason.")
+
+    def test_the_exemptions_are_really_exempt(self):
+        # Guard the guard: if a flag is added to the allowlist later, it should
+        # drop out of the exemption set rather than sit in both.
+        both = self.NEED_NOT_PERSIST & self._allowlist()
+        assert not both, f"listed exempt but also persisted: {sorted(both)}"
+

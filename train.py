@@ -1154,6 +1154,20 @@ def startup(cfg: CLISettings):
                    "latent_encoding", "latent_tok_pool", "latent_read_znorm",
                    "latent_read_znorm_target", "latent_write_only",
                    "e_dropout",
+                   # J5.  THIS LIST IS WHY e_carry_read DID NOTHING FOR TWO
+                   # SMOKE RUNS (jobs 13618150_0 and 13618573_0).  The flag was
+                   # implemented in cortex_graft.py, reported by
+                   # cortex_memory/health.py, unit-tested ten ways and passed
+                   # correctly on the command line -- but this loop is the ONLY
+                   # thing that copies a cortex flag onto the model config, it
+                   # is an allowlist, and the key was not in it.  So
+                   # `getattr(config, "e_carry_read", True)` fell through to its
+                   # default, the Z-only limb spliced full-norm E rows, and the
+                   # loss curve looked perfect.  It belongs in the same class as
+                   # latent_read_scramble and latent_carry_read: the key that
+                   # lets a limb rebuild as ITSELF, without which the treatment
+                   # limb and the control are the same model under two names.
+                   "e_carry_read",
                    # J3.  latent_read_gate_lr_mult persists HARDEST of these:
                    # the stored gate parameter is gate/mult, so a checkpoint
                    # rebuilt at mult 1.0 would read a 0.01-mult gate at 100x.
