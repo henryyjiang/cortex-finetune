@@ -1,0 +1,28 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-27-2026 13:34:12
+Job ID:    13642208
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j6_readout
+Partition: gpu-h100
+QOS:       inferno
+---------------------------------------
+=== J6 read-out | limb=ctrl | step 93552 ===
+    run:        j6-a3z-ctrl
+    checkpoint: cortex-retrofit/j6-a3z-ctrl/checkpoint_93552
+NVIDIA H100 80GB HBM3, 81559 MiB
+ERROR: no cortex-retrofit/j6-a3z-ctrl/checkpoint_93552/chkpt.pt.  Present:
+  (no checkpoint dirs at all)
+---------------------------------------
+Begin Slurm Epilog: Sep-27-2026 13:34:14
+Job ID:        13642208
+Array Job ID:  13641623_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j6_readout
+Resources:     cpu=8,gres/gpu:h100=1,mem=64G,node=1
+Rsrc Used:     cput=00:00:16,vmem=0,walltime=00:00:02,mem=38964K,energy_used=0
+Partition:     gpu-h100
+QOS:           inferno
+Nodes:         atl1-1-03-008-22-0
+---------------------------------------
