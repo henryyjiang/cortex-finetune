@@ -1,0 +1,81 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-27-2026 12:52:41
+Job ID:    13641295
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j6_arms
+Partition: gpu-h100
+QOS:       inferno
+---------------------------------------
+  ok   same dir (ckpts/olmo-retrofit-cortex) -- nothing to compare
+=== J6 | limb=delta | run=j6-a3z-delta ===
+    base:      ckpts/olmo-retrofit-cortex
+    branch:    cortex-retrofit/retro-b2-heal/checkpoint_91552_w16  (step 91552 -> stop 93552, horizon 305176)
+    data:      data/j1_pg19fw50_carry20_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:  gated W=16 K=64 cc=8 grad_chunks=4 wb=1
+    encoding:  delta   znorm rms -> 136.0
+    arm args:  --cortex.latent_read_scramble false --cortex.e_carry_read true --cortex.latent_carry_read true
+    NOTE the echo above is NOT proof a flag took effect -- e_carry_read
+         printed correctly for two runs while doing nothing.  The smoke
+         gate reads cortex_diag; that is the proof.
+usage: train.py [--config CONFIG] [--run_name RUN_NAME] [--out_path OUT_PATH]
+                [--resume_path RESUME_PATH] [--branch_path BRANCH_PATH]
+                [--save_n_mins_before_timeout SAVE_N_MINS_BEFORE_TIMEOUT]
+                [--preprocessed_data_path PREPROCESSED_DATA_PATH]
+                [--dataset_location DATASET_LOCATION]
+                [--dataset_args DATASET_ARGS]
+                [--dataset_config DATASET_CONFIG] [--max_length MAX_LENGTH]
+                [--max_samples MAX_SAMPLES]
+                [--micro_batch_size MICRO_BATCH_SIZE] [--compile {true,false}]
+                [--max_steps MAX_STEPS] [--stop_at_step STOP_AT_STEP]
+                [--epochs EPOCHS] [--batch_size BATCH_SIZE]
+                [--optim_config OPTIM_CONFIG]
+                [--scheduler_args SCHEDULER_ARGS]
+                [--save_interval SAVE_INTERVAL] [--model_name MODEL_NAME]
+                [--wandb_disabled {true,false}] [--seed SEED]
+                [--fix_num_steps {true,false}]
+                [--force_num_steps FORCE_NUM_STEPS]
+                [--train_read_only {true,false}]
+                [--init_from_scratch {true,false}]
+                [--take_loss_over_all_tokens {true,false}]
+                [--max_grad_norm MAX_GRAD_NORM]
+                [--max_nonfinite_skips MAX_NONFINITE_SKIPS]
+                [--override_mean_backprop_depth OVERRIDE_MEAN_BACKPROP_DEPTH]
+                [--override_mean_recurrence OVERRIDE_MEAN_RECURRENCE]
+                [--bf16_true {true,false}]
+                [--compile_warmup_routine {true,false}]
+                [--no_amp {true,false}] [--is_parquet_dataset {true,false}]
+                [--ignore_past_parquet_dataset {true,false}]
+                [--reset_dataset_position {true,false}]
+                [--parquet_dataset_max_tokens PARQUET_DATASET_MAX_TOKENS]
+                [--ignore_past_scheduler {true,false}]
+                [--mean_recurrence_schedule MEAN_RECURRENCE_SCHEDULE]
+                [--mean_backprop_depth_schedule MEAN_BACKPROP_DEPTH_SCHEDULE]
+                [--no_monkeypatch_on_jonas_init {true,false}]
+                [--throttle {true,false}] [--non_recurrent_model {true,false}]
+                [--muon MUON] [--use_ellis_adam USE_ELLIS_ADAM]
+                [--parquet_epoching_flag_use_with_real_caution PARQUET_EPOCHING_FLAG_USE_WITH_REAL_CAUTION]
+                [--cortex CORTEX]
+tip: For details of accepted options run: train.py --help
+error: unrecognized arguments: --model_name_or_path ckpts/olmo-retrofit-cortex --output_dir cortex-retrofit --dataset_path data/j1_pg19fw50_carry20_len4096
+Sun Sep 27 12:52:51: Time to load libraries: 7.66 seconds.
+--------------------------------------------------------------------
+Run finished with errors.
+---------Total time: 0:00:07.692152 ---------
+-----------------Shutdown complete.--------------------------
+
+Next (job 2 of 2):
+  sbatch --dependency=afterany:$SLURM_ARRAY_JOB_ID pace/j6_readout.sbatch
+---------------------------------------
+Begin Slurm Epilog: Sep-27-2026 12:52:51
+Job ID:        13641295
+Array Job ID:  13641080_2
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j6_arms
+Resources:     cpu=8,gres/gpu:h100=1,mem=96G,node=1
+Rsrc Used:     cput=00:01:20,vmem=0,walltime=00:00:10,mem=415556K,energy_used=0
+Partition:     gpu-h100
+QOS:           inferno
+Nodes:         atl1-1-03-008-32-0
+---------------------------------------
