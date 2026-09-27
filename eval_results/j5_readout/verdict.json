@@ -1,0 +1,415 @@
+{
+  "experiment": "j5",
+  "encoding": "endpoint",
+  "deciding_step": 4000,
+  "steps": {
+    "4000": {
+      "step": 4000,
+      "vetoes": [],
+      "limbs": {
+        "zonly": {
+          "operating_cell": "E0Z1",
+          "carry_nll": 2.306536012827142,
+          "chance": 2.302585092994046,
+          "margin_vs_chance": -0.003950919833096034,
+          "X_off": {
+            "mean": 0.06710682192234939,
+            "lo": 0.06285383714927292,
+            "hi": 0.07181861675092409,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.3736428347494907,
+            "real_nll": 2.306536012827142
+          },
+          "X_content": {
+            "mean": 0.005926186175955605,
+            "lo": 0.004948728780694774,
+            "hi": 0.006992083116894937,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.3124621990030954,
+            "real_nll": 2.306536012827142
+          },
+          "reading": "AT_CHANCE"
+        },
+        "eonly": {
+          "operating_cell": "E1Z0",
+          "carry_nll": 2.306306503452699,
+          "chance": 2.302585092994046,
+          "margin_vs_chance": -0.0037214104586529295,
+          "X_off": null,
+          "X_content": null,
+          "E_margin": {
+            "mean": 0.11258886161226789,
+            "lo": 0.10672269380913085,
+            "hi": 0.11897462460056528,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.418895365064967,
+            "real_nll": 2.306306503452699
+          },
+          "reading": "E_DID_NOT_LEARN"
+        },
+        "both": {
+          "operating_cell": "E1Z1",
+          "carry_nll": 2.3068920482246416,
+          "chance": 2.302585092994046,
+          "margin_vs_chance": -0.004306955230595655,
+          "X_off": {
+            "mean": 0.006034633653207637,
+            "lo": 0.005420272851630883,
+            "hi": 0.006654087114786158,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.3129266818778507,
+            "real_nll": 2.3068920482246416
+          },
+          "X_content": {
+            "mean": -1.5880079761683893e-06,
+            "lo": -4.346064540114251e-06,
+            "hi": 1.2113471003042757e-06,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.306890460216667,
+            "real_nll": 2.3068920482246416
+          },
+          "E_margin_ood": {
+            "mean": 0.38302940864055623,
+            "lo": 0.35404126550791964,
+            "hi": 0.41150855109456996,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.6959560905184086,
+            "real_nll": 2.3129266818778507
+          },
+          "z_alone_ood": 2.392842759427474,
+          "reading": "AT_CHANCE"
+        }
+      },
+      "local_nll": {
+        "zonly": 0.024435702309100745,
+        "eonly": 0.024348456513300764,
+        "both": 0.0005725003884426356
+      },
+      "task_learned": {
+        "zonly": true,
+        "eonly": true,
+        "both": true
+      },
+      "no_carry_floor": 2.3736428347494907,
+      "between_limb": {
+        "note": "DRIFT-SUBJECT: E's own carry skill moves 0.37-0.85 nats across ten same-seed runs.  These label nothing.",
+        "carry_nll": {
+          "zonly": 2.306536012827142,
+          "eonly": 2.306306503452699,
+          "both": 2.3068920482246416
+        },
+        "zonly_minus_eonly": 0.00022950937444310426,
+        "both_minus_eonly": 0.0005855447719427254
+      },
+      "e_health": {
+        "eonly_carry_nll": 2.306306503452699,
+        "band": [
+          0.37,
+          0.85
+        ],
+        "max": 1.2,
+        "degraded": true
+      },
+      "pg19": {
+        "zonly": {
+          "nll": 3.515761521137369,
+          "X_off": {
+            "mean": 0.07541791655064874,
+            "lo": 0.07181070136265208,
+            "hi": 0.07832331120644513,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.591179437688015,
+            "real_nll": 3.515761521137369
+          },
+          "X_content": {
+            "mean": 0.07978038648223312,
+            "lo": 0.07177283898159696,
+            "hi": 0.09125105261362787,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.595541907619604,
+            "real_nll": 3.515761521137369
+          }
+        },
+        "eonly": {
+          "nll": 3.5367667519170314,
+          "E_margin": {
+            "mean": 0.1313428411240099,
+            "lo": 0.11819261031153819,
+            "hi": 0.14386587067485596,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.668109593041037,
+            "real_nll": 3.5367667519170314
+          }
+        },
+        "both": {
+          "nll": 3.516337330552102,
+          "X_off": {
+            "mean": 0.02742058343293287,
+            "lo": 0.02379602700674613,
+            "hi": 0.030105981155423064,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.543757913985033,
+            "real_nll": 3.516337330552102
+          },
+          "X_content": {
+            "mean": 3.822665301692389e-05,
+            "lo": -2.219340147400131e-05,
+            "hi": 0.0001328113404187428,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.516375557205119,
+            "real_nll": 3.516337330552102
+          }
+        },
+        "ragged_rows_dropped": 50
+      },
+      "answer": "NO: the carried loop state does not learn to carry content even with a trained latent space, no competitor and full pressure on every carry row",
+      "reading": "AT_CHANCE"
+    },
+    "2000": {
+      "step": 2000,
+      "vetoes": [],
+      "limbs": {
+        "zonly": {
+          "operating_cell": "E0Z1",
+          "carry_nll": 2.3053422616882275,
+          "chance": 2.302585092994046,
+          "margin_vs_chance": -0.002757168694181633,
+          "X_off": {
+            "mean": 0.039987930241265277,
+            "lo": 0.037223059730457426,
+            "hi": 0.042864335368392695,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.345330191929493,
+            "real_nll": 2.3053422616882275
+          },
+          "X_content": {
+            "mean": 0.0009048021511560863,
+            "lo": 0.00044899727518959173,
+            "hi": 0.0014033162160173355,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.306247063839382,
+            "real_nll": 2.3053422616882275
+          },
+          "reading": "AT_CHANCE"
+        },
+        "eonly": {
+          "operating_cell": "E1Z0",
+          "carry_nll": 2.3059412466630107,
+          "chance": 2.302585092994046,
+          "margin_vs_chance": -0.003356153668964801,
+          "X_off": null,
+          "X_content": null,
+          "E_margin": {
+            "mean": 0.04952786610265047,
+            "lo": 0.04728188901146553,
+            "hi": 0.051749321497139594,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.3554691127656584,
+            "real_nll": 2.3059412466630107
+          },
+          "reading": "E_DID_NOT_LEARN"
+        },
+        "both": {
+          "operating_cell": "E1Z1",
+          "carry_nll": 2.305818765935022,
+          "chance": 2.302585092994046,
+          "margin_vs_chance": -0.0032336729409760956,
+          "X_off": {
+            "mean": 0.038469669191306205,
+            "lo": 0.036797527831346946,
+            "hi": 0.04011337401991789,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.3442884351263276,
+            "real_nll": 2.305818765935022
+          },
+          "X_content": {
+            "mean": -3.009696515121618e-08,
+            "lo": -2.0635760252233717e-06,
+            "hi": 1.997119075315782e-06,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.3058187358380566,
+            "real_nll": 2.305818765935022
+          },
+          "E_margin_ood": {
+            "mean": 0.11838896456572932,
+            "lo": 0.11161943971576323,
+            "hi": 0.1250389159821165,
+            "n": 300,
+            "n_clusters": 300,
+            "cmp_nll": 2.4626773996920597,
+            "real_nll": 2.3442884351263276
+          },
+          "z_alone_ood": 2.3491754427680167,
+          "reading": "AT_CHANCE"
+        }
+      },
+      "local_nll": {
+        "zonly": 0.024098736447758104,
+        "eonly": 0.024069310770311058,
+        "both": 0.0240097589886568
+      },
+      "task_learned": {
+        "zonly": true,
+        "eonly": true,
+        "both": true
+      },
+      "no_carry_floor": 2.345330191929493,
+      "between_limb": {
+        "note": "DRIFT-SUBJECT: E's own carry skill moves 0.37-0.85 nats across ten same-seed runs.  These label nothing.",
+        "carry_nll": {
+          "zonly": 2.3053422616882275,
+          "eonly": 2.3059412466630107,
+          "both": 2.305818765935022
+        },
+        "zonly_minus_eonly": -0.0005989849747831677,
+        "both_minus_eonly": -0.00012248072798870524
+      },
+      "e_health": {
+        "eonly_carry_nll": 2.3059412466630107,
+        "band": [
+          0.37,
+          0.85
+        ],
+        "max": 1.2,
+        "degraded": true
+      },
+      "pg19": {
+        "zonly": {
+          "nll": 3.5913918189529332,
+          "X_off": {
+            "mean": 0.07678268103402126,
+            "lo": 0.07371819198131564,
+            "hi": 0.08097003930776607,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.6681744999869514,
+            "real_nll": 3.5913918189529332
+          },
+          "X_content": {
+            "mean": 0.06252853712987559,
+            "lo": 0.05746552289413114,
+            "hi": 0.06903642280535263,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.6539203560828093,
+            "real_nll": 3.5913918189529332
+          }
+        },
+        "eonly": {
+          "nll": 3.6135385919088603,
+          "E_margin": {
+            "mean": 0.10273647081580725,
+            "lo": 0.09773890512988805,
+            "hi": 0.10902140427565563,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.716275062724661,
+            "real_nll": 3.6135385919088603
+          }
+        },
+        "both": {
+          "nll": 3.58927285480037,
+          "X_off": {
+            "mean": 0.039440041333603695,
+            "lo": 0.037278154982216725,
+            "hi": 0.04238437452873626,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.628712896133972,
+            "real_nll": 3.58927285480037
+          },
+          "X_content": {
+            "mean": -0.0002884969743318334,
+            "lo": -0.0007438442626652212,
+            "hi": 0.00011970215484876275,
+            "n": 383,
+            "n_clusters": 18,
+            "cmp_nll": 3.588984357826038,
+            "real_nll": 3.58927285480037
+          }
+        },
+        "ragged_rows_dropped": 50
+      },
+      "answer": "NO: the carried loop state does not learn to carry content even with a trained latent space, no competitor and full pressure on every carry row",
+      "reading": "AT_CHANCE"
+    }
+  },
+  "answer": "NO: the carried loop state does not learn to carry content even with a trained latent space, no competitor and full pressure on every carry row",
+  "embed_ratio": {
+    "j5-a3z-endpoint-zonly": {
+      "first_step": 25,
+      "first": 1.0722401561763337,
+      "last_step": 4000,
+      "last": 3.034378282935467,
+      "window": 4,
+      "last_over_first": 2.8299427749061588,
+      "collapsed": false
+    },
+    "j5-a3z-endpoint-eonly": {
+      "first_step": 25,
+      "first": 0.0,
+      "last_step": 4000,
+      "last": 0.0,
+      "window": 4,
+      "last_over_first": null,
+      "collapsed": false
+    },
+    "j5-a3z-endpoint-both": {
+      "first_step": 25,
+      "first": 1.340218433900108,
+      "last_step": 4000,
+      "last": 4.248944067998108,
+      "window": 4,
+      "last_over_first": 3.170336984273117,
+      "collapsed": false
+    }
+  },
+  "constants": {
+    "LN10": 2.302585092994046,
+    "TASK_LEARNED_LOCAL_MAX": 1.151292546497023,
+    "MIN_EFFECT_CARRY": 0.05,
+    "LEAK_MARGIN": 0.25,
+    "E_CARRY_MAX": 1.2,
+    "E_CARRY_BAND": [
+      0.37,
+      0.85
+    ],
+    "NOREAD_ZMAIN_TOL": 0.0001,
+    "PAIR_MIN_FRAC": 0.9
+  },
+  "trajectory": {
+    "from_step": 2000,
+    "to_step": 4000,
+    "note": "descriptive: the direction, not a decision rule",
+    "available": true,
+    "zonly": {
+      "d_carry_nll": 0.0011937511389144007,
+      "d_X_content": 0.005021384024799519,
+      "d_X_off": 0.027118891681084112
+    },
+    "eonly": {
+      "d_carry_nll": 0.0003652567896881287
+    },
+    "both": {
+      "d_carry_nll": 0.0010732822896195593,
+      "d_X_content": -1.5579110110171731e-06,
+      "d_X_off": -0.03243503553809857
+    }
+  }
+}

@@ -1,0 +1,116 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-27-2026 05:02:00
+Job ID:    13619081
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j5_verdict
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+total 776
+drwxr-xr-x.  2 hjiang420 pace-aivanova7   4096 Sep 27 05:02 .
+drwxr-xr-x. 10 hjiang420 pace-aivanova7  40960 Sep 27 05:02 ..
+-rw-r--r--.  1 hjiang420 pace-aivanova7 249726 Sep 27 05:02 j5-a3z-endpoint-both.jsonl
+-rw-r--r--.  1 hjiang420 pace-aivanova7 238036 Sep 27 05:02 j5-a3z-endpoint-eonly.jsonl
+-rw-r--r--.  1 hjiang420 pace-aivanova7 240442 Sep 27 05:02 j5-a3z-endpoint-zonly.jsonl
+==============================================================================
+J5 VERDICT, step 4000 (pre-registered: evals/score_j5.py, ../j5_prereg.md)
+  Each limb is scored IN ITS OWN TRAINED CELL.  X = NLL(ablated) - NLL(operating);
+  POSITIVE = the live channel is better.  Chance (no information) = ln 10 = 2.3026.
+==============================================================================
+  local-answer NLL (task learned <= 1.1513):
+    zonly  0.0244  learned
+    eonly  0.0243  learned
+    both   0.0006  learned
+  no-carry floor (zonly, both channels off)  2.3736  (leak if < 2.0526)
+
+  --- ZONLY (cell E0Z1) -> AT_CHANCE
+      carry NLL       2.3065   margin under chance -0.0040  (needs > 0.05)
+      X_content       +0.0059 [+0.0049, +0.0070] n=300   (donor's Z minus own Z -- THE deciding cell)
+      X_off           +0.0671 [+0.0629, +0.0718] n=300   (Z skipped minus own Z -- load, not content)
+  --- EONLY (cell E1Z0) -> E_DID_NOT_LEARN
+      carry NLL       2.3063   margin under chance -0.0037  (needs > 0.05)
+      E_margin        +0.1126 [+0.1067, +0.1190] n=300   (E off minus E on -- THE SCALE every Z number is quoted against)
+  --- BOTH (cell E1Z1) -> AT_CHANCE
+      carry NLL       2.3069   margin under chance -0.0043  (needs > 0.05)
+      X_content       -0.0000 [-0.0000, +0.0000] n=300   (donor's Z minus own Z -- THE deciding cell)
+      X_off           +0.0060 [+0.0054, +0.0067] n=300   (Z skipped minus own Z -- load, not content)
+      E_margin (OOD)  +0.3830 [+0.3540, +0.4115] n=300   (this limb trained with E always on)
+      Z alone  (OOD)  2.3928   (E blanked on a limb that never trained that way)
+
+  between limbs -- DRIFT-SUBJECT: E's own carry skill moves 0.37-0.85 nats across ten same-seed runs.  These label nothing.
+    carry NLL  zonly 2.3065  eonly 2.3063  both 2.3069
+    zonly - eonly  0.0002     both - eonly  0.0006
+    E-health: eonly carry NLL 2.3063 (observed band 0.37-0.85, max 1.2)  DEGRADED
+  PG-19 off-task (book-clustered, 50 ragged rows dropped)
+    zonly  NLL 3.5158   X_content +0.0798 [+0.0718, +0.0913] n=383 / 18 books   X_off +0.0754 [+0.0718, +0.0783] n=383 / 18 books
+    eonly  NLL 3.5368   E_margin +0.1313 [+0.1182, +0.1439] n=383 / 18 books
+    both   NLL 3.5163   X_content +0.0000 [-0.0000, +0.0001] n=383 / 18 books   X_off +0.0274 [+0.0238, +0.0301] n=383 / 18 books
+------------------------------------------------------------------------------
+  ANSWER (step 4000): NO: the carried loop state does not learn to carry content even with a trained latent space, no competitor and full pressure on every carry row
+
+==============================================================================
+J5 VERDICT, step 2000 (pre-registered: evals/score_j5.py, ../j5_prereg.md)
+  Each limb is scored IN ITS OWN TRAINED CELL.  X = NLL(ablated) - NLL(operating);
+  POSITIVE = the live channel is better.  Chance (no information) = ln 10 = 2.3026.
+==============================================================================
+  local-answer NLL (task learned <= 1.1513):
+    zonly  0.0241  learned
+    eonly  0.0241  learned
+    both   0.0240  learned
+  no-carry floor (zonly, both channels off)  2.3453  (leak if < 2.0526)
+
+  --- ZONLY (cell E0Z1) -> AT_CHANCE
+      carry NLL       2.3053   margin under chance -0.0028  (needs > 0.05)
+      X_content       +0.0009 [+0.0004, +0.0014] n=300   (donor's Z minus own Z -- THE deciding cell)
+      X_off           +0.0400 [+0.0372, +0.0429] n=300   (Z skipped minus own Z -- load, not content)
+  --- EONLY (cell E1Z0) -> E_DID_NOT_LEARN
+      carry NLL       2.3059   margin under chance -0.0034  (needs > 0.05)
+      E_margin        +0.0495 [+0.0473, +0.0517] n=300   (E off minus E on -- THE SCALE every Z number is quoted against)
+  --- BOTH (cell E1Z1) -> AT_CHANCE
+      carry NLL       2.3058   margin under chance -0.0032  (needs > 0.05)
+      X_content       -0.0000 [-0.0000, +0.0000] n=300   (donor's Z minus own Z -- THE deciding cell)
+      X_off           +0.0385 [+0.0368, +0.0401] n=300   (Z skipped minus own Z -- load, not content)
+      E_margin (OOD)  +0.1184 [+0.1116, +0.1250] n=300   (this limb trained with E always on)
+      Z alone  (OOD)  2.3492   (E blanked on a limb that never trained that way)
+
+  between limbs -- DRIFT-SUBJECT: E's own carry skill moves 0.37-0.85 nats across ten same-seed runs.  These label nothing.
+    carry NLL  zonly 2.3053  eonly 2.3059  both 2.3058
+    zonly - eonly  -0.0006     both - eonly  -0.0001
+    E-health: eonly carry NLL 2.3059 (observed band 0.37-0.85, max 1.2)  DEGRADED
+  PG-19 off-task (book-clustered, 50 ragged rows dropped)
+    zonly  NLL 3.5914   X_content +0.0625 [+0.0575, +0.0690] n=383 / 18 books   X_off +0.0768 [+0.0737, +0.0810] n=383 / 18 books
+    eonly  NLL 3.6135   E_margin +0.1027 [+0.0977, +0.1090] n=383 / 18 books
+    both   NLL 3.5893   X_content -0.0003 [-0.0007, +0.0001] n=383 / 18 books   X_off +0.0394 [+0.0373, +0.0424] n=383 / 18 books
+------------------------------------------------------------------------------
+  ANSWER (step 2000): NO: the carried loop state does not learn to carry content even with a trained latent space, no competitor and full pressure on every carry row
+
+  TRAJECTORY 2000 -> 4000 -- descriptive: the direction, not a decision rule
+    zonly  carry NLL +0.0012 (worsening)   X_content +0.0050   X_off +0.0271
+    eonly  carry NLL +0.0004 (worsening)
+    both   carry NLL +0.0011 (worsening)   X_content -0.0000   X_off -0.0324
+    A null whose numbers MOVE toward the cuts is a different finding from a flat null;
+    only the flat one closes the design.  Neither is a PASS.
+  embed ratio j5-a3z-endpoint-zonly: ||Z col||/||E col|| 1.0722 @ 25 -> 3.0344 @ 4000  (x2.83)
+  embed ratio j5-a3z-endpoint-eonly: ||Z col||/||E col|| 0.0000 @ 25 -> 0.0000 @ 4000
+  embed ratio j5-a3z-endpoint-both: ||Z col||/||E col|| 1.3402 @ 25 -> 4.2489 @ 4000  (x3.17)
+
+wrote eval_results/j5_readout/verdict.json
+
+Push for the next session:
+  git add eval_results/j5_readout logs/j5_diag logs/Report-*.out && git commit -m 'j5 readout' && git push
+---------------------------------------
+Begin Slurm Epilog: Sep-27-2026 05:02:45
+Job ID:        13619081
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j5_verdict
+Resources:     cpu=4,mem=16G,node=1
+Rsrc Used:     cput=00:03:00,vmem=0,walltime=00:00:45,mem=865392K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-005-9-2
+---------------------------------------

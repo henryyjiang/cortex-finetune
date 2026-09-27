@@ -1,0 +1,73 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-26-2026 20:26:37
+Job ID:    13618976
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j5_joint
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+  ok   vocab_size 100278 on both
+  ok   eos_token_id 100257 on both
+  ok   all 29 carry pieces keep their ids
+  ok   the 58-id probe string round-trips identically
+
+TOKENIZER MATCH -- the pack is safe under the model's tokenizer.
+=== J5 buffer-contents arm | limb=both | run=j5-a3z-endpoint-both ===
+    base:      ckpts/olmo8-cortex   (NO branch: step 0 -> stop 4000, horizon 305176)
+    data:      data/j1_pg19fw50_carry20_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:  gated W=16 K=64 cc=8 grad_chunks=4 window_backward=1
+    depth:     mean_recurrence 8, backprop depth 8, RAMP OFF (see item 3)
+    packed:    64 E + 64 Z + 512 tokens + 16 summary = 656 columns
+    read:      --cortex.latent_read embeds --cortex.latent_read_znorm rms --cortex.latent_read_znorm_target 116.0 --cortex.latent_read_scramble false --cortex.e_carry_read true  --cortex.latent_carry_read true
+    schedule:  warmup 250 updates (absolute), save every 2000, diag every 25
+NVIDIA H200, 143771 MiB
+
+[W926 20:27:22.055118719 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Sat Sep 26 20:27:17: Time to load libraries: 15.52 seconds.
+--------------------------------------------------------------------
+------------------ Launching run j5-a3z-endpoint-both------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-02-014-9-0.pace.gatech.edu.
+GPU : NVIDIA H200. CUDA: 12.1.
+[cortex] memory ON: K=0 K_iter=0 ccot_direct=False accum_ccot=False (vecs=16/max=128) gated_accum=False prefix_memory=gated gate(K=64,route=ring,norm=tanh,init=zero,fill=grow) latent(Z on, rule=absolute,band=2..9,renorm=none,read=embeds,EMBEDS(J4: Z as its own input_embeds columns),enc=endpoint,znorm=116.0) prefix_pos=tail prefix_eos_reset=False cross_chunks=8 carry_grad_chunks=4 random_segments=False lora_rank=0
+[cortex] Z channel ON.  latent_depth_rule='absolute' is P0.7's question (evals/diag_depth_band.py): P0.1 measured the band at a SINGLE T and cannot say whether 'informative' tracks the absolute step or the fraction of the loop.  If P0.7 has not reported, this run is asserting an answer it does not have -- record which, in this run's sbatch header.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:23<00:23, 23.53s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:26<00:00, 11.30s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:26<00:00, 13.14s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo8-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retrofit/wandb/run-20260926_202753-hvevup3x
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run j5-a3z-endpoint-both
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/hvevup3x
+[2026-09-26T20:31:04.317] error: *** JOB 13618976 ON atl1-1-02-014-9-0 CANCELLED AT 2026-09-26T20:31:04 DUE to SIGNAL Terminated ***
+---------------------------------------
+Begin Slurm Epilog: Sep-26-2026 20:31:09
+Job ID:        13618976
+Array Job ID:  13618976_2
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j5_joint
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=00:36:00,vmem=0,walltime=00:04:30,mem=2335372K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-23-0
+---------------------------------------
