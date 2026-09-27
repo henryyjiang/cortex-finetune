@@ -164,7 +164,17 @@ WARMUP_STEPS=${WARMUP_STEPS:-250}           # ABSOLUTE -- see item 4
 PARENT_STEP=0                               # no branch: the base IS the start
 CELL_STEPS=${CELL_STEPS:-4000}
 STOP_AT_STEP=$(( PARENT_STEP + CELL_STEPS ))
-SAVE_INTERVAL=${SAVE_INTERVAL:-2000}        # read-outs at 2000 AND 4000
+# HALF the read-out spacing, and that factor of two is not a typo.  train.py has
+# TWO save triggers: `% save_interval` writes save_model_only (a save_pretrained
+# dir, NO chkpt.pt, useless to the read-out) and `% (2 * save_interval)` writes
+# save_checkpoint, which is the checkpoint_<step>/chkpt.pt the read-out loads.
+# At 2000 the full checkpoint would land only at 4000 -- the STEP=2000 read-out
+# would refuse all 13 tasks and the arm would lose its TRAJECTORY (S1.6), which
+# is half of what it is for.  At 1000 the full saves land at 2000 and 4000,
+# exactly the two read-out points.  A SMOKE CANNOT CATCH THIS: at CELL_STEPS=10
+# neither trigger fires and the checkpoint_10 that appears comes from
+# stop_at_step, so the arithmetic is only reachable at the real budget.
+SAVE_INTERVAL=${SAVE_INTERVAL:-1000}        # -> full checkpoints at 2000 and 4000
 DIAG_INTERVAL=${DIAG_INTERVAL:-25}
 MICRO_BS=${MICRO_BS:-2}
 BATCH_SIZE=${BATCH_SIZE:-4}

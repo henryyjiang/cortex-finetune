@@ -382,7 +382,10 @@ class TestTheJointLauncher:
     def test_the_budget_is_four_thousand_read_at_two_and_four(self):
         s = _read(self.SB)
         assert "CELL_STEPS=${CELL_STEPS:-4000}" in s
-        assert "SAVE_INTERVAL=${SAVE_INTERVAL:-2000}" in s
+        # 1000, not 2000: save_checkpoint fires on % (2 * save_interval), so this
+        # is HALF the read-out spacing.  See
+        # TestTheReadOutPointsActuallyGetCheckpoints.
+        assert "SAVE_INTERVAL=${SAVE_INTERVAL:-1000}" in s
 
     def test_the_tokenizer_preflight_refuses_the_launch(self):
         s = _read(self.SB)
@@ -579,4 +582,53 @@ class TestTheFlagReachesTheModelConfig:
         # drop out of the exemption set rather than sit in both.
         both = self.NEED_NOT_PERSIST & self._allowlist()
         assert not both, f"listed exempt but also persisted: {sorted(both)}"
+
+
+
+class TestTheReadOutPointsActuallyGetCheckpoints:
+    """The bug that would have cost the trajectory (caught before it landed).
+
+    train.py has TWO save triggers and only one of them writes what the read-out
+    can load:
+
+      optimizer_step % save_interval        -> save_model_only, a save_pretrained
+                                               dir, NO chkpt.pt
+      optimizer_step % (2 * save_interval)  -> save_checkpoint, which writes
+                                               checkpoint_<step>/chkpt.pt
+
+    pace/j5_readout.sbatch loads checkpoint_$STEP/chkpt.pt, so SAVE_INTERVAL must
+    be HALF the read-out spacing.  At SAVE_INTERVAL=2000 the full checkpoint
+    lands only at 4000 and the STEP=2000 read-out refuses all 13 tasks -- the arm
+    keeps its point estimate and silently loses its trajectory (j5_prereg.md
+    S1.6).  A 10-step smoke cannot reach this: neither trigger fires, and the
+    checkpoint it produces comes from stop_at_step.
+    """
+
+    @staticmethod
+    def _n(name, default=None):
+        m = re.search(rf"^{name}=\$\{{{name}:-([0-9]+)\}}", _read("pace/j5_joint.sbatch"), re.M)
+        return int(m.group(1)) if m else default
+
+    def test_the_full_checkpoint_lands_on_every_read_out_step(self):
+        si, cell = self._n("SAVE_INTERVAL"), self._n("CELL_STEPS")
+        assert si and cell
+        full = {s for s in range(1, cell + 1) if s % (2 * si) == 0} | {cell}
+        # the steps pace/j5_readout.sbatch is driven at
+        for step in (cell // 2, cell):
+            assert step in full, (
+                f"step {step} gets no checkpoint_{step}/chkpt.pt at "
+                f"SAVE_INTERVAL={si}: the read-out there would refuse.  "
+                f"save_checkpoint fires on % (2 * save_interval), so "
+                f"SAVE_INTERVAL must be half the read-out spacing.")
+
+    def test_save_interval_is_half_the_read_out_spacing(self):
+        si, cell = self._n("SAVE_INTERVAL"), self._n("CELL_STEPS")
+        assert 2 * si == cell // 2, (
+            f"SAVE_INTERVAL={si} with CELL_STEPS={cell}: the full-checkpoint "
+            f"period is {2 * si}, but the read-outs are {cell // 2} apart")
+
+    def test_the_readout_loads_the_full_checkpoint_not_the_model_only_dir(self):
+        rb = _read("pace/j5_readout.sbatch")
+        assert "checkpoint_$STEP" in rb and "chkpt.pt" in rb
+        assert "model_only_chkpt" not in rb
 
