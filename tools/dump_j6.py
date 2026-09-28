@@ -35,7 +35,11 @@ from score_j1 import (  # noqa: E402
 )
 
 LN10 = math.log(10.0)
-LIMBS = ("ctrl", "mix", "delta", "slow")
+# `delta` was cancelled 2026-09-27 (6 h node stall, no checkpoint) and
+# REPLACED by J7's `stag`: raw staggered states + the read projection
+# frozen at identity.  Kept in this order so the printed tables line up
+# with the array indices 0-3.
+LIMBS = ("ctrl", "mix", "stag", "slow")
 #: Every limb trained with both channels live, so every limb is scored in the
 #: same cell as J4's real limb.  ON is what the model operates in; OFF is Z
 #: ablated -- "skipped" in the -off file, "another row's Z" in the -donor one.

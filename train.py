@@ -396,6 +396,9 @@ class CLISettings:
             #                      default, and cortex_graft.py now refuses a
             #                      str outright so it cannot reopen silently.
             latent_encoding="delta", latent_tok_pool=4,
+            # J7.  Default false = J4's trained projection, so every arm before
+            # J7 rebuilds exactly as it ran.
+            latent_embed_frozen=False,
             latent_read_znorm="none", latent_read_znorm_target=3.0,
             latent_write_only=False, e_dropout=0.0, e_carry_read=True,
             # Z ATTEMPT 2 (J3), cortex_memory/scratchpad.py.  latent_read
@@ -1217,7 +1220,16 @@ def startup(cfg: CLISettings):
                    # without it would read Z's long-horizon rows on the
                    # short-horizon schedule and report the mismatch as the
                    # arm's result.
-                   "latent_read_scramble_p", "latent_stride"):
+                   "latent_read_scramble_p", "latent_stride",
+                   # J7.  Same class as e_carry_read, and the same failure if
+                   # omitted.  latent_embed_frozen decides whether Z's read is
+                   # the AutoCompressor splice or a trained DxD rotation, so an
+                   # eval or a resume that rebuilt without it would train the
+                   # projection on an arm whose whole point is that it does
+                   # not -- the treatment limb and the control, one name.
+                   # (latent_encoding is already above, and it is what carries
+                   # 'staggered_state'.)
+                   "latent_embed_frozen"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "

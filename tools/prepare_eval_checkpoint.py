@@ -99,6 +99,12 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 # checkpoint records the condition it trained under, exactly
                 # as e_dropout does.
                 "latent_read_scramble_p", "latent_stride",
+                # J7.  Fails in the same silent way latent_stride does, from
+                # the other side: an eval that rebuilt WITHOUT it would give
+                # the frozen arm a trainable projection, load the identity
+                # weights into it, and score a model whose read is a rotation
+                # the arm never trained.  The AC condition is the arm.
+                "latent_embed_frozen",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

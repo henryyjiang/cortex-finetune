@@ -299,6 +299,20 @@ def latent_runtime(cortex) -> dict:
         "mix_frac": float(getattr(cortex, "latent_mix_frac", 0.0)),
         "stride": int(getattr(cortex, "latent_stride", 1)),
         "tape_len": len(getattr(cortex, "_z_tape", [])),
+        # J7.  The MEASURED proof that depth staggering fired, in the same
+        # class as mix_frac above: latent_depth_{rule,lo,hi} rode in J4's and
+        # J5's configs and did NOTHING, because every encoding but 'delta'
+        # short-circuited before the depth map ran and no number said so.
+        # n_depths 1 means the stagger collapsed to a single depth -- a short
+        # loop clamped the band to a point -- and the limb is a single-depth
+        # write under a staggered name.
+        "n_depths": len(getattr(cortex, "_z_depths_used", []) or []),
+        "depths": list(getattr(cortex, "_z_depths_used", []) or []),
+        # Reported beside the write's grad fraction because the two are only
+        # interpretable together: a staggered band at mr8 draws depths that
+        # land in the no-grad PREFIX on a real share of batches, so
+        # write_grad_frac < 1.0 is EXPECTED here and is not a defect.
+        "embed_frozen": bool(getattr(cortex, "latent_embed_frozen", False)),
         "n_pre": int(getattr(cortex, "_n_pre", 0)),
         "n_zpre": int(getattr(cortex, "_n_zpre", 0)),
         "n_sum": int(getattr(cortex, "_n_sum", 0)),

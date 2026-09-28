@@ -56,16 +56,86 @@
 #          NOTE p=1.0 is J4's `donor` limb and ALREADY RAN (carry 0.4367):
 #          at p=1 Z is noise on every row and ignoring it is optimal, which
 #          measures nothing about content.  The graft refuses p=1 here.
-#   delta  latent_encoding delta.  The only write candidate that samples the
-#          loop's INTERMEDIATE computation -- staggered trajectory deltas
-#          across depths, which the coda's output cannot contain.  D3 ranked
-#          the candidates by raw register decode, and that criterion selects
-#          for overlap with E; `endpoint` won it by being E's twin.  Attempt 1
-#          failed `delta` on SCALE (deltas ~0.35 against E's ~136), not on
-#          content, and the rms rescale it never had is passed here.
-#          Depth staggering is LIVE only under this encoding: latent_write()
-#          short-circuits to a single slice otherwise, so J4's and J5's
-#          latent_depth_{rule,lo,hi} rode in their configs and did nothing.
+#   stag   J7, and it REPLACES the `delta` limb (cancelled 2026-09-27 after a
+#          6 h node stall).  latent_encoding staggered_state + the projection
+#          frozen at identity.  Four changes, stacked deliberately, because the
+#          question is FEASIBILITY -- is this channel learnable at all -- and
+#          not which single flag matters.  If X_content moves, ablate then; if
+#          it does not, the null is the strongest one yet because everything
+#          hypothesised to matter was stacked in Z's favour.
+#
+#          (1) RAW STATES, STAGGERED.  s_{k_j} at slot j, not d_{k_j} and not
+#              s_T at every slot.  Staggering and delta-vs-raw are orthogonal
+#              concepts that the code COUPLED: latent_write staged the depth
+#              map over the delta tape, and `_tape_latent` differenced the raw
+#              states away, so `endpoint` (one depth) and `delta` (staggered)
+#              were the only two writes expressible.  J7 tapes the states too.
+#          (2) WHY THIS BEATS BOTH.  Deltas were chosen by P0.1 on SCALE -- at
+#              T=8 a delta is 0.90x the trunc_normal_ noise it replaced in s0,
+#              where the endpoint was 28.1x -- but that argument was ONLY ever
+#              about the s0 read, and s0 was measured dead (RED 11, flat to
+#              4e-5 out to 45x ||s0||, including at exactly zero).  Under the
+#              embeds read every Z row is rescaled to ||E|| regardless, so the
+#              scale argument for deltas expired and nothing replaced it.
+#              D3 never ranked `delta` at all -- its candidates were E, Z_tok,
+#              Z_write, Z_end -- so delta-vs-endpoint has never been decided on
+#              CONTENT in either direction.  Raw staggered states take delta's
+#              actual justification (they sample intermediate depths the coda's
+#              output cannot contain; s_2 is six iterations before s_T and is
+#              NOT E's pre-coda twin) without delta's scale pathology: across
+#              the 2..9 band ||d||/||s0|| spans 12.8 -> 0.90, a 14x range that
+#              the per-row rescale then amplifies hardest exactly where P0.1
+#              says the deltas are nearest the quantization floor, while
+#              ||s_t|| runs 9.2 -> 10.7, a 1.16x range.
+#          (3) NO PROJECTION (latent_embed_frozen true).  AutoCompressor has no
+#              map anywhere -- auto_compressor.py contains zero nn.Linear, and
+#              new_softprompt is last_hidden_state concatenated straight into
+#              inputs_embeds -- and E follows it exactly, post-ln_f rows
+#              spliced unprojected.  latent_embed is a free DxD map trained on
+#              the LM loss, and D3 puts only 15-27% of Z's norm OUTSIDE E's
+#              span, so the cheapest thing it can learn is to rotate Z onto the
+#              directions the attention already reads well: E's.  If it does, a
+#              null cannot distinguish "these depths carry nothing" from "the
+#              map laundered them into E".  Frozen at its identity init the
+#              module is an exact no-op, so the parameter set, the state_dict
+#              and the optimizer count are UNCHANGED -- this arm and J4's
+#              differ in requires_grad and nothing else.
+#              THE RESCALE STAYS ON.  A scalar per row preserves direction; Z
+#              entering at ~10 against E's ~136 inside one concatenation IS the
+#              measured s0 failure, and that is a visibility problem, not a
+#              coordinate one.
+#          (4) READ AND WRITE ALREADY TRAIN TOGETHER, and no read_into module
+#              is added.  J6's diag shows z_read_grad_frac and
+#              z_write_grad_frac both 1.0 on every record, so J4's embeds read
+#              already closed the "never trained together" gap.  And embeds
+#              ALREADY READS AT EVERY DEPTH: core_block_forward computes
+#              adapter(cat([x, input_embeds])) on every one of the T
+#              iterations, so Z's columns are attended at each depth.  A
+#              read_into module would not add depth coverage, it would add a
+#              second reader -- and both readers that were tried had the model
+#              switch them off (J1's gate 0.10 -> 0 in ~270 updates; J3's held
+#              open with gate_lr_mult and still 0.014/0.028, read uniform, own
+#              row 1/65, no selection learned in 2,000 updates).  The embeds
+#              read is the only one whose strength GREW (z_embed_ratio 2.2 ->
+#              3.7).  latent_read=embeds is unchanged and is not a variable.
+#
+#          THE COST, STATED BEFORE THE RUN.  A staggered band is not fully
+#          trainable, and endpoint was.  iterate_forward runs num_steps_no_grad
+#          FIRST, and at mr8 the loop length is SAMPLED: J6's ctrl diag has
+#          z_tape_len from 1 to 26 and num_steps_no_grad 0 on 42/80 records but
+#          up to 18 on the rest.  An absolute 2..9 band over 16 slots is then
+#          fully trainable on 46/80 records, ENTIRELY frozen on 11/80 (13.8%),
+#          and 0.762 of slots on average, against endpoint's 1.0 on every
+#          batch.  That is the price of sampling intermediate depths at all.
+#          It is REPORTED: latent_write_grad_frac has a per-slot branch for
+#          this encoding, because the old last-step shortcut would have printed
+#          1.0 over a write whose slots were frozen.  The gate below reads it.
+#
+#          Also relaxed, in this arm's favour: P0.1's "exclude depth 1, it is
+#          23.8x s0" was a DELTA pathology.  Raw s_1 is an ordinary state at
+#          norm ~9, so depth 1 is legitimately in range -- which matters,
+#          because lo_c = min(lo, hi_c) already pulls the band to 1 on a short
+#          loop.
 #   slow   latent_stride 2.  The short-term / long-term split: Z's ring
 #          pointer advances once per 2 chunks and writes that window's MEAN,
 #          so Z reaches further back than E over the same 64 shared rows.
@@ -89,7 +159,9 @@
 # MEASURED number the forward pass had to produce, checked by the smoke gate:
 #
 #   mix    mix_frac ~ 0.25 in cortex_diag.  0.0 means the roll never fired.
-#   delta  tape_len > 1 and the write draws >1 distinct depth.
+#   stag   z_n_depths > 1 (the write drew more than one depth) and
+#          z_embed_frozen true.  z_write_grad_frac < 1.0 is EXPECTED here and
+#          is not a failure -- see the band arithmetic above.
 #   slow   z_stride 2 and z_blocks > 0.  z_blocks 0 means the ring never
 #          filled, the stride never engaged, and the limb IS the control.
 #   all    z_e_spliced_norm > 0, z_n_zpre 64, z_read_grad_frac 1.0.
@@ -140,9 +212,20 @@ WB_ARGS=""
 if [ "$WINDOW_BACKWARD" = "1" ]; then WB_ARGS="--cortex.window_backward true"; fi
 MIX_P=${MIX_P:-0.25}
 STRIDE=${STRIDE:-2}
+# The depth band.  P0.7 ANSWERED the rule this selects under -- job 13273098,
+# 2026-09-17, re-run WITH --trained_depth (trained_mean_recurrence 8), verdict
+# ABSOLUTE on both rules: magnitude t_hi 8 at T=16/32/64 with cv_absolute 0.0
+# against cv_relative 0.53, novelty t_hi 25.  So `absolute` is measured, not
+# asserted, and the J6 launch banner's "if P0.7 has not reported" caveat is
+# discharged.  2..9 is P0.1's usable band; raising LATENT_LO to 1 is legitimate
+# for a RAW-state write (P0.1's d_1 exclusion was a delta-scale pathology) and
+# would widen the trainable share -- see the band arithmetic in the header
+# before moving it.
+LATENT_LO=${LATENT_LO:-2}
+LATENT_HI=${LATENT_HI:-9}
 SMOKE_GATE=${SMOKE_GATE:-0}
 
-LIMBS=(ctrl mix delta slow)
+LIMBS=(ctrl mix stag slow)
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 LIMB=${LIMBS[$IDX]}
 if [ -z "$LIMB" ]; then echo "no limb at index $IDX (use --array=0-3)"; exit 0; fi
@@ -169,12 +252,16 @@ python tools/check_tokenizer_match.py --pack_tokenizer "$PACK_TOKENIZER" \
 # through the embeds splice at E's measured scale.  The limbs differ in ONE
 # flag each and in nothing else.
 ENCODING=endpoint
+EMBED_FROZEN=false
 ARM_ARGS="--cortex.latent_read_scramble false"
 ARM_ARGS="$ARM_ARGS --cortex.e_carry_read true --cortex.latent_carry_read true"
 case "$LIMB" in
     ctrl)  ;;
     mix)   ARM_ARGS="$ARM_ARGS --cortex.latent_read_scramble_p $MIX_P" ;;
-    delta) ENCODING=delta ;;
+    # J7.  TWO flags, not one, and that is the deliberate exception to this
+    # array's one-flag-per-limb rule -- the header says why.  ctrl remains the
+    # comparison, and it already ran on this branch at this budget.
+    stag)  ENCODING=staggered_state; EMBED_FROZEN=true ;;
     slow)  ARM_ARGS="$ARM_ARGS --cortex.latent_stride $STRIDE" ;;
 esac
 
@@ -187,6 +274,8 @@ echo "    branch:    $BRANCH_PATH  (step $PARENT_STEP -> stop $STOP_AT_STEP, hor
 echo "    data:      $ARM_DATA   (READ THIS LINE -- the only proof the pack arrived)"
 echo "    geometry:  gated W=$ACCUM_VECS K=$GATE_SLOTS cc=$CROSS_CHUNKS grad_chunks=$CARRY_GRAD_CHUNKS wb=$WINDOW_BACKWARD"
 echo "    encoding:  $ENCODING   znorm $ZNORM -> $ZNORM_TARGET"
+echo "    read:      embeds  (every depth: adapter(cat([x, input_embeds])) x T)"
+echo "    embed_proj: frozen=$EMBED_FROZEN   band $LATENT_LO..$LATENT_HI rule absolute"
 echo "    arm args:  $ARM_ARGS"
 echo "    NOTE the echo above is NOT proof a flag took effect -- e_carry_read"
 echo "         printed correctly for two runs while doing nothing.  The smoke"
@@ -231,14 +320,15 @@ python train.py \
     --cortex.gate_fill grow \
     --cortex.latent_carry true \
     --cortex.latent_depth_rule absolute \
-    --cortex.latent_depth_lo 2 \
-    --cortex.latent_depth_hi 9 \
+    --cortex.latent_depth_lo $LATENT_LO \
+    --cortex.latent_depth_hi $LATENT_HI \
     --cortex.latent_renorm none \
     --cortex.latent_encoding $ENCODING \
     --cortex.latent_s0_read false \
     --cortex.latent_read embeds \
     --cortex.latent_read_znorm $ZNORM \
     --cortex.latent_read_znorm_target $ZNORM_TARGET \
+    --cortex.latent_embed_frozen $EMBED_FROZEN \
     $ARM_ARGS \
     --cortex.e_dropout 0.0 \
     --cortex.diag_interval $DIAG_INTERVAL \
@@ -301,13 +391,45 @@ if limb == "mix":
                      "the roll did not fire at the requested rate")
     else:
         notes.append(f"mix_frac {got:.4f} ~ p {mix_p} (the roll fired)")
-elif limb == "delta":
-    tl = v("tape_len") or 0
+elif limb == "stag":
+    # NOTE the key is z_tape_len, not tape_len: training_diag PREFIXES every
+    # latent_runtime field with z_, so the `delta` branch this replaces read
+    # last.get("tape_len") -> None -> 0 and would have FAILED its own limb on a
+    # perfectly good run.  It never fired, because delta never reached the gate.
+    nd = v("z_n_depths") or 0
+    tl = v("z_tape_len") or 0
     if tl < 2:
-        fails.append(f"tape_len {tl}: the loop tape is empty, so the delta "
-                     "write has no depths to stagger across")
+        fails.append(f"z_tape_len {tl}: the loop tape is empty, so the "
+                     "staggered write has no depths to draw from")
+    elif nd < 2:
+        fails.append(f"z_n_depths {nd}: the write drew ONE depth, so the "
+                     "stagger collapsed and this limb IS a single-depth write "
+                     "-- exactly the inert-config failure J4/J5 shipped")
     else:
-        notes.append(f"tape_len {tl} (the write samples {tl} depths)")
+        notes.append(f"z_n_depths {nd} of z_tape_len {tl} "
+                     f"(depths {v('z_depths')}) -- the stagger fired")
+    if v("z_embed_frozen") is not True:
+        fails.append("z_embed_frozen is not True: the projection is TRAINING, "
+                     "so this is J4's read and not the AC condition")
+    else:
+        notes.append("z_embed_frozen true (projection frozen at identity)")
+    if (v("z_encoding") or "") not in ("staggered_state",):
+        fails.append(f"z_encoding {v('z_encoding')!r} != 'staggered_state'")
+    # EXPECTED, and reported rather than gated: a staggered band draws depths
+    # that land in the no-grad prefix on a real share of batches (measured
+    # 0.762 of slots on J6's ctrl split).  Gate only the floor -- a write that
+    # NEVER trained is a dead limb; a write that trained 76% of its slots is
+    # the design.
+    wgf = [r.get("z_write_grad_frac") for r in rows
+           if r.get("z_write_grad_frac") is not None]
+    if wgf:
+        mean_w = sum(wgf) / len(wgf)
+        if max(wgf) == 0:
+            fails.append("z_write_grad_frac 0 on every record: the staggered "
+                         "write never entered the gradient window")
+        else:
+            notes.append(f"z_write_grad_frac mean {mean_w:.3f} "
+                         f"(min {min(wgf):.3f}) -- <1.0 is expected here")
 elif limb == "slow":
     st, blocks = v("z_stride"), v("z_blocks")
     if st != stride:
@@ -319,9 +441,10 @@ elif limb == "slow":
     else:
         notes.append(f"z_stride {st}, z_blocks {blocks} (the stride engaged)")
 else:
-    if v("z_mix_frac") or (v("z_stride") or 1) != 1:
+    if v("z_mix_frac") or (v("z_stride") or 1) != 1 \
+            or v("z_embed_frozen") is True or (v("z_n_depths") or 0) > 1:
         fails.append("the CONTROL is carrying a treatment flag")
-    notes.append("control: no mix, stride 1, endpoint write")
+    notes.append("control: no mix, stride 1, endpoint write, proj trainable")
 
 for n in notes:
     print(f"  ok   {n}")

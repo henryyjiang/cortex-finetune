@@ -73,7 +73,7 @@ MIX_P=${MIX_P:-0.25}
 STRIDE=${STRIDE:-2}
 BOOT=${BOOT:-2000}
 
-LIMBS=(ctrl mix delta slow)
+LIMBS=(ctrl mix stag slow)
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 LIMB=${LIMBS[$IDX]}
 if [ -z "$LIMB" ]; then echo "no limb at index $IDX (use --array=0-3)"; exit 0; fi
@@ -113,13 +113,28 @@ if zn and abs(next(iter(zn)) - want_zn) > 1e-6:
              "The rebuild would score a model nobody trained.")
 
 enc = {r.get("z_encoding") for r in rows} - {None}
-want_enc = "delta" if limb == "delta" else "endpoint"
+want_enc = "staggered_state" if limb == "stag" else "endpoint"
 if enc and want_enc not in enc:
     sys.exit(f"ERROR: {limb} trained with latent_encoding {sorted(enc)}, "
              f"expected {want_enc}.  This run dir is not the limb its name claims.")
 
 # The measured proofs, re-checked at read-out time.  A limb that did not run
 # its own condition during TRAINING cannot be fixed by scoring it correctly.
+if limb == "stag":
+    # The two things that make this checkpoint the arm its name claims, checked
+    # again here because a limb that did not run its own condition during
+    # TRAINING cannot be fixed by scoring it correctly.
+    nd = last.get("z_n_depths") or 0
+    if nd < 2:
+        sys.exit(f"ERROR: z_n_depths {nd} -- the staggered write drew ONE "
+                 "depth, so this run trained as a single-depth write.")
+    if last.get("z_embed_frozen") is not True:
+        sys.exit("ERROR: z_embed_frozen is not True -- the projection trained, "
+                 "so this is J4's read and not J7's AC condition.")
+elif last.get("z_embed_frozen") is True:
+    sys.exit(f"ERROR: {limb} reports z_embed_frozen true but only `stag` "
+             "freezes the projection.")
+
 mix = last.get("z_mix_frac") or 0.0
 st = last.get("z_stride") or 1
 if limb == "mix":
@@ -153,7 +168,11 @@ SETS="$SETS --set latent_tok_pool=4"
 SETS="$SETS --set latent_s0_read=false --set latent_read=embeds"
 SETS="$SETS --set latent_read_znorm=rms --set latent_read_znorm_target=$ZNORM_TARGET"
 case "$LIMB" in
-    delta) SETS="$SETS --set latent_encoding=delta" ;;
+    # J7.  BOTH flags, or the rebuild reads a rotation the arm never trained and
+    # writes a single depth the arm never wrote -- the eval-side twin of the
+    # latent_stride failure below.
+    stag)  SETS="$SETS --set latent_encoding=staggered_state"
+           SETS="$SETS --set latent_embed_frozen=true" ;;
     slow)  SETS="$SETS --set latent_encoding=endpoint --set latent_stride=$STRIDE" ;;
     # `mix` is NOT rebuilt with latent_read_scramble_p: the mix is gated on
     # self.training and is a TRAINING condition, not a read condition.  Its

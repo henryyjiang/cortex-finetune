@@ -18,6 +18,7 @@ Run: python -m pytest tests/test_j6_arms.py -q
 """
 from __future__ import annotations
 
+import ast
 import os
 import re
 import sys
@@ -152,17 +153,42 @@ class TestDeltaIsAdmittedAndStaggers:
 
     def test_endpoint_takes_a_single_depth_and_delta_does_not(self):
         """The claim that sent J6 here: latent_write() SHORT-CIRCUITS to the
-        single-slice _latent_state_write() for every encoding but 'delta', so
-        latent_depth_{rule,lo,hi} ride in J4's and J5's configs -- they are
-        right there in the checkpoints' `sets` -- and do NOTHING."""
-        src = _read("cortex_graft.py")
-        i = src.index("def latent_write(")
-        body = src[i:i + 3000]
-        assert 'if self.latent_encoding != "delta":' in body
-        assert body.index('return self._latent_state_write()') < body.index(
-            "latent_depth_map("), (
-            "the depth map is reached before the short-circuit -- staggering "
-            "would then apply to endpoint too and this test is stale")
+        single-slice _latent_state_write() for every encoding but 'delta' (and,
+        since J7, 'staggered_state'), so latent_depth_{rule,lo,hi} ride in J4's
+        and J5's configs -- they are right there in the checkpoints' `sets` --
+        and do NOTHING.
+
+        Checked BEHAVIOURALLY rather than by source order.  The previous version
+        asserted that `return self._latent_state_write()` appeared before
+        `latent_depth_map(` inside latent_write's body, which J7 broke by moving
+        the staggering into a shared helper -- a refactor that changed nothing
+        about the claim.  `_z_depths_used` is the number the graft now reports
+        for exactly this, so assert on that: empty means the depth map never
+        ran, and no future refactor can make it pass while staggering endpoint.
+        """
+        n_sum = None
+        for enc in ("endpoint", "delta", "staggered_state"):
+            g = _cortex(latent_encoding=enc, latent_depth_rule="absolute",
+                        latent_depth_lo=2, latent_depth_hi=9)
+            n_sum = g.prefix.n_vec
+            g._n_sum = n_sum
+            g._z_tape = [torch.full((B, n_sum, D), float(k + 1))
+                         for k in range(7)]
+            g._z_states = list(g._z_tape)
+            g._z_last_x = torch.full((B, n_sum, D), 99.0)
+            out = g.latent_write()
+            assert out.shape == (B, n_sum, D)
+            if enc == "endpoint":
+                assert g._z_depths_used == [], (
+                    "endpoint reached the depth map -- staggering would then "
+                    "apply to it too and J4/J5's inert configs were not inert")
+                vals = {float(out[0, j, 0].detach()) for j in range(n_sum)}
+                assert vals == {99.0}, (
+                    f"endpoint drew {vals} instead of the final state alone")
+            else:
+                assert len(g._z_depths_used) > 1, (
+                    f"{enc} drew depths {g._z_depths_used} -- the stagger "
+                    "collapsed to a single depth")
 
     def test_delta_draws_its_rows_from_MORE_THAN_ONE_depth(self):
         """(b) for this limb: staggering is the mechanism, so prove it fired.
@@ -369,10 +395,43 @@ class TestTheFlagsSurviveEveryGate:
             body = body[:body.index("\nRC=$?")]
             return set(re.findall(r"^\s+(--[A-Za-z0-9_.]+)", body, re.M))
         extra = flags("pace/j6_arms.sbatch") - flags("pace/j4_joint.sbatch") - exempt
-        assert not extra, (
-            f"j6_arms.sbatch passes {sorted(extra)} to train.py and "
-            "j4_joint.sbatch does not.  Either it is a typo (the 13641080 "
-            "failure) or it is new and belongs in this test's exempt set.")
+        # J7 added --cortex.latent_embed_frozen, which is legitimately new
+        # rather than guessed.  "Proven otherwise" is checkable, so check it
+        # instead of growing the exempt set: a --cortex.X survives only if X is
+        # a DECLARED key of train.py's cortex defaults dict, which is what
+        # jsonargparse builds the flag from.  A typo like the 13641080 batch
+        # (--model_name_or_path for --model_name) still fails, because the
+        # guessed name is not a declared key.
+        # PARSED, not sliced.  The first version of this check regex-sliced the
+        # dict's extent and silently stopped at `latent_read_scramble_p`, which
+        # sits mid-dict -- so it called every key below that line undeclared,
+        # `latent_stride` included, which has shipped for two arms.  A check
+        # that can be wrong in the direction of "everything looks like a typo"
+        # is worse than none, so ask the AST.
+        cortex_keys = set()
+        for node in ast.walk(ast.parse(_read("train.py"))):
+            if not (isinstance(node, ast.AnnAssign)
+                    and isinstance(node.target, ast.Name)
+                    and node.target.id == "cortex"):
+                continue
+            for call in ast.walk(node):
+                if (isinstance(call, ast.Call)
+                        and isinstance(call.func, ast.Name)
+                        and call.func.id == "dict"):
+                    cortex_keys |= {kw.arg for kw in call.keywords if kw.arg}
+        assert {"latent_stride", "e_carry_read"} <= cortex_keys, (
+            "the cortex defaults dict was not found by this parse -- fix the "
+            "parse before trusting what it says about a new flag")
+
+        prefix = "--cortex."
+        undeclared = sorted(
+            f for f in extra
+            if not (f.startswith(prefix) and f[len(prefix):] in cortex_keys))
+        assert not undeclared, (
+            f"j6_arms.sbatch passes {undeclared} to train.py, j4_joint.sbatch "
+            "does not, and they are NOT declared keys of train.py's cortex "
+            "defaults dict.  That is the 13641080 failure: a guessed flag name "
+            "that jsonargparse rejects after the banner has already printed.")
 
     @pytest.mark.parametrize("flag", FLAGS + ("e_carry_read",))
     def test_it_reaches_the_eval_config(self, flag):

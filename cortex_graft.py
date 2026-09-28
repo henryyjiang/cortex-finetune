@@ -366,6 +366,25 @@ class CortexMemory(nn.Module):
         # banner prints which one ran.
         self.latent_s0_read = bool(getattr(config, "latent_s0_read", True))
         self.latent_read = str(getattr(config, "latent_read", "none") or "none")
+        # J7.  AutoCompressor splices its summary vectors with NO map at all
+        # (auto_compressor.py has no nn.Linear anywhere: new_softprompt is
+        # last_hidden_state, concatenated straight into inputs_embeds), and E
+        # follows it exactly -- post-ln_f rows, unprojected.  latent_embed
+        # exists only because Z is sampled from a different place in the net,
+        # and its stated job is "coordinates and scale".  But it is a free DxD
+        # map trained on the LM loss, and D3 puts only 15-27% of Z's norm
+        # OUTSIDE E's span, so the cheapest thing it can learn is to rotate Z
+        # onto the directions the attention already reads well -- E's.  If it
+        # does, a null cannot distinguish "these depths carry nothing" from
+        # "the map laundered them into E", which is the interpretive trap this
+        # project keeps paying for.  Frozen at its IDENTITY init the module is
+        # an exact no-op, so this flag is the AC treatment with the parameter
+        # set left identical -- the two conditions differ in requires_grad and
+        # nothing else.  The RESCALE is NOT affected and must stay on: a scalar
+        # per row preserves direction, and Z entering at ~10 against E's ~136
+        # inside one concatenation IS the measured s0 failure.
+        self.latent_embed_frozen = bool(
+            getattr(config, "latent_embed_frozen", False))
         self.latent_read_depth = str(
             getattr(config, "latent_read_depth", "none") or "none")
         self.latent_read_heads = int(getattr(config, "latent_read_heads", 8))
@@ -517,9 +536,11 @@ class CortexMemory(nn.Module):
         self.latent_read_gate_lr_mult = float(1.0 if _glm is None else _glm)
         _sfb = getattr(config, "latent_scratch_forget_bias", 1.0)
         self.latent_scratch_forget_bias = float(1.0 if _sfb is None else _sfb)
-        if self.latent_encoding not in ("delta", "endpoint", "tokens", "scratch"):
+        if self.latent_encoding not in ("delta", "endpoint", "tokens", "scratch",
+                                       "staggered_state"):
             raise ValueError(
-                f"cortex.latent_encoding must be 'delta', 'endpoint', 'tokens' "
+                f"cortex.latent_encoding must be 'delta', 'endpoint', "
+                f"'staggered_state', 'tokens' "
                 f"or 'scratch'; got {self.latent_encoding!r}.")
         if self.latent_encoding == "scratch" and self.latent_read != "scratch":
             raise ValueError(
@@ -597,7 +618,8 @@ class CortexMemory(nn.Module):
         if self.latent_read == "embeds":
             # J4.  Each clause below is a design that would silently become a
             # DIFFERENT design, so each raises instead of being tolerated.
-            if self.latent_encoding not in ("endpoint", "delta"):
+            if self.latent_encoding not in ("endpoint", "delta",
+                                            "staggered_state"):
                 raise ValueError(
                     f"cortex.latent_read='embeds' (J4) is the read for the "
                     f"write D3 vindicated: pass --cortex.latent_encoding "
@@ -880,6 +902,17 @@ class CortexMemory(nn.Module):
         # J3's fields for a design that has none of them.
         self.latent_embed = (LatentEmbedRead(D)
                              if self.latent_read == "embeds" else None)
+        # J7's AC condition.  The PARAMETER STAYS in the module and in the
+        # optimizer group, so the frozen and trainable arms have an identical
+        # parameter set, an identical state_dict and an identical optimizer
+        # count -- train.py's resume check compares that count, and a
+        # disappearing parameter would trip it.  Adam skips a param whose grad
+        # is None, so requires_grad_(False) on an identity-initialised proj is
+        # an exact algebraic no-op: z_emb == rescale(z_rows), which IS the
+        # AutoCompressor splice.
+        if self.latent_embed is not None and self.latent_embed_frozen:
+            for _p in self.latent_embed.parameters():
+                _p.requires_grad_(False)
         # J3's write.  Built here for the same reason: it adds parameters.
         self.latent_scratch = (
             LatentScratchpad(D, forget_bias_init=self.latent_scratch_forget_bias)
@@ -1293,6 +1326,18 @@ class CortexMemory(nn.Module):
         self._n_zpre = 0                  # J4's Z columns (0 on every other arm)
         self._z_prev:  Optional[torch.Tensor] = None   # [B,n_sum,D], s_{t-1}
         self._z_tape:  list = []          # index t-1 -> d_t at the summary cols
+        # J7.  index t-1 -> s_t at the same columns, appended in the SAME branch
+        # as the delta so the three lists stay index-aligned: _z_states[k-1] is
+        # s_k, _z_tape[k-1] is d_k = s_k - s_{k-1}, and _z_grad[k-1] says
+        # whether step k ran inside the gradient window.  A staggered STATE
+        # write needs s_k, which differencing threw away -- that discard is the
+        # only reason 'endpoint' (one depth) and 'delta' (staggered) were the
+        # only two writes expressible, and why depth staggering rode inert in
+        # J4/J5's configs.  Cost is nothing: `cur` is a VIEW of x, and autograd
+        # already retains every x for the backward, so holding T of them adds
+        # list overhead and no activations.
+        self._z_states: list = []         # index t-1 -> s_t at the summary cols
+        self._z_depths_used: list = []    # the depths latent_write actually drew
         self._z_grad:  list = []          # was step t inside the gradient window
         self._z_s0_scale: Optional[float] = None       # ||s0|| per TOKEN (row L2), fp32
         self._z_s0_rms:   Optional[float] = None       # s0 per-ELEMENT rms, fp32
@@ -1603,6 +1648,11 @@ class CortexMemory(nn.Module):
         cur = x[:, -self._n_sum:]
         if self._z_prev is not None:
             self._z_tape.append(cur - self._z_prev)
+            # J7: the raw state beside its own delta, in ONE branch.  Appending
+            # them separately would let the two tapes drift by one on any config
+            # where _z_prev is not seeded by latent_init, and latent_write
+            # indexes both with the same depth map.
+            self._z_states.append(cur)
             self._z_grad.append(bool(torch.is_grad_enabled()))
         self._z_prev = cur
 
@@ -2002,15 +2052,36 @@ class CortexMemory(nn.Module):
         # written down (rule B is specified as k_j = round(f_j * (T-1))), and
         # matching the specification beats reclaiming one delta at the saturated
         # end of the trajectory, which is the end P0.1 says carries least.
+        if self.latent_encoding == "staggered_state":
+            return self._latent_staggered_write(self._z_states)
         if self.latent_encoding != "delta":
             return self._latent_state_write()
-        T_loop = len(self._z_tape)
+        return self._latent_staggered_write(self._z_tape)
+
+    def _latent_staggered_write(self, tape: list) -> torch.Tensor:
+        """One depth per slot, out of `tape`.  Shared by 'delta' and J7's
+        'staggered_state' so the two encodings cannot drift apart in the slot ->
+        depth convention -- the thing the ring's row map depends on.
+
+        The only difference between them is WHICH tape is passed: differences
+        (d_k) or raw states (s_k).  Everything else -- the depth map, the clamp,
+        the column-j selection, the row congruence under the ring -- is the same
+        code, which is the point.
+        """
+        T_loop = len(tape)
         W = self.prefix.n_vec
         depths = self.latent_depth_map(T_loop, W)
-        rows = []
+        drawn, rows = [], []
         for j, k in enumerate(depths):
-            d = self._z_tape[min(max(k, 1), T_loop) - 1]
-            rows.append(d[:, j:j + 1])
+            k_c = min(max(k, 1), T_loop)
+            drawn.append(k_c)
+            rows.append(tape[k_c - 1][:, j:j + 1])
+        # REPORTED, not assumed.  `latent_depth_{rule,lo,hi}` rode in J4's and
+        # J5's configs doing nothing, because `endpoint` short-circuited before
+        # any of this ran and no number said so.  This is the number that says
+        # so: one distinct depth means the stagger collapsed (a short loop
+        # clamped the band to a point) and the limb IS a single-depth write.
+        self._z_depths_used = sorted(set(drawn))
         return torch.cat(rows, dim=1)
 
     def _latent_state_write(self) -> torch.Tensor:
@@ -2128,6 +2199,21 @@ class CortexMemory(nn.Module):
         """
         if not self._z_grad:
             return 0.0
+        if self.latent_encoding == "staggered_state":
+            # J7.  PER SLOT, not per tape entry, and this is a silent-wrong-
+            # number site: the last-step shortcut below would report 1.0 -- the
+            # last iteration is always trainable -- on a write whose 16 slots
+            # draw depths 2..9, which at mr8 land in the no-grad PREFIX on a
+            # substantial share of batches (the sampler draws num_steps_no_grad
+            # up to 18 against a tape that reaches 26).  Measured on J6's ctrl
+            # diag, an absolute 2..9 band over 16 slots is fully trainable on
+            # 46/80 records, ENTIRELY frozen on 11/80, and 0.762 of slots on
+            # average.  A gate that read 1.0 here would hide that.
+            T_loop = len(self._z_grad)
+            depths = self.latent_depth_map(T_loop, self.prefix.n_vec)
+            live = sum(1 for k in depths
+                       if self._z_grad[min(max(k, 1), T_loop) - 1])
+            return live / len(depths)
         if self.latent_encoding != "delta":
             # A state encoding is written from the LAST step only, so the share
             # of the whole tape would understate it at any no-grad prefix.
@@ -2372,6 +2458,15 @@ def reset_cortex_graft_init(model, log=None):
     embed = getattr(cortex, "latent_embed", None)
     if embed is not None:
         fixed += embed.apply_designed_init()
+        # J7: apply_designed_init resets VALUES, not requires_grad, and this
+        # function runs after the graft is built -- but re-assert anyway, so
+        # that a frozen arm cannot be silently un-frozen by any future reset
+        # path.  An arm that trained its projection while its config said
+        # frozen is a control wearing the treatment's name.
+        if getattr(cortex, "latent_embed_frozen", False):
+            for _p in embed.parameters():
+                _p.requires_grad_(False)
+            fixed += ["latent_embed.[FROZEN at identity]"]
     # (3) insurance: nothing in cortex should be non-finite now — warn loudly if
     #     some module lacked reset_parameters and slipped through.
     bad = [n for n, p in cortex.named_parameters() if not torch.isfinite(p).all()]
