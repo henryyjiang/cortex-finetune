@@ -1,0 +1,114 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-28-2026 11:47:30
+Job ID:    13679794
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  span_ctrl
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '136.0'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'endpoint'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.24s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.57it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/j6-a3z-ctrl/checkpoint_93552/chkpt.pt: 0 missing / 0 unexpected keys
+[z3] data/carry_task_r16_len4096_val: 300 rows, answer_dep checked | encoding endpoint | T=8
+  25/300 rows
+  50/300 rows
+  75/300 rows
+  100/300 rows
+  125/300 rows
+  150/300 rows
+  175/300 rows
+  200/300 rows
+  225/300 rows
+  250/300 rows
+  275/300 rows
+  300/300 rows
+  probed E: acc 0.747 vs baseline 0.097
+  probed Z_write: acc 0.131 vs baseline 0.097
+  probed Z_tok: acc 0.100 vs baseline 0.097
+  probed Z_end: acc 0.131 vs baseline 0.097
+  probed E_ring: acc 0.322 vs baseline 0.103
+  probed Z_ring: acc 0.102 vs baseline 0.103
+==============================================================================
+D3 REGISTER PROBE -- cortex-retrofit/j6-a3z-ctrl/checkpoint_93552
+  encoding endpoint | 300 rows, 2400 (row, chunk) samples | cells by last update: recent 19110, chunk 19126, older 146, never 18
+==============================================================================
+  WRITE (all registers | recent | chunk)
+    E        control  all    0.747 (base 0.097) margin +0.649 [+0.646,+0.653]
+                      recent 0.756 (base 0.094) margin +0.662 [+0.656,+0.669]
+                      chunk  0.742 (base 0.100) margin +0.642 [+0.635,+0.648]
+    Z_write  PARTIAL  all    0.131 (base 0.097) margin +0.034 [+0.028,+0.040]
+                      recent 0.130 (base 0.094) margin +0.036 [+0.028,+0.044]
+                      chunk  0.133 (base 0.100) margin +0.033 [+0.026,+0.041]
+    Z_tok    NONE     all    0.100 (base 0.097) margin +0.002 [-0.001,+0.006]
+                      recent 0.099 (base 0.094) margin +0.005 [-0.000,+0.010]
+                      chunk  0.100 (base 0.100) margin -0.000 [-0.006,+0.005]
+    Z_end    PARTIAL  all    0.131 (base 0.097) margin +0.034 [+0.028,+0.040]
+                      recent 0.130 (base 0.094) margin +0.036 [+0.028,+0.044]
+                      chunk  0.133 (base 0.100) margin +0.033 [+0.026,+0.041]
+  RING (all registers | recent | chunk)
+    E_ring   control  all    0.322 (base 0.103) margin +0.219 [+0.213,+0.225]
+                      recent 0.332 (base 0.100) margin +0.232 [+0.224,+0.240]
+                      chunk  0.312 (base 0.105) margin +0.207 [+0.199,+0.216]
+    Z_ring   NONE     all    0.102 (base 0.103) margin -0.001 [-0.005,+0.003]
+                      recent 0.100 (base 0.100) margin +0.000 [-0.006,+0.006]
+                      chunk  0.104 (base 0.105) margin -0.001 [-0.007,+0.005]
+------------------------------------------------------------------------------
+  SPAN TEST (J7) -- did latent_embed rotate Z onto E's span?
+    share of Z's row energy OUTSIDE E's span, out of fold (1500 samples, 300 rows, E span rank 70 at 99% energy):
+      Z as carried      (no rescale)       0.585767   reported, not contrasted
+      Z rescaled        (pre-rotation)     0.602411   <- the contrast is these two,
+      Z as READ         (post-rotation)    0.826281      so it is rotation-only
+      by E-span rank    r16: 0.704->0.888  r64: 0.610->0.830  r70: 0.602->0.826  r256: 0.447->0.689
+      ratio post/pre                       1.3716
+    => moved AWAY from E's span, not toward it.  This is evidence
+       AGAINST laundering, not a null result: the map is making Z
+       LESS reachable from E than the carry already was.
+------------------------------------------------------------------------------
+  PROBE HEALTH (E margin >= 0.15, CI_lo > 0): OK
+  READING: NO_LATENT_HOLDS -- the loop state at the chunk end does not hold the register file -> the WRITE must change before J4
+
+wrote eval_results/span_ctrl/results.json
+---------------------------------------
+Begin Slurm Epilog: Sep-28-2026 11:56:23
+Job ID:        13679794
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      span_ctrl
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=01:11:12,vmem=0,walltime=00:08:54,mem=16966140K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-18-0
+---------------------------------------
