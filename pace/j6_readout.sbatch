@@ -112,6 +112,11 @@ if zn and abs(next(iter(zn)) - want_zn) > 1e-6:
     sys.exit(f"ERROR: trained at znorm_target {zn}, read-out passing {want_zn}. "
              "The rebuild would score a model nobody trained.")
 
+# DEAD CHECK, KEPT ONLY SO IT IS NOT RE-ADDED AS IF IT WORKED.  training_diag
+# emits ints and floats only, so the str field z_encoding never reaches
+# cortex_diag.jsonl: `enc` is ALWAYS empty and the `if enc` guard always
+# skips.  It has therefore never verified an encoding on any limb of any arm.
+# The live proof that `stag` staggered is the measured z_n_depths >= 2 below.
 enc = {r.get("z_encoding") for r in rows} - {None}
 want_enc = "staggered_state" if limb == "stag" else "endpoint"
 if enc and want_enc not in enc:
@@ -128,11 +133,20 @@ if limb == "stag":
     if nd < 2:
         sys.exit(f"ERROR: z_n_depths {nd} -- the staggered write drew ONE "
                  "depth, so this run trained as a single-depth write.")
-    if last.get("z_embed_frozen") is not True:
-        sys.exit("ERROR: z_embed_frozen is not True -- the projection trained, "
+    # Compare the VALUE, not the identity: training_diag casts bools to int for
+    # wandb, so this arrives as 1/0 and `1 is not True` is True -- which is the
+    # whole reason 13662415_2 exited in 7s on a checkpoint that HAD frozen its
+    # projection.  A missing key is still a hard error; an int 0 is the real
+    # failure this check was written for.
+    ef = last.get("z_embed_frozen")
+    if ef is None:
+        sys.exit("ERROR: no z_embed_frozen in the diag -- the flag never "
+                 "reached the graft, so the condition is unverifiable.")
+    if int(ef) != 1:
+        sys.exit("ERROR: z_embed_frozen is 0 -- the projection trained, "
                  "so this is J4's read and not J7's AC condition.")
-elif last.get("z_embed_frozen") is True:
-    sys.exit(f"ERROR: {limb} reports z_embed_frozen true but only `stag` "
+elif int(last.get("z_embed_frozen") or 0) == 1:
+    sys.exit(f"ERROR: {limb} reports z_embed_frozen 1 but only `stag` "
              "freezes the projection.")
 
 mix = last.get("z_mix_frac") or 0.0
@@ -153,8 +167,13 @@ if limb == "slow":
 elif st != 1:
     sys.exit(f"ERROR: {limb} reports z_stride {st} but only `slow` strides.")
 
-print(f"    limb {limb}: encoding {want_enc}, mix_frac {mix:.4f}, stride {st}, "
-      f"confirmed against {len(rows)} diag rows")
+# `want_enc` is what this limb was CONFIGURED to be, and the dead z_encoding
+# check above cannot confirm it -- so it is labelled expected, not confirmed.
+# What IS measured here is n_depths / embed_frozen / mix_frac / stride.
+print(f"    limb {limb}: encoding {want_enc} (expected, not measured); "
+      f"MEASURED n_depths {last.get('z_n_depths')}, "
+      f"embed_frozen {last.get('z_embed_frozen')}, mix_frac {mix:.4f}, "
+      f"stride {st} -- against {len(rows)} diag rows")
 CHECK
 
 # The graft must be FORCED to the trained build: --model_name loads the base

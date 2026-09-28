@@ -408,13 +408,27 @@ elif limb == "stag":
     else:
         notes.append(f"z_n_depths {nd} of z_tape_len {tl} "
                      f"(depths {v('z_depths')}) -- the stagger fired")
-    if v("z_embed_frozen") is not True:
-        fails.append("z_embed_frozen is not True: the projection is TRAINING, "
+    # NOT `is not True`: training_diag casts every bool to int so wandb will
+    # plot it, so this field arrives as 1/0 and `1 is not True` is True in
+    # Python -- which FAILED this limb on 13662406_2, a run whose projection
+    # was in fact frozen (the log printed 'latent_embed.[FROZEN at identity]'
+    # and z_embed_ratio held at 0.94 while every trainable-proj limb drifted to
+    # 3.7-5.3).  Compare the VALUE, and require the key to be present.
+    ef = v("z_embed_frozen")
+    if ef is None:
+        fails.append("no z_embed_frozen in the diag: the flag never reached "
+                     "the graft")
+    elif int(ef) != 1:
+        fails.append("z_embed_frozen is 0: the projection is TRAINING, "
                      "so this is J4's read and not the AC condition")
     else:
-        notes.append("z_embed_frozen true (projection frozen at identity)")
-    if (v("z_encoding") or "") not in ("staggered_state",):
-        fails.append(f"z_encoding {v('z_encoding')!r} != 'staggered_state'")
+        notes.append("z_embed_frozen 1 (projection frozen at identity)")
+    # NO z_encoding CHECK HERE.  training_diag keeps only ints and floats, so a
+    # str field can never reach cortex_diag.jsonl and `v("z_encoding")` is None
+    # on every limb of every arm -- the check it replaced could not pass, and it
+    # failed 13662406_2 for that reason alone.  The staggered write's MEASURED
+    # proof is z_n_depths >= 2 above, which is the gate's stated principle
+    # anyway: read the measurement, never the flag.
     # EXPECTED, and reported rather than gated: a staggered band draws depths
     # that land in the no-grad prefix on a real share of batches (measured
     # 0.762 of slots on J6's ctrl split).  Gate only the floor -- a write that
