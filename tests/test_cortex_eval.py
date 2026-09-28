@@ -56,7 +56,19 @@ _CONFIG_SRC = _find_raven_config()
 
 
 def _build_raven(**flags):
-    """Tiny real RavenForCausalLM (olmo variant) with the cortex graft."""
+    """Tiny real RavenForCausalLM (olmo variant) with the cortex graft.
+
+    `_expect_value_error=True` makes a ValueError from the graft's own config
+    validation PROPAGATE instead of becoming a skip.  Without it, a test that
+    asserts a bad flag is rejected can never run: the except below swallows the
+    very exception `pytest.raises` is waiting for and reports it as
+    "transformers skew?", which is how test_an_unknown_encoding_still_raises sat
+    inert on the cluster (26 passed, 1 skipped, job 13673654) while the
+    architecture was in fact rejecting the flag correctly.  Scoped to ValueError
+    on purpose: an AttributeError from a real transformers skew must still SKIP,
+    so these tests keep passing off-cluster.
+    """
+    _expect_ve = bool(flags.pop("_expect_value_error", False))
     if _CONFIG_SRC is None:
         pytest.skip("raven_config_minimal.py not found -- looked in the sibling "
                     "recurrent-pretraining checkout and ckpts/{olmo-retrofit-"
@@ -87,6 +99,9 @@ def _build_raven(**flags):
         model = RavenForCausalLM(cfg).eval()
     except Exception as e:
         shutil.rmtree(tmp, ignore_errors=True)
+        # The caller is ASSERTING this ValueError -- let it through.
+        if _expect_ve and isinstance(e, ValueError):
+            raise
         # A retired cortex flag raises ValueError BY DESIGN (cortex_graft.py
         # fails loud rather than running a silently memory-less arm).  Lumping
         # that in with "transformers skew?" made 7 dead-arm tests look like an

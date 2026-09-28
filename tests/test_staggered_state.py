@@ -265,8 +265,13 @@ class TestItStillBuildsAndRuns:
         assert g is not None and torch.count_nonzero(g) > 0
 
     def test_an_unknown_encoding_still_raises(self):
+        # _expect_value_error, or _build_raven turns the ValueError this test
+        # exists to catch into a skip labelled "transformers skew?" -- which it
+        # did on job 13673654, where this was the 1 skipped of 27 on a cluster
+        # whose environment was fine.
         with pytest.raises(ValueError, match="latent_encoding"):
-            _model(encoding="staggered")          # near-miss of the real name
+            _model(encoding="staggered",          # near-miss of the real name
+                   _expect_value_error=True)
 
     def test_embeds_admits_the_new_encoding(self):
         m = _model(encoding="staggered_state")
