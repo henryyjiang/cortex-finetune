@@ -199,6 +199,13 @@ RESID_LAM_REL = 1e-6
 #: sharpest possible REDUNDANT, and threshold-free in practice (a re-coding
 #: lands at ~1e-6, not near this cut).
 RESID_FRAC_MIN = 1e-3
+#: J7 SPAN TEST: `post < LAUNDER_FRAC * pre` is the label "laundered" -- the read
+#: projection more than halved the share of Z surviving E's removal.  CHOSEN, and
+#: a label on a REPORTED ratio, not a gate: both raw fractions and their ratio
+#: print either way, so a reader can disagree with the cut without rerunning.
+#: Half is the coarsest defensible line for "materially moved toward E's span",
+#: and D3's 15-27% outside-E is the scale it is coarse against.
+LAUNDER_FRAC = 0.5
 INCREMENTAL_ENCODINGS = ("E", "E_plus_Z_end", "E_pca", "Z_end_resid_E")
 
 
@@ -338,6 +345,15 @@ def collect(model, cortex, rows: list, pt: dict, n_chunks: int, num_steps,
             if i + 1 >= RING_FROM_CHUNK and state is not None:
                 s = state[0].float().cpu()
                 rec["E_ring"], rec["Z_ring"] = s[:, :D].half(), s[:, D:].half()
+                # J7 SPAN TEST.  Z_ring is Z as CARRIED -- before the read path
+                # touches it.  The laundering question is about the read path's
+                # OUTPUT, which no other tensor here holds, so capture it beside
+                # its own input: the two differ by rescale + latent_embed and
+                # nothing else, on the same rows and the same folds.
+                staged = read_path_z(cortex, s[:, D:])
+                if staged is not None:
+                    rec["Z_scaled"], rec["Z_read"] = (staged[0].half(),
+                                                      staged[1].half())
             samples.append(rec)
         if log_every and (n_done + 1) % log_every == 0:
             print(f"  {n_done + 1}/{len(rows)} rows", flush=True)
@@ -665,6 +681,171 @@ def report_encodings(samples: list, names: tuple, device, n_folds: int,
     return out
 
 
+def read_path_z(cortex, z_rows: torch.Tensor) -> Optional[tuple]:
+    """The read path applied to carried Z rows, returned at BOTH stages:
+    (after rescale, after rescale THEN projection).
+
+    Mirrors cortex_graft._latent_z_rows -- `rescale_rows` to
+    latent_read_znorm_target, then `latent_embed`, in that order.
+
+    BOTH stages, because the rescale and the rotation are different claims and
+    the span test is only about the second.  A per-row rescale is not identity
+    on this data -- it changes row norms, which a per-dim z-score does not undo
+    -- so comparing raw Z_ring against the read's output would charge the
+    rotation for the scale as well.  Returning the intermediate makes the
+    contrast rotation-only, and makes a frozen arm an exact control: at identity
+    the two tensors are equal, so the two fractions must match.
+    """
+    embed = getattr(cortex, "latent_embed", None)
+    if embed is None:
+        return None
+    from cortex_graft import rescale_rows
+    z = z_rows.float()
+    if str(getattr(cortex, "latent_read_znorm", "none")) == "rms":
+        z = rescale_rows(z, float(cortex.latent_read_znorm_target))
+    p = next(embed.parameters())
+    with torch.no_grad():
+        out = embed(z.to(device=p.device, dtype=p.dtype))
+    return z.float().cpu(), out.float().cpu()
+
+
+def outside_fracs(Zs: dict, E: torch.Tensor, folds: torch.Tensor, n_folds: int,
+                  ranks: tuple, device) -> dict:
+    """{(key, rank): outside-fraction} for every Z in `Zs` at every rank.
+
+    ONE SVD of E per fold, reused across every key and every rank: the basis does
+    not depend on which Z is being measured, and a rank-r basis is the first r
+    rows of the same Vh.  Computing it per (key, rank) instead cost 55 SVDs of a
+    ~19k x 2048 matrix where 5 suffice, which is minutes of an otherwise
+    ~10-minute job.
+    """
+    D = E.shape[-1]
+    num = {(k, r): 0.0 for k in Zs for r in ranks}
+    den = dict(num)
+    for f in range(n_folds):
+        tr, te = folds != f, folds == f
+        if not bool(te.any()) or not bool(tr.any()):
+            continue
+        E_tr = E[tr].reshape(-1, D).to(device=device, dtype=torch.float32)
+        Vh = torch.linalg.svd(E_tr, full_matrices=False).Vh
+        for k, Z in Zs.items():
+            Z_te = Z[te].reshape(-1, D).to(device=device, dtype=torch.float32)
+            tot = float(Z_te.pow(2).sum())
+            for r in ranks:
+                V = Vh[:r]
+                num[(k, r)] += float((Z_te - (Z_te @ V.T) @ V).pow(2).sum())
+                den[(k, r)] += tot
+    return {kr: (num[kr] / den[kr] if den[kr] > 0 else float("nan"))
+            for kr in num}
+
+
+def outside_frac(Z: torch.Tensor, E: torch.Tensor, folds: torch.Tensor,
+                 n_folds: int, rank: int, device) -> float:
+    """Share of Z's ROW energy lying OUTSIDE E's row subspace, out of fold.
+
+    Z, E: [n, K, D] -- the ring's two halves, kept as ROWS rather than flattened.
+    Returns sum||z - P_E z||^2 / sum||z||^2 over held-out samples, so it is
+    bounded in [0, 1] and reads directly as "the share of Z the attention cannot
+    already get from E".  This is D3's 15-27% quantity.
+
+    NOT resid_frac.  That one regresses E's top-`pca_k` PCA scores out of Z's,
+    on the FLATTENED [K*D] features, where both effective ranks far exceed
+    pca_k=128 -- the truncation then dominates and a Z squashed ENTIRELY into E's
+    span still reads ~0.89 of its variance surviving (measured, on matched
+    synthetic data, 2026-09-28).  A metric that cannot reach 0 when the
+    hypothesis is exactly true cannot test the hypothesis.  Per-row geometry has
+    no such ceiling: the same synthetic reads ~0 there.
+
+    E's span is the top-`rank` right singular vectors of E's training rows,
+    UNCENTERED -- the question is which directions the read can reach, and the
+    mean is one of them.
+    """
+    num = den = 0.0
+    D = Z.shape[-1]
+    for f in range(n_folds):
+        tr, te = folds != f, folds == f
+        if not bool(te.any()) or not bool(tr.any()):
+            continue
+        E_tr = E[tr].reshape(-1, D).to(device=device, dtype=torch.float32)
+        Vh = torch.linalg.svd(E_tr, full_matrices=False).Vh[:rank]      # [r, D]
+        Z_te = Z[te].reshape(-1, D).to(device=device, dtype=torch.float32)
+        resid = Z_te - (Z_te @ Vh.T) @ Vh
+        num += float(resid.pow(2).sum())
+        den += float(Z_te.pow(2).sum())
+    return num / den if den > 0 else float("nan")
+
+
+def _span_rank(E: torch.Tensor, frac: float = 0.99) -> int:
+    """Rank capturing `frac` of E's row energy -- E's span, sized by E itself
+    rather than by a number chosen here."""
+    D = E.shape[-1]
+    s = torch.linalg.svdvals(E.reshape(-1, D).float())
+    c = torch.cumsum(s.pow(2), 0) / s.pow(2).sum()
+    return int(torch.searchsorted(c, torch.tensor(frac)).item()) + 1
+
+
+def report_span(samples: list, device, n_folds: int,
+                resid_lam_rel: float = RESID_LAM_REL,
+                pca_k: int = RESID_PCA_K) -> dict:
+    """J7's SPAN TEST: did `latent_embed` rotate Z onto E's span?
+
+    `outside_frac` on the same samples and the same row folds, at the two stages
+    of the read path: Z after the rescale, and Z after the rescale AND the
+    projection.  The pair differs by the ROTATION ALONE, which is the claim under
+    test -- the rescale is reported beside them and never folded in, because a
+    scalar per row preserves direction and is the part both arms share.  Being a
+    WITHIN-checkpoint contrast it carries none of the between-run drift a
+    ctrl-vs-stag comparison would, and none of its encoding confound either.
+
+    Readings:
+      post << pre   the map moved Z INTO E's span -- LAUNDERING.  Every Z null
+                    measured through a trained projection is then uninterpretable:
+                    "carries nothing" and "was rotated into E" are the same number.
+      post ~= pre   the map is not why those nulls read empty.  Look elsewhere.
+      post >  pre   the map moved Z AWAY from E's span, which is evidence AGAINST
+                    laundering rather than a null result.
+
+    VALIDATED against known answers, 2026-09-28: identity gives ratio exactly
+    1.0000, a projector onto E's span gives 0.0000, and a half-way map gives
+    0.4966.  The earlier `resid_frac` version of this test could not do that --
+    complete laundering read ~0.89 there, because the flattened [K*D] features
+    have far more effective rank than pca_k=128 and the truncation dominated.
+
+    A frozen arm is the exact control: at identity the two tensors are equal, so
+    a gap there indicts this function rather than the map.
+    """
+    use = [s for s in samples if "Z_ring" in s and "Z_scaled" in s
+           and "Z_read" in s and "E_ring" in s]
+    if not use:
+        return {}
+    rows = torch.tensor([s["row"] for s in use])
+    folds = row_folds(rows, n_folds)
+    E = torch.stack([s["E_ring"] for s in use])          # [n, K, D], rows KEPT
+    rank = _span_rank(E.float())
+    out = {"span_rank": rank, "span_energy": 0.99,
+           "_n": {"samples": len(use), "rows": int(torch.unique(rows).numel())}}
+    # Stability against the one number this probe chooses: if the reading flips
+    # with the rank it is a rank artefact and not a rotation.  STRICTLY below D,
+    # because at rank D the "span" is the whole space and the fraction is
+    # trivially 0 for every input -- a meaningless row that reads like total
+    # laundering.
+    D_ = E.shape[-1]
+    ranks = tuple(sorted({r for r in (16, 64, rank, min(256, D_ // 2))
+                          if 0 < r < D_}))
+    Zs = {k: torch.stack([s[k] for s in use])
+          for k in ("Z_ring", "Z_scaled", "Z_read")}
+    fr = outside_fracs(Zs, E, folds, n_folds, ranks, device)
+    for key, label in (("Z_ring", "carried"), ("Z_scaled", "pre"),
+                       ("Z_read", "post")):
+        out[f"outside_{label}"] = fr[(key, rank)]
+    out["by_rank"] = {str(r): {"pre": fr[("Z_scaled", r)],
+                               "post": fr[("Z_read", r)]} for r in ranks}
+    pre, post = out["outside_pre"], out["outside_post"]
+    out["ratio_post_over_pre"] = (post / pre) if pre else None
+    out["laundered"] = bool(pre and post < LAUNDER_FRAC * pre)
+    return out
+
+
 def report_incremental(samples: list, device, n_folds: int, n_boot: int,
                        seed: int, resid_lam_rel: float = RESID_LAM_REL,
                        pca_k: int = RESID_PCA_K) -> dict:
@@ -748,6 +929,46 @@ def print_report(rep: dict) -> None:
             print(f"    {name:8} {r['status']:8} all    {_fmt(r['all'])}")
             for c in ("recent", "chunk"):
                 print(f"    {'':8} {'':8} {c:6} {_fmt(r[c])}")
+    if rep.get("span"):
+        sp = rep["span"]
+        print("-" * 78)
+        print("  SPAN TEST (J7) -- did latent_embed rotate Z onto E's span?")
+        print(f"    share of Z's row energy OUTSIDE E's span, out of fold "
+              f"({sp['_n']['samples']} samples, {sp['_n']['rows']} rows,"
+              f" E span rank {sp['span_rank']} at {sp['span_energy']:.0%} energy):")
+        print(f"      Z as carried      (no rescale)       "
+              f"{sp['outside_carried']:.6f}   reported, not contrasted")
+        print(f"      Z rescaled        (pre-rotation)     "
+              f"{sp['outside_pre']:.6f}   <- the contrast is these two,")
+        print(f"      Z as READ         (post-rotation)    "
+              f"{sp['outside_post']:.6f}      so it is rotation-only")
+        print(f"      by E-span rank    " + "  ".join(
+            f"r{r}: {v['pre']:.3f}->{v['post']:.3f}"
+            for r, v in sorted(sp["by_rank"].items(), key=lambda kv: int(kv[0]))))
+        r = sp.get("ratio_post_over_pre")
+        print(f"      ratio post/pre                       "
+              f"{'n/a' if r is None else f'{r:.4f}'}")
+        if sp.get("laundered"):
+            print(f"    => LAUNDERED: the projection cut Z's outside-E share to "
+                  f"under {LAUNDER_FRAC:.0%} of what it carried.  A Z null read "
+                  "through")
+            print("       a TRAINED projection cannot distinguish 'carries "
+                  "nothing' from")
+            print("       'was rotated into E'.")
+        elif r is not None and r > 1.05:
+            print("    => moved AWAY from E's span, not toward it.  This is "
+                  "evidence")
+            print("       AGAINST laundering, not a null result: the map is "
+                  "making Z")
+            print("       LESS reachable from E than the carry already was.")
+        else:
+            print("    => NOT laundered at this cut: the projection is not why "
+                  "those nulls")
+            print("       read empty.  On a FROZEN arm the two fractions must "
+                  "be EQUAL")
+            print("       (identity gives ratio 1.0000 exactly) -- a gap there "
+                  "indicts")
+            print("       this probe, not the map.")
     if rep.get("incremental"):
         inc = rep["incremental"]
         print("-" * 78)
@@ -916,13 +1137,19 @@ def main() -> int:
                     "RING_FROM_CHUNK": RING_FROM_CHUNK,
                     "RESID_LAM_REL": args.resid_lam_rel,
                     "RESID_PCA_K": RESID_PCA_K,
-                    "RESID_FRAC_MIN": RESID_FRAC_MIN},
+                    "RESID_FRAC_MIN": RESID_FRAC_MIN,
+                    "LAUNDER_FRAC": LAUNDER_FRAC},
            "self_check": check, "answer_dep_checked": has_dep}
     rep["write"] = report_encodings(samples, WRITE_ENCODINGS, device, args.folds,
                                     args.boot, args.seed)
     rep["ring"] = report_encodings(samples, RING_ENCODINGS, device, args.folds,
                                    args.boot, args.seed)
     rep["reading"] = reading(rep)
+    # J7's span test.  Unconditional: it needs no extra forward pass (Z_read was
+    # captured beside Z_ring) and costs two resid_frac calls, so gating it behind
+    # a flag would only create a run that cannot answer the question it was sent
+    # to answer.
+    rep["span"] = report_span(samples, device, args.folds, args.resid_lam_rel)
     if args.incremental:
         print("  probe (b): the redundancy probe (j4_prereg.md S4.6)", flush=True)
         rep["incremental"] = report_incremental(samples, device, args.folds,
