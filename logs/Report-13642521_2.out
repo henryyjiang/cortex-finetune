@@ -1,0 +1,67 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-27-2026 14:19:08
+Job ID:    13643159
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j6_arms
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+  ok   same dir (ckpts/olmo-retrofit-cortex) -- nothing to compare
+=== J6 | limb=delta | run=j6-a3z-delta ===
+    base:      ckpts/olmo-retrofit-cortex
+    branch:    cortex-retrofit/retro-b2-heal/checkpoint_91552_w16  (step 91552 -> stop 93552, horizon 305176)
+    data:      data/j1_pg19fw50_carry20_len4096   (READ THIS LINE -- the only proof the pack arrived)
+    geometry:  gated W=16 K=64 cc=8 grad_chunks=4 wb=1
+    encoding:  delta   znorm rms -> 136.0
+    arm args:  --cortex.latent_read_scramble false --cortex.e_carry_read true --cortex.latent_carry_read true
+    NOTE the echo above is NOT proof a flag took effect -- e_carry_read
+         printed correctly for two runs while doing nothing.  The smoke
+         gate reads cortex_diag; that is the proof.
+[W927 14:19:22.732619402 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+Sun Sep 27 14:19:20: Time to load libraries: 9.36 seconds.
+--------------------------------------------------------------------
+------------------ Launching run j6-a3z-delta------------------
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+Platform: linux, Python: 3.11.15, PyTorch: 2.5.1+cu121
+CPU threads: 8, GPUs: 1 on atl1-1-03-018-14-0.pace.gatech.edu.
+GPU : NVIDIA H200. CUDA: 12.1.
+[cortex] memory ON: K=0 K_iter=0 ccot_direct=False accum_ccot=False (vecs=16/max=128) gated_accum=False prefix_memory=gated gate(K=64,route=ring,norm=tanh,init=zero,fill=grow) latent(Z on, rule=absolute,band=2..9,renorm=none,read=embeds,EMBEDS(J4: Z as its own input_embeds columns),enc=delta,znorm=136.0) prefix_pos=tail prefix_eos_reset=False cross_chunks=8 carry_grad_chunks=4 random_segments=False lora_rank=0
+[cortex] Z channel ON.  latent_depth_rule='absolute' is P0.7's question (evals/diag_depth_band.py): P0.1 measured the band at a SINGLE T and cannot say whether 'informative' tracks the absolute step or the fraction of the loop.  If P0.7 has not reported, this run is asserting an answer it does not have -- record which, in this run's sbatch header.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [05:03<05:03, 303.36s/it]Loading checkpoint shards: 100%|██████████| 2/2 [05:21<00:00, 135.37s/it]Loading checkpoint shards: 100%|██████████| 2/2 [05:21<00:00, 160.57s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /storage/home/hcoda1/3/hjiang420/.netrc.
+wandb: Currently logged in as: henryyjiang42 (henryyjiang42-georgia-institute-of-technology) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.28.0
+wandb: Run data is saved locally in cortex-retrofit/wandb/run-20260927_142447-o8vz6tgo
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run j6-a3z-delta
+wandb: ⭐️ View project at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit
+wandb: 🚀 View run at https://wandb.ai/henryyjiang42-georgia-institute-of-technology/cortex-retrofit/runs/o8vz6tgo
+/storage/home/hcoda1/3/hjiang420/cortex-finetune/train.py:889: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  ckpt = torch.load(f"{path}/chkpt.pt", map_location=device)
+[2026-09-27T20:19:30.078] error: *** JOB 13643159 ON atl1-1-03-018-14-0 CANCELLED AT 2026-09-27T20:19:30 DUE TO TIME LIMIT ***
+---------------------------------------
+Begin Slurm Epilog: Sep-27-2026 20:19:32
+Job ID:        13643159
+Array Job ID:  13642521_2
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j6_arms
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=2-00:02:56,vmem=0,walltime=06:00:22,mem=3570152K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-018-14-0
+---------------------------------------
