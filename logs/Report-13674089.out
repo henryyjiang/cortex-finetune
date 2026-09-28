@@ -1,0 +1,34 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-28-2026 09:44:20
+Job ID:    13674089
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  unit_suite
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+=== unit suite | atl1-1-02-006-21-2.pace.gatech.edu ===
+    tests: tests/test_staggered_state.py
+    args:  -q -rs
+    torch 2.5.1+cu121, python 3.11.15
+
+.........................s.                                              [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_cortex_eval.py:98: cannot build raven base (transformers skew?): ValueError: cortex.latent_encoding must be 'delta', 'endpoint', 'staggered_state', 'tokens' or 'scratch'; got 'staggered'.
+26 passed, 1 skipped in 26.17s
+
+==============================================================
+SUITE GREEN in 29s
+==============================================================
+---------------------------------------
+Begin Slurm Epilog: Sep-28-2026 09:45:00
+Job ID:        13674089
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      unit_suite
+Resources:     cpu=8,mem=32G,node=1
+Rsrc Used:     cput=00:05:36,vmem=0,walltime=00:00:42,mem=1161920K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-006-21-2
+---------------------------------------
