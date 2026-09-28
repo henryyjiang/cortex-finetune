@@ -1,0 +1,27 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-28-2026 03:03:52
+Job ID:    13662415
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  j6_readout
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== J6 read-out | limb=stag | step 93552 ===
+    run:        j6-a3z-stag
+    checkpoint: cortex-retrofit/j6-a3z-stag/checkpoint_93552
+NVIDIA H200, 143771 MiB
+ERROR: z_embed_frozen is not True -- the projection trained, so this is J4's read and not J7's AC condition.
+---------------------------------------
+Begin Slurm Epilog: Sep-28-2026 03:03:59
+Job ID:        13662415
+Array Job ID:  13662415_2
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      j6_readout
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:00:56,vmem=0,walltime=00:00:07,mem=38532K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-23-0
+---------------------------------------
