@@ -1,0 +1,79 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-28-2026 11:35:43
+Job ID:    13679211
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  span_stag
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 2  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '136.0'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.18s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.64it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-retrofit/j6-a3z-stag/checkpoint_93552/chkpt.pt: 0 missing / 0 unexpected keys
+[z3] data/carry_task_r16_len4096_val: 300 rows, answer_dep checked | encoding staggered_state | T=8
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_z_registers.py", line 1169, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_z_registers.py", line 1125, in main
+    samples, check = collect(model, cortex, rows, pt, args.n_chunks,
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_z_registers.py", line 353, in collect
+    staged = read_path_z(cortex, s[:, D:])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_z_registers.py", line 708, in read_path_z
+    out = embed(z.to(device=p.device, dtype=p.dtype))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/cortex_memory/latent_embed.py", line 142, in forward
+    raise ValueError(
+ValueError: LatentEmbedRead got (64, 2048); expected [B, K, 2048].  The Z rows are the ring's Z half and must arrive at the model's own width.
+---------------------------------------
+Begin Slurm Epilog: Sep-28-2026 11:38:47
+Job ID:        13679211
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      span_stag
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:24:32,vmem=0,walltime=00:03:04,mem=19445048K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-2-0
+---------------------------------------
