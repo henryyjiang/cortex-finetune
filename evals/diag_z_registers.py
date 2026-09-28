@@ -704,8 +704,12 @@ def read_path_z(cortex, z_rows: torch.Tensor) -> Optional[tuple]:
     if str(getattr(cortex, "latent_read_znorm", "none")) == "rms":
         z = rescale_rows(z, float(cortex.latent_read_znorm_target))
     p = next(embed.parameters())
+    # UNSQUEEZE: LatentEmbedRead.forward requires [B, K, D] and raises on 2-D,
+    # while `collect` hands us state[0] -- the batch dim already indexed away.
+    # Call the real module rather than multiplying by proj.weight here, so a
+    # future change inside it (a bias, a norm) reaches this probe too.
     with torch.no_grad():
-        out = embed(z.to(device=p.device, dtype=p.dtype))
+        out = embed(z.unsqueeze(0).to(device=p.device, dtype=p.dtype))[0]
     return z.float().cpu(), out.float().cpu()
 
 
