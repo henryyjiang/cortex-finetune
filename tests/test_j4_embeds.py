@@ -560,21 +560,103 @@ class TestTheSwitchesRefuseNeighbouringDesigns:
             _cortex(latent_read="embed")          # the plausible typo
 
 
+# ─── 7b. the ring's fill, AT THE GRAFT (runs everywhere) ───────────────────
+
+class TestTheRingFillsBeforeItRings:
+    """The growth that section 8 got wrong, pinned where it can be SEEN.
+
+    Section 8's width bug survived four days because its whole class skips
+    off-cluster on a transformers skew, so the only coverage of `gate_fill`
+    widths lived where the suite is rarely run.  CortexMemory needs no
+    transformers, so these run on any machine and the next such regression is
+    caught on the laptop.
+    """
+
+    def _walk(self, chunks):
+        g = _cortex()
+        out, st = [], None
+        for _ in range(chunks):
+            incoming = 0 if st is None else st.shape[1]
+            g.begin(st, None, S, torch.device("cpu"), torch.float32)
+            g.prefix_pack(torch.randn(B, S, D),
+                          torch.arange(S).unsqueeze(0).expand(B, -1))
+            out.append((incoming, int(g._n_zpre), int(g._n_pre)))
+            st = g.prefix.merge(st, torch.randn(B, W, D), torch.randn(B, W, D))
+            out[-1] = out[-1] + (tuple(st.shape),)
+        return out
+
+    def test_grow_appends_a_chunks_worth_per_merge_until_K(self):
+        lap = K // W
+        rows = self._walk(lap + 2)
+        widths = [r[3][1] for r in rows]
+        assert widths == [min((i + 1) * W, K) for i in range(lap + 2)], widths
+
+    def test_the_first_chunk_splices_no_carry_at_all(self):
+        """Not `K`, and not `W` either -- there is nothing to read yet, which
+        is why every 2x2 cell agrees on chunk 1 and why that agreement is the
+        instrument's own sanity check."""
+        incoming, n_zpre, n_pre, _ = self._walk(1)[0]
+        assert (incoming, n_zpre, n_pre) == (0, 0, 0)
+
+    def test_the_spliced_Z_width_tracks_the_carry_it_was_given(self):
+        """_n_zpre is the number of Z columns actually spliced, so it must
+        equal the INCOMING carry's rows on every chunk -- a constant K here
+        would mean the read is sized from the config rather than the state."""
+        for incoming, n_zpre, n_pre, _ in self._walk(K // W + 2):
+            assert n_zpre == incoming and n_pre == incoming
+
+    def test_both_channels_are_the_same_width(self):
+        """E and Z are two halves of ONE [B, K, 2D] tensor, so a fill rule that
+        grew one without the other would be a silent half-width carry."""
+        for _, n_zpre, n_pre, shape in self._walk(K // W + 1):
+            assert shape[2] == 2 * D
+            assert n_zpre == n_pre
+
+
 # ─── 8. end to end on the real model (cluster; skips on transformers skew) ──
 
 class TestOnTheRealModel:
-    def test_a_forward_runs_and_the_carry_round_trips(self):
+    def test_the_carry_grows_to_K_over_a_lap_and_round_trips(self):
+        """The carry GROWS to K; it does not start there.
+
+        `gate_fill="grow"` appends `accum_vecs` rows per merge until the ring
+        is full, so after ONE chunk the carry is [B, W, 2D] and it reaches
+        [B, K, 2D] only at chunk K // W.  Measured on PrefixGatedBuffer at
+        W=4, K=16: 4 -> 8 -> 12 -> 16 -> 16.
+
+        This test previously did one forward and asserted the steady-state
+        [B, K, 2D], then asserted `_n_zpre == K` against a 4-row carry.  Both
+        are the pre-lap width read as the post-lap one.  It had been red on the
+        cluster since the fill rule landed and nobody saw it, because the whole
+        class SKIPS off-cluster on a transformers skew (`RavenConfig` has no
+        `rope_parameters` on newer releases) -- so it only ever runs where the
+        suite is rarely run.
+
+        The growth is the MECHANISM, not an artefact to assert around:
+        cortex-final ships `gate_fill grow`, and its geometry is chosen so that
+        chunks 1-4 fill and 5-8 ring (cross_chunks >= 2 x lap is the exact
+        minimum at which the gate fires in training at all).  So the lap is
+        walked here and the width pinned at every step, which tests the same
+        round trip and additionally pins what broke it.
+        """
+        lap = K // W
+        assert lap * W == K, "this test assumes K is a whole number of laps"
         m = _model()
         ids = torch.randint(0, VOCAB - 1, (B, CL))
-        out = m(ids, num_steps=torch.tensor([0, T]), return_m_cross=True)
-        st = out["m_cross"] if isinstance(out, dict) else out.m_cross
-        assert st.shape == (B, K, 2 * D)          # dual channel, unchanged
-        assert out["logits"].shape[1] == CL       # the carry never reaches the head
-        # second chunk: now there IS a carry, so the Z columns are spliced
-        out2 = m(ids, num_steps=torch.tensor([0, T]), m_cross_in=st,
-                 return_m_cross=True)
-        assert out2["logits"].shape[1] == CL
-        assert m.cortex._n_zpre == K
+        st = None
+        for chunk in range(1, lap + 2):
+            incoming = 0 if st is None else st.shape[1]
+            out = m(ids, num_steps=torch.tensor([0, T]), m_cross_in=st,
+                    return_m_cross=True)
+            # Z is spliced for exactly the rows that ARRIVED -- 0 on the first
+            # chunk, never K before the ring has filled.
+            assert int(m.cortex._n_zpre) == incoming, (chunk, incoming)
+            # the carry never reaches the head, at any width
+            assert out["logits"].shape[1] == CL, chunk
+            st = out["m_cross"] if isinstance(out, dict) else out.m_cross
+            assert st.shape == (B, min(chunk * W, K), 2 * D), chunk
+        assert st.shape == (B, K, 2 * D)      # settled, and stays settled
+        assert int(m.cortex._n_zpre) == K     # the post-lap read, honestly reached
 
     def test_the_limbs_differ_in_the_carry_alone(self):
         ids = torch.randint(0, VOCAB - 1, (B, CL))

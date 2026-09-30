@@ -461,7 +461,22 @@ class TestTheJ4LayoutIsFourBlocks:
         samples, _ = collect(m, m.cortex, _rows(2), NC, torch.tensor([T, 0]),
                              torch.device("cpu"), 1234, set(), 8, 2, log_every=0)
         for s in samples:
-            assert torch.allclose(s["Z_write"], s["Z_end"],
+            # `Z_delta`, NOT `Z_write`.  This module's capture() wraps
+            # prefix.merge and files `new_latent` under "Z_delta" -- a name
+            # left over from when the delta was the only Z write.  Under
+            # `endpoint` that same tensor is s_T at the summary columns, which
+            # is exactly what the docstring above is asserting.  `Z_write` is
+            # evals/diag_z_registers.py's name for it (WRITE_ENCODINGS), and
+            # asking diag_z_content for it is a KeyError on every sample, so
+            # this check could never pass and never has.
+            #
+            # The two capture()s are deliberately separate implementations --
+            # diag_z_content.capture's own docstring says a re-derivation "is a
+            # second implementation that can drift from the first" -- so this
+            # is NOT redundant with the identical invariant in
+            # tests/test_z3_registers.py, which exercises the registers module.
+            # Each capture gets its own check.
+            assert torch.allclose(s["Z_delta"], s["Z_end"],
                                   atol=1e-4, rtol=1e-4), (s["row"], s["chunk"])
 
     @pytest.mark.parametrize("gated", [True, False])
