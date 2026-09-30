@@ -55,6 +55,7 @@ that was the rounding floor wearing the shape of a result.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -240,7 +241,19 @@ def walk(model, cortex, chunks, num_steps=None, backward: bool = True,
     carry = None
     losses = []
     prev_z = None
-    with _Tap(cortex) as tap:
+    # WITHOUT A BACKWARD, THE CHAIN'S GRAPH IS PURE WASTE -- and it is not a
+    # small waste.  `carry` links every chunk to the last, so an 8-chunk walk
+    # holds all eight chunks' activations at T=8 simultaneously.  `backward`
+    # gates the ONLY consumer of that graph (the summed-chain .backward() and
+    # grad_norms below), so when it is off nothing downstream reads .grad.
+    #
+    # It OOMed an H200 at 139.7 GiB on the first run of
+    # pace/measure_znorm.sbatch (job 13764409) at 8 x 512 x batch 4 -- 4x the
+    # footprint prelaunch_final.sbatch walks at (chunk_len 256, batch 2),
+    # which is why this had never surfaced.  prelaunch_final's own two
+    # --no_backward walks were carrying the same dead graph.
+    grad_ctx = contextlib.nullcontext() if backward else torch.no_grad()
+    with _Tap(cortex) as tap, grad_ctx:
         for i, ids in enumerate(chunks):
             kw = {"labels": shift_labels(ids)} if labels else {}
             if num_steps is not None:

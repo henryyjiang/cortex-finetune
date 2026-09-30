@@ -21,6 +21,11 @@
 # minute wall cap is queue headroom, not an estimate -- Slurm bills what you
 # use, so this is ~0.1 GPU-hours.
 #
+# FIRST RUN OOMED (job 13764409, 48 s).  Fixed here and upstream; see the
+# BATCH block below.  If it OOMs again, drop BATCH to 1 before touching
+# CHUNKS or CHUNK_LEN -- those two are the RUN'S geometry and changing them
+# measures ||E|| under a layout cortex-final does not train.
+#
 # WHAT IT MEASURES AND WHY IT IS A GATE
 # -------------------------------------
 # --cortex.latent_read_znorm_target rescales every carried Z row to a FIXED
@@ -70,6 +75,10 @@ conda activate cortex-retro
 export SCRATCH=${SCRATCH:-$HOME/scratch}
 export HF_HOME=$SCRATCH/hf_cache
 export HF_HUB_OFFLINE=1
+# MISSING ON THE FIRST RUN, and the OOM message itself asked for it.  Every
+# other GPU sbatch in pace/ exports this; the walk chains 8 chunks, so its
+# allocation pattern is exactly the fragmenting one it is for.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 MODEL=${MODEL:-ckpts/olmo-retrofit-cortex}
 CKPT=${CKPT:-}                             # empty = the base, i.e. step 0
@@ -77,7 +86,17 @@ DATA=${DATA:-data/fineweb_edu_olmo_len4096}   # the corpus the run STARTS on
 CHUNKS=${CHUNKS:-8}                        # the run's cross_chunks
 CHUNK_LEN=${CHUNK_LEN:-512}                # 4096 / 8
 T=${T:-8}                                  # the run's max_mean_rec
-BATCH=${BATCH:-4}
+# 2, NOT 4.  The walk's own default, and prelaunch_final.sbatch's.  The first
+# run of this script asked for 8 x 512 at batch 4 -- 4x the footprint
+# prelaunch walks at (chunk_len 256, batch 2) -- and OOMed an H200 at
+# 139.7 GiB in 48 seconds (job 13764409).  Two causes, both now fixed: the
+# missing allocator setting above, and `walk()` building the chain's autograd
+# graph even under --no_backward (it skipped only the .backward() call; the
+# graph is now scoped to backward=True, and
+# tests/test_dual_channel_walk.TestTheWalkDoesNotBuildAGraphItWillNotUse
+# pins it).  batch 2 over 8 chunks still gives 2 x 64 = 128 carried row norms,
+# far more than this needs.
+BATCH=${BATCH:-2}
 OUT=${OUT:-eval_results/final5b_znorm_base.json}
 
 echo "=== ZNORM_TARGET measurement ==="

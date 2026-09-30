@@ -463,3 +463,22 @@ class TestThePackCheck:
         body = _strip_comments(_read(self.PACKS))
         assert "SLURM_SUBMIT_DIR:-" in body, (
             "bare `cd $SLURM_SUBMIT_DIR` sends a hand-run to $HOME")
+
+    def test_the_znorm_job_exports_the_allocator_setting(self):
+        """Its first run OOMed (job 13764409) and the CUDA error asked for
+        this by name.  The walk chains 8 chunks, which is exactly the
+        fragmenting allocation pattern expandable_segments exists for."""
+        assert "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" in _read(ZNORM)
+
+    def test_the_znorm_walk_batch_matches_the_established_footprint(self):
+        """prelaunch_final walks at chunk_len 256, batch 2.  This asks for the
+        RUN's geometry (512) so the batch has to come down, or it is 4x a
+        footprint nobody has ever had trouble with."""
+        assert "BATCH=${BATCH:-2}" in _strip_comments(_read(ZNORM))
+
+    def test_it_does_not_trade_geometry_for_headroom(self):
+        """CHUNKS and CHUNK_LEN are the RUN's, so shrinking them to fit would
+        measure ||E|| under a layout cortex-final never trains."""
+        body = _strip_comments(_read(ZNORM))
+        assert "CHUNKS=${CHUNKS:-8}" in body
+        assert "CHUNK_LEN=${CHUNK_LEN:-512}" in body

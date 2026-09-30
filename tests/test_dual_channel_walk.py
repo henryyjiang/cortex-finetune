@@ -379,3 +379,71 @@ class TestTheSpectrumIsRecorded:
                       encoding="utf-8").read()
         for k in ("e_top1_share", "e_spectrum_top", "e_eff_rank_entropy_sq"):
             assert k in src
+
+
+# ─── the graph the walk does NOT need ───────────────────────────────────────
+
+class _StopAfterFirstForward(Exception):
+    """Ends the walk once the only thing under test has been observed."""
+
+
+class TestTheWalkDoesNotBuildAGraphItWillNotUse:
+    """`--no_backward` used to skip only the `.backward()` CALL.
+
+    The forward still built the chain's graph, and `carry` links every chunk
+    to the last, so an 8-chunk walk held all eight chunks' activations at T
+    simultaneously.  Nothing reads `.grad` unless `backward` is set -- the
+    summed-chain backward and `grad_norms` are its only consumers -- so that
+    graph was pure waste, and not a small one: it OOMed an H200 at 139.7 GiB
+    on the first run of pace/measure_znorm.sbatch (job 13764409, 8 x 512 at
+    batch 4).  prelaunch_final.sbatch's two `--no_backward` walks were
+    carrying the same dead graph and had simply never been large enough to
+    notice, at chunk_len 256 and batch 2.
+
+    These run ANYWHERE: `_Tap` needs a real CortexMemory, which builds without
+    transformers, and the recorder model raises before the first merge -- so
+    unlike the rest of this file they do not skip off-cluster, which is where
+    the OOM would have been caught.
+    """
+
+    class _Recorder(torch.nn.Module):
+        """Records whether autograd was live and stops the walk immediately."""
+
+        def __init__(self):
+            super().__init__()
+            self.grad_enabled = None
+
+        def forward(self, **kw):                       # noqa: D102
+            self.grad_enabled = torch.is_grad_enabled()
+            raise _StopAfterFirstForward
+
+    @staticmethod
+    def _cortex():
+        from types import SimpleNamespace
+        from cortex_graft import CortexMemory
+        return CortexMemory(SimpleNamespace(
+            n_embd=64, summary_init_token=EOS, use_memory=True,
+            memory_slots=0, accum_vecs=NV, eos_token_id=EOS,
+            prefix_memory="gated", gate_slots=K, gate_route="ring",
+            gate_init="zero", gate_fill="grow", latent_carry=True,
+            latent_encoding="endpoint", latent_read="embeds",
+            latent_s0_read=False, latent_read_znorm="rms",
+            latent_read_znorm_target=136.0))
+
+    def _grad_enabled_during(self, backward):
+        m = self._Recorder()
+        with pytest.raises(_StopAfterFirstForward):
+            walk(m, self._cortex(), _chunks(1),
+                 num_steps=torch.tensor([0, T]), backward=backward)
+        assert m.grad_enabled is not None, "the walk never called the model"
+        return m.grad_enabled
+
+    def test_no_backward_runs_the_forward_under_no_grad(self):
+        assert self._grad_enabled_during(backward=False) is False
+
+    def test_a_backward_walk_still_builds_its_graph(self):
+        """The guard is scoped, not a blanket no_grad: with `backward` on, the
+        summed-chain backward below still needs the graph, and a walk that
+        silently stopped producing gradient norms would report every watched
+        parameter as dead."""
+        assert self._grad_enabled_during(backward=True) is True
