@@ -57,20 +57,35 @@
 # that answers the mix question.
 #
 # PREP -- the FineWeb-Edu validation pack does not exist yet.  Build it ONCE
-# on a login node, disjoint from the training pack by construction:
+# on a login node.  Two shards, one command each; the SECOND is the one to run.
+#
+# THE OBVIOUS WAY IS THE EXPENSIVE WAY.  --skip_tokens 2_000_000_000 would be
+# disjoint by construction (data/fineweb_edu_olmo_len4096 was built at
+# --max_tokens 2_000_000_000, and the mix's FineWeb-Edu leg is drawn from that
+# same pack) -- but skip_rows is applied AFTER tokenisation, so it would
+# tokenise 2B tokens and throw every one of them away.  Hours, on a shared and
+# throttled login node that enforces its memory cap by killing you.
+#
+# DO THIS INSTEAD.  prepare_packed_dataset consumes shards in SORTED order and
+# stopped at 2.0B of a ~10B sample, so any later shard is untouched.  List the
+# local shards, then pack the LAST one from the top:
 #
 #   export HF_HOME=$SCRATCH/hf_cache
+#   ls $HF_HOME/hub/datasets--HuggingFaceFW--fineweb-edu/snapshots/*/sample/10BT/*.parquet | sort
 #   python tools/prepare_packed_dataset.py \
 #       --tokenizer ckpts/olmo-retrofit-cortex \
-#       --dataset HuggingFaceFW/fineweb-edu --subset 10BT \
+#       --parquet_glob "<the LAST path from that listing>" \
 #       --out data/fineweb_edu_olmo_val_len4096 --max_length 4096 \
-#       --skip_tokens 2_000_000_000 --max_tokens 20_000_000
+#       --max_tokens 20_000_000
 #
-# --skip_tokens 2B discards exactly the prefix data/fineweb_edu_olmo_len4096
-# consumed (it was built at --max_tokens 2_000_000_000), and the mix's
-# FineWeb-Edu leg is drawn from that same pack, so this val set is disjoint
-# from BOTH legs of both arms.  20M tokens = ~4,880 rows, far more than the
-# 400 this job scores.
+# --parquet_glob reads local files directly, so it needs no network and works
+# under HF_HUB_OFFLINE=1 (--list_files does NOT: it calls list_repo_files).
+# 20M tokens = ~4,880 rows, far more than the 400 this job scores, and it packs
+# in minutes because nothing is tokenised and discarded.
+#
+# THE DISJOINTNESS IS AN ASSUMPTION WORTH CHECKING ONCE: it holds only if the
+# 2.0B heal pack did not reach the last shard.  If the listing shows fewer than
+# three shards, fall back to --skip_tokens and accept the cost.
 #
 # The other two packs already exist and are the ones the J read-outs used:
 #   data/pg19_olmo_validation_len4096_strided   the off-task LM pack
