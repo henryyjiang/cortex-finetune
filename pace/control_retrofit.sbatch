@@ -11,6 +11,35 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=henryyjiang42@gmail.com
 
+# ############################################################################
+# ##  SUPERSEDED 2026-09-30 BY pace/control_5b.sbatch.  DO NOT LAUNCH THIS. ##
+# ############################################################################
+#
+# This script never ran -- there is no `=== C-chunked` banner anywhere in
+# logs/, checked 2026-09-30.  Its recipe was correct and is carried into
+# pace/control_5b.sbatch UNCHANGED; what changed is that the two arms now
+# SOURCE their shared recipe from pace/final_5b_common.sh, so the "differs in
+# exactly one variable" requirement in the header below is structural rather
+# than a promise two sibling scripts make on the day they are written.
+#
+# Three things also moved, and they are why launching THIS file would produce
+# a control that is no longer matched to the memory arm:
+#   * micro_batch_size 1 -> 2.  Memory/speed only (same global batch, same
+#     steps, same LR), but both arms must take the SAME value or their wall
+#     clocks and their dataloader item counts diverge.
+#   * out_path cortex-control -> cortex-5b, so both arms land in one wandb
+#     project and overlay for free.
+#   * --cortex.diag_interval is on, which costs nothing here (training_diag
+#     returns {} with no cortex) and is the memory arm's only live record.
+#
+# Launch instead:
+#     PHASE=heal sbatch pace/control_5b.sbatch
+#
+# Kept, not deleted, because the header below is the reasoning of record for
+# the batch size, the LR that was deliberately not re-tuned, the D-fallback
+# geometry and the corpus build.  Read it; do not sbatch it.  To run it anyway
+# (there is no reason to), set I_KNOW_THIS_IS_SUPERSEDED=1.
+#
 # C-CHUNKED — the budget-matched no-memory control at 5B tokens.
 # cortex_next_phase_framework.md §1 and §10.  Sibling of b2_retrofit.sbatch.
 #
@@ -145,6 +174,16 @@
 # / 117M tokens, i.e. 4.1% of the corpus, and every "PG-19 cannot supply the
 # volume" decision was downstream of that number.  Both packs are kept on disk;
 # data/pg19_olmo_len4096 WITHOUT the _strided suffix is the old one.
+
+if [ "${I_KNOW_THIS_IS_SUPERSEDED:-0}" != "1" ]; then
+    echo "REFUSING: pace/control_retrofit.sbatch is SUPERSEDED by"
+    echo "  pace/control_5b.sbatch (2026-09-30).  Launching this would give a"
+    echo "  control at micro_batch_size 1 and out_path cortex-control, which"
+    echo "  is no longer matched to cortex-final.  Use:"
+    echo "      PHASE=heal sbatch pace/control_5b.sbatch"
+    echo "  Set I_KNOW_THIS_IS_SUPERSEDED=1 to override."
+    exit 1
+fi
 
 cd $SLURM_SUBMIT_DIR
 
