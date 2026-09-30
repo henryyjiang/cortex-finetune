@@ -404,3 +404,62 @@ class TestTheLaunchersPointAtEachOther:
         # and it must NOT exit on it
         assert not re.search(r"squeue[\s\S]{0,900}?exit 1", body), (
             "the sequencing check should warn, never refuse")
+
+
+class TestThePackCheck:
+    """The pack check gates a 48h submit, so its own arithmetic has to be the
+    run's -- a check that silently asks a different question is worse than no
+    check, because it reports OK."""
+
+    PACKS = os.path.join(REPO, "pace", "check_packs.sbatch")
+
+    def test_the_step_split_is_the_runs_own(self):
+        """--steps is the steps SERVED FROM THIS PACK, never the horizon.
+        Passing 38,147 for the mix pack over-states its need by 43%."""
+        body = _strip_comments(_read(self.PACKS))
+        assert "MAX_STEPS=${MAX_STEPS:-38147}" in body
+        assert "HEAL_END=${HEAL_END:-11444}" in body
+        assert "MIX_STEPS=${MIX_STEPS:-$(( MAX_STEPS - HEAL_END ))}" in body, (
+            "the mix budget must be derived from the split, not written twice")
+
+    def test_the_batch_size_matches_the_launchers(self):
+        """Row budget is steps x batch_size and is independent of
+        micro_batch_size -- so this is one check for both arms.  The
+        framework's S10 counts were computed at 16 and are half these."""
+        body = _strip_comments(_read(self.PACKS))
+        assert "BATCH_SIZE=${BATCH_SIZE:-32}" in body
+        assert "BATCH_SIZE=${BATCH_SIZE:-32}" in _strip_comments(_read(COMMON))
+
+    def test_it_checks_the_same_packs_the_launchers_read(self):
+        packs = _strip_comments(_read(self.PACKS))
+        common = _strip_comments(_read(COMMON))
+        for name in ("data/fineweb_edu_olmo_len4096", "data/pg19_fw50_olmo_len4096"):
+            assert name in packs and name in common, (
+                f"{name} is not shared between the check and the launcher")
+
+    def test_the_forgotten_flag_is_priced_rather_than_hidden(self):
+        """resume_rows 0 is a CLAIM about how the run is driven (no branch,
+        and --reset_dataset_position on the switch link), so the counterfactual
+        is run too -- its FAIL is expected and must not gate the launch."""
+        body = _strip_comments(_read(self.PACKS))
+        assert "RESUME_ROWS=${RESUME_ROWS:-$(( HEAL_END * BATCH_SIZE ))}" in body
+        m = re.search(r'if \[ "\$RESUME_ROWS" -gt 0 \];(.*?)\nfi\n', body, re.S)
+        assert m, "the counterfactual block is missing"
+        assert "RC_ALL" not in m.group(1), (
+            "the counterfactual sets RC_ALL, so an EXPECTED failure would gate "
+            "the launch")
+
+    def test_the_missing_val_pack_does_not_gate_a_training_launch(self):
+        """fineweb_edu_olmo_val is built later and is read only by the
+        mid-run read-out; a training link must not wait on it."""
+        body = _strip_comments(_read(self.PACKS))
+        m = re.search(r"\*fineweb_edu_olmo_val\*\)(.*?);;", body, re.S)
+        assert m, "no special case for the not-yet-built val pack"
+        assert "RC_ALL" not in m.group(1)
+
+    def test_it_survives_being_run_by_hand(self):
+        """An unset SLURM_SUBMIT_DIR would `cd` to $HOME and then report every
+        pack as missing -- a green-looking path to a wrong answer."""
+        body = _strip_comments(_read(self.PACKS))
+        assert "SLURM_SUBMIT_DIR:-" in body, (
+            "bare `cd $SLURM_SUBMIT_DIR` sends a hand-run to $HOME")

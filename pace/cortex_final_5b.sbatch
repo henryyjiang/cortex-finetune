@@ -109,10 +109,7 @@
 #
 # PRE-FLIGHT (once, before the first submit)
 #   git pull
-#   python tools/check_pack.py --data data/fineweb_edu_olmo_len4096 \
-#       --steps 11444 --batch_size 32 --max_length 4096
-#   python tools/check_pack.py --data data/pg19_fw50_olmo_len4096 \
-#       --steps 26703 --batch_size 32 --max_length 4096
+#   sbatch pace/check_packs.sbatch                                # both packs
 #   sbatch pace/measure_znorm.sbatch                              # the gate
 #   BRANCH_PATH=cortex-retrofit/retro-b2-heal/checkpoint_91552_w16 \
 #       sbatch pace/prelaunch_final.sbatch                        # the wiring gate

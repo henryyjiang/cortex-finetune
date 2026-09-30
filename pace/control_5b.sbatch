@@ -84,10 +84,7 @@
 #
 # PRE-FLIGHT (once, before the first submit)
 #   git pull                       # so the run records a known commit
-#   python tools/check_pack.py --data data/fineweb_edu_olmo_len4096 \
-#       --steps 11444 --batch_size 32 --max_length 4096
-#   python tools/check_pack.py --data data/pg19_fw50_olmo_len4096 \
-#       --steps 26703 --batch_size 32 --max_length 4096
+#   sbatch pace/check_packs.sbatch               # both packs, on a compute node
 #   sbatch pace/smoke_control_mbs2.sbatch        # decides MICRO_BS, see above
 #
 # MONITORING
