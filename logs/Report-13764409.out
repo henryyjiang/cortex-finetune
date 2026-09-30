@@ -1,0 +1,101 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-30-2026 16:36:52
+Job ID:    13764409
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  znorm
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== ZNORM_TARGET measurement ===
+    model:  ckpts/olmo-retrofit-cortex 
+    data:   data/fineweb_edu_olmo_len4096   (real tokens -- random ids measure noise)
+    walk:   8 chunks x 512 tokens, T=8, batch=4
+NVIDIA H200, 143771 MiB
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  9.28it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 18.03it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_dual_channel_walk.py", line 517, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_dual_channel_walk.py", line 503, in main
+    rec = walk(inner, cortex, chunks, num_steps=num_steps,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/diag_dual_channel_walk.py", line 248, in walk
+    out = model(input_ids=ids, m_cross_in=carry, return_m_cross=True,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 744, in forward
+    x, num_steps_no_grad, num_steps_with_grad, xk, block_idx = self.iterate_forward(
+                                                               ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 868, in iterate_forward
+    x, block_idx = self.core_block_forward(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 891, in core_block_forward
+    x = block(x, freqs_cis, block_idx, mask, past_key_values)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 494, in forward
+    x = self.norm_2(self.mlp(x)) + x
+                    ^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/scratch/hf_cache/modules/transformers_modules/olmo-retrofit-cortex/raven_modeling_minimal_cortex.py", line 468, in forward
+    x_fc_1, x_fc_2 = self.fc(x).chunk(2, dim=-1)
+                     ^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/.conda/envs/cortex-retro/lib/python3.11/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 148.00 MiB. GPU 0 has a total capacity of 139.80 GiB of which 129.12 MiB is free. Including non-PyTorch memory, this process has 139.67 GiB memory in use. Of the allocated memory 137.47 GiB is allocated by PyTorch, and 1.53 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+walk failed rc=1
+---------------------------------------
+Begin Slurm Epilog: Sep-30-2026 16:37:38
+Job ID:        13764409
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      znorm
+Resources:     cpu=4,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:03:12,vmem=0,walltime=00:00:48,mem=1778412K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-23-0
+---------------------------------------

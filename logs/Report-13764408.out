@@ -1,0 +1,142 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-30-2026 16:33:31
+Job ID:    13764408
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  ombs2
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== control micro_batch_size gate | 4096 x cc8 ===
+NVIDIA H200, 143771 MiB
+prefix_pack occurrences in the checkpoint's modeling file:
+7
+
+######## control-mbs1 (micro_batch_size 1, use_memory false) ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=False | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.42s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.32it/s]
+[W930 16:34:18.414842226 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 35.3s (1.36B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: accum_vecs 0, accum_max 256, carry_grad_chunks 4 of 8
+  max packed sequence: 512 + 0 carry rows = 512 (max_position_embeddings=4096)
+  optimizer: MuonWithAuxAdam, 2 groups (57m, 59a)
+  warmup 1/1: loss 15.0089  6.0s  peak 99.37 GiB
+  measured: loss 14.3708  3.4s  peak 105.97 GiB
+
+-- result --
+  peak allocated : 105.97 GiB
+  peak reserved  : 106.25 GiB  (76% of 139.80 GiB, 33.55 GiB headroom)
+  micro-step     : 3.4s  -> 1.8 min per optimizer step at batch_size 32 (upper bound: the optimizer step is counted once per micro-step)
+  projection     : 48.3 days for 38,147 steps = 24.1 links of 48h
+
+RESULT FITS max_length=4096 cross_chunks=8 chunk_len=512 memory=False optimizer=True peak_alloc_gib=105.97 peak_res_gib=106.25 step_s=3.4
+[rank0]:[W930 16:34:29.094418936 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+######## control-mbs2 (micro_batch_size 2, use_memory false) ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=False | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 19.75it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 19.66it/s]
+[W930 16:34:56.526424048 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 19.8s (1.36B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: accum_vecs 0, accum_max 256, carry_grad_chunks 4 of 8
+  max packed sequence: 512 + 0 carry rows = 512 (max_position_embeddings=4096)
+  optimizer: MuonWithAuxAdam, 2 groups (57m, 59a)
+  warmup 1/1: loss 15.0166  6.4s  peak 132.68 GiB
+  OOM: CUDA out of memory. Tried to allocate 392.00 MiB. GPU 0 has a total capacity of 139.80 GiB of which 273.12 MiB is free. Including non-PyTorch memory, this process has 139.53 GiB memory in use. Of the allocated memory 138.38 GiB is allocated by PyTorch, and 21.43 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+-- result --
+  peak reserved before OOM: 138.40 GiB of 139.80 GiB
+
+RESULT OOM max_length=4096 cross_chunks=8 chunk_len=512 memory=False optimizer=True peak_alloc_gib=0.00 peak_res_gib=138.40 step_s=0.0
+[rank0]:[W930 16:35:05.798298657 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+######## cortex-mbs2 (micro_batch_size 2, use_memory true) ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 26.44it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W930 16:35:34.371958740 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 20.5s (1.39B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: GATED ring, W 16, K 64, route ring, norm tanh, init zero, fill grow, carry_grad_chunks 4 of 8, WINDOW BACKWARD (peak holds 4 chunks)
+  max packed sequence: 512 + 64 carry rows = 576 (max_position_embeddings=4096)
+  note: lap is 4 chunks; the gate fires from chunk 4 on, and the read block is PINNED at 64 columns from there. Against a no-trim accum on the same chain (128 columns) this is 50% of the read cost -- the pair is 'cheaper AND?', never 'equal cost AND?'.
+  note: +33.6M buffer parameters, which the optimizer holds two moments for. That is the one axis on which the gated arm is the LARGER of the two, and the reason this gate is not a formality.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 13a)
+  warmup 1/1: loss nan  5.9s  peak 79.77 GiB
+  measured: loss nan  3.6s  peak 86.62 GiB
+
+-- result --
+  peak allocated : 86.62 GiB
+  peak reserved  : 87.00 GiB  (62% of 139.80 GiB, 52.81 GiB headroom)
+  micro-step     : 3.6s  -> 1.9 min per optimizer step at batch_size 32 (upper bound: the optimizer step is counted once per micro-step)
+  projection     : 51.0 days for 38,147 steps = 25.5 links of 48h
+
+RESULT FITS max_length=4096 cross_chunks=8 chunk_len=512 memory=True optimizer=True peak_alloc_gib=86.62 peak_res_gib=87.00 step_s=3.6
+[rank0]:[W930 16:35:45.232960994 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+######## cortex-mbs1 (micro_batch_size 1, use_memory true) ########
+=== geometry gate: 4096 tok x cc8 (512-tok chunks) | memory=True | optimizer=True ===
+  device: NVIDIA H200, 139.80 GiB total
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 26.47it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[W930 16:36:13.337875985 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+  loaded fp32 in 20.3s (1.39B params)
+  recurrence: mean 8, backprop depth 8 (from the checkpoint config) -> worst-case num_steps [0 no-grad, 8 with-grad]
+  buffer: GATED ring, W 16, K 64, route ring, norm tanh, init zero, fill grow, carry_grad_chunks 4 of 8, WINDOW BACKWARD (peak holds 4 chunks)
+  max packed sequence: 512 + 64 carry rows = 576 (max_position_embeddings=4096)
+  note: lap is 4 chunks; the gate fires from chunk 4 on, and the read block is PINNED at 64 columns from there. Against a no-trim accum on the same chain (128 columns) this is 50% of the read cost -- the pair is 'cheaper AND?', never 'equal cost AND?'.
+  note: +33.6M buffer parameters, which the optimizer holds two moments for. That is the one axis on which the gated arm is the LARGER of the two, and the reason this gate is not a formality.
+  optimizer: MuonWithAuxAdam, 3 groups (57m, 59a, 13a)
+  warmup 1/1: loss nan  5.5s  peak 60.48 GiB
+  measured: loss nan  3.6s  peak 67.32 GiB
+
+-- result --
+  peak allocated : 67.32 GiB
+  peak reserved  : 67.80 GiB  (48% of 139.80 GiB, 72.00 GiB headroom)
+  micro-step     : 3.6s  -> 1.9 min per optimizer step at batch_size 32 (upper bound: the optimizer step is counted once per micro-step)
+  projection     : 51.1 days for 38,147 steps = 25.5 links of 48h
+
+RESULT FITS max_length=4096 cross_chunks=8 chunk_len=512 memory=True optimizer=True peak_alloc_gib=67.32 peak_res_gib=67.80 step_s=3.6
+[rank0]:[W930 16:36:23.846097995 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+=== summary ===
+  cell                   status      peak      of    use  s/micro
+  none mbs1              FITS    106.25G  139.8G   76%     3.42
+  none mbs2              OOM     138.40G  139.8G   99%     0.00
+  gated+Z mbs2           FITS     87.00G  139.8G   62%     3.61
+  gated+Z mbs1           FITS     67.80G  139.8G   48%     3.61
+
+  VERDICT: control mbs2 OOMs.  Launch at MICRO_BS=1 and plan ~10
+           links.  Do NOT raise it mid-chain.
+---------------------------------------
+Begin Slurm Epilog: Sep-30-2026 16:36:26
+Job ID:        13764408
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      ombs2
+Resources:     cpu=4,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=00:11:52,vmem=0,walltime=00:02:58,mem=2839292K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-23-0
+---------------------------------------

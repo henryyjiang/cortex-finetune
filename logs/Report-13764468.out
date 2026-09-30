@@ -1,0 +1,76 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-30-2026 16:27:21
+Job ID:    13764468
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  check_packs
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+=== pack check | atl1-1-02-010-8-2.pace.gatech.edu ===
+    horizon 38147 steps x 32 seq x 4096 tok = 5000003584 tokens
+    heal 0..11444 (11444 steps)   mix 11444..38147 (26703 steps)
+
+--------------------------------------------------------------
+1/2  heal pack
+pack      : data/fineweb_edu_olmo_len4096
+  rows    : 488,281  x 4097 ids/row (4096 usable)
+  tokens  : 2.000B
+budget    : 11,444 steps x 32 seq = 366,208 rows = 1.500B tokens
+coverage  : 1.33x the budget (+122,073 rows, +3,815 steps)
+
+OK: pack covers the budget with margin.
+
+--------------------------------------------------------------
+2/2  mix pack
+pack      : data/pg19_fw50_olmo_len4096
+  rows    : 940,000  x 4097 ids/row (4096 usable)
+  tokens  : 3.850B
+budget    : 26,703 steps x 32 seq = 854,496 rows = 3.500B tokens
+coverage  : 1.10x the budget (+85,504 rows, +2,672 steps)
+
+OK: pack covers the budget with margin.
+
+--------------------------------------------------------------
+   counterfactual: the mix pack IF the switch link forgets
+   --reset_dataset_position (skip = 366208 rows).
+   A FAIL here is EXPECTED and is the point -- it prices the
+   mistake.  Only the two checks above gate the launch.
+pack      : data/pg19_fw50_olmo_len4096
+  rows    : 940,000  x 4097 ids/row (4096 usable)
+  tokens  : 3.850B
+budget    : 26,703 steps x 32 seq = 854,496 rows = 3.500B tokens
+  + skip  : 366,208 rows fast-forwarded before the first served row (resume cursor)
+  = need  : 1,220,704 rows
+coverage  : 0.77x the budget (-280,704 rows, -8,772 steps)
+
+FAIL: the loader will exhaust at step 17,931 of 26,703.  Build a bigger pack (tools/prepare_packed_dataset.py --max_tokens), lower --stop_at_step, or — if --resume_rows is what pushed it over — pass --reset_dataset_position true on the corpus-switch link so the new pack is read from row 0.
+  (without the 366,208-row skip this pack would cover 1.10x the budget)
+   ^ that is what omitting the flag costs.
+
+--------------------------------------------------------------
+validation packs (existence only -- read a few hundred rows at a time
+by pace/midrun_check.sbatch, so they have no budget to cover)
+  MISSING data/fineweb_edu_olmo_val_len4096
+          expected until built -- the build is in the PREP
+          block of pace/midrun_check.sbatch.  It does NOT
+          gate a training launch, only the read-outs.
+  ok      data/pg19_olmo_validation_len4096_strided  (21M)
+  ok      data/carry_task_r16_len4096_val  (36M)
+
+==============================================================
+PACKS OK -- both arms can reach the 38147-step horizon.
+  Next: sbatch pace/smoke_control_mbs2.sbatch   (decides MICRO_BS)
+==============================================================
+---------------------------------------
+Begin Slurm Epilog: Sep-30-2026 16:27:38
+Job ID:        13764468
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      check_packs
+Resources:     cpu=4,mem=32G,node=1
+Rsrc Used:     cput=00:01:20,vmem=0,walltime=00:00:20,mem=288988K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-010-8-2
+---------------------------------------

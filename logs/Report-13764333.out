@@ -1,0 +1,100 @@
+---------------------------------------
+Begin Slurm Prolog: Sep-30-2026 16:22:50
+Job ID:    13764333
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  unit_suite
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+=== unit suite | atl1-1-01-005-29-1.pace.gatech.edu ===
+    tests: tests/
+    args:  -q
+    torch 2.5.1+cu121, python 3.11.15
+
+........................................................................ [  4%]
+........................................................................ [  8%]
+........................................................................ [ 13%]
+........................................................................ [ 17%]
+........................................................................ [ 22%]
+........................................................................ [ 26%]
+..................s..................................................... [ 31%]
+........................................................................ [ 35%]
+........................................................................ [ 40%]
+.....................................................F.................. [ 44%]
+........................................................................ [ 49%]
+........................................................................ [ 53%]
+........................................................................ [ 58%]
+........................................................................ [ 62%]
+........................................................................ [ 67%]
+........................................................................ [ 71%]
+........................................................................ [ 76%]
+........................................................................ [ 80%]
+........................................................................ [ 85%]
+........................................................................ [ 89%]
+........................................................................ [ 94%]
+........................................................................ [ 98%]
+...F..................                                                   [100%]
+=================================== FAILURES ===================================
+_______ TestOnTheRealModel.test_a_forward_runs_and_the_carry_round_trips _______
+
+self = <test_j4_embeds.TestOnTheRealModel object at 0x15549348c890>
+
+    def test_a_forward_runs_and_the_carry_round_trips(self):
+        m = _model()
+        ids = torch.randint(0, VOCAB - 1, (B, CL))
+        out = m(ids, num_steps=torch.tensor([0, T]), return_m_cross=True)
+        st = out["m_cross"] if isinstance(out, dict) else out.m_cross
+>       assert st.shape == (B, K, 2 * D)          # dual channel, unchanged
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert torch.Size([2, 4, 128]) == (2, 16, 128)
+E         
+E         At index 1 diff: 4 != 16
+E         Use -v to get more diff
+
+tests/test_j4_embeds.py:571: AssertionError
+_ TestTheJ4LayoutIsFourBlocks.test_the_endpoint_write_equals_the_summary_columns _
+
+self = <test_z_content.TestTheJ4LayoutIsFourBlocks object at 0x15549202cd90>
+
+    def test_the_endpoint_write_equals_the_summary_columns(self):
+        """The independent check on the offset: under 'endpoint' the WRITE is
+        s_T at the summary columns (cortex_graft.py, x[:, -n_sum:]), so the
+        merge's new_latent must equal the columns capture sliced.  A wrong
+        offset makes these two different tensors.  This is also the self-check
+        evals/diag_z_registers.py applies per run."""
+        m = self._j4_model()
+        samples, _ = collect(m, m.cortex, _rows(2), NC, torch.tensor([T, 0]),
+                             torch.device("cpu"), 1234, set(), 8, 2, log_every=0)
+        for s in samples:
+>           assert torch.allclose(s["Z_write"], s["Z_end"],
+                                  ^^^^^^^^^^^^
+                                  atol=1e-4, rtol=1e-4), (s["row"], s["chunk"])
+E           KeyError: 'Z_write'
+
+tests/test_z_content.py:464: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_j4_embeds.py::TestOnTheRealModel::test_a_forward_runs_and_the_carry_round_trips
+FAILED tests/test_z_content.py::TestTheJ4LayoutIsFourBlocks::test_the_endpoint_write_equals_the_summary_columns
+2 failed, 1603 passed, 1 skipped in 152.70s (0:02:32)
+
+==============================================================
+SUITE RED (rc=1) after 156s
+  Before believing a failure in a probe or gate test: every red this
+  suite has produced so far has been the INSTRUMENT encoding an
+  assumption the architecture does not share, 8 for 8, with zero
+  architecture defects.  Check whether the check is well-posed for
+  the arm it is failing on.
+==============================================================
+---------------------------------------
+Begin Slurm Epilog: Sep-30-2026 16:25:41
+Job ID:        13764333
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      unit_suite
+Resources:     cpu=8,mem=32G,node=1
+Rsrc Used:     cput=00:23:04,vmem=0,walltime=00:02:53,mem=1448088K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-01-005-29-1
+---------------------------------------
