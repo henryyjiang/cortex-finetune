@@ -646,12 +646,42 @@ class CLISettings:
                 f"cortex.latent_depth_lo/hi ({lo}/{hi}) must satisfy 1 <= lo "
                 f"<= hi.  Depth 0 is s0 itself, which is what Z REPLACES, not "
                 f"something to write.")
-            assert lo >= 2, (
-                f"cortex.latent_depth_lo is {lo}.  d_1 measured 23.8x the noise "
-                f"it replaces -- a different regime, not a larger version of "
-                f"the same one -- and writing it would put one slot three "
-                f"orders of magnitude off the rest.  Set 2 or higher, or turn "
-                f"on --cortex.latent_renorm s0 deliberately.")
+            # THE d_1 EXCLUSION IS A DELTA PATHOLOGY, AND ONLY A DELTA ONE.
+            # Relaxed 2026-09-30 for the raw-state encodings.  P0.1 measured
+            # d_1 = s_1 - s_0 at 23.8x ||s0|| because s_0 is trunc_normal_
+            # noise and s_1 is a real state, so the FIRST DIFFERENCE is
+            # dominated by the loop leaving the noise behind -- a different
+            # regime, not a larger version of the same one.  Across the 2..9
+            # band ||d||/||s0|| then spans 12.8 -> 0.90, a 14x range, which is
+            # what made one slot at d_1 unaddable.
+            #
+            # `staggered_state` differences NOTHING: it tapes s_k directly, and
+            # ||s_t|| runs 9.2 -> 10.7 over the same band, a 1.16x range, so
+            # s_1 is an ordinary state and depth 1 is in distribution.  The
+            # exclusion has no basis under a raw-state write and this assert
+            # was the only thing still enforcing it.  `delta` keeps the floor,
+            # because for `delta` P0.1's measurement still holds.
+            #
+            # THE COST, AND IT IS NOT THE ONE j6_arms.sbatch CLAIMED.  That
+            # launcher said lo=1 "would widen the trainable share"; it does the
+            # opposite.  A slot is trainable iff its depth k exceeds
+            # num_steps_no_grad (the no-grad iterations run FIRST), so adding
+            # the EARLIEST depth adds the least trainable one.  At T=8 over 16
+            # slots the trainable share goes 1.000/1.000/0.812/0.625 (lo=2, at
+            # n_no_grad 0..3) to 1.000/0.812/0.625/0.500 (lo=1) -- worse or
+            # equal at every n, never better.  What lo=1 buys is a 7th depth
+            # further from E's endpoint; what it costs is trainability on that
+            # slot.  `latent_write_grad_frac` reports the realised number.
+            if self.cortex["latent_encoding"] == "delta":
+                assert lo >= 2, (
+                    f"cortex.latent_depth_lo is {lo} under latent_encoding="
+                    f"'delta'.  d_1 measured 23.8x the noise it replaces -- a "
+                    f"different regime, not a larger version of the same one "
+                    f"-- and writing it would put one slot three orders of "
+                    f"magnitude off the rest.  Set 2 or higher, turn on "
+                    f"--cortex.latent_renorm s0 deliberately, or use a "
+                    f"raw-state encoding (staggered_state), where s_1 is an "
+                    f"ordinary state and depth 1 is admissible.")
             # The Z write only trains while the depths it samples are inside the
             # gradient window, and the no-grad steps run FIRST, so the trainable
             # region is always the LAST mean_backprop_depth iterations.  This is

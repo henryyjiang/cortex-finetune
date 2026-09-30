@@ -73,6 +73,19 @@ Config flags (getattr defaults)
                                        deltas are 0.1x with cos(d_t,d_t-1)
                                        reaching -0.95, a near-pure two-cycle
                                        oscillation.
+                                       THE lo=2 FLOOR IS DELTA-ONLY.  d_1's
+                                       23.8x comes from s_0 being noise, so it
+                                       is a property of DIFFERENCING, not of
+                                       depth 1.  Under 'staggered_state' the
+                                       tape holds s_k and ||s_t|| spans just
+                                       1.16x over the band, so lo=1 is
+                                       admissible; train.py asserts lo >= 2 for
+                                       'delta' alone (relaxed 2026-09-30) and
+                                       cortex-final runs 1..9.  The DEFAULT
+                                       here stays 2 so every arm on record
+                                       reproduces from a config that omits the
+                                       field; the band is set explicitly by the
+                                       launcher.
   latent_renorm       : str  = "none"  "none" substitutes the delta as measured
                                        — P0.1 puts it at 0.90x the noise it
                                        replaces AT T=8, so it is in distribution

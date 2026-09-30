@@ -217,11 +217,32 @@ STRIDE=${STRIDE:-2}
 # ABSOLUTE on both rules: magnitude t_hi 8 at T=16/32/64 with cv_absolute 0.0
 # against cv_relative 0.53, novelty t_hi 25.  So `absolute` is measured, not
 # asserted, and the J6 launch banner's "if P0.7 has not reported" caveat is
-# discharged.  2..9 is P0.1's usable band; raising LATENT_LO to 1 is legitimate
-# for a RAW-state write (P0.1's d_1 exclusion was a delta-scale pathology) and
-# would widen the trainable share -- see the band arithmetic in the header
-# before moving it.
-LATENT_LO=${LATENT_LO:-2}
+# discharged.
+#
+# LATENT_LO MOVED 2 -> 1, 2026-09-30 (Henry).  P0.1's d_1 exclusion was a
+# DELTA-scale pathology: d_1 = s_1 - s_0 measures 23.8x ||s0|| only because
+# s_0 is trunc_normal_ noise, so the first difference is dominated by the loop
+# leaving the noise behind.  `staggered_state` differences nothing -- it tapes
+# s_k -- and ||s_t|| runs 9.2 -> 10.7 across the band, a 1.16x range, so s_1
+# is an ordinary state and depth 1 is in distribution.  train.py's `lo >= 2`
+# assert now applies to `delta` only, which is where the measurement holds.
+#
+# CORRECTION TO THIS BLOCK'S OWN EARLIER CLAIM.  It said lo=1 "would widen the
+# trainable share".  It narrows it.  A slot is trainable iff its depth k
+# exceeds num_steps_no_grad, and the no-grad iterations run FIRST, so adding
+# the EARLIEST depth adds the LEAST trainable one.  At T=8 over 16 slots:
+#
+#   n_no_grad     0      1      2      3      4      5
+#   lo=2      1.000  1.000  0.812  0.625  0.438  0.250
+#   lo=1      1.000  0.812  0.625  0.500  0.375  0.250
+#
+# So this trades trainability on the new slot for a 7th depth that sits further
+# from E's endpoint than anything in 2..7.  That is the bet, stated plainly.
+# It also re-maps EVERY slot, not just one: span goes 6 -> 7, so at T=8 the
+# depth of all 16 slots changes ([2,3,4,5,6,7,2,...] -> [1,2,3,4,5,6,7,1,...]).
+# `latent_write_grad_frac` and `_z_depths_used` report what actually ran; read
+# them rather than this table.
+LATENT_LO=${LATENT_LO:-1}
 LATENT_HI=${LATENT_HI:-9}
 SMOKE_GATE=${SMOKE_GATE:-0}
 
