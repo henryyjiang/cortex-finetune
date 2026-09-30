@@ -392,30 +392,47 @@ class TestTheWalkDoesNotBuildAGraphItWillNotUse:
 
     The forward still built the chain's graph, and `carry` links every chunk
     to the last, so an 8-chunk walk held all eight chunks' activations at T
-    simultaneously.  Nothing reads `.grad` unless `backward` is set -- the
-    summed-chain backward and `grad_norms` are its only consumers -- so that
-    graph was pure waste, and not a small one: it OOMed an H200 at 139.7 GiB
-    on the first run of pace/measure_znorm.sbatch (job 13764409, 8 x 512 at
-    batch 4).  prelaunch_final.sbatch's two `--no_backward` walks were
-    carrying the same dead graph and had simply never been large enough to
-    notice, at chunk_len 256 and batch 2.
+    simultaneously.  It OOMed an H200 at 139.7 GiB on the first run of
+    pace/measure_znorm.sbatch (job 13764409, 8 x 512 at batch 4).
+    prelaunch_final.sbatch's two `--no_backward` walks carried the same dead
+    graph and had simply never been large enough to notice, at chunk_len 256
+    and batch 2.
 
-    These run ANYWHERE: `_Tap` needs a real CortexMemory, which builds without
-    transformers, and the recorder model raises before the first merge -- so
-    unlike the rest of this file they do not skip off-cluster, which is where
-    the OOM would have been caught.
+    THE CHAIN IS CUT; AUTOGRAD IS NOT TURNED OFF.  A blanket `torch.no_grad()`
+    is what the first fix did, and it was wrong in the way this repo keeps
+    paying for: `_z_grad` records `torch.is_grad_enabled()` per loop step, so
+    under no_grad `latent_write_grad_frac` reports a hard 0.00 -- "the write
+    never entered the gradient window", a FAILURE signal the training gate
+    acts on -- about the instrument rather than the model.  Both properties
+    are pinned below because fixing either one alone reintroduces the other.
+
+    These run ANYWHERE: `_Tap` needs only a real CortexMemory, which builds
+    without transformers, so unlike the rest of this file they do not skip
+    off-cluster -- which is where the OOM would have been caught.
     """
 
     class _Recorder(torch.nn.Module):
-        """Records whether autograd was live and stops the walk immediately."""
+        """Stands in for the raven forward and records what it was handed."""
 
-        def __init__(self):
+        def __init__(self, rows, stop_after):
             super().__init__()
-            self.grad_enabled = None
+            self.p = torch.nn.Parameter(torch.ones(1))
+            self.rows, self.stop_after = rows, stop_after
+            self.grad_enabled = []
+            self.incoming_has_graph = []
 
-        def forward(self, **kw):                       # noqa: D102
-            self.grad_enabled = torch.is_grad_enabled()
-            raise _StopAfterFirstForward
+        def forward(self, input_ids=None, m_cross_in=None, **kw):
+            self.grad_enabled.append(torch.is_grad_enabled())
+            self.incoming_has_graph.append(
+                None if m_cross_in is None else m_cross_in.grad_fn is not None)
+            if len(self.grad_enabled) >= self.stop_after:
+                raise _StopAfterFirstForward
+            B, S = input_ids.shape
+            # multiplied by a Parameter, so the carry it returns HAS a graph
+            # unless the walk detaches it
+            return {"m_cross": self.p * torch.ones(B, self.rows, 2 * 64),
+                    "loss": self.p.sum(),
+                    "logits": torch.zeros(B, S, 8)}
 
     @staticmethod
     def _cortex():
@@ -430,20 +447,34 @@ class TestTheWalkDoesNotBuildAGraphItWillNotUse:
             latent_s0_read=False, latent_read_znorm="rms",
             latent_read_znorm_target=136.0))
 
-    def _grad_enabled_during(self, backward):
-        m = self._Recorder()
+    def _run(self, backward, chunks=3):
+        m = self._Recorder(rows=NV, stop_after=chunks)
         with pytest.raises(_StopAfterFirstForward):
-            walk(m, self._cortex(), _chunks(1),
+            walk(m, self._cortex(), _chunks(chunks),
                  num_steps=torch.tensor([0, T]), backward=backward)
-        assert m.grad_enabled is not None, "the walk never called the model"
-        return m.grad_enabled
+        assert m.grad_enabled, "the walk never called the model"
+        return m
 
-    def test_no_backward_runs_the_forward_under_no_grad(self):
-        assert self._grad_enabled_during(backward=False) is False
+    def test_no_backward_cuts_the_chain_between_chunks(self):
+        """The incoming carry must arrive with no grad_fn, so the previous
+        chunk's activations are reachable by nothing and get freed."""
+        m = self._run(backward=False)
+        assert m.incoming_has_graph[0] is None          # chunk 0 has no carry
+        assert all(h is False for h in m.incoming_has_graph[1:]), \
+            m.incoming_has_graph
 
-    def test_a_backward_walk_still_builds_its_graph(self):
-        """The guard is scoped, not a blanket no_grad: with `backward` on, the
-        summed-chain backward below still needs the graph, and a walk that
-        silently stopped producing gradient norms would report every watched
-        parameter as dead."""
-        assert self._grad_enabled_during(backward=True) is True
+    def test_a_backward_walk_keeps_the_chain(self):
+        """Cutting it there would silently break the summed-chain backward:
+        gradient that only reaches a parameter through >= 3 chunks -- which is
+        how gate_proj_mem is reached -- would report None and read as dead."""
+        m = self._run(backward=True)
+        assert all(h is True for h in m.incoming_has_graph[1:]), \
+            m.incoming_has_graph
+
+    @pytest.mark.parametrize("backward", [True, False])
+    def test_autograd_stays_enabled_either_way(self, backward):
+        """The fix must not be a no_grad: `_z_grad` records
+        torch.is_grad_enabled() per loop step, so disabling it makes
+        latent_write_grad_frac report 0.00 -- the training gate's signal for
+        "the staggered write never trained" -- on a healthy run."""
+        assert all(self._run(backward=backward).grad_enabled)

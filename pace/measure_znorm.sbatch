@@ -117,10 +117,22 @@ if ! grep -q "iter_write(x, current_step)" "$MODEL/raven_modeling_minimal_cortex
 fi
 
 # The graft is forced to CORTEX-FINAL's build, not the base dir's config
-# (which carries no cortex flags at all).  These mirror
-# pace/cortex_final_5b.sbatch; the Z-side read flags are deliberately omitted
-# because what is being measured is E's carried row norm, which is written
-# before any Z read happens.
+# (which carries no cortex flags at all).
+#
+# THE Z-SIDE READ FLAGS ARE OMITTED, AND THE FIRST REASON GIVEN HERE WAS
+# WRONG.  It said E's norm "is written before any Z read happens".  It is not:
+# the read enters at s0 / every loop iteration, and the E write is post-ln_f at
+# the END, so the read is upstream of it.  The real reason is circularity --
+# latent_read=embeds REQUIRES latent_read_znorm_target, which is the number
+# being measured.
+#
+# What rescues it is a measurement, not an argument.  Chunk 0 runs with NO
+# incoming carry and therefore no Z read at all; chunks 1-7 run with both.
+# On job 13765065 those wrote 100.2 against 98.9-100.1 -- a 1.3% spread across
+# the whole walk.  So the read's influence on ||E|| is inside 1.3%, an order
+# of magnitude under the +-15% band this number is used against.  Read the
+# per-chunk write norms the summary prints and re-check that, rather than
+# trusting this paragraph.
 python evals/diag_dual_channel_walk.py \
     --model_name "$MODEL" ${CKPT:+--checkpoint "$CKPT"} \
     --data "$DATA" \
@@ -155,7 +167,19 @@ print()
 print(f"  Launch with:")
 print(f"    PHASE=heal ZNORM_TARGET={e:.1f} sbatch pace/cortex_final_5b.sbatch")
 print()
-print(f"  Sanity: 171.0 was B2's and 136.0 the b2 heal branch's.  A number far")
-print(f"  outside that range means the walk did not measure what it should --")
-print(f"  check the pack arrived and that the graft built (the --set list).")
+print()
+print(f"  EXPECT ~98 HERE, NOT 136 OR 171.  This walks the UNTRAINED")
+print(f"  conversion -- job 13765065 measured 98.0 at mean NLL 10.27 against")
+print(f"  ln(vocab) 11.52, i.e. the arrangement before any training.  136.0")
+print(f"  and 171.0 are TRAINED anchors and do not apply at step 0:")
+print(f"      ~98   this base, step 0                     (measured)")
+print(f"      136   b2 heal branch -- same base, same corpus, same 1.5B heal")
+print(f"      171   B2 at 5B")
+print(f"  So E's norm is expected to CLIMB over the run, roughly along that")
+print(f"  ladder, and a target pinned here falls out of band as it does.")
+print(f"  That is the re-target question, not a bad measurement: see")
+print(f"  ../final_5b_launch.md S1b and watch cortex/z_embed_ratio.")
+print()
+print(f"  A reading under ~60 or over ~200 is the one to distrust -- check the")
+print(f"  pack arrived and that the graft built (the --set list above).")
 READ
