@@ -32,3 +32,65 @@ Random Initialization not implemented.
 Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.43s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.35it/s]
 Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
 You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=on  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16     2D        16         -   257.96    42.01     8   0.00   yes           -  10.6256
+ 1    16->32     2D        16         -   257.60    36.07     8   0.00   yes    0.00e+00  10.3338
+ 2    32->48     2D        16         -   255.29    38.26     8   0.00   yes    0.00e+00  10.0979
+ 3    48->64     2D        16         -   254.78    38.01     8   0.00   yes    0.00e+00  10.0836
+ 4    64->64     2D        16       yes   255.39    35.75     8   0.00   yes    0.00e+00  10.2356
+ 5    64->64     2D        16       yes   254.55    33.87     8   0.00   yes    0.00e+00  10.3750
+ 6    64->64     2D        16       yes   254.83    31.78     8   0.00   yes    0.00e+00  10.1803
+ 7    64->64     2D        16       yes   255.59    30.87     8   0.00   yes    0.00e+00  10.2172
+
+   mean NLL 10.2686   chance (ln vocab) 11.5164   margin +1.2478
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 2
+   E: row_norm 98.011  centred_cos -0.0137  eff_rank_pr 3.68  entropy 23.63
+   Z: row_norm 13.003  centred_cos -0.0136  eff_rank_pr 12.38  entropy 43.19
+   Z/E norm ratio 0.1327  unwritten Z rows 0
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.7311  ig(bias) 0.5000  |W_in| 0.000e+00  |W_mem| 0.000e+00  left init: False
+   Z  fg(bias) 0.7311  ig(bias) 0.5000  |W_in| 0.000e+00  |W_mem| 0.000e+00  left init: False
+
+   Z read grad frac over this walk: 1.00 (measured=True)  write grad frac 0.00
+   read_grad_frac is a property of the SAMPLER, not of the walk: one
+   no-grad step cuts Z's read gradient to exactly zero, and E's is
+   unaffected because E re-enters through input_embeds every step.
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/final5b_znorm_base.json
+
+======================================================================
+  ZNORM_TARGET = 98.0
+======================================================================
+  (carried E row norm, the block the next chunk actually READS)
+  per-chunk write norms: 100.2  100.1  99.3  99.0  99.2  98.9  99.0  99.3
+  spread across the walk: 98.9 .. 100.2 (+1.3%)
+
+  Launch with:
+    PHASE=heal ZNORM_TARGET=98.0 sbatch pace/cortex_final_5b.sbatch
+
+  Sanity: 171.0 was B2's and 136.0 the b2 heal branch's.  A number far
+  outside that range means the walk did not measure what it should --
+  check the pack arrived and that the graft built (the --set list).
+---------------------------------------
+Begin Slurm Epilog: Sep-30-2026 16:50:12
+Job ID:        13765065
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      znorm
+Resources:     cpu=4,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:02:44,vmem=0,walltime=00:00:41,mem=3827076K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-11-0
+---------------------------------------
