@@ -90,7 +90,8 @@ final5b_shared() {
     BATCH_SIZE=${BATCH_SIZE:-32}               # rows/step -> 131,072 tokens
     MAX_STEPS=${MAX_STEPS:-38147}              # 5.000B / 131,072 -- FIXED
     HEAL_END=${HEAL_END:-11444}                # 30.0% of the horizon
-    STOP_AT_STEP=${STOP_AT_STEP:-0}            # end a phase early, horizon fixed
+    # Defaulted PER PHASE in the case block below: heal stops at HEAL_END,
+    # mix runs to the horizon.  Setting it in the environment still wins.
     MAX_MEAN_REC=${MAX_MEAN_REC:-8}
     RAMP_WARMUP=${RAMP_WARMUP:-0.25}           # full recurrence at step 9,537
     # LR warmup in STEPS, not as a fraction.  The inherited warmup=0.0025 gave
@@ -123,8 +124,29 @@ final5b_shared() {
     MIX_DATA=${MIX_DATA:-data/pg19_fw50_olmo_len4096}
 
     case "$PHASE" in
-    heal) DATA_PATH=${DATA_PATH:-$HEAL_DATA} ;;
-    mix)  DATA_PATH=${DATA_PATH:-$MIX_DATA} ;;
+    heal)
+        DATA_PATH=${DATA_PATH:-$HEAL_DATA}
+        # THE HEAL STOPS AT HEAL_END BY DEFAULT, so no link of the chain has
+        # to remember to add it.  Without this the link that crosses 11,444
+        # keeps training on FineWeb-Edu -- the pack holds 15,258 steps, so it
+        # does not exhaust and nothing complains -- and the arm silently ends
+        # up with a longer heal and a shorter mix than its sibling.  That is a
+        # corpus-schedule mismatch between the two runs, i.e. the one thing
+        # the whole paired design exists to prevent, and it would be invisible
+        # in both loss curves.
+        #
+        # The HORIZON DOES NOT MOVE: stop_at_step ends a phase, max_steps is
+        # what the LR cosine and the recurrence ramp are keyed to.  Varying
+        # max_steps across links re-runs cooldown per segment (the 2026-06-24
+        # sawtooth, baked into the weights).
+        STOP_AT_STEP=${STOP_AT_STEP:-$HEAL_END} ;;
+    mix)
+        DATA_PATH=${DATA_PATH:-$MIX_DATA}
+        # 0 = run to the horizon.  NOT optional and not inherited: with the
+        # global default removed, leaving this unset emits a bare
+        # `--stop_at_step` with no value, and the next flag on the line
+        # (--muon.use_muon) becomes its argument.
+        STOP_AT_STEP=${STOP_AT_STEP:-0} ;;
     *)    echo "PHASE must be heal|mix"; exit 1 ;;
     esac
 }

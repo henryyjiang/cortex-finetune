@@ -482,3 +482,37 @@ class TestThePackCheck:
         body = _strip_comments(_read(ZNORM))
         assert "CHUNKS=${CHUNKS:-8}" in body
         assert "CHUNK_LEN=${CHUNK_LEN:-512}" in body
+
+    def test_the_heal_phase_stops_itself_at_the_boundary(self):
+        """An 11-link chain should not depend on a human remembering
+        STOP_AT_STEP on exactly one of them.  Without it the crossing link
+        keeps training on FineWeb-Edu -- the pack holds 15,258 steps so it
+        does not exhaust and nothing complains -- and that arm ends with a
+        longer heal and a shorter mix than its sibling: a corpus-schedule
+        mismatch between the two runs, invisible in both loss curves."""
+        body = _strip_comments(_read(COMMON))
+        assert "STOP_AT_STEP=${STOP_AT_STEP:-$HEAL_END} ;;" in body
+        # `mix` legitimately defaults to 0; what must NOT exist is a GLOBAL
+        # default above the case block, which would win over the per-phase one.
+        before_case = body.split('case "$PHASE" in')[0]
+        assert "STOP_AT_STEP=" not in before_case, (
+            "a default set before the case block overrides the per-phase ones")
+
+    def test_stop_at_step_never_moves_the_horizon(self):
+        """max_steps is what the LR cosine and the recurrence ramp are keyed
+        to; varying it per link re-runs cooldown per segment."""
+        body = _strip_comments(_read(COMMON))
+        assert "MAX_STEPS=${MAX_STEPS:-38147}" in body
+        assert "--max_steps $MAX_STEPS" in body
+        assert "--stop_at_step $STOP_AT_STEP" in body
+
+    @pytest.mark.parametrize("phase", ["heal", "mix"])
+    def test_every_phase_sets_stop_at_step_to_something(self, phase):
+        """Removing the global default left `mix` emitting a bare
+        `--stop_at_step`, which makes the NEXT flag on the command line its
+        argument.  Caught by running the launcher with a stubbed train.py."""
+        body = _strip_comments(_read(COMMON))
+        m = re.search(rf"^    {phase}\)(.*?);;", body, re.S | re.M)
+        assert m, f"no {phase} branch"
+        assert "STOP_AT_STEP=${STOP_AT_STEP:-" in m.group(1), (
+            f"the {phase} branch does not default STOP_AT_STEP")
