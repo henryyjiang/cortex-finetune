@@ -315,6 +315,28 @@ final5b_launch() {
             echo "  PHASE=mix RESUME_PATH=$RUN_DIR/checkpoint_$LAST \\"
             echo "    EXTRA_ARGS=\"--reset_dataset_position true\" \\"
             echo "    ${ZPASS}sbatch $SELF          # <- THE SWITCH, ONCE"
+            # DO NOT let the heal's ZNORM_TARGET ride into the mix unexamined.
+            # ZPASS echoes back whatever THIS link ran with, and the heal
+            # boundary is the ONE link where a re-target is due by design --
+            # so on 2026-10-03 this line offered ZNORM_TARGET=98.0 while the
+            # same job's watch_run had just FAILED the run at -20.0% from it.
+            # Copy-pasting it spends the single allowed re-target on the stale
+            # value.  The band check cannot catch that: it compares the
+            # checkpoint against the target it TRAINED at, which would agree.
+            if [ "$ARM" = "cortex" ] && [ -n "$ZNORM_TARGET" ]; then
+                echo ""
+                echo "  ^^ ZNORM_TARGET=$ZNORM_TARGET above is THE HEAL'S value, echoed"
+                echo "     back, NOT a recommendation.  The heal boundary is the one"
+                echo "     re-target the design allows.  Re-measure on THIS checkpoint"
+                echo "     and the corpus the mix actually runs on:"
+                echo ""
+                echo "       CKPT=$RUN_DIR/checkpoint_$LAST \\"
+                echo "         DATA=data/pg19_fw50_olmo_len4096 sbatch pace/measure_znorm.sbatch"
+                echo ""
+                echo "     then launch the switch with THAT number, and record that you"
+                echo "     re-targeted.  If the walk agrees with this link's own"
+                echo "     z_e_carried_norm, the number is trustworthy."
+            fi
         else
             echo "  PHASE=mix RESUME_PATH=$RUN_DIR/checkpoint_$LAST \\"
             echo "    ${ZPASS}sbatch $SELF"

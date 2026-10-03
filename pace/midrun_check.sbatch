@@ -275,12 +275,27 @@ done
 
 # ===== 2. the mechanism cells, CORTEX ARM ONLY =============================
 if [ "$ARM" = "cortex" ]; then
+    # THE FULL 2x2 ON THE -off TASKS, so the carry DECOMPOSES.
+    # Until 2026-10-03 these ran E1Z1,E1Z0,E0Z0 and E1Z1,E1Z0, so the only
+    # effect `eval_carry_2x2.py` could compute was Z_main: E_main needs E0Z1
+    # and the interaction needs all four, and compute_effects SKIPS any row
+    # whose cells are absent.  The step-11,444 read-out therefore measured Z's
+    # effect and NOT E's -- E1Z1 vs E0Z0 is the carry E AND Z make TOGETHER
+    # (+0.3119 nats there), which is not E's effect and must not be quoted as
+    # one.  The interaction is the design's actual hypothesis (negative =
+    # E is worth MORE when Z is present) and nothing was reporting it.
+    #
+    # Each cell is a separate full pass, so this is +1 pass on carry-off and
+    # +2 on pg19-off.  CELLS_OFF trims it back if a read-out has to be cheap;
+    # the donor tasks stay 2-cell on purpose -- X_content is a Z-only
+    # question and E0Z1/E0Z0 add nothing to it.
+    CELLS_OFF=${CELLS_OFF:-E1Z1,E1Z0,E0Z1,E0Z0}
     # key                pack   score  z_null  n         cells
     TASKS=(
-        "carry-off       carry  carry  off     $CELL_N   E1Z1,E1Z0,E0Z0"
+        "carry-off       carry  carry  off     $CELL_N   $CELLS_OFF"
         "carry-donor     carry  carry  donor   $CELL_N   E1Z1,E1Z0"
         "carry-local     carry  local  off     100       E1Z1,E1Z0"
-        "pg19-off        pg19   all    off     $NLL_N    E1Z1,E1Z0"
+        "pg19-off        pg19   all    off     $NLL_N    $CELLS_OFF"
         "pg19-donor      pg19   all    donor   $NLL_N    E1Z1,E1Z0"
     )
     for T_ROW in "${TASKS[@]}"; do
@@ -315,6 +330,21 @@ echo "               Across the switch, expect PG-19 down and FineWeb-Edu up a"
 echo "               little.  BOTH up is degradation; PG-19 flat means check"
 echo "               the switch link actually read the mix pack."
 if [ "$ARM" = "cortex" ]; then
+echo "  THE CARRY, DECOMPOSED  the -off tasks now run the full 2x2, so"
+echo "               results.json carries four rows, not one:"
+echo "                 E_main       E0Z1 - E1Z1.  E's effect, Z held ON."
+echo "                 Z_main       E1Z0 - E1Z1.  Z's effect, E held ON  (= X_off)."
+echo "                 Z_alone      E0Z0 - E0Z1.  Z's effect with E held OFF."
+echo "                 interaction  (E's effect without Z) - (E's effect with Z)."
+echo "                              NEGATIVE = COMPLEMENTS: E is worth more when"
+echo "                              Z is present.  This is the design's actual"
+echo "                              hypothesis and the only sign you cannot read"
+echo "                              off a single column."
+echo "               E1Z1 vs E0Z0 is E AND Z TOGETHER, not E's effect.  Quote"
+echo "               E_main for E.  At step 11,444 the together number was"
+echo "               +0.3119 while Z_main was -0.0024, i.e. E was doing"
+echo "               essentially all of it -- but that was an inference from"
+echo "               Z's null, not a measurement, because E0Z1 never ran."
 echo "  X_off        E1Z0 - E1Z1.  Positive on every J arm ever run, including"
 echo "               the ones where Z carried nothing.  It is NOT evidence."
 echo "  X_content    donor - own.  THE deciding number.  J7 measured +0.2215"
