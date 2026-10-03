@@ -1,0 +1,3 @@
+run,id,state,steps,tokens,loss_start,loss_final,loss_min,nan_loss_rows,skipped_updates,gnorm_p50,gnorm_p99,gnorm_max,clip_active_frac,max_loss_jump,end_trend,FLAGS
+c-chunked,eqm9i0t2,crashed,9735,1275985920,10.1372,2.667,2.4967,0,0,0.483,2.752,50.706,0.018,+0.247@3014,2.6555->2.6558  [NOT IMPROVING],final loss >> min loss
+cortex-final,wxz9b9zh,crashed,10896,1428160512,10.0037,2.5783,2.412,0,0,0.546,3.763,46.777,0.067,+0.239@3014,2.5863->2.5816,final loss >> min loss
