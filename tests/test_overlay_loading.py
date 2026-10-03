@@ -66,6 +66,20 @@ def _calls(tree, name):
                  or getattr(n.func, "attr", None) == name)]
 
 
+def _assign_target(tree, call):
+    """The binding target of `call`, or None if its result is discarded.
+
+    Returns the ast node of the target, so the caller can tell a 2-tuple
+    unpack from a single name holding the whole tuple.
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and node.value is call:
+            return node.targets[0] if len(node.targets) == 1 else None
+        if isinstance(node, (ast.AnnAssign, ast.AugAssign)) and node.value is call:
+            return node.target
+    return None
+
+
 def _loads_a_checkpoint(tree):
     return bool(_calls(tree, "load_checkpoint"))
 
@@ -110,6 +124,37 @@ class TestEveryLoaderCanTakeAnOverlay:
             assert "config_overrides" in kwargs, (
                 f"{fn} parses --set but does not pass config_overrides to "
                 f"load_checkpoint, so the geometry is never forced.")
+
+    @pytest.mark.parametrize("fn,src,tree", LOADERS, ids=_ids(LOADERS))
+    def test_it_unpacks_the_two_value_return(self, fn, src, tree):
+        """`load_checkpoint` returns (model, config) -- bind BOTH.
+
+        THE DEFECT THIS EXISTS TO PREVENT (job 13826352, 2026-10-03).
+        `evals/eval_val_nll.py` wrote `model = load_checkpoint(...)` and so
+        held the TUPLE.  That does not fail at the assignment, and it does not
+        fail at the memory probe either: `_unwrap` returns a tuple unchanged
+        and `getattr(tuple, "cortex", None)` is None, so the file printed
+        `memory=NO (control path)` for the CORTEX arm and set carry=off.  It
+        only died later, at the first `model(...)`, with `'tuple' object is
+        not callable`.  The crash was the lucky part -- the quiet failure
+        underneath it scores both arms with the memory disabled, which makes
+        the two-arm difference zero by construction and looks like a null
+        result rather than a bug.
+
+        The file had no test and one caller, so it had never run.  This check
+        is static, covers every loader at once, and fires at write time.
+        """
+        for call in _calls(tree, "load_checkpoint"):
+            parent = _assign_target(tree, call)
+            assert parent is not None, (
+                f"{fn} calls load_checkpoint but does not bind its result; "
+                f"it returns (model, config) and both halves are needed.")
+            assert isinstance(parent, ast.Tuple) and len(parent.elts) == 2, (
+                f"{fn} binds load_checkpoint(...) to "
+                f"`{ast.unparse(parent)}` -- it returns the 2-tuple "
+                f"(model, config), so a single name holds the TUPLE.  That is "
+                f"silent: _unwrap passes a tuple through and the cortex arm "
+                f"then reports itself as the control.  Unpack both.")
 
     @pytest.mark.parametrize("fn,src,tree", LOADERS, ids=_ids(LOADERS))
     def test_the_flag_value_is_what_gets_parsed(self, fn, src, tree):

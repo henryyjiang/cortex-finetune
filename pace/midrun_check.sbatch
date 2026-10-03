@@ -132,8 +132,13 @@ RUN_DIR="$OUT_ROOT/$RUN"
 # job needs no optimizer state.
 CKPT="$RUN_DIR/model_only_chkpt_$STEP"
 [ -d "$CKPT" ] || CKPT="$RUN_DIR/checkpoint_$STEP"
-RES="eval_results/midrun/$RUN/step_$STEP"
-BASE_RES="eval_results/midrun/$RUN/step_$BASELINE_STEP"
+# T is part of the IDENTITY of a read-out, not a knob on one: the slot->depth
+# map is span=min(hi,T-1) tiled as j%span (cortex_graft.py:2156), so scoring
+# the same checkpoint at another T reads a DIFFERENT map.  Keying the dir on
+# STEP alone meant a T=12 run silently overwrote the T=8 JSONs -- and the
+# baseline pairing then compared two maps and called it a corpus effect.
+RES="eval_results/midrun/$RUN/step_${STEP}_T${T}"
+BASE_RES="eval_results/midrun/$RUN/step_${BASELINE_STEP}_T${T}"
 mkdir -p "$RES"
 
 echo "=== midrun | arm=$ARM | run=$RUN | step $STEP ==="
@@ -182,20 +187,37 @@ if [ "$ARM" = "cortex" ]; then
     SETS="$SETS --set latent_read_znorm_target=$ZNORM_TARGET"
     # Cross-check the rebuild against what the run ACTUALLY trained with.
     # The flags above are what we BELIEVE; cortex_diag.jsonl is what happened.
-    python - "$RUN_DIR/cortex_diag.jsonl" "$ZNORM_TARGET" <<'CHECK' || exit 1
+    python - "$RUN_DIR/cortex_diag.jsonl" "$ZNORM_TARGET" "$STEP" <<'CHECK' || exit 1
 import json, sys
-path, want = sys.argv[1], float(sys.argv[2])
+path, want, step = sys.argv[1], float(sys.argv[2]), int(sys.argv[3])
 try:
     rows = [json.loads(l) for l in open(path) if l.strip()]
 except FileNotFoundError:
     sys.exit(f"ERROR: no {path} -- nothing records what this run trained with.")
 if not rows:
     sys.exit("ERROR: cortex_diag.jsonl is empty")
-last = rows[-1]
-seen = {r.get("z_znorm_target") for r in rows} - {None}
-if seen and abs(next(iter(seen)) - want) > 1e-6:
-    sys.exit(f"ERROR: trained at znorm_target {sorted(seen)}, this job passes "
-             f"{want}.  The rebuild would score a model nobody trained.")
+# cortex_diag.jsonl APPENDS ACROSS LINKS, so after a re-target it holds more
+# than one znorm_target and more than one architecture state.  Everything below
+# must describe the checkpoint being SCORED, i.e. the last record at or before
+# $STEP -- not the end of the file, which may be thousands of steps later and
+# under a different target.  The previous version took next(iter(seen)) from a
+# set, so a re-targeted run either refused a correct rebuild or passed a wrong
+# one depending on set iteration order.
+at = [r for r in rows if (r.get("step") or 0) <= step]
+if not at:
+    sys.exit(f"ERROR: no diag record at or before step {step} -- the trace "
+             f"starts at {rows[0].get('step')}, so nothing records what this "
+             f"checkpoint trained with.")
+last = at[-1]
+tgt = [r["z_znorm_target"] for r in at if r.get("z_znorm_target") is not None]
+if tgt and abs(tgt[-1] - want) > 1e-6:
+    allseen = sorted({r.get("z_znorm_target") for r in rows} - {None})
+    sys.exit(f"ERROR: at step {step} this run was training at znorm_target "
+             f"{tgt[-1]}, and this job passes {want}.  The rebuild would score "
+             f"a model nobody trained.  (Targets across the whole chain: "
+             f"{allseen} -- pass the one in effect AT the checkpoint.)")
+print(f"    scoring step {step} against diag record {last.get('step')} "
+      f"(znorm_target {tgt[-1] if tgt else 'n/a'})")
 ef = last.get("z_embed_frozen")
 if ef is None:
     sys.exit("ERROR: no z_embed_frozen in the diag -- the flag never reached "
@@ -238,10 +260,15 @@ for PAIR in "fwedu:$FWEDU_VAL" "pg19:$PG19_VAL"; do
     if [ -f "$BASE_RES/val_nll_$KEY.json" ] && [ "$STEP" != "$BASELINE_STEP" ]; then
         BASE_ARG="--baseline $BASE_RES/val_nll_$KEY.json"
     fi
+    # On the cortex arm a graft that did not build is a FAILED read-out, not a
+    # control measurement: without this the eval scores the no-memory path and
+    # labels the JSON as the cortex arm.
+    EXPECT=""
+    [ "$ARM" = "cortex" ] && EXPECT="--expect_memory"
     python evals/eval_val_nll.py \
         --model_name "$MODEL" --checkpoint "$CKPT" --data "$DATA" $SETS \
         --n_chunks "$N_CHUNKS" --T "$T" --max_examples "$NLL_N" \
-        --boot "$BOOT" --dtype float32 \
+        --boot "$BOOT" --dtype float32 $EXPECT \
         --label "$RUN@$STEP/$KEY" $BASE_ARG \
         --out "$RES/val_nll_$KEY.json" || RC_ALL=$?
 done

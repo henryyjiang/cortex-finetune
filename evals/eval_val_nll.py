@@ -111,6 +111,13 @@ def parse_args() -> argparse.Namespace:
                    help="thread no carry between chunks even on a memory "
                         "model -- the in-arm carry-off floor.  On the control "
                         "this changes nothing and the tool says so.")
+    p.add_argument("--expect_memory", action="store_true",
+                   help="REFUSE to score if the rebuilt model has no prefix "
+                        "buffer.  Pass this on the cortex arm.  Without it a "
+                        "graft that failed to build is not an error here -- "
+                        "the file is memory-agnostic by design, so it quietly "
+                        "becomes the control and the arms' difference is zero "
+                        "by construction rather than by measurement.")
     p.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                    help="force graft-building config flags.  REQUIRED on a "
                         "memory checkpoint: --model_name loads the BASE dir's "
@@ -230,13 +237,27 @@ def main() -> int:
     dtype = torch.float32 if args.dtype == "float32" else torch.bfloat16
     overrides = parse_config_overrides(args.set)
 
-    model = load_checkpoint(args.checkpoint, args.model_name, None, dtype,
-                            device, config_overrides=overrides or None)
+    # TWO values: load_checkpoint returns (model, config).  Binding the tuple
+    # to `model` does NOT fail where it happens -- `_unwrap` hands a tuple
+    # straight back and `getattr(tuple, "cortex")` is None, so the cortex arm
+    # reports `memory=NO (control path)` and scores with the carry OFF.  The
+    # TypeError at the first forward is the lucky part: without it this file
+    # would emit plausible NLLs for both arms with the memory disabled in
+    # both, and the headline difference would be zero BY CONSTRUCTION.
+    model, _cfg = load_checkpoint(args.checkpoint, args.model_name, None, dtype,
+                                  device, config_overrides=overrides or None)
     cortex = getattr(_unwrap(model), "cortex", None)
     has_memory = cortex is not None and getattr(cortex, "prefix", None) is not None
     carry = has_memory and not args.no_carry
     print(f"[val_nll] memory={'yes' if has_memory else 'NO (control path)'}  "
           f"carry={'threaded' if carry else 'off'}")
+    if args.expect_memory and not has_memory:
+        print("FAILED: --expect_memory, but the rebuilt model has no prefix "
+              "buffer, so this would score the CONTROL path and report it as "
+              "the cortex arm.  Check the --set list reached the graft "
+              "(use_memory/prefix_memory/accum_vecs above) and that the "
+              "overlay applied with 0 missing keys.")
+        return 2
     if args.no_carry and not has_memory:
         print("[val_nll] --no_carry on a model with no memory changes nothing; "
               "the number is the same as without it.")
