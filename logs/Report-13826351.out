@@ -1,0 +1,112 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-03-2026 15:24:21
+Job ID:    13826351
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  znorm
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== ZNORM_TARGET measurement ===
+    model:  ckpts/olmo-retrofit-cortex (checkpoint cortex-5b/cortex-final/checkpoint_11444)
+    data:   data/pg19_fw50_olmo_len4096   (real tokens -- random ids measure noise)
+    walk:   8 chunks x 512 tokens, T=8, batch=2
+NVIDIA H200, 143771 MiB
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.40s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.51it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.29it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 4 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 1 unexpected keys
+
+====================================================================================================
+DUAL-CHANNEL WALK  PrefixGatedBuffer  W=16 K=64 route=ring  Z=on  8 chunks x 512 tokens
+====================================================================================================
+ch      rows  width   touched  as ring?   |E|/s0   |Z|/s0  tape  wgrad  read  z-read err     loss
+ 0     0->16     2D        16         -   203.21    11.96     8   1.00   yes           -   2.9550
+ 1    16->32     2D        16         -   199.81    10.73     8   1.00   yes    0.00e+00   2.6653
+ 2    32->48     2D        16         -   198.53     9.61     8   1.00   yes    0.00e+00   2.6304
+ 3    48->64     2D        16         -   201.56     9.78     8   1.00   yes    0.00e+00   2.5790
+ 4    64->64     2D        16       yes   199.56     9.86     8   1.00   yes    0.00e+00   2.4519
+ 5    64->64     2D        16       yes   195.98     9.44     8   1.00   yes    0.00e+00   2.8037
+ 6    64->64     2D        16       yes   193.71    12.27     8   1.00   yes    0.00e+00   2.7469
+ 7    64->64     2D        16       yes   195.06     9.75     8   1.00   yes    0.00e+00   2.6251
+
+   mean NLL 2.6822   chance (ln vocab) 11.5164   margin +8.8343
+
+-- final carry ------------------------------------------------------
+   rows 64  channels 2
+   E: row_norm 78.871  centred_cos -0.0049  eff_rank_pr 9.01  entropy 48.63
+   Z: row_norm 4.274  centred_cos 0.0439  eff_rank_pr 10.99  entropy 44.69
+   Z/E norm ratio 0.0542  unwritten Z rows 0
+
+-- gate parameters --------------------------------------------------
+   E  fg(bias) 0.3322  ig(bias) 0.7675  |W_in| 8.082e+01  |W_mem| 6.988e+01  left init: True
+   Z  fg(bias) 0.6026  ig(bias) 0.7211  |W_in| 9.835e+01  |W_mem| 9.086e+01  left init: True
+
+   Z read grad frac over this walk: 1.00 (measured=True)  write grad frac 1.00
+   read_grad_frac is a property of the SAMPLER, not of the walk: one
+   no-grad step cuts Z's read gradient to exactly zero, and E's is
+   unaffected because E re-enters through input_embeds every step.
+
+This table is evidence about the MACHINERY, not about whether Z helps.
+That needs the full cell, the 2x2 and the influence horizon.
+
+wrote eval_results/final5b_znorm_step11444_mix.json
+
+======================================================================
+  ZNORM_TARGET = 78.9
+======================================================================
+  (carried E row norm, the block the next chunk actually READS)
+  per-chunk write norms: 78.9  77.6  77.2  78.3  77.5  76.2  75.2  75.8
+  spread across the walk: 75.2 .. 78.9 (+4.9%)
+
+  Launch with:
+    PHASE=heal ZNORM_TARGET=78.9 sbatch pace/cortex_final_5b.sbatch
+
+
+  EXPECT ~98 HERE, NOT 136 OR 171.  This walks the UNTRAINED
+  conversion -- job 13765065 measured 98.0 at mean NLL 10.27 against
+  ln(vocab) 11.52, i.e. the arrangement before any training.  136.0
+  and 171.0 are TRAINED anchors and do not apply at step 0:
+      ~98   this base, step 0                     (measured)
+      136   b2 heal branch -- same base, same corpus, same 1.5B heal
+      171   B2 at 5B
+  So E's norm is expected to CLIMB over the run, roughly along that
+  ladder, and a target pinned here falls out of band as it does.
+  That is the re-target question, not a bad measurement: see
+  ../final_5b_launch.md S1b and watch cortex/z_embed_ratio.
+
+  A reading under ~60 or over ~200 is the one to distrust -- check the
+  pack arrived and that the graft built (the --set list above).
+---------------------------------------
+Begin Slurm Epilog: Oct-03-2026 15:26:13
+Job ID:        13826351
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      znorm
+Resources:     cpu=4,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:07:32,vmem=0,walltime=00:01:53,mem=22621616K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------
