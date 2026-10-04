@@ -1,0 +1,26 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-03-2026 20:10:41
+Job ID:    13838060
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  midrun
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== midrun | arm=cortex | run=cortex-final | step 11444 ===
+    checkpoint: cortex-5b/cortex-final/checkpoint_11444
+    baseline:   eval_results/midrun/cortex-final/step_11444_T8  (step 11444)
+NVIDIA H200, 143771 MiB
+/var/lib/slurm/slurmd/job13838060/slurm_script: line 165: ZNORM_TARGET: ARM=cortex needs the ZNORM_TARGET the run LAUNCHED with -- a rebuild at another target scores the read at the wrong strength
+---------------------------------------
+Begin Slurm Epilog: Oct-03-2026 20:10:44
+Job ID:        13838060
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      midrun
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:00:32,vmem=0,walltime=00:00:04,mem=39420K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-2-0
+---------------------------------------
