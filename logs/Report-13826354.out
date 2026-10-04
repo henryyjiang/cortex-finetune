@@ -1,0 +1,100 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-04-2026 03:25:11
+Job ID:    13826354
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  midrun
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+
+CondaError: Run 'conda init' before 'conda deactivate'
+
+=== midrun | arm=control | run=c-chunked | step 11444 ===
+    checkpoint: cortex-5b/c-chunked/checkpoint_11444
+    baseline:   eval_results/midrun/c-chunked/step_11444  (step 11444)
+NVIDIA H200, 143771 MiB
+
+--- val NLL / fwedu  (data/fineweb_edu_olmo_val_len4096)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.30s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.47it/s]
+[load] overlaid cortex-5b/c-chunked/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[val_nll] memory=NO (control path)  carry=off
+  50 samples
+  100 samples
+  150 samples
+  200 samples
+  250 samples
+  300 samples
+  350 samples
+  400 samples
+
+=== val NLL | c-chunked@11444/fwedu ===
+    pack data/fineweb_edu_olmo_val_len4096   400 rows   T=8  n_chunks=8
+    window               NLL                  95% CI
+    all               2.6533        [2.6270, 2.6803]
+    chunk1 (no carry)    2.6694        [2.6296, 2.7105]
+    chunks 2+         2.6511        [2.6232, 2.6780]
+    per chunk: 1:2.669  2:2.641  3:2.635  4:2.649  5:2.663  6:2.684  7:2.657  8:2.628
+    chance margin 8.863 nats (mean 2.653 vs ln(vocab) 11.516)
+
+    wrote eval_results/midrun/c-chunked/step_11444/val_nll_fwedu.json
+
+--- val NLL / pg19  (data/pg19_olmo_validation_len4096_strided)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.32s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.48it/s]
+[load] overlaid cortex-5b/c-chunked/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[val_nll] memory=NO (control path)  carry=off
+  50 samples
+  100 samples
+  150 samples
+  200 samples
+  250 samples
+  300 samples
+  350 samples
+  400 samples
+
+=== val NLL | c-chunked@11444/pg19 ===
+    pack data/pg19_olmo_validation_len4096_strided   400 rows   T=8  n_chunks=8
+    window               NLL                  95% CI
+    all               3.4906        [3.4357, 3.5476]
+    chunk1 (no carry)    3.5348        [3.4556, 3.6209]
+    chunks 2+         3.4843        [3.4275, 3.5390]
+    per chunk: 1:3.535  2:3.544  3:3.481  4:3.491  5:3.468  6:3.503  7:3.490  8:3.413
+    chance margin 8.026 nats (mean 3.491 vs ln(vocab) 11.516)
+
+    wrote eval_results/midrun/c-chunked/step_11444/val_nll_pg19.json
+=== watch_run | cortex-5b/c-chunked | arm=control ===
+--- (no --log passed; skipping the link's stdout) ---
+
+--- the mechanism, from cortex_diag.jsonl --------------------------------
+  empty, as it must be: no cortex, nothing to report.
+
+--- state on disk -------------------------------------------------------
+  21 resumable checkpoints, newest checkpoint_11444 (30.0% of the horizon)
+  >> the next link is THE CORPUS SWITCH.  It, and only it, passes EXTRA_ARGS="--reset_dataset_position true".
+
+  note control: no mechanism to check.  Its health lives in the loss curve and in held-out NLL (pace/midrun_check.sbatch).
+
+VERDICT: no failures, 0 warn.  This says the link ran as configured.  It does NOT say the mechanism helps.
+
+=== midrun finished rc=0 -> eval_results/midrun/c-chunked/step_11444 ===
+
+HOW TO READ IT -- the bars, written down before the numbers arrive:
+  val NLL      chunk1 is the 'did it break' number (no carry either arm).
+               Across the switch, expect PG-19 down and FineWeb-Edu up a
+               little.  BOTH up is degradation; PG-19 flat means check
+               the switch link actually read the mix pack.
+  chance margin  any cell within 0.25 nats of ln(vocab) is scoring noise
+               and every delta computed from it is a difference of two
+               noise levels.
+---------------------------------------
+Begin Slurm Epilog: Oct-04-2026 03:42:11
+Job ID:        13826354
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      midrun
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=02:16:08,vmem=0,walltime=00:17:01,mem=17678232K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------
