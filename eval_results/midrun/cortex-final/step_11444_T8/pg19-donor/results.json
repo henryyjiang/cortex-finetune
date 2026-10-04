@@ -1,6 +1,6 @@
 {
   "instrument": "2x2 carry ablation (matched column count)",
-  "when": "2026-10-03T16:51:57",
+  "when": "2026-10-03T23:30:22",
   "model_name": "ckpts/olmo-retrofit-cortex",
   "z_channel": true,
   "config": {
@@ -8,7 +8,7 @@
     "T": 8,
     "dtype": "float32",
     "samples": 400,
-    "s0_std": 0.008585378527641296,
+    "s0_std": 0.008588314056396484,
     "z_null": "donor",
     "score": "all",
     "data": "data/pg19_olmo_validation_len4096_strided",
