@@ -245,11 +245,12 @@ X_off and X_content rose together by almost exactly the same amount (+0.053 /
 much as deleting Z. The band is holding more content than it did, not just more
 column.
 
-**The interaction halved and is now indistinguishable from zero**
-([−0.003, +0.089]). At 11,444 E and Z measurably *substituted*; at 22,800 that
-is no longer detectable on pg19. This is movement toward the design's
-hypothesis (negative = complements) without reaching it — do not call it
-complementary, call it "no longer significantly substituting".
+**The interaction halved and its CI now includes zero** ([−0.003, +0.089]).
+**But do not read this as a finding** — the interaction is
+`(E0Z0 − E1Z0) − (E0Z1 − E1Z1)`, so it uses BOTH E-off cells and sits in the
+untrustworthy tier of §3d. The honest statement is: *we cannot measure whether
+E and Z complement or substitute in this run.* The apparent move toward the
+design's hypothesis (negative = complements) is not evidence for it.
 
 **The two packs disagree in direction** on E_main (carry +0.107, pg19 −0.066)
 and on the interaction (carry +0.179, pg19 −0.064). The synthetic carry task
@@ -287,6 +288,45 @@ ablation in it, and needs no E-off cell.
 To make the E-side effects measurable at all, a future arm would need
 `e_dropout > 0`. That is an architecture change and
 [[cortex-final-z-architecture-frozen]] applies; it is not a mid-run fix.
+
+### 3d-bis. "E only" vs "Z only" — the cells exist, the test does not
+
+Asked directly: is there an E-only vs Z-only comparison? The 2x2 **does** carry
+both one-channel cells — `E1Z0` is E alone, `E0Z1` is Z alone — and they can be
+contrasted (computed here from the saved `per_sample` arrays, 10k bootstrap):
+
+| contrast | carry @22800 | pg19 @22800 |
+|---|---:|---:|
+| E alone vs neither | +0.6006 [+0.589,+0.612] | +0.3243 [+0.287,+0.357] |
+| Z alone vs neither | +0.4118 [+0.403,+0.421] | +0.1702 [+0.125,+0.209] |
+| **E alone vs Z alone** | **+0.1887** [+0.180,+0.198] | **+0.1542** [+0.145,+0.164] |
+| both vs E alone (= X_off) | +0.1154 [+0.110,+0.121] | +0.1252 [+0.120,+0.132] |
+| both vs Z alone (= E_main) | +0.3041 [+0.296,+0.312] | +0.2794 [+0.266,+0.295] |
+
+Taken at face value E alone beats Z alone by ~0.15–0.19 nats. **But every row
+except `both vs E alone` touches an E-off cell, so only that one row is
+trustworthy** (§3d).
+
+**The real E-only vs Z-only test is a TRAINING design, not an eval.** J5 did it
+properly with three separately trained limbs — `evals/score_j5.py:70-73`:
+
+```
+zonly  trained with E's spliced rows zeroed  -> its cell is E0*
+eonly  trained with Z's columns zeroed       -> its cell is E1Z0
+both   trained with both live                -> its cell is E1Z1
+```
+
+and that file states the governing rule outright: *"score a limb in another
+limb's cell and the number is an out-of-distribution condition reported as the
+arm's result."* That is exactly what the 5B mid-run check does when it switches
+E off, because **the 5B pair has only two arms — `control` and `cortex`** — and
+no one-channel limb was ever trained.
+
+**So: no, there is no E-only vs Z-only test at 5B.** There are E-only and
+Z-only *cells*, produced by ablating a jointly-trained model at eval time, and
+they are not a substitute. Getting the real number means training a limb, which
+is an architecture-level decision — see
+[[cortex-final-z-architecture-frozen]].
 
 ### 3e. The ‖E‖ WARN fired again, as predicted
 
@@ -396,12 +436,16 @@ reference for everything after it.
 Updated after read-out 3. **ANSWERED** items stay on the list with their answer
 — the point is the trajectory, not a clean slate.
 
-- **The interaction sign.** *Partly ANSWERED, and the packs disagree.* On pg19
-  it halved and is now **not significant** (+0.1094\* → +0.0449 n.s.), i.e. no
-  longer detectably substituting. On carry it moved the other way, to
-  **+0.2965\***, strongly substituting. So "is substitution stable?" has no
-  single answer yet — it depends on the pack. Watch whether pg19's crosses into
-  negative (the design's actual hypothesis) by the next read-out.
+- **The interaction sign.** *NOT ANSWERABLE in this run, and that is the
+  answer.* The interaction needs both E-off cells (§3d), which the model never
+  trained in. The raw numbers moved in opposite directions by pack — pg19
+  +0.1094 → +0.0449 (CI now spans zero), carry +0.1175 → +0.2965 — which is
+  itself a sign the term is not measuring one stable thing. **To settle
+  complement-vs-substitute you need separately TRAINED limbs**, the way J5 did
+  it (`evals/score_j5.py:70-73`: a `zonly` limb trained with E's rows zeroed, an
+  `eonly` limb trained with Z's columns zeroed). The 5B pair has no such limb —
+  only `control` and `cortex` — so no eval-time ablation can substitute for
+  one. See [[e-off-cells-are-ood-no-e-dropout]].
 - **Does X_content survive the re-target?** **ANSWERED: YES, and it grew.**
   +0.0771 → **+0.1295** on pg19 at `znorm_target=78.9` with the lo=1..9 band,
   share held at ~100% (107.0% → 103.4%). The content read is robust to the
