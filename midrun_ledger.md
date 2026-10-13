@@ -411,7 +411,19 @@ Three things change together at step 11,450, so a Z-vs-E delta across that
 boundary is **not** a clean "did Z grow" read:
 
 1. **More training** — the intended variable.
-2. **Corpus switch** — heal → mix, at `HEAL_END = 11444`.
+2. **Corpus switch** — heal → mix, at `HEAL_END = 11444`. **This is the
+   severe one, and it is worse than "the corpus changed":**
+   `final_5b_common.sh:123-124` gives
+   `HEAL_DATA=data/fineweb_edu_olmo_len4096` and
+   `MIX_DATA=data/pg19_fw50_olmo_len4096`. The heal phase was FineWeb-Edu
+   **only** — no books at all. So at the 11,444 baseline **PG-19 was entirely
+   out-of-domain**; at 22,800 it is in-domain. Every PG-19 number therefore
+   crosses an out-of-domain → in-domain boundary, which on its own explains
+   the ~0.55 nat improvement on both arms, and is a live alternative
+   explanation for Z contributing more there: the model now trains on
+   long-form books, so there is in-distribution long-range structure for the
+   carry to exploit. That is NOT the same claim as "the mechanism got better
+   at remembering".
 3. **`znorm_target` 98.0 → 78.9** — a **load-bearing forward-pass constant**,
    not a watch value: `rescale_rows(z, latent_read_znorm_target)` at
    `cortex_graft.py:1521, 1581, 1583`. It rescales both own and donor Z, so it
@@ -428,6 +440,19 @@ baseline row is scored at a **different read strength** than every later row.
 *regime + training*, not training alone. The clean within-regime baseline will
 be the first successful post-11,450 read-out — i.e. 22,800 becomes the new
 reference for everything after it.
+
+**What this leaves standing, stated precisely.** The ABSOLUTE numbers at
+22,800 are sound: Z's contents are worth **+0.1295 nats on PG-19 at ~100%
+share**, measured with E on throughout, via a within-configuration content
+substitution (own Z vs donor Z, matched column count) — the cleanest
+instrument in the suite, and the only one touching no ablated-E cell and no
+cross-regime pairing. What is NOT sound is attributing the **increase** from
++0.0771 to the mechanism learning, because the eval pack went from
+never-trained-on to trained-on over the same interval.
+
+Likewise the §3b lead narrowing is sound as a *same-checkpoint* contrast —
+both arms saw the identical corpus change, so it cancels — but its comparison
+to the 11,444 lead inherits the same caveat.
 
 ---
 
