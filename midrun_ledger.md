@@ -475,10 +475,16 @@ Updated after read-out 3. **ANSWERED** items stay on the list with their answer
   +0.0771 → **+0.1295** on pg19 at `znorm_target=78.9` with the lo=1..9 band,
   share held at ~100% (107.0% → 103.4%). The content read is robust to the
   re-target and the re-map. See [[lo1-band-holds-content-at-11444]].
-- **Why is loss flat?** Still open, and now sharper: training loss moved
-  −0.0255 over ~15k steps while gate norms moved 16–34% **and** Z's measured
-  contribution on pg19 nearly doubled. The mechanism is demonstrably learning
-  something the aggregate loss does not show.
+- **Why is loss flat?** Still open, and now with a candidate. Training loss
+  moved −0.0255 over ~15k steps while gate norms moved 16–34% **and** Z's
+  measured contribution on pg19 nearly doubled. **Candidate (2026-10-13):**
+  cortex's mean grad norm has grown 0.795 → 1.341 against a fixed
+  `--max_grad_norm 1.0`, so clip engagement went 4.4% → **32.9%**, and when it
+  engages the coefficient averages 0.636. A third of updates having their
+  gradient cut to ~64% is a real and growing distortion. The control is flat
+  at ~0.4%. No non-finite anywhere in either arm, so this is not instability —
+  but it is monotone. See
+  [[cortex-grad-scale-is-growing-clip-rate-rising]].
 - **Does the chunk1 deficit close?** **ANSWERED: NO, it widened.** fwedu
   +0.0394 → +0.0604, pg19 +0.0492 → +0.0547. The graft's fixed cost on
   no-carry context is growing, not amortising.
