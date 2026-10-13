@@ -12,6 +12,7 @@ Never overwrite a row — a superseded number gets a note, not a deletion.
 |---|------|------|------|--------|-------|---------|
 | 1 | 2026-10-03 | 11444 | — | both | val NLL + full 2x2 | **OK** — the baseline every later row pairs against |
 | 2 | 2026-10-12 | 23100 | 13989859 / 13989860 | both | val NLL + full 2x2 | **FAILED, rc=1, zero evals** — bad checkpoint path (see §2) |
+| 3 | 2026-10-13 | 22800 | 13994793 / 13994794 | both | val NLL + full 2x2 | **OK, rc=0 both arms** — first complete post-switch read-out (see §3) |
 
 ---
 
@@ -159,7 +160,114 @@ Before submitting, three repo-side fixes:
 
 ---
 
-## 3. Mechanism trace at 23,100 / 26,550 — the one thing that did land
+## 3. Step 22,800 — 2026-10-13 — OK, both arms, T=8
+
+Jobs 13994793 (control) / 13994794 (cortex), both **`rc=0`**, ~21 min each.
+Scored off `cortex-5b/<run>/checkpoint_22800`, `0 missing / 0 unexpected keys`
+on both arms. Trained under **`znorm_target = 78.9`** and the **mix** corpus.
+Diag at the scored step: `n_depths 7`, `embed_frozen 1`,
+`e_carried_norm 75.880`, `embed_ratio 1.0398` — in band.
+
+Both repo fixes are confirmed working: the resumable checkpoint resolved, and
+**control paired for the first time** ("PAIRED against c-chunked@11444/fwedu,
+400 shared rows"), which it had been silently skipping.
+
+### 3a. Within-arm, paired vs 11,444 (positive = worse now)
+
+| pack | slice | cortex-final | c-chunked |
+|------|-------|-------------:|----------:|
+| fwedu | all | +0.0188 [+0.0147,+0.0228] | +0.0067 [+0.0024,+0.0106] |
+| fwedu | chunk1 | +0.0272 [+0.0209,+0.0335] | +0.0062 [+0.0001,+0.0121] |
+| pg19 | all | **−0.5300** [−0.5577,−0.5009] | **−0.5622** [−0.5849,−0.5390] |
+| pg19 | chunk1 | −0.5915 [−0.6296,−0.5548] | −0.5970 [−0.6332,−0.5609] |
+
+The corpus switch did exactly what the script's pre-written bar predicted:
+**PG-19 down hard (~0.55 nats), FineWeb-Edu up a little.** Not degradation —
+this is the mix pack arriving. Both arms show it, so it is the corpus, not the
+mechanism.
+
+### 3b. Arm vs arm — THE LEAD NARROWED
+
+| pack | slice | cortex | control | cortex−control | @11444 | change |
+|------|-------|-------:|--------:|---------------:|-------:|-------:|
+| fwedu | all | 2.6038 | 2.6601 | **−0.0563** | −0.0683 | lead −0.012 |
+| fwedu | chunk1 | 2.7360 | 2.6755 | +0.0604 | +0.0394 | deficit +0.021 |
+| fwedu | chunks2plus | 2.5849 | 2.6578 | **−0.0729** | −0.0837 | lead −0.011 |
+| pg19 | all | 2.8956 | 2.9284 | **−0.0328** | −0.0651 | **lead HALVED** |
+| pg19 | chunk1 | 2.9925 | 2.9378 | +0.0547 | +0.0492 | deficit +0.006 |
+| pg19 | chunks2plus | 2.8818 | 2.9271 | **−0.0453** | −0.0814 | lead −0.036 |
+
+The qualitative shape **holds**: cortex still pays on chunk1 (no carry) and
+still wins on chunks2+. But the margin is shrinking on both packs, and on PG-19
+it roughly halved. The control captured more of the mix corpus's gain
+(−0.5622 vs −0.5300). **This is the headline tension of this read-out** —
+Z's internal contribution grew (§3c) while the between-arm advantage fell.
+
+### 3c. The 2x2 — 11,444 → 22,800
+
+`*` = 95% CI excludes zero. Sign convention: positive = that channel helps.
+
+#### carry (n=300, score=carry)
+
+| | @11444 | @22800 | Δ |
+|---|---:|---:|---:|
+| cells E1Z1/E1Z0/E0Z1/E0Z0 | 2.4884 / 2.4860 / 2.6853 / 2.8003 | 2.5598 / 2.6752 / 2.8639 / 3.2757 | |
+| E_main | +0.1969\* | +0.3041\* | +0.1072 |
+| **X_off** (= Z_main) | −0.0024\* | **+0.1154\*** | **+0.1178** |
+| **X_content** | −0.0005 | **−0.0006** | −0.0002 |
+| **content share** | 18.5% (of ~0) | **−0.6%** | |
+| Z_alone | +0.1150\* | +0.4118\* | +0.2968 |
+| interaction | +0.1175\* | +0.2965\* | +0.1790 |
+| carry-local Z_main | −0.0323 | −0.0236 | +0.0087 |
+
+**This is the pre-J7 signature, and the script named it in advance:** *"Zero
+here with X_off positive is the pre-J7 signature: columns load-bearing,
+contents irrelevant."* X_off appeared from nothing (−0.002 → +0.115) while
+X_content stayed pinned at zero and **not significant**. On the synthetic carry
+task Z's columns became worth 0.115 nats as **free capacity**, carrying nothing
+retrievable. Z still hurts local tokens (−0.024).
+
+#### pg19 (n=400, score=all)
+
+| | @11444 | @22800 | Δ |
+|---|---:|---:|---:|
+| cells E1Z1/E1Z0/E0Z1/E0Z0 | 3.4029 / 3.4750 / 3.7487 / 3.9301 | 2.8818 / 3.0070 / 3.1612 / 3.3313 | |
+| E_main | +0.3457\* | +0.2794\* | −0.0663 |
+| **X_off** (= Z_main) | +0.0721\* | **+0.1252\*** | **+0.0531** (+74%) |
+| **X_content** | +0.0771\* | **+0.1295\*** | **+0.0523** (+68%) |
+| **content share** | 107.0% | **103.4%** | |
+| Z_alone | +0.1815\* | +0.1702\* | −0.0113 |
+| **interaction** | +0.1094\* | **+0.0449 (n.s.)** | −0.0644 |
+
+**On natural text Z's contribution nearly doubled and it is real content.**
+X_off and X_content rose together by almost exactly the same amount (+0.053 /
++0.052), holding the share at ~100% — substituting a donor Z still costs as
+much as deleting Z. The band is holding more content than it did, not just more
+column.
+
+**The interaction halved and is now indistinguishable from zero**
+([−0.003, +0.089]). At 11,444 E and Z measurably *substituted*; at 22,800 that
+is no longer detectable on pg19. This is movement toward the design's
+hypothesis (negative = complements) without reaching it — do not call it
+complementary, call it "no longer significantly substituting".
+
+**The two packs disagree in direction** on E_main (carry +0.107, pg19 −0.066)
+and on the interaction (carry +0.179, pg19 −0.064). The synthetic carry task
+and natural text are telling different stories; §6 carries that forward.
+
+### 3d. The ‖E‖ WARN fired again, as predicted
+
+Cortex arm: `1 warn`, the same `‖E‖ has moved −14.3% across the trace`.
+Control: `0 warn`. This is the known false alarm resolved in §4a — it compares
+the first diag record to the last over a trace that always includes launch.
+**Nothing to investigate.** Note also that `watch_run.py` reads the *live* diag,
+so `cortex-final_at_22800.jsonl` and `_at_23100.jsonl` are byte-identical
+copies of the same 547-row file (both end at step 26,550); the `_at_<step>`
+name records when it was copied, not a truncation at that step.
+
+---
+
+## 4. Mechanism trace at 23,100 / 26,550 — the one thing that did land
 
 From `logs/final5b_diag/cortex-final_at_23100.jsonl` (547 rows, steps 50→26,550).
 Architecture checks all pass: `n_depths 9`, `embed_frozen 1`,
@@ -224,7 +332,7 @@ None of this says whether Z *helps* — that is the 2x2, and it did not run.
 
 ---
 
-## 4. Confounds on any 11,444 → 22,800 comparison
+## 5. Confounds on any 11,444 → 22,800 comparison
 
 Three things change together at step 11,450, so a Z-vs-E delta across that
 boundary is **not** a clean "did Z grow" read:
@@ -250,16 +358,41 @@ reference for everything after it.
 
 ---
 
-## 5. Open questions carried forward
+## 6. Open questions carried forward
 
-- **The interaction sign.** Positive (substitutes) on both packs at 11,444,
-  against the design's hypothesis. Does it move at all under the mix corpus, or
-  is substitution the stable answer for this architecture?
-- **Does X_content survive the re-target?** 107% share on pg19 at
-  `znorm_target=98.0`. The band is re-mapped by the lo=1..9 widening and the
-  read strength has changed; the value does not transfer as-is.
-- **Why is loss flat?** −0.0255 nats over ~15k steps while gate norms move
-  16–34%. The mechanism is still learning; the loss is not moving with it.
-- **Does the chunk1 deficit close?** Cortex paid ~0.04–0.05 nats there at
-  11,444. If the carry is improving, chunk1 should hold flat while chunks2+
-  pulls further ahead.
+Updated after read-out 3. **ANSWERED** items stay on the list with their answer
+— the point is the trajectory, not a clean slate.
+
+- **The interaction sign.** *Partly ANSWERED, and the packs disagree.* On pg19
+  it halved and is now **not significant** (+0.1094\* → +0.0449 n.s.), i.e. no
+  longer detectably substituting. On carry it moved the other way, to
+  **+0.2965\***, strongly substituting. So "is substitution stable?" has no
+  single answer yet — it depends on the pack. Watch whether pg19's crosses into
+  negative (the design's actual hypothesis) by the next read-out.
+- **Does X_content survive the re-target?** **ANSWERED: YES, and it grew.**
+  +0.0771 → **+0.1295** on pg19 at `znorm_target=78.9` with the lo=1..9 band,
+  share held at ~100% (107.0% → 103.4%). The content read is robust to the
+  re-target and the re-map. See [[lo1-band-holds-content-at-11444]].
+- **Why is loss flat?** Still open, and now sharper: training loss moved
+  −0.0255 over ~15k steps while gate norms moved 16–34% **and** Z's measured
+  contribution on pg19 nearly doubled. The mechanism is demonstrably learning
+  something the aggregate loss does not show.
+- **Does the chunk1 deficit close?** **ANSWERED: NO, it widened.** fwedu
+  +0.0394 → +0.0604, pg19 +0.0492 → +0.0547. The graft's fixed cost on
+  no-carry context is growing, not amortising.
+- **NEW — why did the between-arm lead narrow while Z got stronger?** The
+  central tension of read-out 3. pg19 `all` lead halved (−0.0651 → −0.0328)
+  while pg19 X_content rose 68%. Candidates: (a) the control captured more of
+  the mix corpus's gain for reasons unrelated to memory, (b) Z's gain is
+  real but is being paid for by the widening chunk1 deficit, (c) E_main fell
+  on pg19 (−0.066) and Z's rise did not fully cover it. **(c) is checkable
+  now:** E_main + X_off went 0.4178 → 0.4046 on pg19, i.e. roughly flat — so
+  Z gained approximately what E lost, which favours (c) and is consistent
+  with the weakening interaction. Worth one careful look before the next
+  read-out.
+- **NEW — carry has become an unreliable instrument.** X_off +0.1154\* with
+  X_content −0.0006 (n.s.) is the pre-J7 signature: the columns are
+  load-bearing as free capacity and the contents are irrelevant. Meanwhile
+  `Z_alone` jumped to +0.4118 and `E_main` rose to +0.3041. Treat carry's Z
+  numbers as a capacity measurement, not a content one, and quote pg19 for
+  any claim about what Z holds.
