@@ -127,11 +127,23 @@ cortex)  RUN=${RUN:-cortex-final} ;;
 esac
 
 RUN_DIR="$OUT_ROOT/$RUN"
-# model_only_chkpt_* lands every save_interval (300); checkpoint_* every 600.
-# Prefer the weights-only dir -- it exists at twice the resolution and this
-# job needs no optimizer state.
-CKPT="$RUN_DIR/model_only_chkpt_$STEP"
-[ -d "$CKPT" ] || CKPT="$RUN_DIR/checkpoint_$STEP"
+# ONLY the resumable checkpoint_<step>/chkpt.pt is loadable here.
+#
+# This used to prefer model_only_chkpt_$STEP "because it exists at twice the
+# resolution and this job needs no optimizer state".  That branch could never
+# load: save_model_only (train.py:873) writes via model.save_pretrained(), an
+# HF dir with config.json + safetensors and NO chkpt.pt, while
+# load_checkpoint (evals/model_utils.py:183-189) requires chkpt.pt inside a
+# dir and raises otherwise.  j5_joint.sbatch:168-169 already said so.
+#
+# It hid on step-number luck.  save_interval=300, resumable every 600:
+#   STEP=11444 (%300=44)  -> no model_only dir, fell through, WORKED
+#   STEP=23100 (%300=0)   -> model_only dir existed, every eval died rc=1
+# and 23100%600=300, so there was no resumable checkpoint there either --
+# re-ordering the branch would not have rescued that step.  PICK A STEP THE
+# RUN ACTUALLY WROTE A chkpt.pt FOR: a multiple of 600, or one of the
+# irregular fault/timeout saves the error block below lists.
+CKPT="$RUN_DIR/checkpoint_$STEP"
 # T is part of the IDENTITY of a read-out, not a knob on one: the slot->depth
 # map is span=min(hi,T-1) tiled as j%span (cortex_graft.py:2156), so scoring
 # the same checkpoint at another T reads a DIFFERENT map.  Keying the dir on
@@ -146,10 +158,21 @@ echo "    checkpoint: $CKPT"
 echo "    baseline:   $BASE_RES  (step $BASELINE_STEP)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
-if [ ! -d "$CKPT" ]; then
-    echo "ERROR: no checkpoint at step $STEP.  Present:"
-    ls -d "$RUN_DIR"/model_only_chkpt_* "$RUN_DIR"/checkpoint_* 2>/dev/null \
-        | sed 's/.*\///' | sort -t_ -k3 -n | tail -8
+# Test for the FILE, not the dir: a checkpoint_<step>/ that exists but is
+# missing chkpt.pt (an interrupted save) would otherwise pass this gate and
+# fail 200 lines later inside the first eval.  Sort numerically on the step
+# field -- README rule 5, "discover checkpoints numerically, never lexically"
+# (the old `-k3` here was keyed for the 4-field model_only_chkpt_<step> name
+# and silently mis-sorted the 2-field checkpoint_<step> one).
+if [ ! -f "$CKPT/chkpt.pt" ]; then
+    echo "ERROR: no loadable checkpoint at step $STEP ($CKPT/chkpt.pt absent)."
+    echo "  Resumable checkpoints are every 2 x save_interval = 600 steps,"
+    echo "  plus irregular fault/timeout saves.  Newest 8 that HAVE chkpt.pt:"
+    for d in "$RUN_DIR"/checkpoint_*; do
+        [ -f "$d/chkpt.pt" ] && echo "${d##*/}"
+    done | sort -t_ -k2 -n | tail -8 | sed 's/^/    /'
+    echo "  (model_only_chkpt_* dirs are save_pretrained exports with no"
+    echo "   chkpt.pt and are NOT loadable here -- see the comment above.)"
     exit 1
 fi
 
@@ -256,9 +279,23 @@ for PAIR in "fwedu:$FWEDU_VAL" "pg19:$PG19_VAL"; do
         RC_ALL=1
         continue
     fi
+    # A missing baseline must be LOUD.  This was a bare `if` with no else, so
+    # a baseline dir that did not match $BASE_RES ran the eval UNPAIRED and
+    # said nothing -- which is what the control arm had been doing: its
+    # baseline sits at step_11444/ while this path keys on step_11444_T8/.
+    # Unpaired is a legitimate run (the pairing only tightens the CI), so this
+    # warns and continues rather than failing.
     BASE_ARG=""
-    if [ -f "$BASE_RES/val_nll_$KEY.json" ] && [ "$STEP" != "$BASELINE_STEP" ]; then
+    if [ "$STEP" = "$BASELINE_STEP" ]; then
+        :   # scoring the baseline itself; nothing to pair against
+    elif [ -f "$BASE_RES/val_nll_$KEY.json" ]; then
         BASE_ARG="--baseline $BASE_RES/val_nll_$KEY.json"
+    else
+        echo "WARN: no baseline at $BASE_RES/val_nll_$KEY.json"
+        echo "      -> running UNPAIRED: wider CI, and no paired delta vs step $BASELINE_STEP."
+        echo "      Present for this run:"
+        ls -d "eval_results/midrun/$RUN"/step_* 2>/dev/null \
+            | sed 's/.*\//        /' || echo "        (none)"
     fi
     # On the cortex arm a graft that did not build is a FAILED read-out, not a
     # control measurement: without this the eval scores the no-memory path and

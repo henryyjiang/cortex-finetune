@@ -516,3 +516,89 @@ class TestThePackCheck:
         assert m, f"no {phase} branch"
         assert "STOP_AT_STEP=${STOP_AT_STEP:-" in m.group(1), (
             f"the {phase} branch does not default STOP_AT_STEP")
+
+
+class TestTheReadOutLoadsALoadableCheckpoint:
+    """Jobs 13989859/13989860 (step 23,100) died with rc=1 before loading any
+    weights, on every eval, both arms.  The read-out preferred
+    model_only_chkpt_$STEP for --checkpoint, which can never load:
+    save_model_only (train.py:873) writes via model.save_pretrained() -- an HF
+    dir with config.json + safetensors and NO chkpt.pt -- while load_checkpoint
+    (evals/model_utils.py:183-189) requires chkpt.pt inside a dir.
+
+    It hid on step-number luck.  save_interval=300, resumable every 600:
+    STEP=11444 (%300=44) found no model_only dir and fell through to the good
+    branch, so the baseline read-out passed; STEP=23100 (%300=0) found one and
+    died.  Nothing about the script changed in between."""
+
+    def test_the_midrun_never_resolves_a_checkpoint_to_a_model_only_dir(self):
+        """The invariant is about what CKPT is BOUND to, not whether the words
+        appear: the error block mentions model_only_chkpt_* on purpose, to tell
+        an operator why the dir they can see is not eligible."""
+        mid = _strip_comments(_read(MIDRUN))
+        binds = [ln for ln in mid.splitlines()
+                 if re.match(r'\s*CKPT=', ln) or "CKPT=" in ln]
+        assert binds, "nothing assigns CKPT"
+        for ln in binds:
+            assert "model_only" not in ln, (
+                f"CKPT is bound to a model_only dir: {ln.strip()!r}.  Those "
+                "are save_pretrained exports with no chkpt.pt; passed to "
+                "--checkpoint they raise, and before the model_utils guard "
+                "existed they scored the BASE weights and looked healthy")
+
+    def test_the_midrun_only_ever_passes_CKPT_as_the_checkpoint(self):
+        mid = _strip_comments(_read(MIDRUN))
+        passed = re.findall(r"--checkpoint\s+(\S+)", mid)
+        assert passed, "no --checkpoint is passed at all"
+        assert set(passed) == {'"$CKPT"'}, (
+            f"--checkpoint is passed something other than \"$CKPT\": {passed}")
+
+    def test_the_midrun_resolves_the_resumable_checkpoint(self):
+        mid = _strip_comments(_read(MIDRUN))
+        assert 'CKPT="$RUN_DIR/checkpoint_$STEP"' in mid
+
+    def test_the_midrun_gate_tests_for_the_file_not_the_directory(self):
+        """A checkpoint_<step>/ that exists but is missing chkpt.pt -- an
+        interrupted save -- passed a `[ ! -d ]` gate and failed 200 lines
+        later inside the first eval."""
+        mid = _strip_comments(_read(MIDRUN))
+        assert '[ ! -f "$CKPT/chkpt.pt" ]' in mid, (
+            "the checkpoint gate tests the dir, not chkpt.pt")
+
+    def test_the_midrun_lists_candidates_numerically(self):
+        """README rule 5: discover checkpoints numerically, never lexically.
+        The old listing used `sort -t_ -k3 -n`, keyed for the 4-field
+        model_only_chkpt_<step> name, which mis-sorts checkpoint_<step>."""
+        mid = _strip_comments(_read(MIDRUN))
+        assert "sort -t_ -k2 -n" in mid
+        assert "sort -t_ -k3 -n" not in mid
+
+
+class TestTheReadOutSaysWhenItIsUnpaired:
+    """`--baseline` is what tightens the CI.  The pairing was a bare `if -f`
+    with no else, so a baseline dir that did not match $BASE_RES ran UNPAIRED
+    and said nothing -- which the control arm had been doing since the T-keying
+    change: its baseline sat at step_11444/ while the path keys on
+    step_11444_T8/.  Unpaired is legitimate; silent is not."""
+
+    def test_the_midrun_warns_when_the_baseline_is_missing(self):
+        mid = _strip_comments(_read(MIDRUN))
+        assert "UNPAIRED" in mid, (
+            "a missing baseline is still silent; the read-out loses the "
+            "paired delta and reports nothing")
+
+    def test_both_arms_baselines_are_keyed_on_T(self):
+        """T is part of the IDENTITY of a read-out (the slot->depth map is
+        span=min(hi,T-1) tiled as j%span), so an un-suffixed baseline dir is
+        both unpairable and ambiguous about which map produced it."""
+        for run in ("cortex-final", "c-chunked"):
+            d = os.path.join(REPO, "eval_results", "midrun", run)
+            if not os.path.isdir(d):
+                pytest.skip(f"no local eval_results for {run}")
+            steps = [x for x in os.listdir(d) if x.startswith("step_")]
+            assert steps, f"no baseline dirs under {d}"
+            for s in steps:
+                assert re.match(r"^step_\d+_T\d+$", s), (
+                    f"{run}/{s} is not keyed on T, so midrun_check's "
+                    f"BASE_RES=step_<n>_T<t> cannot find it and the arm runs "
+                    f"unpaired")
