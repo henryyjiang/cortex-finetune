@@ -255,7 +255,40 @@ complementary, call it "no longer significantly substituting".
 and on the interaction (carry +0.179, pg19 −0.064). The synthetic carry task
 and natural text are telling different stories; §6 carries that forward.
 
-### 3d. The ‖E‖ WARN fired again, as predicted
+### 3d. CAVEAT — the E-off cells are out of distribution in this run
+
+`pace/cortex_final_5b.sbatch:205` sets `--cortex.e_dropout 0.0`, and the diag
+confirms it was never overridden: `z_e_dropout` is 0.0 and `z_e_dropped` is 0
+across all 547 records. **This run was never trained with E switched off.**
+
+`tools/prepare_carry_task.py` says so explicitly about its own instrument:
+`Z_alone` is *"only in-distribution for a model trained with
+--cortex.e_dropout > 0"*. The same applies to anything else computed from an
+E-off cell. So the five effects split into two tiers:
+
+| effect | cells used | trustworthy? |
+|---|---|---|
+| **X_off**, **X_content** | E1Z1, E1Z0 — **E always on** | **YES** |
+| E_main | needs E0Z1 | no — E-off is OOD |
+| Z_alone | needs E0Z0, E0Z1 | no — OOD, and the task doc says so |
+| interaction | needs all four | no — inherits the OOD cells |
+
+This is why carry's E0Z0 jumps to 3.2757 and `Z_alone` to +0.4118: those cells
+ask the model to run in a configuration it has never seen, and the resulting
+NLLs are inflated.
+
+**Consequence for §3b's reading.** The "E_main + X_off is flat on pg19
+(0.4178 → 0.4046), so Z gained what E lost" inference leans on E_main, which is
+in the untrustworthy tier. Treat it as a hypothesis worth one check, not a
+measured result. **The narrowing between-arm lead in §3b stands on its own** —
+it is a plain NLL contrast between two independently trained models with no
+ablation in it, and needs no E-off cell.
+
+To make the E-side effects measurable at all, a future arm would need
+`e_dropout > 0`. That is an architecture change and
+[[cortex-final-z-architecture-frozen]] applies; it is not a mid-run fix.
+
+### 3e. The ‖E‖ WARN fired again, as predicted
 
 Cortex arm: `1 warn`, the same `‖E‖ has moved −14.3% across the trace`.
 Control: `0 warn`. This is the known false alarm resolved in §4a — it compares
@@ -274,7 +307,7 @@ Architecture checks all pass: `n_depths 9`, `embed_frozen 1`,
 `e_carried_norm 78.494`, `embed_ratio 1.0051`, `znorm_target 78.9`, zero
 dead rows, no mix, stride 1, E read on, no e_dropout.
 
-### 3a. The `‖E‖ −14.3%` WARN is a FALSE ALARM — resolved
+### 4a. The `‖E‖ −14.3%` WARN is a FALSE ALARM — resolved
 
 The job warned *"‖E‖ has moved −14.3% across the trace… still climbing is an
 instability"* and said to compare thirds before deciding. Doing that:
@@ -297,7 +330,7 @@ last-record over a trace that always includes launch, so **it will fire on
 every future read-out forever** and look worse as the trace grows. It should
 exclude the warmup window or compare thirds itself.
 
-### 3b. What actually drifted, 11,444 → 26,550
+### 4b. What actually drifted, 11,444 → 26,550
 
 Mean over the 1,000 steps ending at each point (n=20 / n=21 records).
 
