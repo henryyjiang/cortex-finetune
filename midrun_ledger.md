@@ -340,6 +340,48 @@ name records when it was copied, not a truncation at that step.
 
 ---
 
+### 3f. Training health from the full wandb history (added 2026-10-13)
+
+`wandb_exports/cortex-5b/` is now complete — six links per arm, deduped with
+later-link-wins on the resume overlaps. **27,585 unique steps (cortex) and
+24,222 (control), zero missing-step gaps, zero non-finite or missing values
+across all 51,807 updates.** Clean data.
+
+Progress to the 38,147-step horizon: **cortex 72.3%, control 63.5%.**
+
+| band | cortex loss | cortex mean ‖g‖ | cortex clip% | control loss | control clip% |
+|---|---:|---:|---:|---:|---:|
+| 11,445–14,000 | 2.6236 | 1.014 | 21.1% | 2.6899 | 0.7% |
+| 14,000–17,000 | 2.6010 | 0.986 | 19.3% | 2.6642 | 0.7% |
+| 17,000–20,000 | 2.5891 | 1.047 | 22.9% | 2.6497 | 0.6% |
+| 20,000–23,000 | 2.5705 | 1.089 | 24.1% | 2.6303 | 0.6% |
+| 23,000–24,223 | 2.5501 | 0.986 | 17.7% | 2.6117 | 0.7% |
+| 24,223–27,586 | 2.5346 | 1.336 | 31.0% | — | — |
+
+**Paired training loss, same step, mix phase (≥11,445): cortex ahead
++0.0622 ± 0.0001 nats, t=644, n=12,778.** Slowly narrowing band over band
+(0.0663 → 0.0663 → 0.0631 → 0.0606 → 0.0597, then 0.0616), i.e. a mild decline
+of ~0.007 nats over the mix phase — far gentler than the held-out PG-19 lead
+halving in §3b.
+
+**LR cooldown is active and matched.** Both arms peak at 1.0e-3, hold flat to
+~15,000, then decay together — identical to three digits at every shared step
+(6.816e-4 at 24,000 on both). Cortex is at 4.40e-4 by 27,585. The steady loss
+decline is partly this, which is expected and healthy.
+
+**The clip-rate rise, in context.** Cortex's mean gradient norm grows while LR
+falls (1.098 at 20k → 1.448 at 27k as LR goes 8.53e-4 → 4.40e-4), so against a
+**fixed** `--max_grad_norm 1.0` engagement necessarily climbs: 4.4% early →
+31.0% now, coefficient averaging ~0.63 when engaged. The trend is continuous
+across the 26k link boundary, so it is not a resume artefact. Control sits flat
+at ~0.6% with mean ‖g‖ ~0.52.
+
+This is a watch item, **not** a problem: zero non-finite anywhere, `train.py`
+aborts only on consecutive non-finite, and loss falls steadily over exactly the
+interval where engagement climbs. Revisit if it passes ~50%.
+
+---
+
 ## 4. Mechanism trace at 23,100 / 26,550 — the one thing that did land
 
 From `logs/final5b_diag/cortex-final_at_23100.jsonl` (547 rows, steps 50→26,550).
@@ -475,16 +517,31 @@ Updated after read-out 3. **ANSWERED** items stay on the list with their answer
   +0.0771 → **+0.1295** on pg19 at `znorm_target=78.9` with the lo=1..9 band,
   share held at ~100% (107.0% → 103.4%). The content read is robust to the
   re-target and the re-map. See [[lo1-band-holds-content-at-11444]].
-- **Why is loss flat?** Still open, and now with a candidate. Training loss
-  moved −0.0255 over ~15k steps while gate norms moved 16–34% **and** Z's
-  measured contribution on pg19 nearly doubled. **Candidate (2026-10-13):**
-  cortex's mean grad norm has grown 0.795 → 1.341 against a fixed
-  `--max_grad_norm 1.0`, so clip engagement went 4.4% → **32.9%**, and when it
-  engages the coefficient averages 0.636. A third of updates having their
-  gradient cut to ~64% is a real and growing distortion. The control is flat
-  at ~0.4%. No non-finite anywhere in either arm, so this is not instability —
-  but it is monotone. See
-  [[cortex-grad-scale-is-growing-clip-rate-rising]].
+- **~~Why is loss flat?~~ RETRACTED 2026-10-13 — IT IS NOT FLAT.** This
+  question was an artefact of my own bad comparison and should never have been
+  on the list. I read the diag's 1,000-step window at 11,444 (**2.5829**,
+  the last 1k of the HEAL corpus) against the window at 26,550 (**2.5348**,
+  mix corpus) and called the −0.048 "nearly flat". But those windows sit on
+  **different corpora**: the switch to PG-19+fw50 *raised* training loss by
+  **+0.0589** because it is the harder pack. Measured within the mix phase
+  only, against the full wandb history (now complete to step 27,585):
+
+  | arm | mix first 2,000 | mix last 2,000 | Δ |
+  |---|---:|---:|---:|
+  | cortex-final | 2.6280 | 2.5301 | **−0.0979** |
+  | c-chunked | 2.6951 | 2.6158 | **−0.0793** |
+
+  Both arms are declining steadily and monotonically, band over band, and
+  **cortex is declining faster**. There is no flat-loss puzzle. The lesson is
+  the one §5 already states about PG-19 and generalises: never pair a
+  pre-switch window against a post-switch one.
+
+- **~~Clip rate as the cause of the flat loss~~ — moot.** Added one commit
+  earlier as the candidate explanation; with no flat loss to explain it is
+  withdrawn as a *hypothesis*. The clip-rate rise itself is real and still
+  worth watching (§3f), it is simply not suppressing learning: loss falls
+  steadily over exactly the interval where engagement climbs 21% → 31%.
+
 - **Does the chunk1 deficit close?** **ANSWERED: NO, it widened.** fwedu
   +0.0394 → +0.0604, pg19 +0.0492 → +0.0547. The graft's fixed cost on
   no-carry context is growing, not amortising.
