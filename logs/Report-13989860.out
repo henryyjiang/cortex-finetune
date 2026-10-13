@@ -1,0 +1,172 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-12-2026 19:39:31
+Job ID:    13989860
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  midrun
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== midrun | arm=cortex | run=cortex-final | step 23100 ===
+    checkpoint: cortex-5b/cortex-final/model_only_chkpt_23100
+    baseline:   eval_results/midrun/cortex-final/step_11444_T8  (step 11444)
+NVIDIA H200, 143771 MiB
+    scoring step 23100 against diag record 23100 (znorm_target 78.9)
+    diag OK: 547 rows, n_depths 9, embed_frozen 1, e_carried_norm 78.49375915527344, embed_ratio 1.0051445647079498
+
+--- val NLL / fwedu  (data/fineweb_edu_olmo_val_len4096)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_val_nll.py", line 369, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_val_nll.py", line 247, in main
+    model, _cfg = load_checkpoint(args.checkpoint, args.model_name, None, dtype,
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/model_utils.py", line 187, in load_checkpoint
+    raise FileNotFoundError(
+FileNotFoundError: cortex-5b/cortex-final/model_only_chkpt_23100 is a directory with no chkpt.pt in it.  Pass the checkpoint dir or the .pt file; passing neither used to run silently on the BASE weights.
+
+--- val NLL / pg19  (data/pg19_olmo_validation_len4096_strided)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_val_nll.py", line 369, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_val_nll.py", line 247, in main
+    model, _cfg = load_checkpoint(args.checkpoint, args.model_name, None, dtype,
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/model_utils.py", line 187, in load_checkpoint
+    raise FileNotFoundError(
+FileNotFoundError: cortex-5b/cortex-final/model_only_chkpt_23100 is a directory with no chkpt.pt in it.  Pass the checkpoint dir or the .pt file; passing neither used to run silently on the BASE weights.
+
+--- 2x2 / carry-off  (score carry, z_null off, n 300, cells E1Z1,E1Z0,E0Z1,E0Z0)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 648, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 420, in main
+    model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/model_utils.py", line 187, in load_checkpoint
+    raise FileNotFoundError(
+FileNotFoundError: cortex-5b/cortex-final/model_only_chkpt_23100 is a directory with no chkpt.pt in it.  Pass the checkpoint dir or the .pt file; passing neither used to run silently on the BASE weights.
+
+--- 2x2 / carry-donor  (score carry, z_null donor, n 300, cells E1Z1,E1Z0)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 648, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 420, in main
+    model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/model_utils.py", line 187, in load_checkpoint
+    raise FileNotFoundError(
+FileNotFoundError: cortex-5b/cortex-final/model_only_chkpt_23100 is a directory with no chkpt.pt in it.  Pass the checkpoint dir or the .pt file; passing neither used to run silently on the BASE weights.
+
+--- 2x2 / carry-local  (score local, z_null off, n 100, cells E1Z1,E1Z0)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 648, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 420, in main
+    model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/model_utils.py", line 187, in load_checkpoint
+    raise FileNotFoundError(
+FileNotFoundError: cortex-5b/cortex-final/model_only_chkpt_23100 is a directory with no chkpt.pt in it.  Pass the checkpoint dir or the .pt file; passing neither used to run silently on the BASE weights.
+
+--- 2x2 / pg19-off  (score all, z_null off, n 400, cells E1Z1,E1Z0,E0Z1,E0Z0)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 648, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 420, in main
+    model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/model_utils.py", line 187, in load_checkpoint
+    raise FileNotFoundError(
+FileNotFoundError: cortex-5b/cortex-final/model_only_chkpt_23100 is a directory with no chkpt.pt in it.  Pass the checkpoint dir or the .pt file; passing neither used to run silently on the BASE weights.
+
+--- 2x2 / pg19-donor  (score all, z_null donor, n 400, cells E1Z1,E1Z0)
+Traceback (most recent call last):
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 648, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/eval_carry_2x2.py", line 420, in main
+    model, cfg = load_checkpoint(args.checkpoint, args.model_name, None,
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/home/hcoda1/3/hjiang420/cortex-finetune/evals/model_utils.py", line 187, in load_checkpoint
+    raise FileNotFoundError(
+FileNotFoundError: cortex-5b/cortex-final/model_only_chkpt_23100 is a directory with no chkpt.pt in it.  Pass the checkpoint dir or the .pt file; passing neither used to run silently on the BASE weights.
+=== watch_run | cortex-5b/cortex-final | arm=cortex ===
+--- (no --log passed; skipping the link's stdout) ---
+
+--- the mechanism, from cortex_diag.jsonl --------------------------------
+  547 rows, last at step 26550, loss 2.414
+  columns  E 64  Z 64  writes/chunk 16  E spliced norm 79.4
+  gradient read 1.000 (min)   write 0.710 mean, 0.000 min, 10.1% of records fully frozen
+           <1.0 on the write is the DESIGN here -- a staggered band draws depths inside the no-grad prefix (J6 measured 0.76 mean, 13.8% frozen)
+  stagger  n_depths last 6, median 5, collapsed to 1 on 89/547 records   tape_len 7
+  embed    frozen=1  z_embed_ratio first 1.058 -> last 0.994 (identity holds it at ~1.0; a trainable map went 2.17x in 23 steps)
+  ||E||    92.6 -> 79.4 over the trace (-14.3%)
+           znorm_target 78.9, now +0.6% away
+  gates    E left-init=1 (w 92.4)   Z left-init=1 (w 129)
+           fg 0.181 / ig 0.907   fg_z 0.456 / ig_z 0.848   summary_emb 16.4
+  carry    rows 64  E norm 79.2 rank_pr 8.39 cos -0.004
+           Z norm 21.8 rank_pr 6.81 cos -0.004  zero rows 0
+  clean    no mix, stride 1, E read on, no e_dropout
+
+--- state on disk -------------------------------------------------------
+  48 resumable checkpoints, newest checkpoint_26531 (69.5% of the horizon)
+
+  note every line above is a MEASURED number the forward pass had to produce, not a flag echo.  None of them says whether Z helps: that is pace/midrun_check.sbatch.
+  WARN ||E|| has moved -14.3% across the trace. Settled high is a calibration constant; still climbing is an instability with a schedule -- compare the first and last thirds before deciding.
+
+VERDICT: no failures, 1 warn.  This says the link ran as configured.  It does NOT say the mechanism helps.
+
+=== midrun finished rc=1 -> eval_results/midrun/cortex-final/step_23100_T8 ===
+
+HOW TO READ IT -- the bars, written down before the numbers arrive:
+  val NLL      chunk1 is the 'did it break' number (no carry either arm).
+               Across the switch, expect PG-19 down and FineWeb-Edu up a
+               little.  BOTH up is degradation; PG-19 flat means check
+               the switch link actually read the mix pack.
+  THE CARRY, DECOMPOSED  the -off tasks now run the full 2x2, so
+               results.json carries four rows, not one:
+                 E_main       E0Z1 - E1Z1.  E's effect, Z held ON.
+                 Z_main       E1Z0 - E1Z1.  Z's effect, E held ON  (= X_off).
+                 Z_alone      E0Z0 - E0Z1.  Z's effect with E held OFF.
+                 interaction  (E's effect without Z) - (E's effect with Z).
+                              NEGATIVE = COMPLEMENTS: E is worth more when
+                              Z is present.  This is the design's actual
+                              hypothesis and the only sign you cannot read
+                              off a single column.
+               E1Z1 vs E0Z0 is E AND Z TOGETHER, not E's effect.  Quote
+               E_main for E.  At step 11,444 the together number was
+               +0.3119 while Z_main was -0.0024, i.e. E was doing
+               essentially all of it -- but that was an inference from
+               Z's null, not a measurement, because E0Z1 never ran.
+  X_off        E1Z0 - E1Z1.  Positive on every J arm ever run, including
+               the ones where Z carried nothing.  It is NOT evidence.
+  X_content    donor - own.  THE deciding number.  J7 measured +0.2215
+               at latent_depth_lo=2; this run trains lo=1, which re-maps
+               all 16 slots, so that value does not transfer as-is.
+               Zero here with X_off positive is the pre-J7 signature:
+               columns load-bearing, contents irrelevant.
+  content share  X_content / X_off.  0% on ctrl/mix/slow, 103% on J7.
+  chunk1_max_spread  must be ~0 -- the cells must agree where no carry
+               exists, or they differ in something other than the carry.
+  chance margin  any cell within 0.25 nats of ln(vocab) is scoring noise
+               and every delta computed from it is a difference of two
+               noise levels.
+---------------------------------------
+Begin Slurm Epilog: Oct-12-2026 19:39:48
+Job ID:        13989860
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      midrun
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=00:02:48,vmem=0,walltime=00:00:21,mem=223296K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------
