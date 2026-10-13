@@ -1,0 +1,110 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-13-2026 00:57:11
+Job ID:    13994793
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  midrun
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== midrun | arm=control | run=c-chunked | step 22800 ===
+    checkpoint: cortex-5b/c-chunked/checkpoint_22800
+    baseline:   eval_results/midrun/c-chunked/step_11444_T8  (step 11444)
+NVIDIA H200, 143771 MiB
+
+--- val NLL / fwedu  (data/fineweb_edu_olmo_val_len4096)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.97s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.01it/s]
+[load] overlaid cortex-5b/c-chunked/checkpoint_22800/chkpt.pt: 0 missing / 0 unexpected keys
+[val_nll] memory=NO (control path)  carry=off
+  50 samples
+  100 samples
+  150 samples
+  200 samples
+  250 samples
+  300 samples
+  350 samples
+  400 samples
+
+=== val NLL | c-chunked@22800/fwedu ===
+    pack data/fineweb_edu_olmo_val_len4096   400 rows   T=8  n_chunks=8
+    window               NLL                  95% CI
+    all               2.6601        [2.6338, 2.6870]
+    chunk1 (no carry)    2.6755        [2.6348, 2.7165]
+    chunks 2+         2.6578        [2.6306, 2.6850]
+    per chunk: 1:2.676  2:2.645  3:2.641  4:2.655  5:2.672  6:2.693  7:2.665  8:2.634
+    chance margin 8.856 nats (mean 2.660 vs ln(vocab) 11.516)
+
+  PAIRED against c-chunked@11444/fwedu (400 shared rows).  Positive = THIS checkpoint is WORSE.
+    window              delta                  95% CI
+    all               +0.0067      [+0.0024, +0.0106]
+    chunk1            +0.0062      [+0.0001, +0.0121]
+    chunks2plus       +0.0068      [+0.0025, +0.0108]
+    chunk1 is the honest 'did the model break' number: no carry exists there in either arm.
+
+    wrote eval_results/midrun/c-chunked/step_22800_T8/val_nll_fwedu.json
+
+--- val NLL / pg19  (data/pg19_olmo_validation_len4096_strided)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.65s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.20it/s]
+[load] overlaid cortex-5b/c-chunked/checkpoint_22800/chkpt.pt: 0 missing / 0 unexpected keys
+[val_nll] memory=NO (control path)  carry=off
+  50 samples
+  100 samples
+  150 samples
+  200 samples
+  250 samples
+  300 samples
+  350 samples
+  400 samples
+
+=== val NLL | c-chunked@22800/pg19 ===
+    pack data/pg19_olmo_validation_len4096_strided   400 rows   T=8  n_chunks=8
+    window               NLL                  95% CI
+    all               2.9284        [2.8784, 2.9807]
+    chunk1 (no carry)    2.9378        [2.8623, 3.0171]
+    chunks 2+         2.9271        [2.8733, 2.9776]
+    per chunk: 1:2.938  2:2.978  3:2.918  4:2.935  5:2.903  6:2.938  7:2.941  8:2.878
+    chance margin 8.588 nats (mean 2.928 vs ln(vocab) 11.516)
+
+  PAIRED against c-chunked@11444/pg19 (400 shared rows).  Positive = THIS checkpoint is WORSE.
+    window              delta                  95% CI
+    all               -0.5622      [-0.5849, -0.5390]
+    chunk1            -0.5970      [-0.6332, -0.5609]
+    chunks2plus       -0.5573      [-0.5803, -0.5341]
+    chunk1 is the honest 'did the model break' number: no carry exists there in either arm.
+
+    wrote eval_results/midrun/c-chunked/step_22800_T8/val_nll_pg19.json
+=== watch_run | cortex-5b/c-chunked | arm=control ===
+--- (no --log passed; skipping the link's stdout) ---
+
+--- the mechanism, from cortex_diag.jsonl --------------------------------
+  empty, as it must be: no cortex, nothing to report.
+
+--- state on disk -------------------------------------------------------
+  42 resumable checkpoints, newest checkpoint_23349 (61.2% of the horizon)
+
+  note control: no mechanism to check.  Its health lives in the loss curve and in held-out NLL (pace/midrun_check.sbatch).
+
+VERDICT: no failures, 0 warn.  This says the link ran as configured.  It does NOT say the mechanism helps.
+
+=== midrun finished rc=0 -> eval_results/midrun/c-chunked/step_22800_T8 ===
+
+HOW TO READ IT -- the bars, written down before the numbers arrive:
+  val NLL      chunk1 is the 'did it break' number (no carry either arm).
+               Across the switch, expect PG-19 down and FineWeb-Edu up a
+               little.  BOTH up is degradation; PG-19 flat means check
+               the switch link actually read the mix pack.
+  chance margin  any cell within 0.25 nats of ln(vocab) is scoring noise
+               and every delta computed from it is a difference of two
+               noise levels.
+---------------------------------------
+Begin Slurm Epilog: Oct-13-2026 01:18:36
+Job ID:        13994793
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      midrun
+Resources:     cpu=8,gres/gpu:h200=1,mem=64G,node=1
+Rsrc Used:     cput=02:51:52,vmem=0,walltime=00:21:29,mem=27802652K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-11-0
+---------------------------------------
