@@ -1061,4 +1061,15 @@ GPU: cuda:0 | Step: 257088 | Updates: 27512 | Time/step: 1.6465 | Tok/sec=  4975
 GPU: cuda:0 | Step: 257104 | Updates: 27513 | Time/step: 1.5440 | Tok/sec=  5305.86 | Loss: 2.5280 / log-ppl: 12.5284 | Grad-Norm 0.5534 | ClipCoef 1.0000 | Peak-Mem 90.93GiB
 GPU: cuda:0 | Step: 257120 | Updates: 27514 | Time/step: 1.6945 | Tok/sec=  4834.57 | Loss: 2.4420 / log-ppl: 11.4964 | Grad-Norm 0.8624 | ClipCoef 1.0000 | Peak-Mem 90.94GiB
 GPU: cuda:0 | Step: 257136 | Updates: 27515 | Time/step: 1.6268 | Tok/sec=  5035.80 | Loss: 2.4919 / log-ppl: 12.0841 | Grad-Norm 0.6425 | ClipCoef 1.0000 | Peak-Mem 90.89GiB
-GPU: cuda:0 | Step: 257152 | Updates: 27516 | Time/step: 1.6759 | Tok/sec=  4888.06 | Loss: 2.6256 / log-ppl: 13.8124 | Grad-Norm 1.4125 | ClipCoef 0.7080 | Peak-Mem 90.91GiB
+GPU: cuda:0 | Step: 257152 | Updates: 27516 | Time/step: 1.6759 | Tok/sec=  4888.06 | Loss: 2.6256 / log-ppl: 13.8124 | Grad-Norm 1.4125 | ClipCoef 0.7080 | Peak-Mem 90.91GiB---------------------------------------
+Begin Slurm Epilog: Oct-13-2026 12:26:34
+Job ID:        13990027
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      cf5b
+Resources:     cpu=8,gres/gpu:h200=1,mem=128G,node=1
+Rsrc Used:     cput=2-19:32:48,vmem=0,walltime=08:26:36,mem=17234344K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------
