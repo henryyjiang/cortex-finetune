@@ -1,4 +1,5 @@
 run,id,state,steps,tokens,loss_start,loss_final,loss_min,nan_loss_rows,skipped_updates,gnorm_p50,gnorm_p99,gnorm_max,clip_active_frac,max_loss_jump,end_trend,FLAGS
+c-chunked,c163a0et,crashed,36612,4798808064,2.5236,2.5372,2.3397,0,0,0.49,0.79,4.855,0.004,+0.271@36260,2.5318->2.5326  [NOT IMPROVING],final loss >> min loss
 c-chunked,34w23hfm,crashed,33845,4436131840,2.5876,2.5381,2.337,0,0,0.492,0.755,4.857,0.005,+0.262@30387,2.5474->2.5425,final loss >> min loss
 c-chunked,2i56c7aw,crashed,28638,3753639936,2.5911,2.564,2.3547,0,0,0.495,0.75,4.804,0.003,+0.361@26559,2.5704->2.5763  [NOT IMPROVING],final loss >> min loss
 c-chunked,pujmoq6m,crashed,23383,3064856576,2.6304,2.6047,2.3967,0,0,0.499,0.807,6.565,0.006,+0.308@18500,2.6134->2.6065,final loss >> min loss
@@ -6,6 +7,7 @@ c-chunked,2z650au1,crashed,18586,2436104192,2.6475,2.6464,2.4776,0,0,0.504,0.805
 c-chunked,tiptdaxu,crashed,17017,2230452224,2.8899,2.6656,2.4442,0,0,0.518,0.874,10.268,0.007,+0.281@12081,2.6596->2.6561,final loss >> min loss
 c-chunked,teclfb1p,finished,11444,1499987968,2.6247,2.6322,2.4942,0,0,0.477,0.519,0.641,0.0,+0.237@10938,2.6351->2.6485  [NOT IMPROVING],final loss >> min loss
 c-chunked,eqm9i0t2,crashed,9735,1275985920,10.1372,2.667,2.4967,0,0,0.483,2.752,50.706,0.018,+0.247@3014,2.6555->2.6558  [NOT IMPROVING],final loss >> min loss
+cortex-final,910n9cm1,crashed,37517,4917428224,2.4707,2.4671,2.2753,0,0,1.069,21.906,264.412,0.553,+0.287@36260,2.4649->2.4759  [NOT IMPROVING],final loss >> min loss
 cortex-final,ava0i2ma,crashed,34328,4499439616,2.5163,2.4787,2.2573,0,0,0.941,14.27,680.874,0.456,+0.271@30387,2.4799->2.4738,final loss >> min loss
 cortex-final,5ulvg7zu,failed,27703,3631087616,2.5431,2.5614,2.3045,0,0,0.82,9.989,65.332,0.331,+0.339@26559,2.5198->2.5199  [NOT IMPROVING],final loss >> min loss
 cortex-final,34rwptt7,crashed,26572,3482845184,2.5708,2.5087,2.3045,0,0,0.734,7.67,98.265,0.251,+0.338@26559,2.5281->2.5274,final loss >> min loss
