@@ -13,6 +13,7 @@ Never overwrite a row — a superseded number gets a note, not a deletion.
 | 1 | 2026-10-03 | 11444 | — | both | val NLL + full 2x2 | **OK** — the baseline every later row pairs against |
 | 2 | 2026-10-12 | 23100 | 13989859 / 13989860 | both | val NLL + full 2x2 | **FAILED, rc=1, zero evals** — bad checkpoint path (see §2) |
 | 3 | 2026-10-13 | 22800 | 13994793 / 13994794 | both | val NLL + full 2x2 | **OK, rc=0 both arms** — first complete post-switch read-out (see §3) |
+| 4 | 2026-10-21 | 37517 | — (log/diag only) | both | paired training loss + mechanism trace | **OK** — no evals; lead flat at −0.062, ‖E‖ broke upward (see §7) |
 
 ---
 
@@ -561,3 +562,171 @@ Updated after read-out 3. **ANSWERED** items stay on the list with their answer
   `Z_alone` jumped to +0.4118 and `E_main` rose to +0.3041. Treat carry's Z
   numbers as a capacity measurement, not a content one, and quote pg19 for
   any claim about what Z holds.
+
+---
+
+## 7. Step 37,517 — 2026-10-21 — training-loss + mechanism read, no evals
+
+Not a `midrun_check` read-out: no held-out NLL, no 2x2. This is the complete
+per-step wandb export for **both arms, all links** plus the cumulative 770-row
+`cortex_diag.jsonl` at 37,500, pulled after the final pair's links died on
+SIGBUS (jobs 14178512 / 14178513, `rc=135`, Oct-20 13:31, ~20h short of the 48h
+wall — not a wall-clock stop; see `final_pair_last_link.md`).
+
+Resubmitted from the verified checkpoints as jobs **14258163** (control, from
+`checkpoint_36600`) and **14258172** (cortex, from `checkpoint_37200`), both
+with `STOP_AT_STEP=38146` so the horizon lands a *resumable* checkpoint — the
+`max_steps` break path at `train.py:2540` writes only a model-only
+`final_checkpoint`, which §2a already showed cannot be scored.
+
+### 7a. The arms pair per step — and the lead does NOT decay
+
+Rows consumed on the mix pack is exactly `(update − 11,444) × 32` for both
+arms, so at a given optimizer step both see the same batch. 36,612 paired
+steps. Cortex minus control, 2,000-step bands:
+
+| band | control | cortex | delta | se | t |
+|---|---:|---:|---:|---:|---:|
+| 11k–13k | 2.6938 | 2.6266 | **−0.0672** | 0.0003 | −244 |
+| 13k–15k | 2.6688 | 2.6054 | −0.0634 | 0.0002 | −283 |
+| 17k–19k | 2.6503 | 2.5901 | −0.0602 | 0.0002 | −267 |
+| 21k–23k | 2.6220 | 2.5627 | −0.0592 | 0.0002 | −244 |
+| 25k–27k | 2.5922 | 2.5314 | −0.0608 | 0.0002 | −257 |
+| 29k–31k | 2.5590 | 2.4975 | −0.0615 | 0.0002 | −260 |
+| 33k–35k | 2.5393 | 2.4756 | −0.0637 | 0.0002 | −266 |
+| 35k–37k | 2.5354 | 2.4708 | **−0.0646** | 0.0003 | −199 |
+
+**Flat.** −0.0672 at the start of the mix phase, −0.0646 at 37k, a shallow dip
+to −0.0592 near 22k, total range 0.008 nats = 13% of the lead, no monotone
+trend over 25,000 updates. Both arms decline monotonically band over band, so
+§3f's conclusion holds and extends to the horizon.
+
+**This sharpens §3b into a real question.** §3b has the held-out pg19 lead
+**halving, −0.0651 → −0.0328**, at a read-out inside this very span — and
+−0.0651 is almost exactly the training-loss lead. So the training advantage
+held at ~0.062 throughout while its transfer to held-out pg19 halved. That is a
+**generalisation-gap** signal, not a loss of capability, and it reframes §6's
+"NEW — why did the between-arm lead narrow while Z got stronger?": the answer
+is not that cortex stopped winning. It did not. Candidate (b) from §6 — Z's
+gain paid for by the widening chunk1 deficit — survives this; candidate (a)
+does not, since the control captured no extra training-loss ground.
+
+### 7b. Ignore `summary.csv`'s end-of-run flags
+
+`end_trend ... [NOT IMPROVING]` fires on **11 of 16** runs in the table,
+including both of these. It compares 100-step means where se ≈ 0.025, so a
+−0.011 "trend" is noise; the 2,000-step bands above show steady decline.
+`final loss >> min loss` fires by construction (noisy per-step min vs a mean)
+on **16 of 16**. Neither belongs in a write-up.
+
+### 7c. Clipping is a tail device, not a brake — earlier framing corrected
+
+Cortex's clip engagement is now **56.1%** (p50 ‖g‖ crossed 1.0 between 31k and
+33k) against the control's flat **0.4%**, and the trend is monotone from 25k:
+20.9% → 23.5% → 33.5% → 39.1% → 42.6% → 47.7% → 56.4% → 56.1%. But the mean
+‖g‖ that drives those numbers is tail-dominated, and reporting it alone
+misleads:
+
+| step ≥ 33,000 | cortex | control |
+|---|---:|---:|
+| mean ‖g‖ | 2.447 | ~0.50 |
+| **median ‖g‖** | **1.078** | ~0.49 |
+| p99 / max | 20.2 / 680.9 | 0.79 / 4.9 |
+| clip coef at the median | 0.923 | 1.000 |
+| **effective step, mean of min(‖g‖,1)** | **0.901** | **0.503** |
+
+Clipping removes **63% of the mean** but only **7.2% at the median update**,
+and the step cortex actually applies is **1.8× LARGER** than the control's, not
+smaller. So the arms are not matched on effective step size, but the asymmetry
+**favours cortex** — it is a design question for the next run, not a caveat
+that weakens the lead. Zero non-finite losses and zero non-finite grad norms in
+either arm across the full history.
+
+### 7d. ‖E‖ broke upward after 26,550 — §4a's "settled" did not hold
+
+§4a's thirds ended at 26,550, which is almost exactly the inflection. In the
+`znorm_target=78.9` era:
+
+| steps | mean ‖E‖ | sd | vs 78.9 | n |
+|---|---:|---:|---:|---:|
+| 11,450 – 20,000 | 77.157 | 1.052 | −2.21% | 187 |
+| 20,000 – 26,550 | 78.089 | 1.074 | −1.03% | 135 |
+| 26,550 – 32,000 | 80.716 | 0.874 | **+2.30%** | 113 |
+| 32,000 – 37,500 | **82.044** | 0.581 | **+3.99%** | 112 |
+
+Last 20 records mean **82.173 = +4.15%**, with the **sd shrinking** 1.05 →
+0.58: a settled new level, monotone across four windows, still inside
+`watch_run`'s ±15% band so nothing fires. §4a's "stop watching it" was correct
+for its data and wrong as a forecast.
+
+**Benign so far, because it is a joint scale drift:** `z_row_norm` rose with it
+(21.26 → 21.97, +3.3%) and `z_over_e_norm` held at ~0.268 across the whole
+trace, so Z tracked E and the injection ratio is preserved. `z_embed_ratio`
+0.96 and `z_embed_norm` flat confirm the freeze is not implicated (§4a point 3
+discriminates in one number). **Write-up limitation:** the mix phase trained
+with ‖E‖ drifting +4% away from its injection target, so Z was injected ~4%
+quiet relative to E by the end. `ZNORM_TARGET=78.9` is still the right value to
+carry into the final link — changing it now would be the step discontinuity the
+protocol rules out.
+
+### 7e. Both watch_run trajectory WARNs pointed the wrong way
+
+§4a predicted the ‖E‖ WARN would "fire on every future read-out forever". It
+did, at **−11.9%**, while ‖E‖ was actually **+4.15%** — wrong in sign and
+magnitude, with its "still climbing" right only by accident. The same
+first-record-vs-last-record defect produces a second bad warning:
+
+> *"E's carry effective rank has halved over the trace (1.73 → 5.43)"*
+
+which is self-contradictory as printed, since 1.73 → 5.43 is a rise.
+`watch_run.py:456` tests `pr[-1]` against half the first-quarter mean (11.32) —
+the honest test — but *displays* `pr[0]`, the step-50 warm-up value, from which
+the series ramps UP (1.73, 4.92, 4.72, 6.33, … 12.54). **The warning's
+substance is right**: by sixths the series runs 12.53, 8.23, 8.20, 8.26, 7.40,
+**6.59**, last-50 mean **6.44** — a peak-to-now decline of ~49%. Quote "peaked
+~12.5, now ~6.4". Fixing both means excluding the warmup window and comparing
+windows rather than endpoints.
+
+### 7f. The gates specialised by horizon — a positive result
+
+By sixths of the trace, all monotone:
+
+| key | s1 | s3 | s6 (now) |
+|---|---:|---:|---:|
+| `fg_at_bias` (E forget) | 0.609 | 0.268 | **0.169** |
+| `ig_at_bias` (E input) | 0.567 | 0.832 | **0.915** |
+| `fg_z_at_bias` (Z forget) | 0.654 | 0.550 | **0.446** |
+| `ig_z_at_bias` (Z input) | 0.580 | 0.782 | **0.856** |
+| `e_eff_rank_pr` | 12.53 | 8.20 | **6.59** |
+| `z_eff_rank_pr` | 6.74 | 6.79 | **6.14** |
+| `summary_emb_norm` | 12.6 | 15.5 | **16.4** |
+
+**E has become nearly memoryless across chunks** — retaining ~17% of the
+previous carry per step and writing almost entirely new content — while **Z
+retains 2.6× more** (0.446 vs 0.169). That is direct evidence the two channels
+**specialise by horizon rather than duplicating each other**, which is worth
+stating explicitly against §3's substitution finding and §6's unresolved
+complement-vs-substitute question. It does not settle that question — only
+separately trained limbs can (§3d-bis) — but it is mechanism-side evidence the
+eval-time 2x2 cannot produce.
+
+Against it: **E's carry is concentrating.** Effective rank peaked ~12.5 and is
+now ~6.4 of 64 rows (~10% of available directions), converging DOWN onto Z's
+~6.1, which barely moved (−9%). E writes hard into a shrinking subspace. Loss
+is falling and the lead is stable, so this is a finding, not an alarm — and
+report it paired with 7f's gate result, never alone.
+
+Everything that should be pinned is pinned: `z_read_grad_frac` 1.000
+throughout, `z_write_grad_frac` 0.77 (matches J6's 0.76 — the staggered band
+drawing depths inside the no-grad prefix is the DESIGN, not a leak),
+`z_zero_rows` 0 (all 64 rows written), `z_znorm_target` 78.9 from step 11,450
+with no second step.
+
+### 7g. The run is already effectively over
+
+`train/lr` peaked at **1.000e−03** (step 96) and is now **2.87e−06 = 0.29% of
+peak**. The lr-integral left over the remaining ~630 updates is **0.003%** of
+the run total. Expect the final read-out to move these numbers in the third
+decimal, not the second — the last link is a formality to reach the horizon and
+produce a scorable checkpoint, not a stretch where anything is still being
+learned. Plan the final `midrun_check` at **STEP=38146**.
