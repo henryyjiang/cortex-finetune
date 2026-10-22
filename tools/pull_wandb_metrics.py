@@ -12,7 +12,8 @@ wandb + pandas); the cluster's cortex-retro env also has wandb.
 Outputs
 -------
   wandb_exports/<project>/<run_name>__<run_id>.csv   full per-step history (train/*)
-  wandb_exports/<project>/summary.csv                one row per run
+  wandb_exports/<project>/summary.csv                one row per run (incl. created_at,
+                                                     which orders a chain's links)
   stdout: per-run anomaly report + cross-run summary table
 
 What "anomaly" means here
@@ -76,7 +77,14 @@ def freeze_until(config: dict):
 
 
 def analyze(name: str, run, df: pd.DataFrame) -> dict:
-    info = {"run": name, "id": run.id, "state": run.state}
+    # created_at is the only authoritative ordering of a CHAIN.  Each link of a
+    # chained run is its own wandb run (train.py never passes resume=), so the
+    # exports carry no chain order at all, and tools/stitch_wandb_links.py has
+    # to infer it from the first logged step -- which is the resume point and
+    # is therefore right, except across a false start that logged nothing past
+    # the checkpoint it resumed from.  Recording it costs a column.
+    info = {"run": name, "id": run.id, "state": run.state,
+            "created_at": getattr(run, "created_at", None)}
     if df.empty or "train/loss" not in df.columns:
         info["note"] = "NO HISTORY"
         return info
@@ -197,7 +205,7 @@ def main() -> int:
         reports.append(rep)
         print(f"-- {r.name}  [{r.state}, {len(df)} logged steps] -> {csv}")
         for k, v in rep.items():
-            if k not in ("run", "id", "state"):
+            if k not in ("run", "id", "state", "created_at"):
                 print(f"     {k:26} {v}")
         print()
         # Rewrite the summary after every run, so an interrupted pull still
