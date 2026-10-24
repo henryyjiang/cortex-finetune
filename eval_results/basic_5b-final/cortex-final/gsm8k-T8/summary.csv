@@ -1,0 +1,2 @@
+correct,total,accuracy,nll_per_token,n_shot,median_prompt_tokens
+9,500,0.0180,,8,685

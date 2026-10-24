@@ -1,0 +1,29 @@
+{
+  "final_checkpoint": {
+    "\u22645sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226410sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226420sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226450sess": {
+      "correct": 21,
+      "total": 272,
+      "accuracy": 0.07720588235294118
+    },
+    ">50sess": {
+      "correct": 19,
+      "total": 228,
+      "accuracy": 0.08333333333333333
+    }
+  }
+}
