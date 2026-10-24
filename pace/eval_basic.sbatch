@@ -102,6 +102,60 @@ else
         --dirs "$MODEL_DIR"
 fi
 
+# --- OVERLAY: the trained weights, loaded ON TOP of the HF dir --------------
+# evals/model_utils.py calls reset_cortex_graft_init immediately after
+# from_pretrained, by design: HF's post_init re-initialises every cortex tensor
+# with a depth-scaled scheme that hands the graft non-finite weights.  That
+# reset is only safe because the overlay RESTORES every key the checkpoint
+# carries straight afterwards -- "for a fully-trained checkpoint this is a
+# no-op by construction", in the loader's own words.
+#
+# THIS SCRIPT NEVER PASSED ONE.  On 2026-10-23 (jobs 14306816 / 14306838) the
+# reset was therefore the LAST thing to touch cortex-final's memory: prefix
+# gates back to gate_init=zero, latent_reader back to kaiming, summary_emb
+# re-seeded from wte[eos].  BABILong came back 0/250 in all 18 cells with
+# degenerate text.  The single-forward tasks (MC, GSM8K) were NOT affected --
+# buffers.py:191 returns (None, None) on chunk 1, so with no carry to read the
+# clobbered weights never reach the logits -- which is exactly why a whole
+# round went by before anything looked wrong.
+#
+# Point OVERLAY at the train.py checkpoint whose weights you mean to score:
+#   OVERLAY=cortex-5b/cortex-final/checkpoint_38146/chkpt.pt
+# A correct overlay prints:  [load] overlaid <path>: 0 missing / 0 unexpected
+OVERLAY=${OVERLAY:-}
+ALLOW_NO_OVERLAY=${ALLOW_NO_OVERLAY:-false}
+OVERLAY_ARGS=()
+if [ -n "$OVERLAY" ]; then
+    [ -f "$OVERLAY" ] || { echo "No such overlay checkpoint: $OVERLAY"; exit 1; }
+    OVERLAY_ARGS=(--checkpoint "$OVERLAY")
+fi
+# A memory checkpoint with no overlay is the bug above.  Refuse before the GPU
+# hours are spent.  BASE=true is exempt: a base dir carries no trained cortex,
+# so there the reset is correct behaviour and costs nothing.
+# FAILS CLOSED.  Only a definite "0" (config has no use_memory) is allowed
+# through: a probe that cannot run -- no python on PATH yet, unreadable
+# config.json -- yields "?" and refuses, because a guard that silently no-ops
+# is worse than no guard.  (This project has already paid for one `2>/dev/null`
+# that turned a failed scan into a fake pass.)
+if [ -z "$OVERLAY" ] && [ "$ALLOW_NO_OVERLAY" != "true" ] && [ "$BASE" != "true" ]; then
+    USES_MEM=$(python -c 'import json,sys; print(1 if json.load(open(sys.argv[1]+"/config.json")).get("use_memory") else 0)' "$MODEL_DIR" 2>/dev/null || echo "?")
+    if [ "$USES_MEM" = "?" ]; then
+        echo "REFUSING: could not read use_memory from $MODEL_DIR/config.json."
+        echo "  The overlay guard cannot verify this checkpoint, so it will not"
+        echo "  guess.  Fix the probe, or set ALLOW_NO_OVERLAY=true knowingly."
+        exit 1
+    fi
+    if [ "$USES_MEM" != "0" ]; then
+        echo "REFUSING: $MODEL_DIR has use_memory=true but OVERLAY is unset."
+        echo "  reset_cortex_graft_init would wipe the trained cortex weights"
+        echo "  and nothing would restore them -- chunk-carrying evals"
+        echo "  (BABILong, LongMemEval) would score a designed-init memory."
+        echo "  Set OVERLAY=<out_root>/<run>/checkpoint_<step>/chkpt.pt, or"
+        echo "  ALLOW_NO_OVERLAY=true to score the untrained memory on purpose."
+        exit 1
+    fi
+fi
+
 OUT="eval_results/basic_${EVAL_TAG}/${LABEL}"
 mkdir -p "$OUT"
 echo "=== basic eval: $LABEL  ($MODEL_DIR) -> $OUT ==="
@@ -133,6 +187,7 @@ fi
 if [ "$SKIP_MC" != "true" ]; then
     python evals/eval_multiple_choice.py \
         --model_name "$MODEL_DIR" \
+        "${OVERLAY_ARGS[@]}" \
         --tasks hellaswag winogrande arc_easy arc_challenge piqa \
         "${T_ARGS[@]}" \
         --out_dir "$MC_OUT"
@@ -160,6 +215,7 @@ for NS in $N_SHOT; do
     echo "--- gsm8k: n_shot=$NS score_only=$SCORE_ONLY -> $G_OUT ---"
     python evals/eval_gsm8k.py \
         --model_name "$MODEL_DIR" \
+        "${OVERLAY_ARGS[@]}" \
         --max_examples $GSM8K_MAX \
         "${T_ARGS[@]}" "${G_ARGS[@]}" \
         --out_dir "$G_OUT"
