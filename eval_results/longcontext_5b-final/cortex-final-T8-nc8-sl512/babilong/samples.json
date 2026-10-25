@@ -4,210 +4,210 @@
       "bucket": "1k",
       "question": "Where is John? ",
       "gold": "hallway",
-      "pred": " 1, in the , but, and) of",
+      "pred": " office\n\n",
       "correct": false
     },
     {
       "bucket": "1k",
       "question": "Where is Mary? ",
       "gold": "bathroom",
-      "pred": " 1, and the nation was, in the nation,",
+      "pred": " bathroom\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Sandra? ",
+      "gold": "kitchen",
+      "pred": " garden\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where is Sandra? ",
+      "gold": "hallway",
+      "pred": " garden\n",
       "correct": false
     },
     {
       "bucket": "1k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " 1. 1, in this time, and the",
-      "correct": false
-    },
-    {
-      "bucket": "1k",
-      "question": "Where is Sandra? ",
-      "gold": "hallway",
-      "pred": " 1, and the nation was, in the nation,",
-      "correct": false
-    },
-    {
-      "bucket": "1k",
-      "question": "Where is Sandra? ",
-      "gold": "kitchen",
-      "pred": " 1, and the nation was in this time, and",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where is John? ",
       "gold": "hallway",
-      "pred": " 1. 2, and the family, and her",
-      "correct": false
+      "pred": " hallway\n",
+      "correct": true
     },
     {
       "bucket": "2k",
       "question": "Where is Mary? ",
       "gold": "bathroom",
-      "pred": " 1.  in the family, and the family,",
-      "correct": false
+      "pred": " bathroom\n",
+      "correct": true
     },
     {
       "bucket": "2k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " 1.  in the family, and the family,",
+      "pred": " garden\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where is Sandra? ",
       "gold": "hallway",
-      "pred": "  in 3-ward-ism, and her/",
+      "pred": " garden\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": "  in the family, and the family were here, and",
+      "pred": " garden\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where is John? ",
       "gold": "hallway",
-      "pred": "  of the world\" of the house, and the arch",
-      "correct": false
+      "pred": " hallway\n\n",
+      "correct": true
     },
     {
       "bucket": "4k",
       "question": "Where is Mary? ",
       "gold": "bathroom",
-      "pred": "  1 1  of the world\" of the",
-      "correct": false
+      "pred": " bathroom\n",
+      "correct": true
     },
     {
       "bucket": "4k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " 1. 1 to go to the world in the",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where is Sandra? ",
       "gold": "hallway",
-      "pred": " 1. 1-2, in the nation,",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " \"in order of the family, but we have, but",
-      "correct": false
+      "pred": " in the kitchen\n\n",
+      "correct": true
     },
     {
       "bucket": "8k",
       "question": "Where is John? ",
       "gold": "hallway",
-      "pred": " she is, but, but, is, and the virtue",
-      "correct": false
+      "pred": " hallway\n\n",
+      "correct": true
     },
     {
       "bucket": "8k",
       "question": "Where is Mary? ",
       "gold": "bathroom",
-      "pred": " she is, and has, and the 1s to",
-      "correct": false
+      "pred": " bathroom\n",
+      "correct": true
     },
     {
       "bucket": "8k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " her children, and has, and the 1, and",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where is Sandra? ",
       "gold": "hallway",
-      "pred": " her children, and has, and the nation, and the",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " her children (seeed, but, and the nation,",
+      "pred": " garden\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where is John? ",
       "gold": "hallway",
-      "pred": " (read, but a  The  (ed: ",
+      "pred": " office\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where is Mary? ",
       "gold": "bathroom",
-      "pred": "  (or, in, in fact, in, but",
-      "correct": false
+      "pred": " bathroom\n",
+      "correct": true
     },
     {
       "bucket": "16k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " (read, in  Her Grace, in  (read",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where is Sandra? ",
       "gold": "hallway",
-      "pred": "  (or, in, in-fisted, but,",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": "  30, but a particular, in fact, in",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where is John? ",
       "gold": "hallway",
-      "pred": " she was going to the first, and she is a.",
+      "pred": " John\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where is Mary? ",
       "gold": "bathroom",
-      "pred": " she was going to the only, and she is a.",
+      "pred": " Mary\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " 1. only as, and only, and she is",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where is Sandra? ",
       "gold": "hallway",
-      "pred": " the other, or, and other, i.e. (",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where is Sandra? ",
       "gold": "kitchen",
-      "pred": " other - but the other side of the other, or,",
+      "pred": " garden\n\n",
       "correct": false
     }
   ],
@@ -216,210 +216,210 @@
       "bucket": "1k",
       "question": "Where is the milk? ",
       "gold": "hallway",
-      "pred": " 1. 4, in this side, and the",
+      "pred": " in the cellar.\n\n",
       "correct": false
     },
     {
       "bucket": "1k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " 1, in the nation, in the) of the",
+      "pred": " Mary got the football. Mary travelled to the kitchen.\n",
       "correct": false
     },
     {
       "bucket": "1k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " 1, in the 4, in the 4",
+      "pred": " kitchen\n",
       "correct": false
     },
     {
       "bucket": "1k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " 1, in the 2, in the first,",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "1k",
       "question": "Where is the milk? ",
       "gold": "garden",
-      "pred": " 1, in the nation was exercised in this was,",
+      "pred": " kitchen\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where is the milk? ",
       "gold": "hallway",
-      "pred": "  in the family, and the house might be, and",
+      "pred": " in the house.\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": "  values, and the world with the family and the house",
+      "pred": " in the kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " 1.  in the family, and the family,",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": "  inmost of the family, and the family, and",
+      "pred": " kitchen\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where is the milk? ",
       "gold": "garden",
-      "pred": " 1. 2, and the family, and the",
+      "pred": " in the cow's udder\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where is the milk? ",
       "gold": "hallway",
-      "pred": "  of the world\" 1) the first, in",
+      "pred": " milk\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " \"yes, in the house, in the house, in",
+      "pred": " kitchen\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " 1, but it may, and the nation, but",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " \u201cin order to the family, but in the family and",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where is the milk? ",
       "gold": "garden",
-      "pred": " \u201cI 1, in the 10, in the",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where is the milk? ",
       "gold": "hallway",
-      "pred": " her children, and has, and the 1s and",
+      "pred": " milk\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " she is, and the 1, and the 1",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " she is, and the 1, and the  ",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": " she is, and has, and the 1s,",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where is the milk? ",
       "gold": "garden",
-      "pred": " her children, and has, and the 1, and",
+      "pred": " in the cow's stomach\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where is the milk? ",
       "gold": "hallway",
-      "pred": "  (readers, and all, in-fisted children",
+      "pred": " milk\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": "  (readers, but only, in-fisted,",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": "  (or, in  - read, in-fisted",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where is the football? ",
       "gold": "hallway",
-      "pred": "  (readers, but, in fact, but (",
+      "pred": " kitchen\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
-      "question": "Where is the milk? ",
-      "gold": "garden",
-      "pred": " (read, but a, or, in fact, in",
-      "correct": false
-    },
-    {
-      "bucket": "32k",
-      "question": "Where is the milk? ",
-      "gold": "hallway",
-      "pred": " The other, but only, but only, as, as",
-      "correct": false
-    },
-    {
-      "bucket": "32k",
-      "question": "Where is the football? ",
-      "gold": "hallway",
-      "pred": " the time of the time, to) day\u2019s day\u2019s",
-      "correct": false
-    },
-    {
-      "bucket": "32k",
-      "question": "Where is the football? ",
-      "gold": "hallway",
-      "pred": " she was a long time ago. She was a long time",
-      "correct": false
-    },
-    {
-      "bucket": "32k",
-      "question": "Where is the football? ",
-      "gold": "hallway",
-      "pred": " the only man, and that for a long time ago,",
-      "correct": false
-    },
-    {
-      "bucket": "32k",
       "question": "Where is the milk? ",
       "gold": "garden",
-      "pred": " not only the - but the only, but the only child",
+      "pred": " milk\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the milk? ",
+      "gold": "hallway",
+      "pred": " milk\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the football? ",
+      "gold": "hallway",
+      "pred": " kitchen\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the football? ",
+      "gold": "hallway",
+      "pred": " kitchen\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the football? ",
+      "gold": "hallway",
+      "pred": " kitchen\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "32k",
+      "question": "Where is the milk? ",
+      "gold": "garden",
+      "pred": " milk\n\n",
       "correct": false
     }
   ],
@@ -428,210 +428,210 @@
       "bucket": "1k",
       "question": "Where was the apple before the bathroom? ",
       "gold": "office",
-      "pred": " 1, and 4-iron in the 1",
+      "pred": " bathroom\n\n",
       "correct": false
     },
     {
       "bucket": "1k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " \u201cI.  1, and) of the family",
-      "correct": false
+      "pred": " office\n",
+      "correct": true
     },
     {
       "bucket": "1k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " 1. 1, and) have I. ",
-      "correct": false
-    },
-    {
-      "bucket": "1k",
-      "question": "Where was the football before the garden? ",
-      "gold": "bathroom",
-      "pred": " 1, and all that , and) of the",
+      "pred": " bedroom\n\n",
       "correct": false
     },
     {
       "bucket": "1k",
       "question": "Where was the football before the garden? ",
       "gold": "bathroom",
-      "pred": " 1, and 4-3, and, and",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "1k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where was the apple before the bathroom? ",
       "gold": "office",
-      "pred": "  in the family, and the house of the, and",
+      "pred": " bathroom\n\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": "  in the family, and the house of the family,",
-      "correct": false
+      "pred": " office\n",
+      "correct": true
     },
     {
       "bucket": "2k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " , and the world,-1.  values,",
-      "correct": false
-    },
-    {
-      "bucket": "2k",
-      "question": "Where was the football before the garden? ",
-      "gold": "bathroom",
-      "pred": " \u201cin this time, 1-1.  values",
+      "pred": " bedroom\n",
       "correct": false
     },
     {
       "bucket": "2k",
       "question": "Where was the football before the garden? ",
       "gold": "bathroom",
-      "pred": " \u201cinianusism out with the , and the",
+      "pred": " garden\n\n",
+      "correct": false
+    },
+    {
+      "bucket": "2k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where was the apple before the bathroom? ",
       "gold": "office",
-      "pred": " 1, and the world, nelson-land,",
+      "pred": " bathroom\n\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": "  values and the nudge-r roll of the first prize",
-      "correct": false
+      "pred": " office\n\n",
+      "correct": true
     },
     {
       "bucket": "4k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": "  1, to the arts and the world's self",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "4k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "4k",
       "question": "Where was the football before the garden? ",
       "gold": "bathroom",
-      "pred": " 3Him, in the house, and the house",
-      "correct": false
-    },
-    {
-      "bucket": "4k",
-      "question": "Where was the football before the garden? ",
-      "gold": "bathroom",
-      "pred": " 1.  of the world's past and the world",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where was the apple before the bathroom? ",
       "gold": "office",
-      "pred": " she is, and has, and the nation, and the",
+      "pred": " bathroom\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " she has, but she, but, but, but,",
-      "correct": false
+      "pred": " office\n",
+      "correct": true
     },
     {
       "bucket": "8k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " she is, and has, and the 1, and",
+      "pred": " office\n\n",
+      "correct": true
+    },
+    {
+      "bucket": "8k",
+      "question": "Where was the football before the garden? ",
+      "gold": "bathroom",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "8k",
       "question": "Where was the football before the garden? ",
       "gold": "bathroom",
-      "pred": " she is, and has, and the virtues and the nation",
-      "correct": false
-    },
-    {
-      "bucket": "8k",
-      "question": "Where was the football before the garden? ",
-      "gold": "bathroom",
-      "pred": " she is, and has, and the 1s and",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where was the apple before the bathroom? ",
       "gold": "office",
-      "pred": " (read, but (readers, in-fisted,",
+      "pred": " bathroom\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " 13, but she (or, in fact, read",
-      "correct": false
+      "pred": " office\n\n",
+      "correct": true
     },
     {
       "bucket": "16k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " (read, in fact, or, in fact, and",
+      "pred": " John took the football to the hallway. John took the football",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where was the football before the garden? ",
       "gold": "bathroom",
-      "pred": " (read, in  (or, in-fisted her",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "16k",
       "question": "Where was the football before the garden? ",
       "gold": "bathroom",
-      "pred": "  (readers, but only, in fact, but",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where was the apple before the bathroom? ",
       "gold": "office",
-      "pred": " 1. The only man, and she was going to",
+      "pred": " bathroom\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " 1. She was a, and she was called,",
+      "pred": " hallway\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where was the apple before the hallway? ",
       "gold": "office",
-      "pred": " 1, who was only, and only, or,",
+      "pred": " the hall\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where was the football before the garden? ",
       "gold": "bathroom",
-      "pred": " 1. She was a, and only a, but",
+      "pred": " garden\n\n",
       "correct": false
     },
     {
       "bucket": "32k",
       "question": "Where was the football before the garden? ",
       "gold": "bathroom",
-      "pred": " The first, and she was called, and she was called",
+      "pred": " garden\n\n",
       "correct": false
     }
   ]

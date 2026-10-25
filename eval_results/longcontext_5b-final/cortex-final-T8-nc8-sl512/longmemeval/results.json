@@ -1,5 +1,5 @@
 {
-  "final_checkpoint": {
+  "cortex-final": {
     "\u22645sess": {
       "correct": 0,
       "total": 0,
@@ -16,9 +16,9 @@
       "accuracy": 0.0
     },
     "\u226450sess": {
-      "correct": 2,
+      "correct": 1,
       "total": 272,
-      "accuracy": 0.007352941176470588
+      "accuracy": 0.003676470588235294
     },
     ">50sess": {
       "correct": 1,

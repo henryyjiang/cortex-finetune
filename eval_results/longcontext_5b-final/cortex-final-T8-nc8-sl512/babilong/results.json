@@ -1,99 +1,99 @@
 {
-  "final_checkpoint": {
+  "cortex-final": {
     "qa1": {
       "1k": {
-        "correct": 0,
+        "correct": 46,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.184
       },
       "2k": {
-        "correct": 0,
+        "correct": 45,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.18
       },
       "4k": {
-        "correct": 0,
+        "correct": 44,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.176
       },
       "8k": {
-        "correct": 0,
+        "correct": 47,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.188
       },
       "16k": {
-        "correct": 0,
+        "correct": 49,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.196
       },
       "32k": {
-        "correct": 0,
+        "correct": 16,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.064
       }
     },
     "qa2": {
       "1k": {
-        "correct": 0,
+        "correct": 55,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.22
       },
       "2k": {
-        "correct": 0,
+        "correct": 47,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.188
       },
       "4k": {
-        "correct": 0,
+        "correct": 52,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.208
       },
       "8k": {
-        "correct": 0,
+        "correct": 45,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.18
       },
       "16k": {
-        "correct": 0,
+        "correct": 43,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.172
       },
       "32k": {
-        "correct": 0,
+        "correct": 45,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.18
       }
     },
     "qa3": {
       "1k": {
-        "correct": 0,
+        "correct": 20,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.08
       },
       "2k": {
-        "correct": 0,
+        "correct": 24,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.096
       },
       "4k": {
-        "correct": 0,
+        "correct": 24,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.096
       },
       "8k": {
-        "correct": 0,
+        "correct": 22,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.088
       },
       "16k": {
-        "correct": 0,
+        "correct": 16,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.064
       },
       "32k": {
-        "correct": 0,
+        "correct": 2,
         "total": 250,
-        "accuracy": 0.0
+        "accuracy": 0.008
       }
     }
   }

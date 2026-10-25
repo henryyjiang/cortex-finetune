@@ -1,6 +1,6 @@
 model,bucket,correct,total,accuracy
-final_checkpoint,≤5sess,0,0,0.0000
-final_checkpoint,≤10sess,0,0,0.0000
-final_checkpoint,≤20sess,0,0,0.0000
-final_checkpoint,≤50sess,2,272,0.0074
-final_checkpoint,>50sess,1,228,0.0044
+cortex-final,≤5sess,0,0,0.0000
+cortex-final,≤10sess,0,0,0.0000
+cortex-final,≤20sess,0,0,0.0000
+cortex-final,≤50sess,1,272,0.0037
+cortex-final,>50sess,1,228,0.0044
