@@ -48,11 +48,13 @@
 #                          carry's effect actually enters
 #                        C write-side attention of the summary slots
 #                        D logit lens on E/Z rows vs source / next / donor chunk
+#                        E effective rank + centred cosine of the E and Z ring
 #
 # COST (H200 fp32; local 5070 Ti smoke / 2.5, plus ~10 min per load):
 #   dissection  800 items (qa1/qa2 x 1k/2k/4k/8k x 100): cortex ~1.1 h,
 #               control ~25 min
-#   interp      see the submit notes / diag_memory_interp.py's header
+#   interp      24 rows, part B (182 blocked forwards a row) ~95% of it:
+#               ~10 min compute + ~10 min load per checkpoint
 # 12 h wall.
 # ============================================================================
 
@@ -90,10 +92,10 @@ if [[ ",$PARTS," == *",dissect,"* ]]; then
 fi
 
 if [ "$ARM" = "cortex" ] && [[ ",$PARTS," == *",interp,"* ]]; then
-    step "memory interp (A-D)"
+    step "memory interp (A-E)"
     python evals/diag_memory_interp.py --model_name "$MODEL" --checkpoint "$CKPT" \
         $SETS --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_rows 24 \
-        --parts A,B,C,D --dtype float32 --out_dir "$RES/interp" || RC_ALL=$?
+        --parts A,B,C,D,E --dtype float32 --seed 1234 --boot 2000 --out_dir "$RES/interp" || RC_ALL=$?
 fi
 
 echo ""

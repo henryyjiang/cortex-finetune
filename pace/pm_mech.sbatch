@@ -75,19 +75,25 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 git rev-parse --short HEAD 2>/dev/null | sed 's/^/    commit: /'
 RC_ALL=0
 step() { echo ""; echo "--- [$ARM@$STEP] $1  ($(date +%H:%M:%S))"; }
+# ONLY=<comma list> reruns a subset: chunk1, horizon, econtent, ceiling, mc.
+#   e.g. sbatch --array=0-1 --export=ALL,ONLY=horizon pace/pm_mech.sbatch
+ONLY=${ONLY:-all}
+want() { [[ ",$ONLY," == *",all,"* || ",$ONLY," == *",$1,"* ]]; }
 
 # ---- chunk-1 tax + drift ---------------------------------------------------
-step "chunk1 + drift"
 PARTS=chunk1,drift
 [ "$ARM" = "control" ] && PARTS=chunk1
-python evals/diag_chunk1_drift.py --model_name "$MODEL" --checkpoint "$CKPT" \
-    $SETS --data "$PG19_VAL" --T "$T" --parts "$PARTS" \
-    --max_rows 200 --bank_rows 64 --drift_chunks 202 --drift_streams 6 \
-    --dtype float32 --out_dir "$RES/chunk1_drift" || RC_ALL=$?
+if want chunk1; then
+    step "chunk1 + drift"
+    python evals/diag_chunk1_drift.py --model_name "$MODEL" --checkpoint "$CKPT" \
+        $SETS --data "$PG19_VAL" --T "$T" --parts "$PARTS" \
+        --max_rows 200 --bank_rows 64 --drift_chunks 202 --drift_streams 6 \
+        --dtype float32 --out_dir "$RES/chunk1_drift" || RC_ALL=$?
+fi
 
 if [ "$ARM" = "cortex" ]; then
     # ---- influence horizon, per channel ------------------------------------
-    for CH in e z both; do
+    want horizon && for CH in e z both; do
         step "influence horizon, channel $CH"
         python evals/eval_influence_horizon.py --model_name "$MODEL" \
             --checkpoint "$CKPT" $SETS --data "$PG19_VAL" --n_chunks 8 \
@@ -96,15 +102,17 @@ if [ "$ARM" = "cortex" ]; then
             --out_dir "$RES/horizon_$CH" || RC_ALL=$?
     done
     # ---- E's content effect, in distribution --------------------------------
-    step "2x2 E-donor (E_content)"
-    python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" \
-        $SETS --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 \
-        --boot 2000 --dtype float32 --e_null donor --cells E1Z1,E0Z1 \
-        --out_dir "$RES/e_content" || RC_ALL=$?
+    if want econtent; then
+        step "2x2 E-donor (E_content)"
+        python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" \
+            $SETS --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 \
+            --boot 2000 --dtype float32 --e_null donor --cells E1Z1,E0Z1 \
+            --out_dir "$RES/e_content" || RC_ALL=$?
+    fi
 fi
 
 # ---- the oracle ceiling (38146 only: the HF dir carries the 38146 config) ---
-if [ "$STEP" = "38146" ]; then
+if [ "$STEP" = "38146" ] && want ceiling; then
     step "context ceiling"
     python evals/eval_context_ceiling.py \
         --model_name "cortex-5b/$RUN/final_checkpoint" --checkpoint "$CKPT" \
@@ -122,7 +130,9 @@ mc() {   # $1 = label, $2.. = extra args
         --checkpoint "$CKPT" $SETS --tasks $MC_TASKS --T "$T" \
         --out_dir "$RES/mc_$label" "$@" || RC_ALL=$?
 }
-if [ "$ARM" = "cortex" ] && [ "$STEP" = "38146" ]; then
+if ! want mc; then
+    :
+elif [ "$ARM" = "cortex" ] && [ "$STEP" = "38146" ]; then
     mc none
     for C in mean64 generic64; do
         if [ -f "$RES/chunk1_drift/$C.pt" ]; then

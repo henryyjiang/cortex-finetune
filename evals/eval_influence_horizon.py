@@ -94,6 +94,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from model_utils import (  # noqa: E402
     load_checkpoint, parse_config_overrides, to_num_steps, _unwrap,
 )
+# Called in main() since 8ed6281 but never imported, so every run died with
+# NameError before scoring a sample.
+from cortex_memory.health import refuse_if_scrambled  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
