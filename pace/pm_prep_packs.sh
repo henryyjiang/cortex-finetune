@@ -32,7 +32,14 @@ MIX=data/pg19_fw50_olmo_len4096
 VAL=data/pg19_olmo_validation_len4096_strided
 TRAIN_OUT=data/pg19fw50_recall_train_len4096
 VAL_OUT=data/pg19_val_recall_len4096
-COMMON="--frac 1.0 --n_facts 2 --n_chunks 8 --fact_chunks 0,1,2,3,4,5 --seed 74"
+COMMON="--frac 1.0 --n_facts 2 --n_chunks 8 --fact_chunks 0,1,2,3,4,5"
+# DIFFERENT SEEDS, on purpose.  prepare_recall_mix seeds each row's facts from
+# (seed, row index) alone, so one seed for both packs makes val row i ask
+# EXACTLY train row i's question with the same answer -- a probe the recall
+# limb may have seen once in training.  Caught 2026-10-28 on the first build
+# (both packs' sample tail: "lonely basket" -> "rush").
+TRAIN_SEED=74
+VAL_SEED=75
 
 for d in "$MIX" "$VAL" "$TOK"; do
     [ -e "$d" ] || { echo "ERROR: missing $d"; exit 1; }
@@ -53,13 +60,13 @@ if [ -d "$TRAIN_OUT" ]; then
     echo "exists, skipping: $TRAIN_OUT"
 else
     python tools/prepare_recall_mix.py --data "$MIX" --tokenizer "$TOK" \
-        --out "$TRAIN_OUT" --max_rows 16000 --num_proc 8 $COMMON
+        --out "$TRAIN_OUT" --max_rows 16000 --num_proc 8 $COMMON --seed $TRAIN_SEED
 fi
 if [ -d "$VAL_OUT" ]; then
     echo "exists, skipping: $VAL_OUT"
 else
     python tools/prepare_recall_mix.py --data "$VAL" --tokenizer "$TOK" \
-        --out "$VAL_OUT" --max_rows 400 $COMMON
+        --out "$VAL_OUT" --max_rows 400 $COMMON --seed $VAL_SEED
 fi
 
 python tools/check_pack.py --data "$TRAIN_OUT" --steps 2000 --batch_size 4
