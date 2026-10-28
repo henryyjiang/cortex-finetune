@@ -61,6 +61,15 @@ def parse_args() -> argparse.Namespace:
                         "these the graft builds with no buffer.  Mirror the "
                         "arm's PROBE_SETS in pace/p1_arms.sbatch.  RED 12.")
     p.add_argument("--dtype",        default="bfloat16", choices=["float32", "bfloat16"])
+    p.add_argument("--prefix_carry", default=None,
+                   help="a saved carry tensor [1, rows, 2D] (evals/"
+                        "diag_chunk1_drift.py writes mean64.pt / generic64.pt) "
+                        "fed as m_cross_in to EVERY scoring forward.  MC is a "
+                        "single forward, i.e. chunk 1, which under gate_fill="
+                        "grow carries no columns at all; this asks whether the "
+                        "MC gap to the control is a missing-register effect "
+                        "that a fixed default carry closes.  Refused on a model "
+                        "with no prefix buffer.")
     return p.parse_args()
 
 
@@ -76,6 +85,7 @@ def log_prob_of_completion(
     T: Optional[int],
     seq_len: int,
     device: torch.device,
+    prefix_carry: Optional[torch.Tensor] = None,
 ) -> float:
     """Mean per-token log-prob of completion_ids given context_ids."""
     all_ids      = (context_ids + completion_ids)[-seq_len:]
@@ -83,7 +93,16 @@ def log_prob_of_completion(
     input_ids    = torch.tensor(all_ids, dtype=torch.long).unsqueeze(0).to(device)
 
     num_steps = to_num_steps(T)
-    logits    = model(input_ids=input_ids, num_steps=num_steps)["logits"][0]  # [S, V]
+    if prefix_carry is None:
+        logits = model(input_ids=input_ids, num_steps=num_steps)["logits"][0]  # [S, V]
+    else:
+        logits = model(input_ids=input_ids, num_steps=num_steps,
+                       m_cross_in=prefix_carry)["logits"][0]
+        if logits.shape[0] != input_ids.shape[1]:
+            raise RuntimeError(f"logits cover {logits.shape[0]} positions for "
+                               f"{input_ids.shape[1]} tokens: the carried columns "
+                               f"were not stripped, so the gather below would "
+                               f"score the wrong positions")
 
     log_probs      = F.log_softmax(logits[:-1], dim=-1)          # [S-1, V]
     target         = input_ids[0, 1:]                             # [S-1]
@@ -167,7 +186,8 @@ LOADERS = {
 # Task evaluation
 # ---------------------------------------------------------------------------
 
-def run_task(task_name, examples, model, tokenizer, T, seq_len, device):
+def run_task(task_name, examples, model, tokenizer, T, seq_len, device,
+             prefix_carry=None):
     correct = 0
     records = []
     for i, (context, choices, label) in enumerate(examples):
@@ -186,7 +206,8 @@ def run_task(task_name, examples, model, tokenizer, T, seq_len, device):
             # paired, and makes the run reproducible across jobs -- which the
             # P0.5 replicate showed it was not.
             seed_example(f"{task_name}:{i}")
-            scores.append(log_prob_of_completion(model, ctx_ids, comp_ids, T, seq_len, device))
+            scores.append(log_prob_of_completion(model, ctx_ids, comp_ids, T,
+                                                 seq_len, device, prefix_carry))
         pred       = max(range(len(scores)), key=lambda j: scores[j])
         is_correct = pred == label
         correct   += int(is_correct)
@@ -221,6 +242,16 @@ def main() -> None:
 
     T = args.T
     print(f"T={T if T is not None else cfg.mean_recurrence}  tasks={args.tasks}")
+    prefix_carry = None
+    if args.prefix_carry:
+        from model_utils import _unwrap
+        cx = getattr(_unwrap(model), "cortex", None)
+        if cx is None or getattr(cx, "prefix", None) is None:
+            raise SystemExit("--prefix_carry on a model with no prefix buffer: "
+                             "there is no read site to feed it to.")
+        prefix_carry = torch.load(args.prefix_carry, map_location=device).to(dtype)
+        print(f"prefix_carry {args.prefix_carry}: shape {tuple(prefix_carry.shape)}, "
+              f"E row norm {prefix_carry[..., :prefix_carry.shape[-1] // 2].float().norm(dim=-1).mean():.2f}")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -231,7 +262,7 @@ def main() -> None:
         print(f"\n{'='*55}\nTask: {task}\n{'='*55}")
         examples = LOADERS[task](args.max_examples)
         result, records = run_task(task, examples, model, tokenizer, T,
-                                   args.seq_len, device)
+                                   args.seq_len, device, prefix_carry)
         all_results[task] = result
         all_records[task] = records
         print(f"  {task}: {result['correct']}/{result['total']} = {result['accuracy']:.4f}")

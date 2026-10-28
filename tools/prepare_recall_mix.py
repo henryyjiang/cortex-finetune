@@ -64,8 +64,8 @@ VALUES = [
     "wharf", "yew", "zephyr", "brook", "cliff", "drift", "elm", "flint",
 ]
 
-FACT_TMPL  = '\nRemember this: the code word for the {key} is "{value}".\n'
-PROBE_TMPL = '\nQuestion: What is the code word for the {key}?\nAnswer: "{value}"'
+FACT_TMPL  = '\nRemember this: the code word for {key} is "{value}".\n'
+PROBE_TMPL = '\nQuestion: What is the code word for {key}?\nAnswer: "{value}"'
 
 
 def splice_facts_probe(ids, placements, probe_ids):
@@ -109,6 +109,11 @@ def main() -> int:
                          "inserted at lower positions — ~20 tokens per fact)")
     ap.add_argument("--seed",      type=int, default=74)
     ap.add_argument("--num_proc",  type=int, default=1)
+    ap.add_argument("--max_rows",  type=int, default=0,
+                    help="keep only the first N rows of --data (0 = all).  A "
+                         "2,000-update limb at batch 4 reads 8,000 rows, and "
+                         "mapping the whole 940k-row mix pack for that costs "
+                         "an hour of login node for nothing")
     args = ap.parse_args()
 
     from datasets import load_from_disk
@@ -116,6 +121,8 @@ def main() -> int:
 
     tok = AutoTokenizer.from_pretrained(args.tokenizer)
     ds = load_from_disk(args.data)
+    if args.max_rows and args.max_rows < len(ds):
+        ds = ds.select(range(args.max_rows))
     row_len = len(ds[0]["input_ids"])          # max_length + 1
     chunk_len = (row_len - 1) // args.n_chunks # matches train.py's torch.chunk
     fact_chunks = [int(c) for c in args.fact_chunks.split(",")]
@@ -124,11 +131,15 @@ def main() -> int:
     print(f"{args.data}: {len(ds)} rows x {row_len}; chunk_len={chunk_len}, "
           f"frac={args.frac}, n_facts={args.n_facts}, fact_chunks={fact_chunks}")
 
+    has_mask = "attention_mask" in ds.column_names
     stats = {"augmented": 0, "plain": 0, "not_full": 0}
 
     def augment(row, idx):
         rng = random.Random(args.seed * 1_000_003 + idx)  # per-row, order-stable
-        ids, mask = row["input_ids"], row["attention_mask"]
+        ids = row["input_ids"]
+        # A wrapped pack (FineWeb-Edu's half of pg19_fw50) may carry no mask
+        # column at all; every one of its rows is full by construction.
+        mask = row.get("attention_mask") or [1] * len(ids)
         if mask[-1] != 1:                       # padded row: splice would mix
             stats["not_full"] += 1              # probe with eos-pad garbage
             return row
@@ -158,7 +169,9 @@ def main() -> int:
             placements.append((rng.randrange(lo, hi), fact_ids))
         new_ids = splice_facts_probe(ids, placements, probe_ids)
         stats["augmented"] += 1
-        return {"input_ids": new_ids, "attention_mask": [1] * row_len}
+        if has_mask:
+            return {"input_ids": new_ids, "attention_mask": [1] * row_len}
+        return {"input_ids": new_ids}
 
     # num_proc=1 by default: the stats dict and rng-by-idx stay exact; the map
     # is tokenizer-bound but cheap (facts/probes are ~20 tokens each).

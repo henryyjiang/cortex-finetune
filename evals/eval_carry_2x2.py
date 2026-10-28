@@ -119,6 +119,19 @@ def parse_args() -> argparse.Namespace:
                         "(row si + n//2): the content control, and how J1's "
                         "donor limb is scored in its own trained condition "
                         "(its in-batch roll cannot run at this tool's batch 1).")
+    p.add_argument("--e_null", default="zero", choices=["zero", "donor"],
+                   help="what an E-off cell feeds.  'zero' (default, every 2x2 "
+                        "on record) blanks E's half of the carry -- which on "
+                        "cortex-final is OUT OF DISTRIBUTION, because it trained "
+                        "with e_dropout 0.0 and never saw E off.  'donor' feeds "
+                        "ANOTHER ROW's carried E at the same chunk index (row "
+                        "si + n//2, the same donor --z_null donor uses): same "
+                        "columns, norms, register and positions, different "
+                        "content.  E0Z1 - E1Z1 is then E's CONTENT effect, "
+                        "measured with E on and in distribution -- the E-side "
+                        "twin of X_content.  Requires --cells E1Z1,E0Z1, so no "
+                        "Z_alone or interaction is computed from donor cells "
+                        "under a label that means 'E off'.")
     p.add_argument("--score", default="all",
                    choices=["all", "answers", "carry", "local"],
                    help="which tokens a cell's NLL averages over.  'all' (the "
@@ -224,9 +237,48 @@ def carried_z(model, cortex, xs, num_steps, device, seed,
     return out_z
 
 
+def carried_e(model, cortex, xs, num_steps, device, seed,
+              hidden_size: int) -> list:
+    """The E rows each chunk of this row READS (entry i = E half of the carry
+    entering chunk i, None for chunk 1), from the row's own E1Z1 chain -- the
+    donor E is what that row carries in normal use, exactly as carried_z."""
+    torch.manual_seed(seed)
+    state, out_e = None, []
+    cortex.latent_read_null = None
+    for xc in xs:
+        out_e.append(None if state is None else state[..., :hidden_size].clone())
+        with torch.no_grad():
+            out = model(input_ids=xc.unsqueeze(0).to(device),
+                        num_steps=num_steps, m_cross_in=state,
+                        return_m_cross=True)
+        state = (out.get("m_cross") if isinstance(out, dict)
+                 else getattr(out, "m_cross", None))
+    return out_e
+
+
+def donor_e_swap(state: torch.Tensor, donor: torch.Tensor,
+                 hidden_size: int) -> torch.Tensor:
+    """Replace the E half of `state` with `donor`'s, leaving Z untouched.
+
+    Shapes must match EXACTLY: under gate_fill=grow the row count is a function
+    of the chunk index alone, so a mismatch means the donor chain and this one
+    are at different chunks, and splicing anyway would be a silent misalignment.
+    """
+    if donor is None:
+        raise ValueError("donor E is None at a chunk that has an incoming carry")
+    if donor.shape[:-1] != state.shape[:-1] or donor.shape[-1] != hidden_size:
+        raise ValueError(f"donor E {tuple(donor.shape)} does not fit the "
+                         f"carry {tuple(state.shape)} (hidden {hidden_size})")
+    d = donor.to(device=state.device, dtype=state.dtype)
+    if state.shape[-1] == hidden_size:
+        return d
+    return torch.cat([d, state[..., hidden_size:]], dim=-1)
+
+
 def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
               e_on: bool, z_on: bool, s0_std: float, hidden_size: int,
-              z_null: str = "noise", donor_z: Optional[list] = None):
+              z_null: str = "noise", donor_z: Optional[list] = None,
+              e_null: str = "zero", donor_e: Optional[list] = None):
     """Mean NLL over chunks 2..N for one cell of the 2x2.
 
     Chunk 1 is excluded from the endpoint (no incoming carry either way, so
@@ -240,7 +292,8 @@ def chain_nll(model, cortex, xs, ys, ms, num_steps, device, seed,
         m_in = state
         if m_in is not None:
             if not e_on:
-                m_in = null_e(m_in, hidden_size)
+                m_in = (donor_e_swap(m_in, donor_e[i], hidden_size)
+                        if e_null == "donor" else null_e(m_in, hidden_size))
             # Z lives in a separate field; when the channel exists the graft
             # takes it from the same slot columns.  Nulling it is a per-chunk
             # substitution, handled by the graft hook rather than here.
@@ -457,6 +510,11 @@ def main() -> int:
 
     cells = CELLS if z_live else (("E1Z1", True, True), ("E0Z1", False, True))
     cells = select_cells(cells, args.cells)
+    if args.e_null == "donor" and sorted(c[0] for c in cells) != ["E0Z1", "E1Z1"]:
+        raise SystemExit("--e_null donor needs --cells E1Z1,E0Z1 exactly: with a "
+                         "donor in the E-off slot, Z_alone and the interaction "
+                         "would be computed from cells whose label says 'E off' "
+                         "while E carries another document.")
     num_steps = to_num_steps(args.T)
 
     from datasets import load_from_disk
@@ -523,12 +581,23 @@ def main() -> int:
             donor_z = carried_z(model, cortex, dxs, num_steps, device,
                                 args.seed + dj, hidden_size)
 
+        donor_e = None
+        if args.e_null == "donor":
+            dj = (si + n // 2) % n
+            dids = torch.tensor(ds[dj]["input_ids"], dtype=torch.long)[:-1]
+            if dj == si or dids.numel() < keep:
+                continue
+            dxs = list(torch.chunk(dids[:keep], args.n_chunks))
+            donor_e = carried_e(model, cortex, dxs, num_steps, device,
+                                args.seed + dj, hidden_size)
+
         firsts, ok = [], True
         for name, e_on, z_on in cells:
             nll, first = chain_nll(model, cortex, xs, ys, ms, num_steps, device,
                                    args.seed + si, e_on, z_on, s0_std,
                                    hidden_size, z_null=args.z_null,
-                                   donor_z=donor_z)
+                                   donor_z=donor_z, e_null=args.e_null,
+                                   donor_e=donor_e)
             if nll is None:
                 ok = False
                 break
@@ -552,6 +621,7 @@ def main() -> int:
         "config": {"n_chunks": args.n_chunks, "T": args.T,
                    "dtype": args.dtype, "samples": n_used,
                    "s0_std": s0_std, "z_null": args.z_null,
+                   "e_null": args.e_null,
                    "score": args.score, "data": args.data,
                    "checkpoint": args.checkpoint,
                    "cells": [c[0] for c in cells]},
@@ -593,6 +663,14 @@ def main() -> int:
         [c["mean_nll"] for c in report["cells"].values()], vocab)
 
     report["effects"] = compute_effects(per_cell, z_live, args.boot, args.seed)
+    if args.e_null == "donor" and "E_main" in report["effects"]:
+        e = report["effects"].pop("E_main")
+        e["note"] = ("NLL with ANOTHER document's E minus with this document's "
+                     "E, Z held on.  Positive = E's CONTENTS help.  E is on in "
+                     "both cells (matched columns, norms, positions), so unlike "
+                     "E_main under --e_null zero this is in distribution on a "
+                     "model trained with e_dropout 0.")
+        report["effects"]["E_content"] = e
 
     print(f"\n{'=' * 78}")
     print(f"2x2 carry ablation -- mean NLL over chunks 2..{args.n_chunks}, "
@@ -601,7 +679,7 @@ def main() -> int:
     print("=" * 78)
     for name, e_on, z_on in cells:
         c = report["cells"][name]
-        print(f"  {name}  E={'on ' if e_on else 'off'}  "
+        print(f"  {name}  E={'on ' if e_on else ('dnr' if args.e_null == 'donor' else 'off')}  "
               f"Z={'on ' if z_on else 'off'}   "
               f"NLL {c['mean_nll']:.5f}" if c["mean_nll"] is not None else
               f"  {name}  (no data)")
