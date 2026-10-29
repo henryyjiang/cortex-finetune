@@ -135,3 +135,22 @@ def test_pm_limbs_saves_a_resumable_checkpoint():
     assert "LIMB_MAX_STEPS=$(( STOP_AT_STEP + 1 ))" in s
     assert "--ignore_past_scheduler true" in s
     assert "--branch_path $BRANCH_PATH" in s
+
+
+def test_lownorm_moves_both_channels_and_is_read_as_itself():
+    """A lownorm limb that lost either flag would train (or be scored as) a
+    half-rescaled carry under the limb's name."""
+    s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
+    assert "LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm)" in s
+    assert '[ "$LIMB" = "lownorm" ] && ZNORM_TARGET=$LOWNORM_TARGET' in s
+    assert "--cortex.e_read_norm_target $LOWNORM_TARGET" in s
+    # the switch must precede the ARM_ARGS line that consumes ZNORM_TARGET
+    assert s.index("ZNORM_TARGET=$LOWNORM_TARGET") < \
+        s.index("--cortex.latent_read_znorm_target $ZNORM_TARGET")
+    r = open(os.path.join(ROOT, "pace/pm_limb_readout.sbatch"), encoding="utf-8").read()
+    assert r.count("lownorm") >= 4
+    assert "--set e_read_norm_target=$LOWNORM_TARGET" in r
+    assert "--set latent_read_znorm_target=$LOWNORM_TARGET" in r
+    # same default target on both sides
+    pat = r"LOWNORM_TARGET=\$\{LOWNORM_TARGET:-([0-9.]+)\}"
+    assert re.findall(pat, s) == re.findall(pat, r) != []

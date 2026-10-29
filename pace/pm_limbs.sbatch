@@ -18,6 +18,7 @@
 #
 #   sbatch --array=0-5 pace/pm_limbs.sbatch
 #     [0] both  [1] eonly  [2] zonly  [3] edrop  [4] recall  [5] recall_ctrl
+#   sbatch --array=6 pace/pm_limbs.sbatch      [6] lownorm (added 2026-10-29)
 #
 # WHY TRAINED LIMBS AND NOT MORE ABLATIONS (2026-10-28)
 # -----------------------------------------------------
@@ -47,6 +48,16 @@
 #               improves, the ring CAN hold it and the data never asked.
 #   recall_ctrl the c-chunked control on the same recall pack.  It cannot see
 #               across chunks, so its probe score is the answer-prior floor.
+#   lownorm     E AND Z spliced at TOKEN scale: --cortex.e_read_norm_target and
+#               latent_read_znorm_target both LOWNORM_TARGET (4.5 = the
+#               frequency-weighted ||wte|| row norm on PG-19 tokens, measured
+#               2026-10-29) instead of E unscaled at ~84 and Z at 78.9.
+#               SandwichBlock reads raw x, so the carry's V is ~18x a token's
+#               and the coda puts 57-72% of real-token attention mass on it
+#               (local probe, 8 PG-19 test books).  The test of "the chunk-1
+#               tax is the weights adapting to a carry 18x too loud": read
+#               chunk 1 and MC against `both`.  A continuation, so a null may
+#               mean "2,000 updates cannot unlearn it", not "scale is not it".
 #
 # eonly IS A MEASUREMENT, NOT A SHIP CANDIDATE.  Z stays in cortex-final
 # (feedback_z_required); this limb exists to price E alone in distribution.
@@ -112,10 +123,10 @@ source pace/final_5b_common.sh
 OUT_DIR=${OUT_DIR:-cortex-pm}         # its own wandb project and scratch dir
 final5b_shared
 
-LIMBS=(both eonly zonly edrop recall recall_ctrl)
+LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm)
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 LIMB=${LIMBS[$IDX]}
-if [ -z "$LIMB" ]; then echo "no limb at index $IDX (use --array=0-5)"; exit 0; fi
+if [ -z "$LIMB" ]; then echo "no limb at index $IDX (use --array=0-6)"; exit 0; fi
 
 PARENT_STEP=${PARENT_STEP:-38146}
 CELL_STEPS=${CELL_STEPS:-2000}
@@ -125,6 +136,9 @@ LIMB_BATCH=${LIMB_BATCH:-4}
 LR_SCALE=${LR_SCALE:-0.1}
 SEED=${LIMB_SEED:-75}
 ZNORM_TARGET=${ZNORM_TARGET:-78.9}
+LOWNORM_TARGET=${LOWNORM_TARGET:-4.5}
+# lownorm moves Z's target too, so ARM_ARGS below carries ONE znorm flag.
+[ "$LIMB" = "lownorm" ] && ZNORM_TARGET=$LOWNORM_TARGET
 RECALL_DATA=${RECALL_DATA:-data/pg19fw50_recall_train_len4096}
 DIAG_INTERVAL=${DIAG_INTERVAL:-25}
 
@@ -189,6 +203,7 @@ else
         eonly) READ="--cortex.e_carry_read true  --cortex.latent_carry_read false --cortex.e_dropout 0.0" ;;
         zonly) READ="--cortex.e_carry_read false --cortex.latent_carry_read true  --cortex.e_dropout 0.0" ;;
         edrop) READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.25" ;;
+        lownorm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.e_read_norm_target $LOWNORM_TARGET" ;;
         *)     READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.0" ;;
     esac
     ARM_ARGS="$ARM_ARGS $READ"
@@ -273,11 +288,22 @@ elif limb == "zonly" and max(abs(v) for v in esn) != 0.0:
     fails.append(f"zonly spliced E rows of norm up to {max(esn):.4g}; expected EXACTLY 0")
 elif limb != "zonly" and min(esn) <= 0.0:
     fails.append(f"{limb} spliced E norm {min(esn):.4g}: E is off on a limb that carries it")
+elif limb == "lownorm" and max(abs(v - target) for v in esn) > 0.02 * target:
+    fails.append(f"lownorm spliced E norm {min(esn):.3g}..{max(esn):.3g}, expected "
+                 f"{target}: e_read_norm_target never reached the graft")
 else:
     notes.append(f"z_e_spliced_norm {esn[0]:.2f}..{esn[-1]:.2f}")
 er = vals("z_embed_ratio")
 if not er:
     fails.append("z_embed_ratio absent")
+elif limb == "lownorm":
+    # E is CARRIED at ~84 but SPLICED at the target, so the ratio to the
+    # carried norm is ~0.05 by design; check Z's spliced norm itself.
+    zn = vals("z_embed_norm")
+    if not zn or max(abs(v - target) for v in zn) > 0.02 * target:
+        fails.append(f"lownorm z_embed_norm {zn[:1]}..{zn[-1:]}, expected {target}")
+    else:
+        notes.append(f"z_embed_norm {zn[0]:.2f}..{zn[-1]:.2f} (target {target})")
 elif limb == "eonly":
     if max(abs(v) for v in er) != 0.0:
         fails.append(f"eonly z_embed_ratio up to {max(er):.4g}; expected EXACTLY 0")
@@ -304,7 +330,7 @@ en = vals("z_e_carried_norm")
 if en:
     m = sum(en) / len(en)
     notes.append(f"z_e_carried_norm mean {m:.2f} vs target {target:.2f}")
-    if not 0.85 * target <= m <= 1.15 * target:
+    if limb != "lownorm" and not 0.85 * target <= m <= 1.15 * target:
         fails.append(f"||E|| {m:.2f} is >15% from ZNORM_TARGET {target:.2f}")
 for k in ("fg_at_bias", "fg_z_at_bias", "e_eff_rank_pr", "z_eff_rank_pr"):
     v = vals(k)

@@ -401,6 +401,10 @@ class CLISettings:
             latent_embed_frozen=False,
             latent_read_znorm="none", latent_read_znorm_target=3.0,
             latent_write_only=False, e_dropout=0.0, e_carry_read=True,
+            # Post-mortem `lownorm` limb: rescale the spliced E rows to this row
+            # norm (0 = off, every arm before it).  A typed float default for
+            # the same jsonargparse reason as e_carry_read above.
+            e_read_norm_target=0.0,
             # Z ATTEMPT 2 (J3), cortex_memory/scratchpad.py.  latent_read
             # 'scratch' + latent_encoding 'scratch' is the in-loop scratchpad;
             #   latent_carry_read          False = J3's no-read limb (carry
@@ -1259,7 +1263,11 @@ def startup(cfg: CLISettings):
                    # not -- the treatment limb and the control, one name.
                    # (latent_encoding is already above, and it is what carries
                    # 'staggered_state'.)
-                   "latent_embed_frozen"):
+                   "latent_embed_frozen",
+                   # Post-mortem `lownorm`.  Same class again: rebuilt without
+                   # it, the limb splices E at ~84 instead of token scale and
+                   # is `both` wearing the limb's name.
+                   "e_read_norm_target"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "

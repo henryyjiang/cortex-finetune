@@ -476,6 +476,13 @@ class CortexMemory(nn.Module):
         #                      what makes this comparable to J4's limbs rather
         #                      than a different architecture.  Zeros, not
         #                      omission: see the Z block's own note below.
+        #   e_read_norm_target rescale every SPLICED E row to this row norm
+        #                      (0 = off: the unscaled splice every arm through
+        #                      cortex-final ran).  OLMo-2's SandwichBlock reads
+        #                      raw x, so E at ~84 enters V ~18x louder than a
+        #                      token (~4.5); the post-mortem `lownorm` limb
+        #                      sets it, with latent_read_znorm_target, to token
+        #                      scale.  Read only: the merge sees the real carry.
         self.latent_encoding = str(
             getattr(config, "latent_encoding", "delta") or "delta")
         _pool = getattr(config, "latent_tok_pool", 4)
@@ -487,6 +494,8 @@ class CortexMemory(nn.Module):
             getattr(config, "latent_read_znorm_target", 3.0) or 3.0)
         self.latent_write_only = bool(getattr(config, "latent_write_only", False))
         self.e_dropout = float(getattr(config, "e_dropout", 0.0) or 0.0)
+        self.e_read_norm_target = float(
+            getattr(config, "e_read_norm_target", 0.0) or 0.0)
         # No `or True`: that would turn an explicit False into True (the trap
         # latent_tok_pool's `or 4` already sprang once, a few lines up).
         _ecr = getattr(config, "e_carry_read", True)
@@ -718,6 +727,13 @@ class CortexMemory(nn.Module):
             raise ValueError(
                 "cortex.e_dropout blanks the carried E rows of the prefix "
                 "splice; without --cortex.prefix_memory there are none.")
+        if self.e_read_norm_target < 0:
+            raise ValueError(f"cortex.e_read_norm_target must be >= 0 (0 = off); "
+                             f"got {self.e_read_norm_target}")
+        if self.e_read_norm_target > 0 and not pmode:
+            raise ValueError(
+                "cortex.e_read_norm_target rescales the carried E rows of the "
+                "prefix splice; without --cortex.prefix_memory there are none.")
         if not self.e_carry_read and not pmode:
             raise ValueError(
                 "cortex.e_carry_read=false zeros the carried E rows of the "
@@ -1131,6 +1147,11 @@ class CortexMemory(nn.Module):
                 # stays the PRE-blank norm on purpose: z_embed_ratio divides by
                 # it, so measuring it after the blank would make J4's only
                 # read-strength number undefined on exactly this arm.
+                # e_read_norm_target is applied HERE, after the blank, so the
+                # spliced norm below proves it landed and exact-zero rows (the
+                # Z-only arm, dropped rows) stay exactly zero.
+                if self.e_read_norm_target > 0:
+                    parts[-1] = rescale_rows(parts[-1], self.e_read_norm_target)
                 self._e_spliced_norm = float(
                     parts[-1].detach().float().flatten(0, -2).norm(dim=-1).mean())
                 # ── J4: THE Z HALF, AS ITS OWN COLUMNS ────────────────────

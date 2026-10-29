@@ -20,6 +20,9 @@
 #     [0] both [1] eonly [2] zonly [3] edrop [4] recall [5] recall_ctrl
 #     [6] cortex-final@38146 recall probe only (the zero point)
 #     [7] c-chunked@38146   recall probe only
+#     [8] lownorm           (sbatch --array=8; needs pm_limbs --array=6)
+#   mc/   both + lownorm: the MC suite, so the benchmark gap is read limb
+#         against limb (`both` absorbs the re-warm, as everywhere else).
 #
 # Run AFTER pm_limbs; each limb task refuses if its checkpoint_40146/chkpt.pt is
 # absent.  Read every limb against `both`, never against 38,146: `both` carries
@@ -51,10 +54,11 @@ cd $SLURM_SUBMIT_DIR
 source pace/pm_common.sh
 pm_env
 
-LIMBS=(both eonly zonly edrop recall recall_ctrl ref_cortex ref_control)
+LIMBS=(both eonly zonly edrop recall recall_ctrl ref_cortex ref_control lownorm)
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 LIMB=${LIMBS[$IDX]}
-[ -n "$LIMB" ] || { echo "no task at index $IDX (use --array=0-7)"; exit 0; }
+[ -n "$LIMB" ] || { echo "no task at index $IDX (use --array=0-8)"; exit 0; }
+LOWNORM_TARGET=${LOWNORM_TARGET:-4.5}
 STOP=${STOP:-40146}
 RECALL_VAL=${RECALL_VAL:-data/pg19_val_recall_len4096}
 RC_ALL=0
@@ -77,6 +81,19 @@ case "$LIMB" in
             case "$LIMB" in
                 eonly) SETS="$SETS --set latent_carry_read=false" ;;
                 zonly) SETS="$SETS --set e_carry_read=false" ;;
+                lownorm)
+                    # Later --set wins, so these replace pm_resolve's 78.9.
+                    SETS="$SETS --set e_read_norm_target=$LOWNORM_TARGET"
+                    SETS="$SETS --set latent_read_znorm_target=$LOWNORM_TARGET"
+                    python - "cortex-pm/pm-lownorm/cortex_diag.jsonl" "$LOWNORM_TARGET" <<'CHECK' || exit 1
+import json, sys
+tg = [json.loads(l).get("z_znorm_target") for l in open(sys.argv[1]) if l.strip()]
+tg = [t for t in tg if t is not None]
+if not tg or abs(tg[-1] - float(sys.argv[2])) > 1e-6:
+    sys.exit(f"ERROR: pm-lownorm trained at znorm_target {tg[-1:]}, rebuilding at {sys.argv[2]}")
+print(f"    lownorm znorm_target {sys.argv[2]} confirmed against its diag")
+CHECK
+                    ;;
             esac
         fi ;;
 esac
@@ -102,7 +119,7 @@ python evals/score_recall_probe.py --model_name "$MODEL" --checkpoint "$CKPT" \
     --out_dir "$RES/recall" || RC_ALL=$?
 
 case "$LIMB" in
-    both|edrop|recall)
+    both|edrop|recall|lownorm)
         step "Z content (E on)"
         python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
             --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 --dtype float32 \
@@ -114,7 +131,7 @@ case "$LIMB" in
             --z_null donor --cells E0Z1,E0Z0 --out_dir "$RES/z_content" || RC_ALL=$? ;;
 esac
 case "$LIMB" in
-    both|eonly|edrop|recall)
+    both|eonly|edrop|recall|lownorm)
         step "E content"
         python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
             --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 --dtype float32 \
@@ -132,6 +149,12 @@ if [ "$LIMB" = "both" ] || [ "$LIMB" = "recall" ]; then
         $SETS --data "$PG19_VAL" --n_chunks 8 --depths 1 2 3 4 5 6 7 \
         --damage donor --damage_channel both --T "$T" --max_examples 100 \
         --dtype float32 --out_dir "$RES/horizon" || RC_ALL=$?
+fi
+if [ "$LIMB" = "both" ] || [ "$LIMB" = "lownorm" ]; then
+    step "MC suite (single forward: the chunk-1 tax on benchmarks)"
+    python evals/eval_multiple_choice.py --model_name "$MODEL" \
+        --checkpoint "$CKPT" $SETS --tasks hellaswag winogrande arc_easy arc_challenge piqa \
+        --T "$T" --out_dir "$RES/mc" || RC_ALL=$?
 fi
 echo ""
 echo "=== pm_read $LIMB finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="

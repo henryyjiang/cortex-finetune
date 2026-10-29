@@ -105,6 +105,9 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 # weights into it, and score a model whose read is a rotation
                 # the arm never trained.  The AC condition is the arm.
                 "latent_embed_frozen",
+                # Post-mortem `lownorm`: without it E is spliced at ~84, not
+                # token scale -- the limb rebuilt as `both`.
+                "e_read_norm_target",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

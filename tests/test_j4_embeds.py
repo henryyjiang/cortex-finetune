@@ -454,6 +454,60 @@ class TestTheZOnlyArm:
         assert abs(row["e_carried_norm"] - E_NORM) < 1.0
 
 
+class TestTheLowNormLimb:
+    """pm `lownorm`: e_read_norm_target rescales the SPLICED E rows (and the
+    launcher drops latent_read_znorm_target to match), so the carry enters at
+    token scale instead of ~18x above it."""
+
+    def test_off_by_default_and_bit_identical(self):
+        st = _carry()
+        torch.manual_seed(0)
+        a = _pack(_cortex(), st)[0]
+        torch.manual_seed(0)
+        b = _pack(_cortex(e_read_norm_target=0.0), st)[0]
+        assert torch.equal(a, b)
+
+    def test_e_rows_enter_at_the_target_and_the_diag_proves_it(self):
+        g = _cortex(e_read_norm_target=4.5, latent_read_znorm_target=4.5)
+        torch.manual_seed(0)
+        p = _pack(g, _carry(unwritten=2))[0]
+        n = _e_block(p).norm(dim=-1)
+        assert torch.allclose(n[:, :-2], torch.full_like(n[:, :-2], 4.5), atol=1e-4)
+        assert float(n[:, -2:].abs().max()) == 0.0, "unwritten rows must stay exactly zero"
+        # Both diags are means over every row, the two zero rows included.
+        assert abs(g._e_carried_norm - E_NORM * (K - 2) / K) < 1.0, \
+            "the carried (pre-rescale) norm is unchanged"
+        assert abs(g._e_spliced_norm - 4.5 * (K - 2) / K) < 1e-3
+
+    def test_the_z_only_arm_stays_zero(self):
+        g = _cortex(e_carry_read=False, e_read_norm_target=4.5)
+        torch.manual_seed(0)
+        p = _pack(g, _carry())[0]
+        assert float(_e_block(p).abs().sum()) == 0.0
+
+    def test_the_buffer_merge_sees_the_real_carry(self):
+        """Read-only: rescaling the splice must not touch the stored state."""
+        st = _carry()
+        before = st.clone()
+        _pack(_cortex(e_read_norm_target=4.5), st)
+        assert torch.equal(st, before)
+
+    def test_it_refuses_a_negative_target_and_a_missing_buffer(self):
+        with pytest.raises(ValueError, match=">= 0"):
+            _cortex(e_read_norm_target=-1.0)
+        with pytest.raises(ValueError, match="there are none"):
+            _cortex(e_read_norm_target=4.5, prefix_memory="", latent_carry=False,
+                    latent_encoding="delta", latent_read="none",
+                    latent_read_znorm="none", latent_s0_read=True)
+
+    def test_train_py_declares_and_persists_it(self):
+        tp = _src("train.py")
+        assert "e_read_norm_target=0.0," in tp
+        i = tp.index('    if cfg.cortex["use_memory"]:')
+        j = tp.index("setattr(config, _k, cfg.cortex[_k])", i)
+        assert '"e_read_norm_target"' in tp[i:j]
+
+
 # ─── 5. the gradient property ───────────────────────────────────────────────
 
 class TestTheGradient:
