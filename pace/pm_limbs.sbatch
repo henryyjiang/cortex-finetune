@@ -286,7 +286,11 @@ if not esn:
     fails.append("z_e_spliced_norm absent")
 elif limb == "zonly" and max(abs(v) for v in esn) != 0.0:
     fails.append(f"zonly spliced E rows of norm up to {max(esn):.4g}; expected EXACTLY 0")
-elif limb != "zonly" and min(esn) <= 0.0:
+elif limb == "edrop" and max(esn) <= 0.0:
+    fails.append("edrop spliced E norm is 0 on EVERY record: E never reached the splice")
+elif limb not in ("zonly", "edrop") and min(esn) <= 0.0:
+    # edrop is exempt from the min: at mbs 2 both rows are blanked in ~1/16
+    # records, so an exact 0 there is the dropout working (job 14560553_3).
     fails.append(f"{limb} spliced E norm {min(esn):.4g}: E is off on a limb that carries it")
 elif limb == "lownorm" and max(abs(v - target) for v in esn) > 0.02 * target:
     fails.append(f"lownorm spliced E norm {min(esn):.3g}..{max(esn):.3g}, expected "
