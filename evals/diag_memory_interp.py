@@ -138,9 +138,55 @@ D. LOGIT LENS ON MEMORY ROWS.  E rows are post-ln_f states: lm_head applied
    highest own precision -- illustrative, not representative) are printed with
    their source chunk's first 40 words.
 
+   TWO MORE LENSES, same cells and references (2026-10-30, after the first
+   read-out: E's own-donor was +0.010 n.s. while the top-50 were " ", "the",
+   "a" -- tokens every chunk contains, so the lens could not separate rows):
+     `rare`      the head's top-k AMONG RARE FORMS ONLY, scored against the
+                 references' rare forms.  Rare = an alphabetic form occurring
+                 in < RARE_MAX_DF (10%) of the sampled chunks (rows' + donors',
+                 document frequency) -- the "does a royalty passage's memory
+                 decode to 'king'" question with the function words removed.
+     `emb_all` / `emb_rare`  top-k by COSINE to the INPUT embedding table
+                 (wte), not through ln_f + lm_head: E is spliced exactly where
+                 token embeddings go, so wte is its natural coordinate system.
+                 Z is decoded as SPLICED (latent_embed(rescale(Z))); cosine is
+                 scale-free, so the rescale only matters through latent_embed.
+                 Whether wte and lm_head are tied is recorded (D.tied_embeddings).
+
 E. RING GEOMETRY.  Participation-ratio effective rank and mean centred cosine
    (cortex_memory.health.rank_stats -- the repo's one implementation) of the E
    and Z halves of the carry after each chunk.
+
+F. TOPIC STEERING (data-driven).  Does reading ANOTHER document's memory pull
+   predictions toward THAT document's words?  For chunk q = 2..n of each row,
+   teacher-forced exactly like B (intact chain states, no-op merge, pointer
+   guard, same seed): one forward reading the row's own carry, one reading the
+   DONOR row's carry at the same chunk index (the donor's own chain, run here).
+   Word sets (rare forms, see D), over the ring window -- the chunks
+   max(1, q - lap) .. q-1 that the carry read at q summarises:
+     don   rare forms of the donor's window, absent from the row's window,
+           from chunk q itself and from the control's window
+     own   the same for the row's own window
+     ctl   the same for a CONTROL row's window (a third book that never
+           entered either carry) -- the generic-shift baseline
+   delta[S] = mean over chunk q's positions of
+              log P_donor_carry(next token in S) - log P_own_carry(...)
+   steer_lift = delta[don] - delta[ctl]   (> 0: the memory carries the source's
+                                          vocabulary into the next chunk)
+   own_drop   = delta[own] - delta[ctl]   (< 0: swapping the memory out costs
+                                          the row its own vocabulary)
+   Per row = mean over chunks with all three sets non-empty; CI over rows.
+   --steer_demo adds an ILLUSTRATION (not a statistic): two built-in passages
+   (royalty, sea) each read as chunk 1, then one neutral passage read with
+   each carry; prints the tokens whose mean log-prob rises most under each.
+
+G. SOFT CARRY-ATTENTION SCALING.  B with a finite bias: log(alpha) added to
+   every real-token -> carried-column logit at every site (alpha = 0 is B's
+   block-everywhere, alpha = 1 is intact), for --carry_scales, on E+Z and on E
+   only; delta NLL vs intact over chunks 2..n, and by query-position bin.
+   alpha < 1 IMPROVING NLL would mean the model over-attends to memory.
+   Teacher-forced like B.  Veto, row 0: alpha = 1 through the explicit path
+   must reproduce intact within FIDELITY_TOL (the B fidelity bound).
 
 ROWS.  The strided PG-19 pack is consecutive non-overlapping windows, ~21 per
 book, with each book's last window EOS-marked and EOS-padded.  The first 24
@@ -205,7 +251,13 @@ from model_utils import (  # noqa: E402
 )
 from eval_influence_horizon import _patched_merge, paired_ci  # noqa: E402
 
-PARTS = ("A", "B", "C", "D", "E")
+PARTS = ("A", "B", "C", "D", "E", "F", "G")
+#: A form is "rare" (D's `rare` / `emb_rare`, F's word sets) when it occurs in
+#: fewer than this share of the sampled chunks (rows' and donors').
+RARE_MAX_DF = 0.10
+#: Which bag of forms each D lens variant is scored against.
+LENS_BAG = {"all": "all", "long": "long", "rare": "rare",
+            "emb_all": "all", "emb_rare": "rare"}
 READ_KINDS = ("E", "Z", "own", "summary", "first_tok")
 WRITE_KINDS = ("E", "Z", "real", "summary")
 TOKEN_CLASSES = ("content", "function", "continuation", "other")
@@ -355,6 +407,86 @@ def precision_at_k(topk_ids: torch.Tensor, form_of: torch.Tensor,
     ok = f >= 0
     hit[ok] = bow[f[ok]]
     return hit.float().mean(dim=-1)
+
+
+def frequent_forms(bags: list, max_df: float) -> torch.Tensor:
+    """Bool [n_forms]: forms present in >= max_df of the bags (document frequency)."""
+    if not bags:
+        raise ValueError("no bags to count document frequency over")
+    cnt = torch.zeros(bags[0].shape, dtype=torch.float32, device=bags[0].device)
+    for b in bags:
+        cnt += b.float()
+    return cnt / len(bags) >= max_df
+
+
+def restrict_forms(form_of: torch.Tensor, keep: torch.Tensor) -> torch.Tensor:
+    """The vocab -> form table with every form outside `keep` mapped to -1."""
+    out = torch.full_like(form_of, -1)
+    ok = form_of >= 0
+    out[ok] = torch.where(keep[form_of[ok]], form_of[ok], -1)
+    return out
+
+
+def carry_logit_bias(causal: torch.Tensor, real: tuple, ranges: list,
+                     logbias: float) -> torch.Tensor:
+    """The attention bias with real-token -> carried-column logits shifted.
+
+    -inf blocks the columns (part B); log(alpha) multiplies their unnormalised
+    weight by alpha (part G); 0 returns the causal bias unchanged.  Carried
+    columns precede every real token, so their causal bias is 0 and the shift
+    is the whole entry.
+    """
+    b = causal.clone()
+    r0, r1 = real
+    for lo, hi in ranges:
+        b[r0:r1, lo:hi] = b[r0:r1, lo:hi] + logbias
+    return b
+
+
+def set_logmass(logp: torch.Tensor, ids: torch.Tensor) -> torch.Tensor:
+    """[L, V] log-probs -> [L] log P(next token is one of `ids`)."""
+    return torch.logsumexp(logp[:, ids], dim=-1)
+
+
+def steer_deltas(own_logp: torch.Tensor, don_logp: torch.Tensor, sets: dict,
+                 valid: torch.Tensor) -> dict:
+    """Per word set: mean over valid positions of logmass(donor) - logmass(own).
+
+    `sets` maps name -> vocab id tensor; an empty set gives None.  Returns the
+    deltas plus `steer_lift` = don - ctl and `own_drop` = own - ctl (None when
+    a needed set is empty).
+    """
+    d = {}
+    for name, ids in sets.items():
+        if ids is None or ids.numel() == 0:
+            d[name] = None
+            continue
+        diff = set_logmass(don_logp, ids) - set_logmass(own_logp, ids)
+        d[name] = float(diff[valid].double().mean())
+    ok = lambda *k: all(d.get(x) is not None for x in k)  # noqa: E731
+    d["steer_lift"] = d["don"] - d["ctl"] if ok("don", "ctl") else None
+    d["own_drop"] = d["own"] - d["ctl"] if ok("own", "ctl") else None
+    return d
+
+
+def pick_control(row: int, donor: Optional[int], usable: list,
+                 book: dict) -> Optional[int]:
+    """F's control row: the middle window of a book that is neither the row's
+    nor the donor's (a quarter of the pack away, then onward).  None if the
+    pack has fewer than three detectable books."""
+    books = sorted({book[r] for r in usable})
+    taken = {book[row]} | ({book[donor]} if donor is not None else set())
+    if len(books) - len(taken & set(books)) < 1:
+        return None
+    by_book: dict = {}
+    for r in usable:
+        by_book.setdefault(book[r], []).append(r)
+    i0 = books.index(book[row])
+    for off in [len(books) // 4] + list(range(1, len(books))):
+        b = books[(i0 + off) % len(books)]
+        if b not in taken:
+            return _middle_out(by_book[b])[0]
+    return None
 
 
 def classify_tokens(texts: list) -> list:
@@ -753,21 +885,27 @@ class AttnProbe:
         return self._bias[key]
 
     def _blocked(self, kind, i, t):
+        """(column ranges, logit shift) at this call, or (None, None).
+
+        `block` is (scope, idx, channels) -- a -inf block, part B -- or
+        (scope, idx, channels, logbias) with a finite shift, part G.
+        """
         if self.block is None:
-            return None
-        scope, idx, ch = self.block
+            return None, None
+        scope, idx, ch = self.block[:3]
+        lb = self.block[3] if len(self.block) > 3 else float("-inf")
         hit = (scope == "all"
                or (scope in ("prelude", "coda") and kind == scope and idx == i)
                or (scope == "core_layer" and kind == "core" and idx == i)
                or (scope == "iter" and kind == "core" and idx == t))
         if not hit:
-            return None
+            return None, None
         lay, ranges = self.lay, []
         if "E" in ch and lay["nE"]:
             ranges.append(lay["E"])
         if "Z" in ch and lay["nZ"]:
             ranges.append(lay["Z"])
-        return ranges or None
+        return (ranges or None), lb
 
     def _probs(self, q, k, bias):
         kf = k.float()
@@ -825,16 +963,13 @@ class AttnProbe:
         q, k = self.rope(q, k, cos, sin)
         if B != 1 or q.shape[2] != k.shape[2]:
             raise RuntimeError("memory_interp runs batch 1, uncached")
-        ranges = self._blocked(kind, i, t)
+        ranges, lb = self._blocked(kind, i, t)
         explicit = ranges is not None or self.force_explicit
         P = None
         if self.capture_A or self.capture_C or self.verify or explicit:
             bias = self._causal(S, x.device)
             if ranges:
-                bias = bias.clone()
-                r0, r1 = self.lay["real"]
-                for lo, hi in ranges:
-                    bias[r0:r1, lo:hi] = float("-inf")
+                bias = carry_logit_bias(bias, self.lay["real"], ranges, lb)
             P = self._probs(q, k, bias)
         if explicit:
             y = self._pv(P, v).to(q.dtype)
@@ -1009,7 +1144,13 @@ def verify_layout(cortex, buf, model, ids, state, num_steps, q, geo, device):
                      f"{packed.shape[1]} vs expected 2x{nE}, {W}, {2 * nE + L + W}")
     p = packed[0]
     E_carry, Z_carry = state[0, :, :D], state[0, :, D:]
-    if not torch.equal(p[:nE], E_carry.to(p.dtype)):
+    e_t = float(getattr(cortex, "e_read_norm_target", 0.0) or 0.0)
+    if e_t > 0:     # pm `lownorm`: every spliced E row rescaled to e_t
+        e_exp = rescale_rows(E_carry[None].to(p.dtype), e_t)[0]
+        if not torch.allclose(p[:nE].float(), e_exp.float(), rtol=1e-4, atol=1e-4):
+            fails.append(f"columns [0, nE) are not the carried E rows rescaled "
+                         f"to {e_t}")
+    elif not torch.equal(p[:nE], E_carry.to(p.dtype)):
         fails.append("columns [0, nE) are not the carried E rows")
     z_exp = cortex.latent_embed(rescale_rows(Z_carry[None].to(p.dtype),
                                              geo["znorm_target"]))[0].to(p.dtype)
@@ -1066,7 +1207,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dtype", default="float32", choices=["float32", "bfloat16"])
     p.add_argument("--seed", type=int, default=1234)
     p.add_argument("--boot", type=int, default=2000)
-    p.add_argument("--parts", default="A,B,C,D,E")
+    p.add_argument("--parts", default="A,B,C,D,E",
+                   help="subset of A..G; F (topic steering) and G (soft carry "
+                        "scaling) are opt-in")
+    p.add_argument("--carry_scales", type=float, nargs="+",
+                   default=[0.5, 0.75, 1.25],
+                   help="part G: alpha multiplying real->carried attention "
+                        "weight (log alpha added to the logits); each > 0")
+    p.add_argument("--steer_demo", action="store_true",
+                   help="part F illustration: royalty vs sea passage carries "
+                        "read into one neutral passage; top tokens that rise")
     p.add_argument("--topk", type=int, default=50)
     p.add_argument("--n_bins", type=int, default=8)
     p.add_argument("--out_dir", default="eval_results/memory_interp")
@@ -1194,6 +1344,42 @@ def main() -> int:
               f"bootstrap treats windows of one book as independent, so every "
               f"CI below is optimistic.", flush=True)
 
+    # RARE FORMS (D's rare lenses, F's word sets): document frequency over
+    # every chunk this run reads text from -- the rows' and their donors'.
+    form_rare = rare_tok = None
+    rare_info: dict = {}
+    if parts & {"D", "F"}:
+        sample = set(rows) | ({pick_donor(r, usable, book_of) for r in rows} - {None})
+        bags = [bag_of_forms(x, form_all, len(forms_all))
+                for r in sorted(sample)
+                for x in split_row(torch.tensor(ds[r]["input_ids"],
+                                                dtype=torch.long), n, L)[0]]
+        freq = frequent_forms(bags, RARE_MAX_DF)
+        form_rare = restrict_forms(form_all, ~freq)
+        rare_tok = form_rare >= 0
+        df = torch.stack([b.float() for b in bags]).mean(0)
+        rare_info = {
+            "rule": f"alphabetic form present in < {RARE_MAX_DF:.0%} of the "
+                    f"{len(bags)} sampled chunks (document frequency over the "
+                    "rows' and donors' chunks)",
+            "n_sampled_chunks": len(bags), "n_forms": len(forms_all),
+            "n_frequent_forms": int(freq.sum()),
+            "rare_vocab_ids": int(rare_tok.sum()),
+            "most_frequent": [forms_all[i] for i in
+                              df.topk(min(25, len(forms_all))).indices.tolist()]}
+        print(f"[rare] {rare_info['n_frequent_forms']} frequent forms dropped "
+              f"({rare_info['rule']}); most frequent: "
+              f"{rare_info['most_frequent'][:12]}", flush=True)
+    from cortex_graft import rescale_rows
+    wte = inner.transformer.wte.weight[:V]
+    tied = bool(wte.data_ptr() == inner.lm_head.weight.data_ptr()
+                or torch.equal(wte, inner.lm_head.weight))
+    wte_f = wte.float()             # a view in fp32; one copy in a bf16 smoke
+    wte_norm = wte_f.norm(dim=-1).clamp_min(1e-12)
+    if "G" in parts and any(a <= 0 for a in args.carry_scales):
+        refuse(f"--carry_scales must all be > 0 (0 is part B's block); got "
+               f"{args.carry_scales}")
+
     probe = AttnProbe(inner, T)
     n_age = n_lap
     acc = Acc(probe.n_blk, probe.H, n, n_age, args.n_bins, W, device)
@@ -1227,7 +1413,15 @@ def main() -> int:
     E_rows: dict = {}
     examples = []
     donors: list = []
-    timing = {"chain_s": [], "B_s": [], "D_s": [], "E_s": [], "bare_chain_s": None}
+    controls: list = []
+    F_rows: dict = {}
+    F_lift_by_chunk = [[] for _ in range(n - 1)]
+    F_sizes: dict = {}
+    G_res: dict = {}
+    G_bins: dict = {}
+    pos_bin = position_bins(L, args.n_bins).to(device)
+    timing = {"chain_s": [], "B_s": [], "D_s": [], "E_s": [], "F_s": [], "G_s": [],
+              "bare_chain_s": None}
     t_start = time.perf_counter()
 
     def chain(si, xs, ys, cls, capture: bool, verify_chunks=()):
@@ -1449,66 +1643,123 @@ def main() -> int:
                 _sync(device)
                 timing["B_s"].append(time.perf_counter() - t0)
 
+            # ── G ────────────────────────────────────────────────────────
+            if "G" in parts:
+                _sync(device)
+                t0 = time.perf_counter()
+                if ri == 0:
+                    one = run_site(si, xs, ys, cls, states, ("all", None, "EZ", 0.0))
+                    gaps = [abs(mean_nll([a], [m]) - mean_nll([b], [m]))
+                            for a, b, m in zip(one, ces[1:], valid[1:])]
+                    checks["G_alpha1_max_abs_nats"] = max(gaps)
+                    if max(gaps) > FIDELITY_TOL:
+                        msg = (f"part G at alpha = 1 misses intact by "
+                               f"{max(gaps):.2e} nats/chunk (tol {FIDELITY_TOL})")
+                        if smoke:
+                            print(f"WARNING (bf16 smoke): {msg}", flush=True)
+                        else:
+                            refuse(msg)
+                for a in args.carry_scales:
+                    for ch in ("EZ", "E"):
+                        key = f"{ch}|{a:g}"
+                        sce = run_site(si, xs, ys, cls, states,
+                                       ("all", None, ch, math.log(a)))
+                        G_res.setdefault(key, []).append(
+                            mean_nll(sce, valid[1:]) - nll_intact)
+                        sb = torch.zeros(args.n_bins, dtype=torch.float64,
+                                         device=device)
+                        cb = torch.zeros_like(sb)
+                        for a_, b_, m_ in zip(sce, ces[1:], valid[1:]):
+                            sb.index_add_(0, pos_bin[m_], (a_ - b_)[m_].double())
+                            cb.index_add_(0, pos_bin[m_],
+                                          torch.ones_like(sb[pos_bin[m_]]))
+                        G_bins.setdefault(key, []).append(
+                            (sb / cb.clamp_min(1)).tolist())
+                _sync(device)
+                timing["G_s"].append(time.perf_counter() - t0)
+
         # ── D ────────────────────────────────────────────────────────────
         if "D" in parts:
             t0 = time.perf_counter()
+            tables = (("all", form_all, forms_all), ("long", form_long, forms_long),
+                      ("rare", form_rare, forms_all))
             bow = {v: [bag_of_forms(x, fo, len(fl)) for x in xs]
-                   for v, fo, fl in (("all", form_all, forms_all),
-                                     ("long", form_long, forms_long))}
+                   for v, fo, fl in tables}
             dbow = ({v: [bag_of_forms(x, fo, len(fl)) for x in dxs]
-                     for v, fo, fl in (("all", form_all, forms_all),
-                                       ("long", form_long, forms_long))}
+                     for v, fo, fl in tables}
                     if dxs is not None else None)
-            fo_of = {"all": form_all, "long": form_long}
+            fo_of = {"all": form_all, "long": form_long, "rare": form_rare}
             row_acc: dict = {}
 
             def add(key, vals):
                 row_acc.setdefault(key, []).extend(vals.tolist())
 
             def lens(rows_, ch):
+                """Top-k token ids per lens variant (LENS_BAG); `long` scores
+                the head's own top-k against the >= 4-letter bags."""
                 h = rows_.to(device=inner.lm_head.weight.device,
                              dtype=inner.lm_head.weight.dtype)
                 with torch.no_grad():
+                    lg = inner.lm_head(inner.transformer.ln_f(h) if ch == "Z"
+                                       else h).float()
+                    he = h      # E is spliced as is; cosine ignores e_read_norm_target
                     if ch == "Z":
-                        h = inner.transformer.ln_f(h)
-                    return inner.lm_head(h).float().topk(args.topk, dim=-1).indices
+                        if cortex.latent_read_znorm == "rms":
+                            he = rescale_rows(h, cortex.latent_read_znorm_target)
+                        he = cortex.latent_embed(he[None])[0]
+                    cs = (F.normalize(he.float(), dim=-1) @ wte_f.T) / wte_norm
+                    off, k = ~rare_tok, args.topk
+                    top = {"all": lg.topk(k, dim=-1).indices,
+                           "rare": lg.masked_fill(off, float("-inf"))
+                                     .topk(k, dim=-1).indices,
+                           "emb_all": cs.topk(k, dim=-1).indices,
+                           "emb_rare": cs.masked_fill(off, float("-inf"))
+                                         .topk(k, dim=-1).indices}
+                    top["long"] = top["all"]
+                    return top
 
             def score(top, ch, bucket, w, extra=None, prev=None):
-                for v in ("all", "long"):
-                    refs = {"own": bow[v][w - 1],
-                            "next": bow[v][w] if w < n else None,
-                            "donor": dbow[v][w - 1] if dbow is not None else None,
-                            "prev": bow[v][prev - 1] if prev else None}
+                for v, bag in LENS_BAG.items():
+                    refs = {"own": bow[bag][w - 1],
+                            "next": bow[bag][w] if w < n else None,
+                            "donor": dbow[bag][w - 1] if dbow is not None else None,
+                            "prev": bow[bag][prev - 1] if prev else None}
                     for rname, bw in refs.items():
                         if bw is None:
                             continue
-                        pk = precision_at_k(top, fo_of[v], bw)
+                        pk = precision_at_k(top[v], fo_of[bag], bw)
                         add((ch, bucket, v, rname), pk)
                         if extra is not None:
                             for j, d in enumerate(extra):
                                 add((ch, f"depth{d}", v, rname), pk[j:j + 1])
-                alpha = (form_all[top] >= 0).float().mean(-1)
+                alpha = (form_all[top["all"]] >= 0).float().mean(-1)
                 add((ch, bucket, "alpha_frac", "-"), alpha)
                 return
+
+            def words_of(ids_):
+                return [vocab_text[t] for t in ids_.tolist()]
 
             for c in range(1, n + 1):                         # fresh writes
                 for ch, t in (("E", writes[c - 1][0]), ("Z", writes[c - 1][1])):
                     top = lens(t[0], ch)
                     score(top, ch, "fresh", c, depth_map if ch == "Z" else None)
                     if ri == 0 and ch == "E" and c in (2, 4, 6) and c <= n:
-                        own = precision_at_k(top, form_all, bow["all"][c - 1])
+                        own = precision_at_k(top["all"], form_all, bow["all"][c - 1])
                         j = int(own.argmax())
-                        ztop = lens(writes[c - 1][1][0, j:j + 1], "Z")[0]
+                        ztop = lens(writes[c - 1][1][0, j:j + 1], "Z")
                         words = tok.decode(xs[c - 1].tolist()).split()[:40]
                         examples.append({
                             "chunk": c, "slot": j, "z_depth": depth_map[j],
                             "selected_by": "max own precision@k among 16 E slots",
-                            "E_top15": [vocab_text[t] for t in top[j, :15].tolist()],
+                            "E_top15": words_of(top["all"][j, :15]),
+                            "E_top15_rare": words_of(top["rare"][j, :15]),
+                            "E_emb_top15_rare": words_of(top["emb_rare"][j, :15]),
                             "E_own_p": float(own[j]),
                             "E_donor_p": (float(precision_at_k(
-                                top[j:j + 1], form_all, dbow["all"][c - 1])[0])
+                                top["all"][j:j + 1], form_all, dbow["all"][c - 1])[0])
                                 if dbow is not None else None),
-                            "Z_top15_crude": [vocab_text[t] for t in ztop[:15].tolist()],
+                            "Z_top15_crude": words_of(ztop["all"][0, :15]),
+                            "Z_emb_top15_rare": words_of(ztop["emb_rare"][0, :15]),
                             "source_first40": " ".join(words)})
             for q in range(2, n + 1):                         # ring rows as read
                 st = states[q - 1][0]
@@ -1518,7 +1769,7 @@ def main() -> int:
                     for b in range(len(wr) // W):
                         w = wr[b * W]
                         a = q - w
-                        tb = top[b * W:(b + 1) * W]
+                        tb = {v: tt[b * W:(b + 1) * W] for v, tt in top.items()}
                         score(tb, ch, f"age{min(a, n_age)}", w)
                         if w > n_lap:   # gate mix: does it still hold w - lap?
                             score(tb, ch, "gated", w, prev=w - n_lap)
@@ -1539,10 +1790,73 @@ def main() -> int:
                         E_rows.setdefault(f"{ch}|{c}|{k_}", []).append(rs[k_])
             timing["E_s"].append(time.perf_counter() - t0)
 
+        # ── F ────────────────────────────────────────────────────────────
+        # After D and E: the donor's chain below moves the ring pointer, and
+        # nothing later in this row reads the row's own chain.
+        ctrl_si = (pick_control(si, donor_si, usable, book_of)
+                   if "F" in parts and dxs is not None else None)
+        controls.append(ctrl_si)
+        if "F" in parts and ctrl_si is None and ri == 0:
+            print("WARNING: part F needs a donor and a control from two other "
+                  "books; this pack has fewer -- F skipped.", flush=True)
+        if ctrl_si is not None:
+            _sync(device)
+            t0 = time.perf_counter()
+            d_ids = torch.tensor(ds[donor_si]["input_ids"], dtype=torch.long)
+            _, dys = split_row(d_ids, n, L)
+            _, d_states, _, _ = chain(donor_si, dxs, dys, None, capture=False)
+            cxs = split_row(torch.tensor(ds[ctrl_si]["input_ids"],
+                                         dtype=torch.long), n, L)[0]
+            nf = len(forms_all)
+            rb = {key: [bag_of_forms(x, form_rare, nf) for x in xx]
+                  for key, xx in (("own", xs), ("don", dxs), ("ctl", cxs))}
+            per_q = []
+            for q in range(2, n + 1):
+                win = range(max(1, q - n_lap), q)
+                u = {key: torch.stack([b[c - 1] for c in win]).any(0)
+                     for key, b in rb.items()}
+                here = bag_of_forms(xs[q - 1], form_all, nf)
+                sets_f = {key: u[key] & ~here & ~torch.stack(
+                              [u[o] for o in u if o != key]).any(0) for key in u}
+                ids_f = {key: torch.nonzero((form_all >= 0)
+                                            & m[form_all.clamp_min(0)]).squeeze(1)
+                         for key, m in sets_f.items()}
+                lps = []
+                for which, st_ in (("own", states[q - 1]), ("don", d_states[q - 1])):
+                    torch.manual_seed(chunk_seed(args.seed, si, q))
+                    with ring_pointer_guard(buf), \
+                            _patched_merge(buf, lambda s, nv, nl=None: s), \
+                            torch.no_grad():
+                        out = model(input_ids=xs[q - 1][None].to(device),
+                                    num_steps=num_steps, m_cross_in=st_,
+                                    return_m_cross=False)
+                    if which == "own" and not torch.equal(
+                            ce_of(out, ys[q - 1])[0], ces[q - 1]):
+                        refuse(f"row {si} chunk {q}: part F's own-carry forward "
+                               "is not bit-identical to the intact chain; the "
+                               "donor contrast would not be paired")
+                    lps.append(torch.log_softmax(out.logits[0].float(), dim=-1))
+                dd = steer_deltas(lps[0], lps[1], ids_f, valid[q - 1])
+                for key, m in sets_f.items():
+                    F_sizes.setdefault(key, []).append(int(m.sum()))
+                if dd["steer_lift"] is not None:
+                    F_lift_by_chunk[q - 2].append(dd["steer_lift"])
+                per_q.append(dd)
+                del lps
+            use = [d for d in per_q
+                   if d["steer_lift"] is not None and d["own_drop"] is not None]
+            for key in ("steer_lift", "own_drop", "don", "own", "ctl"):
+                F_rows.setdefault(key, []).append(
+                    _mean([d[key] for d in use]) if use else None)
+            _sync(device)
+            timing["F_s"].append(time.perf_counter() - t0)
+
         print(f"  row {ri + 1}/{len(rows)} (ds {si}): intact {nll_intact:.4f} "
               f"chain {timing['chain_s'][-1]:.1f}s"
               + (f"  B {timing['B_s'][-1]:.1f}s" if timing["B_s"] else "")
-              + (f"  D {timing['D_s'][-1]:.1f}s" if timing["D_s"] else ""),
+              + (f"  D {timing['D_s'][-1]:.1f}s" if timing["D_s"] else "")
+              + (f"  F {timing['F_s'][-1]:.1f}s" if timing["F_s"] else "")
+              + (f"  G {timing['G_s'][-1]:.1f}s" if timing["G_s"] else ""),
               flush=True)
         report = build_report(args, parts, probe, acc, geo, depth_map, checks,
                               layout_checks, B_res, B_chunk, sites, intact_rows,
@@ -1550,6 +1864,21 @@ def main() -> int:
                               rows[:ri + 1], skipped, smoke, t_load, device,
                               mem_after_load if device.type == "cuda" else None,
                               n_lap)
+        report.update(report_FG(args, F_rows, F_lift_by_chunk, F_sizes, G_res,
+                                G_bins))
+        if "D" in report:
+            report["D"]["lens"].update({
+                "rare": "lm_head top-k among RARE forms only, vs rare-form bags",
+                "emb_all": "top-k cosine to the INPUT embedding table (wte); "
+                           "Z as spliced, latent_embed(rescale(Z))",
+                "emb_rare": "emb_all among RARE forms only, vs rare-form bags"})
+            report["D"]["rare_rule"] = rare_info
+            report["D"]["tied_embeddings"] = tied
+        report["timing"]["F_s_per_row"] = _mean(timing["F_s"])
+        report["timing"]["G_s_per_row"] = _mean(timing["G_s"])
+        report["control_rows"] = controls
+        report["control_books"] = [None if c is None else book_of[c]
+                                   for c in controls]
         report["row_books"] = [book_of[r] for r in rows[:ri + 1]]
         report["n_distinct_books"] = len(set(report["row_books"]))
         report["donor_rows"] = donors
@@ -1559,10 +1888,118 @@ def main() -> int:
                   encoding="utf-8") as fh:
             json.dump(report, fh, indent=1)
 
+    if args.steer_demo:
+        # Fresh chains from m_cross_in=None reset the ring pointer: safe only
+        # here, after every row's chain is finished.
+        t0 = time.perf_counter()
+        report["steer_demo"] = steer_demo(model, buf, tok, form_long, vocab_text,
+                                          num_steps, device, args.seed)
+        report["timing"]["steer_demo_s"] = time.perf_counter() - t0
+        with open(os.path.join(args.out_dir, "results.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump(report, fh, indent=1)
+
     print_report(report, probe)
     print(f"\nwrote {os.path.join(args.out_dir, 'results.json')}  "
           f"({time.perf_counter() - t_start:.0f}s)")
     return 0
+
+
+STEER_PASSAGES = {
+    "royalty": (
+        "The old king sat upon his throne in the great hall of the palace, and "
+        "the queen sat beside him wearing the jewelled crown of her mothers. "
+        "Before them knelt the dukes and earls of the realm, each come to swear "
+        "allegiance to the young prince, who would one day rule the kingdom in "
+        "his father's stead. Heralds in royal livery cried the titles of every "
+        "lord as he rose. The court had not seen such a gathering since the "
+        "coronation, when the archbishop had anointed the king before the "
+        "assembled nobility and the people had cheered their sovereign in the "
+        "streets below the castle walls. Now the king was grey, and the barons "
+        "whispered of succession, of which princess the prince would marry, "
+        "and which of the great houses would rise or fall with the next reign."),
+    "sea": (
+        "The ship left the harbour at dawn, her sails filling with the wind off "
+        "the open sea. The captain stood at the helm while the sailors hauled "
+        "on the ropes and the waves broke white against the bow. Gulls wheeled "
+        "above the mast, and the coast fell away behind them until only the "
+        "lighthouse could be seen. By noon the swell had grown heavy; the "
+        "vessel rolled, spray washed across the deck, and the mate ordered the "
+        "crew to reef the topsail. They meant to reach the islands before the "
+        "tide turned, to drop anchor in the bay beyond the reef, where the "
+        "fishing boats lay at their moorings and the water was calm and blue "
+        "beneath the cliffs."),
+    "neutral": (
+        "In the morning they rose early and went out together. Nobody said very "
+        "much at first. After a while the talk turned to the old days, to "
+        "people they had known and places they had been, and to what each of "
+        "them meant to do next. One of them remembered a story that had been "
+        "told to him long ago, and he began to tell it slowly, stopping now and "
+        "then to recall what came next, while the others listened and waited "
+        "to hear how it would end."),
+}
+
+
+def steer_demo(model, buf, tok, form_long, vocab_text, num_steps, device, seed,
+               k: int = 20) -> dict:
+    """ILLUSTRATION for part F, not a statistic: read the neutral passage with
+    the carry each themed passage writes as chunk 1, and list the >= 4-letter
+    tokens whose mean log-prob over the neutral passage rises most under one
+    carry relative to the other."""
+    enc = lambda s: tok(s, add_special_tokens=False)["input_ids"]  # noqa: E731
+    neutral = torch.tensor(enc(STEER_PASSAGES["neutral"]))[None].to(device)
+    mean_lp = {}
+    for name in ("royalty", "sea"):
+        src = torch.tensor([tok.eos_token_id] + enc(STEER_PASSAGES[name]))
+        torch.manual_seed(seed)
+        with torch.no_grad():
+            st = model(input_ids=src[None].to(device), num_steps=num_steps,
+                       m_cross_in=None, return_m_cross=True).m_cross
+            torch.manual_seed(seed + 1)
+            with ring_pointer_guard(buf), \
+                    _patched_merge(buf, lambda s, nv, nl=None: s):
+                lg = model(input_ids=neutral, num_steps=num_steps, m_cross_in=st,
+                           return_m_cross=False).logits[0].float()
+        mean_lp[name] = torch.log_softmax(lg, dim=-1).mean(0)
+    d = (mean_lp["royalty"] - mean_lp["sea"]).masked_fill(
+        form_long.to(device) < 0, float("nan"))
+
+    def top(x):
+        v, i = x.nan_to_num(float("-inf")).topk(k)
+        return [[vocab_text[j], round(float(a), 3)] for j, a in zip(i.tolist(), v.tolist())]
+
+    return {"note": "illustration only: one passage pair, one neutral passage; "
+                    "delta = mean log-prob over the neutral passage under the "
+                    "royalty carry minus under the sea carry, >= 4-letter tokens",
+            "passages": STEER_PASSAGES,
+            "royalty_over_sea": top(d), "sea_over_royalty": top(-d)}
+
+
+def report_FG(args, F_rows, F_lift_by_chunk, F_sizes, G_res, G_bins) -> dict:
+    out = {}
+    if F_rows and any(v is not None for v in F_rows.get("steer_lift", [])):
+        out["F"] = {
+            "note": "delta[S] = mean_pos log P_donor_carry(next in S) - log "
+                    "P_own_carry(next in S); steer_lift = delta[don] - "
+                    "delta[ctl], own_drop = delta[own] - delta[ctl]; sets are "
+                    "rare forms of each row's ring window, mutually exclusive "
+                    "and absent from chunk q; CI over rows",
+            "rare_max_df": RARE_MAX_DF,
+            **{key: boot(v, args.boot, args.seed) for key, v in F_rows.items()},
+            "steer_lift_by_chunk": [_mean(v) for v in F_lift_by_chunk],
+            "set_size_mean_forms": {key: _mean(v) for key, v in F_sizes.items()},
+            "per_row_steer_lift": r6(F_rows["steer_lift"])}
+    if G_res:
+        out["G"] = {
+            "note": "delta = NLL with log(alpha) added to every real->carried "
+                    "logit at every site, minus intact; chunks 2..n, paired "
+                    "per row.  alpha < 1 lowering NLL = over-attention",
+            "scales": list(args.carry_scales),
+            "cells": {key: {**boot(v, args.boot, args.seed),
+                            "by_pos_bin": [_mean(col) for col in zip(*G_bins[key])],
+                            "per_row": r6(v)}
+                      for key, v in G_res.items()}}
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1846,13 +2283,36 @@ def print_report(rep, probe) -> None:
                       f"{_f(g('donor')):>8}{_f(g('prev')):>8}"
                       f"{_f(cn and cn['mean'], '+.4f'):>12}   "
                       f"[{_f(cn and cn['lo'], '+.4f')}, {_f(cn and cn['hi'], '+.4f')}]")
+        if "rare_rule" in Dd:
+            print(f"\n  D lenses beyond the head's own top-k (rare = "
+                  f"{Dd['rare_rule'].get('rule')}; tied_embeddings="
+                  f"{Dd.get('tied_embeddings')})")
+            print(f"  {'lens':<10}{'cell':<10}{'own':>8}{'next':>8}{'donor':>8}"
+                  f"{'own-donor':>12}{'95% CI':>22}")
+            for v in ("rare", "emb_all", "emb_rare"):
+                for ch in ("E", "Z"):
+                    for bk in ("fresh", "pure", "gated"):
+                        g = lambda r: Dd["cells"].get(f"{ch}|{bk}|{v}|{r}", {}).get("mean")
+                        cn = Dd["contrasts"].get(f"{ch}|{bk}|{v}|own-donor")
+                        if g("own") is None:
+                            continue
+                        print(f"  {v:<10}{ch + ' ' + bk:<10}{_f(g('own')):>8}"
+                              f"{_f(g('next')):>8}{_f(g('donor')):>8}"
+                              f"{_f(cn and cn['mean'], '+.4f'):>12}   "
+                              f"[{_f(cn and cn['lo'], '+.4f')}, "
+                              f"{_f(cn and cn['hi'], '+.4f')}]")
         for ex in Dd["examples"]:
             print(f"\n  example: chunk {ex['chunk']} slot {ex['slot']} "
                   f"({ex['selected_by']}) own p {ex['E_own_p']:.2f} donor p "
                   f"{_f(ex['E_donor_p'], '.2f')}")
             print(f"    source: {ex['source_first40']}")
             print(f"    E top15: {ex['E_top15']}")
+            if "E_top15_rare" in ex:
+                print(f"    E top15 rare (head): {ex['E_top15_rare']}")
+                print(f"    E top15 rare (wte cosine): {ex['E_emb_top15_rare']}")
             print(f"    Z top15 (crude, depth {ex['z_depth']}): {ex['Z_top15_crude']}")
+            if "Z_emb_top15_rare" in ex:
+                print(f"    Z top15 rare (wte cosine): {ex['Z_emb_top15_rare']}")
     if "E" in rep:
         cells = rep["E"]["cells"]
         print("\nE. ring geometry after chunk c (PR rank / centred cos)")
@@ -1861,7 +2321,50 @@ def print_report(rep, probe) -> None:
             print(f"  {ch}: " + "  ".join(
                 f"c{c} {cells[f'{ch}|{c}|eff_rank_pr']:.2f}/"
                 f"{cells[f'{ch}|{c}|centred_cosine']:.2f}" for c in cs))
+    if "F" in rep:
+        Fr = rep["F"]
+        print("\nF. topic steering: read chunk q with the DONOR's carry instead of "
+              "its own (nats, log-mass on each word set)")
+        for key, lab_ in (("steer_lift", "steer_lift (don - ctl)"),
+                          ("own_drop", "own_drop   (own - ctl)"),
+                          ("don", "delta don"), ("own", "delta own"),
+                          ("ctl", "delta ctl")):
+            s = Fr.get(key) or {}
+            sig = "" if (s.get("lo") is None or s.get("n", 0) < 2
+                         or s["lo"] <= 0 <= s["hi"]) else " *"
+            print(f"  {lab_:<26}{_f(s.get('mean'), '+.4f'):>10}   "
+                  f"[{_f(s.get('lo'), '+.4f')}, {_f(s.get('hi'), '+.4f')}]"
+                  f"{s.get('n', 0):>4}{sig}")
+        print("  steer_lift by chunk q=2..n: "
+              + " ".join(_f(x, "+.3f") for x in Fr["steer_lift_by_chunk"])
+              + "   mean set sizes (forms): "
+              + " ".join(f"{k} {v:.0f}" for k, v in Fr["set_size_mean_forms"].items()
+                         if v is not None))
+    if "steer_demo" in rep:
+        sd = rep["steer_demo"]
+        print(f"\n  steer demo ({sd['note']})")
+        print("    royalty carry > sea carry: "
+              + ", ".join(f"{w.strip()} {d:+.2f}" for w, d in sd["royalty_over_sea"]))
+        print("    sea carry > royalty carry: "
+              + ", ".join(f"{w.strip()} {d:+.2f}" for w, d in sd["sea_over_royalty"]))
+    if "G" in rep:
+        Gr = rep["G"]
+        print("\nG. soft carry-attention scaling: log(alpha) on every real->carried "
+              "logit, delta NLL vs intact (negative = better)")
+        print(f"  {'cell':<12}{'delta':>10}{'95% CI':>24}{'n':>4}   by query-position bin")
+        for key, s in Gr["cells"].items():
+            ch, a = key.split("|")
+            sig = "" if (s["lo"] is None or s["n"] < 2
+                         or s["lo"] <= 0 <= s["hi"]) else " *"
+            print(f"  {ch + ' a=' + a:<12}{_f(s['mean'], '+.5f'):>10}   "
+                  f"[{_f(s['lo'], '+.5f')}, {_f(s['hi'], '+.5f')}]{s['n']:>4}{sig}   "
+                  + " ".join(_f(x, "+.3f") for x in s["by_pos_bin"]))
     t = rep["timing"]
+    if t.get("F_s_per_row") is not None or t.get("G_s_per_row") is not None:
+        print(f"\ntiming s/row: F {_f(t.get('F_s_per_row'), '.1f')}  G "
+              f"{_f(t.get('G_s_per_row'), '.1f')}"
+              + (f"  steer_demo {t['steer_demo_s']:.1f}s" if "steer_demo_s" in t
+                 else ""))
     print(f"\ntiming s/row: chain(+A,C capture) {_f(t['chain_with_AC_capture_s_per_row'], '.1f')}"
           f" (excl row0 {_f(t['chain_s_per_row_excl_row0'], '.1f')})"
           f"  bare chain(row0) {_f(t['bare_chain_s_row0'], '.1f')}  B "
