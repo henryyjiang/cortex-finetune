@@ -80,6 +80,24 @@ step() { echo ""; echo "--- [$ARM@$STEP] $1  ($(date +%H:%M:%S))"; }
 ONLY=${ONLY:-all}
 want() { [[ ",$ONLY," == *",all,"* || ",$ONLY," == *",$1,"* ]]; }
 
+# E_CLAMP=<norm> runs ONLY the 202-chunk drift, with every spliced E row
+# rescaled to <norm> at read (e_read_norm_target; the merge keeps the raw
+# carry), into drift_eclamp<norm>/ -- never over chunk1_drift/.  2026-10-30:
+# the unclamped drift has E's row norm 83 -> 166 -> 885 (chunks 2/32/202) and
+# the carry hurting from chunk 27; E is read raw, Z is rescaled.  Same seed and
+# streams as chunk1_drift/, so the two pair chunk for chunk.
+#   sbatch --array=0 --export=ALL,E_CLAMP=82 pace/pm_mech.sbatch
+if [ -n "${E_CLAMP:-}" ]; then
+    [ "$ARM" = "cortex" ] || { echo "E_CLAMP needs a cortex task (--array=0 or 1)"; exit 1; }
+    ONLY=eclamp   # every want() below is false: nothing else runs
+    step "drift, spliced E rescaled to $E_CLAMP"
+    python evals/diag_chunk1_drift.py --model_name "$MODEL" --checkpoint "$CKPT" \
+        $SETS --set e_read_norm_target="$E_CLAMP" --data "$PG19_VAL" --T "$T" \
+        --parts drift --max_rows 200 --bank_rows 64 --drift_chunks 202 \
+        --drift_streams 6 --dtype float32 \
+        --out_dir "$RES/drift_eclamp$E_CLAMP" || RC_ALL=$?
+fi
+
 # ---- chunk-1 tax + drift ---------------------------------------------------
 PARTS=chunk1,drift
 [ "$ARM" = "control" ] && PARTS=chunk1
