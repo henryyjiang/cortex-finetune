@@ -49,21 +49,34 @@
 #                      Use this tool's `distance` field, never that flag.
 #                      `normal` reproduced the benchmark's per-item argmin on
 #                      40/40 smoke items (residual cand-NLL 0.11: bf16 there).
-#   interp/            (cortex only) evals/diag_memory_interp.py:
+#   interp/            (cortex + limbs) evals/diag_memory_interp.py:
 #                        A read-attention shares per layer x loop iteration x head,
 #                          and by ring-row age -> the memory heads, and the loop
 #                          depth where memory is consumed
 #                        B attention-blocking delta-NLL map per site -> where the
 #                          carry's effect actually enters
 #                        C write-side attention of the summary slots
-#                        D logit lens on E/Z rows vs source / next / donor chunk
+#                        D logit lens on E/Z rows vs source / next / donor chunk,
+#                          plus (2026-10-30) a RARE-word variant (forms in <10%
+#                          of sampled chunks: does a royalty chunk's row decode
+#                          to 'king'?) and an INPUT-EMBEDDING lens (cosine to
+#                          wte, where E is spliced)
 #                        E effective rank + centred cosine of the E and Z ring
+#                        F topic steering: a donor book's carry read into a
+#                          row -- does it lift THAT book's distinctive words
+#                          (vs a third book's)?  steer_lift; + --steer_demo
+#                          (royalty vs sea passage into one neutral passage)
+#                        G soft carry scaling: real->carried attention x alpha
+#                          (0.5 / 0.75 / 1.25).  alpha < 1 improving NLL would
+#                          mean the model OVER-attends to memory
 #
 # COST (H200 fp32; local 5070 Ti smoke / 2.5, plus ~10 min per load):
 #   dissection  800 items (qa1/qa2 x 1k/2k/4k/8k x 100): cortex ~1.1 h,
 #               control ~25 min
-#   interp      24 rows, part B (182 blocked forwards a row) ~95% of it:
-#               ~10 min compute + ~10 min load per checkpoint
+#   interp      24 rows, part B (182 blocked forwards a row) most of it:
+#               ~10 min compute + ~10 min load per checkpoint; F+G+the new D
+#               lenses add ~12 s a row (smoke: F 9-12, G 23-27, D 5-8 s on
+#               the 5070 Ti) = ~5 min
 # 12 h wall.
 # ============================================================================
 
@@ -116,7 +129,8 @@ if [ "$ARM" != "control" ] && [[ ",$PARTS," == *",interp,"* ]]; then
     step "memory interp ($INTERP_PARTS)"
     python evals/diag_memory_interp.py --model_name "$MODEL" --checkpoint "$CKPT" \
         $SETS --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_rows 24 \
-        --parts "$INTERP_PARTS" --dtype float32 --seed 1234 --boot 2000 --out_dir "$RES/interp" || RC_ALL=$?
+        --parts "$INTERP_PARTS" --steer_demo --dtype float32 --seed 1234 --boot 2000 \
+        --out_dir "$RES/interp" || RC_ALL=$?
 fi
 
 echo ""
