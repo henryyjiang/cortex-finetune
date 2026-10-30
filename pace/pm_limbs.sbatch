@@ -19,6 +19,19 @@
 #   sbatch --array=0-5 pace/pm_limbs.sbatch
 #     [0] both  [1] eonly  [2] zonly  [3] edrop  [4] recall  [5] recall_ctrl
 #   sbatch --array=6 pace/pm_limbs.sbatch      [6] lownorm (added 2026-10-29)
+#   sbatch --array=7 pace/pm_limbs.sbatch      [7] carrydrop (added 2026-10-30)
+#
+# carrydrop (2026-10-30): the battery left the no-carry penalty (+0.080 on
+# chunk 1 AND on chunks 2-8 run without carry; the whole MC gap) standing as
+# a TRAINING-ALLOCATION effect by elimination: borrowed/fixed carries make it
+# worse, lownorm did not move it, no limb moved chunk 1.  Only chunk 1 -- 1/8
+# of every row's loss -- ever trains the no-carry mode.  --cortex.carry_dropout
+# OMITS the whole read (E and Z columns) on CARRYDROP_P of forwards, so that
+# share rises to 1/8 + 7/8 x p (0.56 at p 0.5).  Omitted, not zeroed: edrop's
+# zero columns still take softmax mass, which is why it never tested this.
+# Read against `both`: chunk-1 NLL and MC should move toward the control if
+# allocation is the cause; chunks 2+ show the price.  A null after 2,000
+# updates at x0.1 LR is weak evidence (the penalty grew over 26,700 updates).
 #
 # WHY TRAINED LIMBS AND NOT MORE ABLATIONS (2026-10-28)
 # -----------------------------------------------------
@@ -123,10 +136,10 @@ source pace/final_5b_common.sh
 OUT_DIR=${OUT_DIR:-cortex-pm}         # its own wandb project and scratch dir
 final5b_shared
 
-LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm)
+LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm carrydrop)
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 LIMB=${LIMBS[$IDX]}
-if [ -z "$LIMB" ]; then echo "no limb at index $IDX (use --array=0-6)"; exit 0; fi
+if [ -z "$LIMB" ]; then echo "no limb at index $IDX (use --array=0-7)"; exit 0; fi
 
 PARENT_STEP=${PARENT_STEP:-38146}
 CELL_STEPS=${CELL_STEPS:-2000}
@@ -137,6 +150,7 @@ LR_SCALE=${LR_SCALE:-0.1}
 SEED=${LIMB_SEED:-75}
 ZNORM_TARGET=${ZNORM_TARGET:-78.9}
 LOWNORM_TARGET=${LOWNORM_TARGET:-4.5}
+CARRYDROP_P=${CARRYDROP_P:-0.5}
 # lownorm moves Z's target too, so ARM_ARGS below carries ONE znorm flag.
 [ "$LIMB" = "lownorm" ] && ZNORM_TARGET=$LOWNORM_TARGET
 RECALL_DATA=${RECALL_DATA:-data/pg19fw50_recall_train_len4096}
@@ -204,6 +218,7 @@ else
         zonly) READ="--cortex.e_carry_read false --cortex.latent_carry_read true  --cortex.e_dropout 0.0" ;;
         edrop) READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.25" ;;
         lownorm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.e_read_norm_target $LOWNORM_TARGET" ;;
+        carrydrop) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.carry_dropout $CARRYDROP_P" ;;
         *)     READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.0" ;;
     esac
     ARM_ARGS="$ARM_ARGS $READ"
@@ -265,9 +280,9 @@ echo "=== limb $LIMB finished rc=$RC ==="
 # ===== THE GATE: did this limb run ITS OWN condition? ======================
 # Reads the MEASURED diagnostics, never the flags (the e_carry_read lesson).
 # Every check is j5_joint.sbatch's, re-keyed for these limbs.
-python - "$OUT_DIR/$RUN_NAME/cortex_diag.jsonl" "$LIMB" "$ZNORM_TARGET" <<'GATE'
+python - "$OUT_DIR/$RUN_NAME/cortex_diag.jsonl" "$LIMB" "$ZNORM_TARGET" "$CARRYDROP_P" <<'GATE'
 import json, sys
-path, limb, target = sys.argv[1], sys.argv[2], float(sys.argv[3])
+path, limb, target, cd_p = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4])
 try:
     rows = [json.loads(l) for l in open(path) if l.strip()]
 except FileNotFoundError:
@@ -330,6 +345,21 @@ if limb == "edrop":
                      f"(expect ~0.5 at mbs 2) over {len(dropped)} records")
         if dropped and m == 0:
             fails.append("e_dropout configured but no row was ever blanked")
+cdv = vals("z_carry_dropout")
+if limb == "carrydrop":
+    if not cdv or abs(cdv[-1] - cd_p) > 1e-6:
+        fails.append(f"z_carry_dropout {cdv[-1] if cdv else None}, expected {cd_p} -- the flag never reached the graft")
+    else:
+        # carry_dropped is 0/1 for the LAST forward before each record, so its
+        # mean estimates p (no tight band: 80 records, and the edrop gate's
+        # false fail is the lesson).
+        dropped = vals("z_carry_dropped")
+        m = sum(dropped) / max(len(dropped), 1)
+        notes.append(f"z_carry_dropout {cd_p}; reads omitted {m:.3f} of {len(dropped)} records")
+        if not dropped or m == 0:
+            fails.append("carry_dropout configured but no read was ever omitted")
+elif cdv and max(cdv) != 0.0:
+    fails.append(f"z_carry_dropout {max(cdv)} on limb {limb}, which never drops the carry")
 en = vals("z_e_carried_norm")
 if en:
     m = sum(en) / len(en)

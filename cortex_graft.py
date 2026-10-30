@@ -483,6 +483,15 @@ class CortexMemory(nn.Module):
         #                      token (~4.5); the post-mortem `lownorm` limb
         #                      sets it, with latent_read_znorm_target, to token
         #                      scale.  Read only: the merge sees the real carry.
+        #   carry_dropout      OMIT the whole read (no E, no Z columns) on a
+        #                      random share of forwards, training only, so the
+        #                      no-carry mode (chunk 1, every MC item) trains on
+        #                      more than chunk 1's 1/8 of the loss.  Omitted,
+        #                      not zeroed: a zero column still takes ~3-5% of
+        #                      the softmax (the Z block's note in prefix_pack),
+        #                      so zeros are not the condition MC runs in.  The
+        #                      post-mortem `carrydrop` limb.  Read only: the
+        #                      merge sees the real carry.
         self.latent_encoding = str(
             getattr(config, "latent_encoding", "delta") or "delta")
         _pool = getattr(config, "latent_tok_pool", 4)
@@ -496,6 +505,7 @@ class CortexMemory(nn.Module):
         self.e_dropout = float(getattr(config, "e_dropout", 0.0) or 0.0)
         self.e_read_norm_target = float(
             getattr(config, "e_read_norm_target", 0.0) or 0.0)
+        self.carry_dropout = float(getattr(config, "carry_dropout", 0.0) or 0.0)
         # No `or True`: that would turn an explicit False into True (the trap
         # latent_tok_pool's `or 4` already sprang once, a few lines up).
         _ecr = getattr(config, "e_carry_read", True)
@@ -734,6 +744,18 @@ class CortexMemory(nn.Module):
             raise ValueError(
                 "cortex.e_read_norm_target rescales the carried E rows of the "
                 "prefix splice; without --cortex.prefix_memory there are none.")
+        if not 0.0 <= self.carry_dropout < 1.0:
+            raise ValueError(f"cortex.carry_dropout must be in [0, 1); got "
+                             f"{self.carry_dropout}")
+        if self.carry_dropout > 0 and not pmode:
+            raise ValueError(
+                "cortex.carry_dropout omits the carried columns of the prefix "
+                "splice; without --cortex.prefix_memory there are none.")
+        if self.carry_dropout > 0 and self.e_dropout > 0:
+            raise ValueError(
+                "cortex.carry_dropout with cortex.e_dropout > 0 stacks two "
+                "dropouts on one read, and a read-out could not say which one "
+                "a result belongs to.  Pick one per limb.")
         if not self.e_carry_read and not pmode:
             raise ValueError(
                 "cortex.e_carry_read=false zeros the carried E rows of the "
@@ -1084,6 +1106,15 @@ class CortexMemory(nn.Module):
 
         if read:
             state = self._carried_state()
+            # CARRY-DROPOUT: one draw per forward (both micro-batch rows share
+            # it; rows cannot differ in length), on the device RNG as E-dropout
+            # draws.  A dropped forward splices nothing, exactly as chunk 1.
+            self._carry_dropped = 0
+            if (state is not None and state.shape[1] > 0 and self.training
+                    and self.carry_dropout > 0
+                    and float(torch.rand((), device=input_embeds.device))
+                    < self.carry_dropout):
+                state, self._carry_dropped = None, 1
             if state is not None and state.shape[1] > 0:
                 state = state.to(device=input_embeds.device, dtype=input_embeds.dtype)
                 # ONLY THE E HALF ENTERS HERE.  Until J4 the Z half was
@@ -1385,6 +1416,7 @@ class CortexMemory(nn.Module):
         self._z_read_delta_norm: Optional[float] = None  # ||injected delta||, fp32
         self._z_last_x: Optional[torch.Tensor] = None  # final loop state, NOT detached
         self._e_dropped: int = 0                       # E rows blanked this forward
+        self._carry_dropped: int = 0                   # 1 if this forward's read was omitted
         # --- J3 scratchpad per-call runtime ------------------------------
         self._scratch: Optional[torch.Tensor] = None   # [B,S_packed,D] m_t, NOT detached
         self._scratch_row_norm: Optional[float] = None  # ||m row|| at the read, fp32

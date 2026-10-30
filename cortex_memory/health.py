@@ -349,6 +349,8 @@ def latent_runtime(cortex) -> dict:
         "znorm_target": float(getattr(cortex, "latent_read_znorm_target", 0.0)),
         "e_dropout": float(getattr(cortex, "e_dropout", 0.0)),
         "e_dropped": int(getattr(cortex, "_e_dropped", 0)),
+        "carry_dropout": float(getattr(cortex, "carry_dropout", 0.0)),
+        "carry_dropped": int(getattr(cortex, "_carry_dropped", 0)),
         # THE Z-ONLY ARM, recorded for the reason znorm_target is recorded below:
         # it is a CONFIG FLAG and not a stored parameter, so a read-out rebuilt
         # with E on would splice real E rows into an arm that never trained with

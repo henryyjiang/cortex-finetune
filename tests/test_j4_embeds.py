@@ -508,6 +508,77 @@ class TestTheLowNormLimb:
         assert '"e_read_norm_target"' in tp[i:j]
 
 
+class TestTheCarryDropoutLimb:
+    """pm `carrydrop`: on a sampled share of TRAINING forwards the whole read
+    is omitted -- no E and no Z columns -- so the chunk runs in the no-carry
+    mode chunk 1 and every MC item run in.  Omitted, not zeroed: zero columns
+    still take softmax mass, so they are a different condition."""
+
+    def test_off_by_default_and_bit_identical(self):
+        st = _carry()
+        torch.manual_seed(0)
+        a = _pack(_cortex().train(), st)[0]
+        torch.manual_seed(0)
+        b = _pack(_cortex(carry_dropout=0.0).train(), st)[0]
+        assert torch.equal(a, b)
+
+    def test_a_dropped_forward_packs_exactly_as_chunk_1(self):
+        g = _cortex(carry_dropout=0.999)
+        emb = torch.randn(B, S, D)
+        g.eval()
+        chunk1, pos1, n1, s1, _ = _pack(g, None, emb=emb)
+        g.train()
+        torch.manual_seed(0)
+        p, pos, n_prefix, n_sum, _ = _pack(g, _carry(), emb=emb)
+        assert g._carry_dropped == 1
+        assert n_prefix == 0 == n1 and n_sum == s1
+        assert g._n_pre == 0 and g._n_zpre == 0
+        assert torch.equal(p, chunk1) and torch.equal(pos, pos1)
+
+    def test_eval_never_drops(self):
+        g = _cortex(carry_dropout=0.999).eval()
+        torch.manual_seed(0)
+        _, _, n_prefix, _, _ = _pack(g, _carry())
+        assert n_prefix == 2 * K and g._carry_dropped == 0
+
+    def test_it_drops_about_the_configured_share(self):
+        g = _cortex(carry_dropout=0.5).train()
+        st = _carry()               # _carry() reseeds, so build it once
+        torch.manual_seed(0)
+        dropped = 0
+        for _ in range(400):
+            _pack(g, st)
+            dropped += g._carry_dropped
+        assert 160 < dropped < 240, dropped
+
+    def test_the_buffer_merge_sees_the_real_carry(self):
+        st = _carry()
+        before = st.clone()
+        g = _cortex(carry_dropout=0.999).train()
+        torch.manual_seed(0)
+        _pack(g, st)
+        assert g._carry_dropped == 1 and torch.equal(st, before)
+
+    def test_it_refuses_bad_rates_a_missing_buffer_and_e_dropout(self):
+        for bad in (1.0, -0.1):
+            with pytest.raises(ValueError, match=r"carry_dropout must be in \[0, 1\)"):
+                _cortex(carry_dropout=bad)
+        with pytest.raises(ValueError, match="there are none"):
+            _cortex(carry_dropout=0.5, prefix_memory="", latent_carry=False,
+                    latent_encoding="delta", latent_read="none",
+                    latent_read_znorm="none", latent_s0_read=True)
+        with pytest.raises(ValueError, match="Pick one per limb"):
+            _cortex(carry_dropout=0.5, e_dropout=0.25)
+
+    def test_train_py_declares_and_persists_it(self):
+        tp = _src("train.py")
+        assert "carry_dropout=0.0," in tp
+        i = tp.index('    if cfg.cortex["use_memory"]:')
+        j = tp.index("setattr(config, _k, cfg.cortex[_k])", i)
+        assert '"carry_dropout"' in tp[i:j]
+        assert '"carry_dropout"' in _src("tools/prepare_eval_checkpoint.py")
+
+
 # ─── 5. the gradient property ───────────────────────────────────────────────
 
 class TestTheGradient:
@@ -737,6 +808,25 @@ class TestOnTheRealModel:
         (out["loss"] if isinstance(out, dict) else out.loss).backward()
         gr = m.cortex.latent_embed.proj.weight.grad
         assert gr is not None and float(gr.abs().sum()) > 0
+
+    def test_a_dropped_chunk_matches_chunk_1_and_the_ring_still_grows(self):
+        """carrydrop on the real model: a dropped chunk's logits equal the same
+        ids run with no carry at all, and the buffer chain keeps filling."""
+        m = _model(carry_dropout=0.999)
+        ids = torch.randint(0, VOCAB - 1, (B, CL))
+        torch.manual_seed(7)
+        o1 = m(ids, num_steps=torch.tensor([0, T]), return_m_cross=True)
+        st = o1["m_cross"] if isinstance(o1, dict) else o1.m_cross
+        # o1 IS the no-carry run of these ids; no side forward in between,
+        # which would reset the ring pointer (ring-pointer-is-buffer-state).
+        torch.manual_seed(7)
+        out = m(ids, num_steps=torch.tensor([0, T]), m_cross_in=st,
+                labels=ids, return_m_cross=True)
+        assert m.cortex._carry_dropped == 1 and int(m.cortex._n_zpre) == 0
+        assert torch.allclose(out["logits"], o1["logits"], atol=1e-5)
+        st2 = out["m_cross"] if isinstance(out, dict) else out.m_cross
+        assert st2.shape == (B, min(2 * W, K), 2 * D)   # merged, not restarted
+        out["loss"].backward()                           # the write still trains
 
 
 # ─── 9. the launcher and the read-out agree with this file ──────────────────

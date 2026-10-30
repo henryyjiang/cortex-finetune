@@ -20,8 +20,17 @@
 #   sbatch --array=0-2 --export=ALL,PARTS=dissect pace/pm_probe.sbatch
 #   sbatch --array=0-1 --export=ALL,PARTS=interp  pace/pm_probe.sbatch
 #     [0] cortex@38146   [1] cortex@11444   [2] control@38146 (dissection only)
+#     [3] limb both      [4] limb recall    [5] limb lownorm  (pm-*/checkpoint_40146)
 #
 # Task 1 is the heal-end half of the heal-vs-final comparison, as in pm_mech.
+#
+# LIMB TASKS (2026-10-30), each read against `both`, never against 38,146:
+#   sbatch --array=3-4 --export=ALL,PARTS=dissect pace/pm_probe.sbatch
+#       does the recall limb's past-the-lap retention (25-31% at 5-6 chunks on
+#       its own probe) reach BABILong?  Watch teleport - normal at dist 4-7/8+.
+#   sbatch --array=3,5 --export=ALL,PARTS=interp pace/pm_probe.sbatch
+#       does reading the carry at token scale move WHERE it is read (coda mass,
+#       part B's blocking map) -- the lownorm question the battery left open.
 #
 #   babilong_dissect/  WRITE -> RETAIN -> READ on BABILong qa1/qa2
 #                      (evals/diag_babilong_dissect.py).  normal / nocarry /
@@ -62,13 +71,25 @@ cd $SLURM_SUBMIT_DIR
 source pace/pm_common.sh
 pm_env
 
-CASES=("cortex 38146" "cortex 11444" "control 38146")
+CASES=("cortex 38146" "cortex 11444" "control 38146" "limb both" "limb recall" "limb lownorm")
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 read ARM STEP <<< "${CASES[$IDX]}"
-[ -n "$ARM" ] || { echo "no case at index $IDX (use --array=0-2)"; exit 0; }
-pm_resolve "$ARM" "$STEP" || exit 1
+[ -n "$ARM" ] || { echo "no case at index $IDX (use --array=0-5)"; exit 0; }
+if [ "$ARM" = "limb" ]; then
+    # The limbs branched from 38146 and trained at its 78.9 rebuild flags;
+    # lownorm then splices both channels at LOWNORM_TARGET, as its read-out does.
+    pm_resolve cortex 38146 >/dev/null || exit 1
+    CKPT="cortex-pm/pm-$STEP/checkpoint_40146"
+    RES="eval_results/pm/limbs/pm-$STEP"
+    [ -f "$CKPT/chkpt.pt" ] || { echo "ERROR: no $CKPT/chkpt.pt"; exit 1; }
+    LOWNORM_TARGET=${LOWNORM_TARGET:-4.5}
+    [ "$STEP" = "lownorm" ] && SETS="$SETS --set e_read_norm_target=$LOWNORM_TARGET --set latent_read_znorm_target=$LOWNORM_TARGET"
+else
+    pm_resolve "$ARM" "$STEP" || exit 1
+fi
 BABILONG_PATH=${BABILONG_PATH:-data/babilong-1k}
 PARTS=${PARTS:-dissect,interp}
+INTERP_PARTS=${INTERP_PARTS:-A,B,C,D,E,F,G}
 # the benchmark's own records, for the per-item reproduction check (38146 only)
 case "$ARM@$STEP" in
     cortex@38146)  REC="--records eval_results/longcontext_5b-final/cortex-final-T8-nc8-sl512/babilong" ;;
@@ -91,11 +112,11 @@ if [[ ",$PARTS," == *",dissect,"* ]]; then
         --out_dir "$RES/babilong_dissect" || RC_ALL=$?
 fi
 
-if [ "$ARM" = "cortex" ] && [[ ",$PARTS," == *",interp,"* ]]; then
-    step "memory interp (A-E)"
+if [ "$ARM" != "control" ] && [[ ",$PARTS," == *",interp,"* ]]; then
+    step "memory interp ($INTERP_PARTS)"
     python evals/diag_memory_interp.py --model_name "$MODEL" --checkpoint "$CKPT" \
         $SETS --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_rows 24 \
-        --parts A,B,C,D,E --dtype float32 --seed 1234 --boot 2000 --out_dir "$RES/interp" || RC_ALL=$?
+        --parts "$INTERP_PARTS" --dtype float32 --seed 1234 --boot 2000 --out_dir "$RES/interp" || RC_ALL=$?
 fi
 
 echo ""

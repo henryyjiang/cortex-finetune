@@ -21,7 +21,9 @@
 #     [6] cortex-final@38146 recall probe only (the zero point)
 #     [7] c-chunked@38146   recall probe only
 #     [8] lownorm           (sbatch --array=8; needs pm_limbs --array=6)
-#   mc/   both + lownorm: the MC suite, so the benchmark gap is read limb
+#     [9] carrydrop         (sbatch --array=9; needs pm_limbs --array=7):
+#                           val NLL (chunk 1 IS the no-carry mode), recall, MC
+#   mc/   both + lownorm + carrydrop: the MC suite, so the benchmark gap is read limb
 #         against limb (`both` absorbs the re-warm, as everywhere else).
 #
 # Run AFTER pm_limbs; each limb task refuses if its checkpoint_40146/chkpt.pt is
@@ -54,10 +56,10 @@ cd $SLURM_SUBMIT_DIR
 source pace/pm_common.sh
 pm_env
 
-LIMBS=(both eonly zonly edrop recall recall_ctrl ref_cortex ref_control lownorm)
+LIMBS=(both eonly zonly edrop recall recall_ctrl ref_cortex ref_control lownorm carrydrop)
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 LIMB=${LIMBS[$IDX]}
-[ -n "$LIMB" ] || { echo "no task at index $IDX (use --array=0-8)"; exit 0; }
+[ -n "$LIMB" ] || { echo "no task at index $IDX (use --array=0-9)"; exit 0; }
 LOWNORM_TARGET=${LOWNORM_TARGET:-4.5}
 STOP=${STOP:-40146}
 RECALL_VAL=${RECALL_VAL:-data/pg19_val_recall_len4096}
@@ -150,7 +152,7 @@ if [ "$LIMB" = "both" ] || [ "$LIMB" = "recall" ]; then
         --damage donor --damage_channel both --T "$T" --max_examples 100 \
         --dtype float32 --out_dir "$RES/horizon" || RC_ALL=$?
 fi
-if [ "$LIMB" = "both" ] || [ "$LIMB" = "lownorm" ]; then
+if [ "$LIMB" = "both" ] || [ "$LIMB" = "lownorm" ] || [ "$LIMB" = "carrydrop" ]; then
     step "MC suite (single forward: the chunk-1 tax on benchmarks)"
     python evals/eval_multiple_choice.py --model_name "$MODEL" \
         --checkpoint "$CKPT" $SETS --tasks hellaswag winogrande arc_easy arc_challenge piqa \

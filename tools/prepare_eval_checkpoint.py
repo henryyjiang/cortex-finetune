@@ -108,6 +108,8 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 # Post-mortem `lownorm`: without it E is spliced at ~84, not
                 # token scale -- the limb rebuilt as `both`.
                 "e_read_norm_target",
+                # Post-mortem `carrydrop`: training-only, persisted as e_dropout is.
+                "carry_dropout",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

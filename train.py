@@ -405,6 +405,9 @@ class CLISettings:
             # norm (0 = off, every arm before it).  A typed float default for
             # the same jsonargparse reason as e_carry_read above.
             e_read_norm_target=0.0,
+            # Post-mortem `carrydrop` limb: omit the whole carried read (E and
+            # Z columns) on this share of forwards, training only (0 = off).
+            carry_dropout=0.0,
             # Z ATTEMPT 2 (J3), cortex_memory/scratchpad.py.  latent_read
             # 'scratch' + latent_encoding 'scratch' is the in-loop scratchpad;
             #   latent_carry_read          False = J3's no-read limb (carry
@@ -1267,7 +1270,10 @@ def startup(cfg: CLISettings):
                    # Post-mortem `lownorm`.  Same class again: rebuilt without
                    # it, the limb splices E at ~84 instead of token scale and
                    # is `both` wearing the limb's name.
-                   "e_read_norm_target"):
+                   "e_read_norm_target",
+                   # Post-mortem `carrydrop`.  Training-only in effect, but
+                   # persists so the checkpoint records what it trained under.
+                   "carry_dropout"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -1308,6 +1314,8 @@ def startup(cfg: CLISettings):
                         if cfg.cortex['latent_read_znorm'] == 'rms' else "")
                      + (f",e_dropout={cfg.cortex['e_dropout']}"
                         if cfg.cortex['e_dropout'] else "")
+                     + (f",carry_dropout={cfg.cortex['carry_dropout']}"
+                        if cfg.cortex['carry_dropout'] else "")
                      + ") "
                      if cfg.cortex['latent_carry'] else "") +
                   f"prefix_pos={cfg.cortex['prefix_pos']} "

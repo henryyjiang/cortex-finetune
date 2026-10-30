@@ -141,7 +141,7 @@ def test_lownorm_moves_both_channels_and_is_read_as_itself():
     """A lownorm limb that lost either flag would train (or be scored as) a
     half-rescaled carry under the limb's name."""
     s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
-    assert "LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm)" in s
+    assert "LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm carrydrop)" in s
     assert '[ "$LIMB" = "lownorm" ] && ZNORM_TARGET=$LOWNORM_TARGET' in s
     assert "--cortex.e_read_norm_target $LOWNORM_TARGET" in s
     # the switch must precede the ARM_ARGS line that consumes ZNORM_TARGET
@@ -154,3 +154,17 @@ def test_lownorm_moves_both_channels_and_is_read_as_itself():
     # same default target on both sides
     pat = r"LOWNORM_TARGET=\$\{LOWNORM_TARGET:-([0-9.]+)\}"
     assert re.findall(pat, s) == re.findall(pat, r) != []
+
+
+def test_carrydrop_trains_its_flag_and_is_read_against_both():
+    """carrydrop must train with carry_dropout (and nothing else changed), the
+    gate must check the measured drop, and round 2 must run the MC suite on it
+    -- the benchmark gap is the whole point of the limb."""
+    s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
+    assert "--cortex.carry_dropout $CARRYDROP_P" in s
+    assert "CARRYDROP_P=${CARRYDROP_P:-0.5}" in s
+    assert 'vals("z_carry_dropped")' in s
+    r = open(os.path.join(ROOT, "pace/pm_limb_readout.sbatch"), encoding="utf-8").read()
+    limbs = re.search(r"^LIMBS=\((.*)\)$", r, re.M).group(1).split()
+    assert limbs.index("carrydrop") == 9 and limbs.index("both") == 0
+    assert '[ "$LIMB" = "carrydrop" ]; then\n    step "MC suite' in r
