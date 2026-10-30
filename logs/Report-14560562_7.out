@@ -1,0 +1,50 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-29-2026 11:48:31
+Job ID:    14560562
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_read
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== pm_read | ref_control | cortex-5b/c-chunked/checkpoint_38146 -> eval_results/pm/c-chunked/step_38146_T8 ===
+    commit: 1a2fdee
+
+--- [ref_control] recall probe  (11:48:36)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.80s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.09it/s]
+[load] overlaid cortex-5b/c-chunked/checkpoint_38146/chkpt.pt: 0 missing / 0 unexpected keys
+  50 rows
+  100 rows
+  150 rows
+  200 rows
+  250 rows
+  300 rows
+  350 rows
+
+======================================================================
+RECALL PROBE  n=383 (skipped 17)
+======================================================================
+  dist    n  nocarry_nll nocarry_acc
+   all  383        5.880     0.000
+     2   73        5.967     0.000
+     3   54        5.740     0.000
+     4   70        5.914     0.000
+     5   63        6.180     0.000
+     6   58        5.742     0.000
+     7   65        5.697     0.000
+wrote eval_results/pm/c-chunked/step_38146_T8/recall/results.json
+
+=== pm_read ref_control finished rc=0 (11:55:03) -> eval_results/pm/c-chunked/step_38146_T8 ===
+---------------------------------------
+Begin Slurm Epilog: Oct-29-2026 11:55:03
+Job ID:        14560562
+Array Job ID:  14560562_7
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_read
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=02:55:04,vmem=0,walltime=00:21:53,mem=29828632K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-014-2-0
+---------------------------------------

@@ -1,0 +1,170 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-29-2026 15:37:40
+Job ID:    14560570
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_mech
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== pm_mech | control @ 11444 | cortex-5b/c-chunked/checkpoint_11444 -> eval_results/pm/c-chunked/step_11444_T8 ===
+NVIDIA H200, 143771 MiB
+    commit: 1a2fdee
+
+--- [control@11444] chunk1 + drift  (15:37:43)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 70.54it/s]
+[load] overlaid cortex-5b/c-chunked/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+  chunk1: 25 rows
+  chunk1: 50 rows
+  chunk1: 75 rows
+  chunk1: 100 rows
+  chunk1: 125 rows
+  chunk1: 150 rows
+  chunk1: 175 rows
+  chunk1: 200 rows
+
+==============================================================================
+CHUNK-1 TAX  (n=200 rows, control: no-carry profiles only)
+==============================================================================
+  none       chunk-1 NLL 3.7395
+  by position bin (64-token bins), chunk 1 no carry vs chunks 2+ with carry:
+    4.393  3.806  3.686  3.711  3.641  3.583  3.528  3.568
+    4.326  3.763  3.685  3.629  3.602  3.591  3.603  3.590
+  no-carry NLL by chunk: 3.739 3.840 3.723 3.692 3.726 3.676 3.697 3.709
+  carry NLL by chunk:    3.739 3.840 3.723 3.692 3.726 3.676 3.697 3.709
+
+wrote eval_results/pm/c-chunked/step_11444_T8/chunk1_drift/results.json
+
+--- [control@11444] MC none  (15:44:34)
+Loading checkpoint: cortex-5b/c-chunked/checkpoint_11444
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.15it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  2.26it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.98it/s]
+Using the latest cached version of the dataset since Rowan/hellaswag couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/Rowan___hellaswag/default/0.0.0/218ec52e09a7e7462a5400043bb9a69a41d06b76 (last modified on Fri Jul 10 21:28:18 2026).
+Using the latest cached version of the dataset since allenai/winogrande couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'winogrande_xl' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___winogrande/winogrande_xl/0.0.0/01e74176c63542e6b0bcb004dcdea22d94fb67b5 (last modified on Fri Jul 10 21:28:20 2026).
+Using the latest cached version of the dataset since allenai/ai2_arc couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'ARC-Easy' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___ai2_arc/ARC-Easy/0.0.0/210d026faf9955653af8916fad021475a3f00453 (last modified on Fri Jul 10 21:28:21 2026).
+Using the latest cached version of the dataset since allenai/ai2_arc couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'ARC-Challenge' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___ai2_arc/ARC-Challenge/0.0.0/210d026faf9955653af8916fad021475a3f00453 (last modified on Fri Jul 10 21:28:22 2026).
+Using the latest cached version of the dataset since ybisk/piqa couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/ybisk___piqa/default/0.0.0/142c51238b3ca2bc61e9a075913871b8b600e8e1 (last modified on Fri Jul 10 21:28:23 2026).
+[load] overlaid cortex-5b/c-chunked/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+T=8  tasks=['hellaswag', 'winogrande', 'arc_easy', 'arc_challenge', 'piqa']
+
+=======================================================
+Task: hellaswag
+=======================================================
+  [hellaswag] 200/10042  acc=0.4850
+  [hellaswag] 400/10042  acc=0.4750
+  [hellaswag] 600/10042  acc=0.4883
+  [hellaswag] 800/10042  acc=0.4975
+  [hellaswag] 1000/10042  acc=0.4890
+  [hellaswag] 1200/10042  acc=0.5008
+  [hellaswag] 1400/10042  acc=0.5014
+  [hellaswag] 1600/10042  acc=0.4956
+  [hellaswag] 1800/10042  acc=0.4950
+  [hellaswag] 2000/10042  acc=0.4915
+  [hellaswag] 2200/10042  acc=0.4955
+  [hellaswag] 2400/10042  acc=0.4975
+  [hellaswag] 2600/10042  acc=0.4969
+  [hellaswag] 2800/10042  acc=0.4961
+  [hellaswag] 3000/10042  acc=0.5017
+  [hellaswag] 3200/10042  acc=0.5050
+  [hellaswag] 3400/10042  acc=0.5109
+  [hellaswag] 3600/10042  acc=0.5172
+  [hellaswag] 3800/10042  acc=0.5245
+  [hellaswag] 4000/10042  acc=0.5285
+  [hellaswag] 4200/10042  acc=0.5338
+  [hellaswag] 4400/10042  acc=0.5400
+  [hellaswag] 4600/10042  acc=0.5424
+  [hellaswag] 4800/10042  acc=0.5433
+  [hellaswag] 5000/10042  acc=0.5488
+  [hellaswag] 5200/10042  acc=0.5525
+  [hellaswag] 5400/10042  acc=0.5572
+  [hellaswag] 5600/10042  acc=0.5609
+  [hellaswag] 5800/10042  acc=0.5638
+  [hellaswag] 6000/10042  acc=0.5668
+  [hellaswag] 6200/10042  acc=0.5671
+  [hellaswag] 6400/10042  acc=0.5692
+  [hellaswag] 6600/10042  acc=0.5714
+  [hellaswag] 6800/10042  acc=0.5732
+  [hellaswag] 7000/10042  acc=0.5747
+  [hellaswag] 7200/10042  acc=0.5750
+  [hellaswag] 7400/10042  acc=0.5766
+  [hellaswag] 7600/10042  acc=0.5763
+  [hellaswag] 7800/10042  acc=0.5797
+  [hellaswag] 8000/10042  acc=0.5807
+  [hellaswag] 8200/10042  acc=0.5820
+  [hellaswag] 8400/10042  acc=0.5838
+  [hellaswag] 8600/10042  acc=0.5836
+  [hellaswag] 8800/10042  acc=0.5843
+  [hellaswag] 9000/10042  acc=0.5847
+  [hellaswag] 9200/10042  acc=0.5871
+  [hellaswag] 9400/10042  acc=0.5885
+  [hellaswag] 9600/10042  acc=0.5892
+  [hellaswag] 9800/10042  acc=0.5890
+  [hellaswag] 10000/10042  acc=0.5911
+  hellaswag: 5931/10042 = 0.5906
+
+=======================================================
+Task: winogrande
+=======================================================
+  [winogrande] 200/1267  acc=0.5450
+  [winogrande] 400/1267  acc=0.5675
+  [winogrande] 600/1267  acc=0.5650
+  [winogrande] 800/1267  acc=0.5600
+  [winogrande] 1000/1267  acc=0.5530
+  [winogrande] 1200/1267  acc=0.5525
+  winogrande: 701/1267 = 0.5533
+
+=======================================================
+Task: arc_easy
+=======================================================
+  [arc_easy] 200/570  acc=0.4750
+  [arc_easy] 400/570  acc=0.4725
+  arc_easy: 281/570 = 0.4930
+
+=======================================================
+Task: arc_challenge
+=======================================================
+  [arc_challenge] 200/299  acc=0.3300
+  arc_challenge: 100/299 = 0.3344
+
+=======================================================
+Task: piqa
+=======================================================
+  [piqa] 200/1838  acc=0.7500
+  [piqa] 400/1838  acc=0.7250
+  [piqa] 600/1838  acc=0.7267
+  [piqa] 800/1838  acc=0.7188
+  [piqa] 1000/1838  acc=0.7240
+  [piqa] 1200/1838  acc=0.7208
+  [piqa] 1400/1838  acc=0.7157
+  [piqa] 1600/1838  acc=0.7200
+  [piqa] 1800/1838  acc=0.7206
+  piqa: 1326/1838 = 0.7214
+
+Task                Correct    Total      Acc
+---------------------------------------------
+hellaswag              5931    10042   0.5906
+winogrande              701     1267   0.5533
+arc_easy                281      570   0.4930
+arc_challenge           100      299   0.3344
+piqa                   1326     1838   0.7214
+
+Results saved → eval_results/pm/c-chunked/step_11444_T8/mc_none
+
+=== pm_mech control@11444 finished rc=0  (16:11:38) -> eval_results/pm/c-chunked/step_11444_T8 ===
+---------------------------------------
+Begin Slurm Epilog: Oct-29-2026 16:11:40
+Job ID:        14560570
+Array Job ID:  14560570_3
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_mech
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=1-02:48:48,vmem=0,walltime=03:21:06,mem=34036432K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-014-2-0
+---------------------------------------

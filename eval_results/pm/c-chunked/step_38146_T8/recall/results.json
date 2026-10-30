@@ -1,0 +1,3115 @@
+{
+  "instrument": "recall probe by distance",
+  "when": "2026-10-29T11:55:02",
+  "checkpoint": "cortex-5b/c-chunked/checkpoint_38146",
+  "has_memory": false,
+  "config": {
+    "T": 8,
+    "data": "data/pg19_val_recall_len4096",
+    "overrides": {}
+  },
+  "skipped_rows": 17,
+  "all": {
+    "n": 383,
+    "nocarry_nll": 5.880495124946375,
+    "nocarry_acc": 0.0
+  },
+  "by_distance": {
+    "2": {
+      "n": 73,
+      "nocarry_nll": 5.966925967229556,
+      "nocarry_acc": 0.0
+    },
+    "3": {
+      "n": 54,
+      "nocarry_nll": 5.7403239100067704,
+      "nocarry_acc": 0.0
+    },
+    "4": {
+      "n": 70,
+      "nocarry_nll": 5.913698274748666,
+      "nocarry_acc": 0.0
+    },
+    "5": {
+      "n": 63,
+      "nocarry_nll": 6.179851441156297,
+      "nocarry_acc": 0.0
+    },
+    "6": {
+      "n": 58,
+      "nocarry_nll": 5.742209068660078,
+      "nocarry_acc": 0.0
+    },
+    "7": {
+      "n": 65,
+      "nocarry_nll": 5.697367693827703,
+      "nocarry_acc": 0.0
+    }
+  },
+  "records": [
+    {
+      "row": 0,
+      "key": "the gentle saddle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.687844276428223,
+      "nocarry_hit": false
+    },
+    {
+      "row": 1,
+      "key": "the distant palace",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 8.282669067382812,
+      "nocarry_hit": false
+    },
+    {
+      "row": 2,
+      "key": "the marble hammer",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.517655849456787,
+      "nocarry_hit": false
+    },
+    {
+      "row": 4,
+      "key": "the gentle organ",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.492814064025879,
+      "nocarry_hit": false
+    },
+    {
+      "row": 5,
+      "key": "the velvet harbor",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.032402992248535,
+      "nocarry_hit": false
+    },
+    {
+      "row": 6,
+      "key": "the rusty garden",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.384404182434082,
+      "nocarry_hit": false
+    },
+    {
+      "row": 7,
+      "key": "the silver meadow",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 7.109816551208496,
+      "nocarry_hit": false
+    },
+    {
+      "row": 8,
+      "key": "the golden kettle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.95726203918457,
+      "nocarry_hit": false
+    },
+    {
+      "row": 9,
+      "key": "the crimson basket",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.193257808685303,
+      "nocarry_hit": false
+    },
+    {
+      "row": 10,
+      "key": "the crimson meadow",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 7.709456443786621,
+      "nocarry_hit": false
+    },
+    {
+      "row": 11,
+      "key": "the crimson saddle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 7.721251487731934,
+      "nocarry_hit": false
+    },
+    {
+      "row": 12,
+      "key": "the golden jacket",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.871865272521973,
+      "nocarry_hit": false
+    },
+    {
+      "row": 13,
+      "key": "the lonely basket",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.004300594329834,
+      "nocarry_hit": false
+    },
+    {
+      "row": 14,
+      "key": "the gentle falcon",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.335694313049316,
+      "nocarry_hit": false
+    },
+    {
+      "row": 15,
+      "key": "the cobalt anchor",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.420411109924316,
+      "nocarry_hit": false
+    },
+    {
+      "row": 16,
+      "key": "the narrow hammer",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.528409481048584,
+      "nocarry_hit": false
+    },
+    {
+      "row": 17,
+      "key": "the hollow ladder",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.9283447265625,
+      "nocarry_hit": false
+    },
+    {
+      "row": 18,
+      "key": "the distant harbor",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.067109107971191,
+      "nocarry_hit": false
+    },
+    {
+      "row": 19,
+      "key": "the velvet organ",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.034206390380859,
+      "nocarry_hit": false
+    },
+    {
+      "row": 20,
+      "key": "the cobalt meadow",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.040643215179443,
+      "nocarry_hit": false
+    },
+    {
+      "row": 21,
+      "key": "the silent ladder",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.390167236328125,
+      "nocarry_hit": false
+    },
+    {
+      "row": 22,
+      "key": "the iron jacket",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.695269584655762,
+      "nocarry_hit": false
+    },
+    {
+      "row": 23,
+      "key": "the scarlet falcon",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.7713141441345215,
+      "nocarry_hit": false
+    },
+    {
+      "row": 24,
+      "key": "the broken temple",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.824440956115723,
+      "nocarry_hit": false
+    },
+    {
+      "row": 25,
+      "key": "the golden harbor",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.437035083770752,
+      "nocarry_hit": false
+    },
+    {
+      "row": 26,
+      "key": "the broken anchor",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.904216289520264,
+      "nocarry_hit": false
+    },
+    {
+      "row": 27,
+      "key": "the broken island",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.33758544921875,
+      "nocarry_hit": false
+    },
+    {
+      "row": 28,
+      "key": "the crimson compass",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.403848171234131,
+      "nocarry_hit": false
+    },
+    {
+      "row": 29,
+      "key": "the violet organ",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 7.294162273406982,
+      "nocarry_hit": false
+    },
+    {
+      "row": 30,
+      "key": "the hollow bridge",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.969998359680176,
+      "nocarry_hit": false
+    },
+    {
+      "row": 31,
+      "key": "the hollow organ",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.368432998657227,
+      "nocarry_hit": false
+    },
+    {
+      "row": 32,
+      "key": "the emerald orchard",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.185023784637451,
+      "nocarry_hit": false
+    },
+    {
+      "row": 34,
+      "key": "the velvet candle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.416886806488037,
+      "nocarry_hit": false
+    },
+    {
+      "row": 35,
+      "key": "the cobalt engine",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.379549503326416,
+      "nocarry_hit": false
+    },
+    {
+      "row": 36,
+      "key": "the quiet harbor",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.030762672424316,
+      "nocarry_hit": false
+    },
+    {
+      "row": 37,
+      "key": "the emerald candle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.167256832122803,
+      "nocarry_hit": false
+    },
+    {
+      "row": 38,
+      "key": "the salted mirror",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.777922630310059,
+      "nocarry_hit": false
+    },
+    {
+      "row": 39,
+      "key": "the iron organ",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.938736915588379,
+      "nocarry_hit": false
+    },
+    {
+      "row": 40,
+      "key": "the winter ribbon",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.324991703033447,
+      "nocarry_hit": false
+    },
+    {
+      "row": 41,
+      "key": "the velvet valley",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.292622089385986,
+      "nocarry_hit": false
+    },
+    {
+      "row": 42,
+      "key": "the violet compass",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.689582347869873,
+      "nocarry_hit": false
+    },
+    {
+      "row": 43,
+      "key": "the quiet meadow",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.8778076171875,
+      "nocarry_hit": false
+    },
+    {
+      "row": 44,
+      "key": "the broken meadow",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.536364555358887,
+      "nocarry_hit": false
+    },
+    {
+      "row": 45,
+      "key": "the salted ribbon",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.90122652053833,
+      "nocarry_hit": false
+    },
+    {
+      "row": 46,
+      "key": "the hollow hammer",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.186405181884766,
+      "nocarry_hit": false
+    },
+    {
+      "row": 47,
+      "key": "the velvet lantern",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.867643356323242,
+      "nocarry_hit": false
+    },
+    {
+      "row": 48,
+      "key": "the winter ribbon",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.138434410095215,
+      "nocarry_hit": false
+    },
+    {
+      "row": 49,
+      "key": "the summer lantern",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 7.740225791931152,
+      "nocarry_hit": false
+    },
+    {
+      "row": 50,
+      "key": "the cobalt valley",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.962299346923828,
+      "nocarry_hit": false
+    },
+    {
+      "row": 51,
+      "key": "the cobalt candle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.876277446746826,
+      "nocarry_hit": false
+    },
+    {
+      "row": 52,
+      "key": "the iron valley",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.009404182434082,
+      "nocarry_hit": false
+    },
+    {
+      "row": 53,
+      "key": "the silver garden",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.678171157836914,
+      "nocarry_hit": false
+    },
+    {
+      "row": 54,
+      "key": "the narrow ribbon",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.541023254394531,
+      "nocarry_hit": false
+    },
+    {
+      "row": 55,
+      "key": "the winter ribbon",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.023619651794434,
+      "nocarry_hit": false
+    },
+    {
+      "row": 56,
+      "key": "the salted hammer",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.227385997772217,
+      "nocarry_hit": false
+    },
+    {
+      "row": 57,
+      "key": "the amber kettle",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.864008903503418,
+      "nocarry_hit": false
+    },
+    {
+      "row": 58,
+      "key": "the summer anchor",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.243124008178711,
+      "nocarry_hit": false
+    },
+    {
+      "row": 59,
+      "key": "the cobalt harbor",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.170273780822754,
+      "nocarry_hit": false
+    },
+    {
+      "row": 60,
+      "key": "the distant mirror",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.552790641784668,
+      "nocarry_hit": false
+    },
+    {
+      "row": 61,
+      "key": "the ancient anchor",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.6854448318481445,
+      "nocarry_hit": false
+    },
+    {
+      "row": 62,
+      "key": "the lonely ribbon",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 8.148816108703613,
+      "nocarry_hit": false
+    },
+    {
+      "row": 63,
+      "key": "the salted falcon",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.787083625793457,
+      "nocarry_hit": false
+    },
+    {
+      "row": 65,
+      "key": "the gentle engine",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 8.595115661621094,
+      "nocarry_hit": false
+    },
+    {
+      "row": 66,
+      "key": "the crimson ribbon",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 7.296294212341309,
+      "nocarry_hit": false
+    },
+    {
+      "row": 67,
+      "key": "the amber basket",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.981147766113281,
+      "nocarry_hit": false
+    },
+    {
+      "row": 68,
+      "key": "the amber temple",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.88345193862915,
+      "nocarry_hit": false
+    },
+    {
+      "row": 69,
+      "key": "the salted harbor",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 9.353689193725586,
+      "nocarry_hit": false
+    },
+    {
+      "row": 70,
+      "key": "the velvet temple",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.341419219970703,
+      "nocarry_hit": false
+    },
+    {
+      "row": 71,
+      "key": "the hidden lantern",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.144597053527832,
+      "nocarry_hit": false
+    },
+    {
+      "row": 72,
+      "key": "the salted castle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.787006378173828,
+      "nocarry_hit": false
+    },
+    {
+      "row": 73,
+      "key": "the crimson compass",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.55641508102417,
+      "nocarry_hit": false
+    },
+    {
+      "row": 74,
+      "key": "the amber needle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.236533164978027,
+      "nocarry_hit": false
+    },
+    {
+      "row": 75,
+      "key": "the salted wagon",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 7.869208335876465,
+      "nocarry_hit": false
+    },
+    {
+      "row": 77,
+      "key": "the ancient needle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.2690958976745605,
+      "nocarry_hit": false
+    },
+    {
+      "row": 78,
+      "key": "the salted needle",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.093985557556152,
+      "nocarry_hit": false
+    },
+    {
+      "row": 79,
+      "key": "the silent palace",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.992380142211914,
+      "nocarry_hit": false
+    },
+    {
+      "row": 80,
+      "key": "the hidden organ",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.8370585441589355,
+      "nocarry_hit": false
+    },
+    {
+      "row": 81,
+      "key": "the shadow ladder",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.750354766845703,
+      "nocarry_hit": false
+    },
+    {
+      "row": 82,
+      "key": "the summer orchard",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.598732948303223,
+      "nocarry_hit": false
+    },
+    {
+      "row": 83,
+      "key": "the lonely compass",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.760793685913086,
+      "nocarry_hit": false
+    },
+    {
+      "row": 84,
+      "key": "the summer palace",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 8.068025588989258,
+      "nocarry_hit": false
+    },
+    {
+      "row": 85,
+      "key": "the broken castle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.969185829162598,
+      "nocarry_hit": false
+    },
+    {
+      "row": 86,
+      "key": "the gentle harbor",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.712158203125,
+      "nocarry_hit": false
+    },
+    {
+      "row": 87,
+      "key": "the copper bridge",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.303606986999512,
+      "nocarry_hit": false
+    },
+    {
+      "row": 88,
+      "key": "the shadow valley",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.041769504547119,
+      "nocarry_hit": false
+    },
+    {
+      "row": 89,
+      "key": "the winter castle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.04843282699585,
+      "nocarry_hit": false
+    },
+    {
+      "row": 90,
+      "key": "the marble falcon",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.8747239112854,
+      "nocarry_hit": false
+    },
+    {
+      "row": 91,
+      "key": "the amber ladder",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.039870738983154,
+      "nocarry_hit": false
+    },
+    {
+      "row": 92,
+      "key": "the emerald needle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.277077674865723,
+      "nocarry_hit": false
+    },
+    {
+      "row": 93,
+      "key": "the gentle kettle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.717766284942627,
+      "nocarry_hit": false
+    },
+    {
+      "row": 94,
+      "key": "the velvet bridge",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.855232238769531,
+      "nocarry_hit": false
+    },
+    {
+      "row": 95,
+      "key": "the marble falcon",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.344426155090332,
+      "nocarry_hit": false
+    },
+    {
+      "row": 97,
+      "key": "the salted palace",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 7.324250221252441,
+      "nocarry_hit": false
+    },
+    {
+      "row": 98,
+      "key": "the violet castle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.520617485046387,
+      "nocarry_hit": false
+    },
+    {
+      "row": 99,
+      "key": "the silver island",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 7.025647163391113,
+      "nocarry_hit": false
+    },
+    {
+      "row": 100,
+      "key": "the summer jacket",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.79425048828125,
+      "nocarry_hit": false
+    },
+    {
+      "row": 101,
+      "key": "the hollow lantern",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.197879314422607,
+      "nocarry_hit": false
+    },
+    {
+      "row": 102,
+      "key": "the crimson candle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.2262043952941895,
+      "nocarry_hit": false
+    },
+    {
+      "row": 103,
+      "key": "the iron kettle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.687407493591309,
+      "nocarry_hit": false
+    },
+    {
+      "row": 104,
+      "key": "the gentle valley",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.821207046508789,
+      "nocarry_hit": false
+    },
+    {
+      "row": 105,
+      "key": "the copper garden",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.276257514953613,
+      "nocarry_hit": false
+    },
+    {
+      "row": 106,
+      "key": "the broken falcon",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.3054518699646,
+      "nocarry_hit": false
+    },
+    {
+      "row": 107,
+      "key": "the violet compass",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.32454252243042,
+      "nocarry_hit": false
+    },
+    {
+      "row": 108,
+      "key": "the hollow engine",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.442501068115234,
+      "nocarry_hit": false
+    },
+    {
+      "row": 109,
+      "key": "the silver orchard",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.335205554962158,
+      "nocarry_hit": false
+    },
+    {
+      "row": 110,
+      "key": "the iron window",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.097559928894043,
+      "nocarry_hit": false
+    },
+    {
+      "row": 111,
+      "key": "the rusty lantern",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.687135696411133,
+      "nocarry_hit": false
+    },
+    {
+      "row": 112,
+      "key": "the hollow basket",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 7.926551818847656,
+      "nocarry_hit": false
+    },
+    {
+      "row": 113,
+      "key": "the distant saddle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.855599880218506,
+      "nocarry_hit": false
+    },
+    {
+      "row": 114,
+      "key": "the iron anchor",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.248494625091553,
+      "nocarry_hit": false
+    },
+    {
+      "row": 115,
+      "key": "the silent ribbon",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 8.231754302978516,
+      "nocarry_hit": false
+    },
+    {
+      "row": 116,
+      "key": "the rusty ribbon",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 6.2364654541015625,
+      "nocarry_hit": false
+    },
+    {
+      "row": 117,
+      "key": "the velvet anchor",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 7.801628112792969,
+      "nocarry_hit": false
+    },
+    {
+      "row": 118,
+      "key": "the silver kettle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.3284759521484375,
+      "nocarry_hit": false
+    },
+    {
+      "row": 119,
+      "key": "the crimson anchor",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.636185646057129,
+      "nocarry_hit": false
+    },
+    {
+      "row": 120,
+      "key": "the broken castle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 7.786635875701904,
+      "nocarry_hit": false
+    },
+    {
+      "row": 121,
+      "key": "the silver ladder",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.749570369720459,
+      "nocarry_hit": false
+    },
+    {
+      "row": 122,
+      "key": "the crimson island",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.86703634262085,
+      "nocarry_hit": false
+    },
+    {
+      "row": 123,
+      "key": "the silver compass",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.706488132476807,
+      "nocarry_hit": false
+    },
+    {
+      "row": 124,
+      "key": "the narrow ribbon",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.164690017700195,
+      "nocarry_hit": false
+    },
+    {
+      "row": 125,
+      "key": "the summer temple",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.551995754241943,
+      "nocarry_hit": false
+    },
+    {
+      "row": 126,
+      "key": "the scarlet meadow",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.726421356201172,
+      "nocarry_hit": false
+    },
+    {
+      "row": 127,
+      "key": "the rusty valley",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.3708977699279785,
+      "nocarry_hit": false
+    },
+    {
+      "row": 128,
+      "key": "the silent mirror",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.4208526611328125,
+      "nocarry_hit": false
+    },
+    {
+      "row": 129,
+      "key": "the narrow ribbon",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.877657890319824,
+      "nocarry_hit": false
+    },
+    {
+      "row": 130,
+      "key": "the shadow hammer",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 6.032630920410156,
+      "nocarry_hit": false
+    },
+    {
+      "row": 131,
+      "key": "the hidden jacket",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.178552627563477,
+      "nocarry_hit": false
+    },
+    {
+      "row": 132,
+      "key": "the hidden engine",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.45930814743042,
+      "nocarry_hit": false
+    },
+    {
+      "row": 133,
+      "key": "the lonely bridge",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 6.109279632568359,
+      "nocarry_hit": false
+    },
+    {
+      "row": 134,
+      "key": "the broken island",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.201388835906982,
+      "nocarry_hit": false
+    },
+    {
+      "row": 135,
+      "key": "the rusty temple",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.234865188598633,
+      "nocarry_hit": false
+    },
+    {
+      "row": 136,
+      "key": "the silent engine",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.711730003356934,
+      "nocarry_hit": false
+    },
+    {
+      "row": 137,
+      "key": "the hidden anchor",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.541201591491699,
+      "nocarry_hit": false
+    },
+    {
+      "row": 138,
+      "key": "the winter lantern",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.601296424865723,
+      "nocarry_hit": false
+    },
+    {
+      "row": 139,
+      "key": "the silent organ",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 3.978487730026245,
+      "nocarry_hit": false
+    },
+    {
+      "row": 140,
+      "key": "the silent castle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.865270614624023,
+      "nocarry_hit": false
+    },
+    {
+      "row": 141,
+      "key": "the iron garden",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.08284330368042,
+      "nocarry_hit": false
+    },
+    {
+      "row": 142,
+      "key": "the silver temple",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.753367900848389,
+      "nocarry_hit": false
+    },
+    {
+      "row": 143,
+      "key": "the shadow orchard",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.381487846374512,
+      "nocarry_hit": false
+    },
+    {
+      "row": 144,
+      "key": "the crimson bridge",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.336379051208496,
+      "nocarry_hit": false
+    },
+    {
+      "row": 145,
+      "key": "the velvet harbor",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.718306541442871,
+      "nocarry_hit": false
+    },
+    {
+      "row": 146,
+      "key": "the silver hammer",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 3.763505697250366,
+      "nocarry_hit": false
+    },
+    {
+      "row": 147,
+      "key": "the amber meadow",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.51596212387085,
+      "nocarry_hit": false
+    },
+    {
+      "row": 148,
+      "key": "the cobalt basket",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.169227600097656,
+      "nocarry_hit": false
+    },
+    {
+      "row": 149,
+      "key": "the ivory meadow",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 4.931617259979248,
+      "nocarry_hit": false
+    },
+    {
+      "row": 150,
+      "key": "the silent anchor",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.552395820617676,
+      "nocarry_hit": false
+    },
+    {
+      "row": 151,
+      "key": "the broken hammer",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.269340991973877,
+      "nocarry_hit": false
+    },
+    {
+      "row": 152,
+      "key": "the shadow garden",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.368800163269043,
+      "nocarry_hit": false
+    },
+    {
+      "row": 153,
+      "key": "the emerald island",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.337331295013428,
+      "nocarry_hit": false
+    },
+    {
+      "row": 154,
+      "key": "the velvet falcon",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.833020210266113,
+      "nocarry_hit": false
+    },
+    {
+      "row": 155,
+      "key": "the rusty bridge",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.270145416259766,
+      "nocarry_hit": false
+    },
+    {
+      "row": 156,
+      "key": "the lonely castle",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.681391716003418,
+      "nocarry_hit": false
+    },
+    {
+      "row": 157,
+      "key": "the shadow palace",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.899560451507568,
+      "nocarry_hit": false
+    },
+    {
+      "row": 158,
+      "key": "the golden kettle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.481137752532959,
+      "nocarry_hit": false
+    },
+    {
+      "row": 159,
+      "key": "the salted meadow",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.951800346374512,
+      "nocarry_hit": false
+    },
+    {
+      "row": 160,
+      "key": "the silver meadow",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.536869049072266,
+      "nocarry_hit": false
+    },
+    {
+      "row": 161,
+      "key": "the marble kettle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 3.860185384750366,
+      "nocarry_hit": false
+    },
+    {
+      "row": 162,
+      "key": "the shadow palace",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.091867446899414,
+      "nocarry_hit": false
+    },
+    {
+      "row": 163,
+      "key": "the quiet lantern",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.505926132202148,
+      "nocarry_hit": false
+    },
+    {
+      "row": 164,
+      "key": "the scarlet bridge",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.356414794921875,
+      "nocarry_hit": false
+    },
+    {
+      "row": 165,
+      "key": "the copper compass",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.183642864227295,
+      "nocarry_hit": false
+    },
+    {
+      "row": 166,
+      "key": "the amber mirror",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.724432945251465,
+      "nocarry_hit": false
+    },
+    {
+      "row": 167,
+      "key": "the scarlet jacket",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.4832000732421875,
+      "nocarry_hit": false
+    },
+    {
+      "row": 168,
+      "key": "the cobalt lantern",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.073718070983887,
+      "nocarry_hit": false
+    },
+    {
+      "row": 169,
+      "key": "the silent engine",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.105310916900635,
+      "nocarry_hit": false
+    },
+    {
+      "row": 170,
+      "key": "the velvet mirror",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.395750045776367,
+      "nocarry_hit": false
+    },
+    {
+      "row": 171,
+      "key": "the summer garden",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.4936957359313965,
+      "nocarry_hit": false
+    },
+    {
+      "row": 172,
+      "key": "the velvet castle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.970523357391357,
+      "nocarry_hit": false
+    },
+    {
+      "row": 173,
+      "key": "the distant lantern",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.222104072570801,
+      "nocarry_hit": false
+    },
+    {
+      "row": 174,
+      "key": "the distant needle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.923846244812012,
+      "nocarry_hit": false
+    },
+    {
+      "row": 175,
+      "key": "the scarlet ribbon",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.91087007522583,
+      "nocarry_hit": false
+    },
+    {
+      "row": 176,
+      "key": "the distant basket",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.644333839416504,
+      "nocarry_hit": false
+    },
+    {
+      "row": 177,
+      "key": "the summer palace",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 4.927777290344238,
+      "nocarry_hit": false
+    },
+    {
+      "row": 178,
+      "key": "the amber ribbon",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.803044319152832,
+      "nocarry_hit": false
+    },
+    {
+      "row": 179,
+      "key": "the ivory valley",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.336332321166992,
+      "nocarry_hit": false
+    },
+    {
+      "row": 180,
+      "key": "the emerald needle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.307048797607422,
+      "nocarry_hit": false
+    },
+    {
+      "row": 181,
+      "key": "the salted wagon",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.648209571838379,
+      "nocarry_hit": false
+    },
+    {
+      "row": 182,
+      "key": "the crimson jacket",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.026761531829834,
+      "nocarry_hit": false
+    },
+    {
+      "row": 183,
+      "key": "the velvet island",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.414697647094727,
+      "nocarry_hit": false
+    },
+    {
+      "row": 184,
+      "key": "the hidden harbor",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.178413391113281,
+      "nocarry_hit": false
+    },
+    {
+      "row": 185,
+      "key": "the winter anchor",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.205606460571289,
+      "nocarry_hit": false
+    },
+    {
+      "row": 186,
+      "key": "the crimson palace",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.49307918548584,
+      "nocarry_hit": false
+    },
+    {
+      "row": 187,
+      "key": "the winter jacket",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.598762035369873,
+      "nocarry_hit": false
+    },
+    {
+      "row": 188,
+      "key": "the violet lantern",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.002740859985352,
+      "nocarry_hit": false
+    },
+    {
+      "row": 189,
+      "key": "the hollow compass",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.130317211151123,
+      "nocarry_hit": false
+    },
+    {
+      "row": 190,
+      "key": "the golden temple",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.571507930755615,
+      "nocarry_hit": false
+    },
+    {
+      "row": 191,
+      "key": "the iron harbor",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 8.133666038513184,
+      "nocarry_hit": false
+    },
+    {
+      "row": 192,
+      "key": "the amber ribbon",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.797971248626709,
+      "nocarry_hit": false
+    },
+    {
+      "row": 193,
+      "key": "the emerald valley",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.5867743492126465,
+      "nocarry_hit": false
+    },
+    {
+      "row": 194,
+      "key": "the winter harbor",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 8.304965019226074,
+      "nocarry_hit": false
+    },
+    {
+      "row": 195,
+      "key": "the crimson organ",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 4.394965171813965,
+      "nocarry_hit": false
+    },
+    {
+      "row": 196,
+      "key": "the hidden meadow",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 8.423746109008789,
+      "nocarry_hit": false
+    },
+    {
+      "row": 197,
+      "key": "the hollow needle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.034144401550293,
+      "nocarry_hit": false
+    },
+    {
+      "row": 198,
+      "key": "the ancient harbor",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.321049690246582,
+      "nocarry_hit": false
+    },
+    {
+      "row": 199,
+      "key": "the rusty saddle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.865743637084961,
+      "nocarry_hit": false
+    },
+    {
+      "row": 200,
+      "key": "the hollow palace",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.267642974853516,
+      "nocarry_hit": false
+    },
+    {
+      "row": 202,
+      "key": "the crimson mirror",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.053708076477051,
+      "nocarry_hit": false
+    },
+    {
+      "row": 203,
+      "key": "the ancient basket",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 7.815676689147949,
+      "nocarry_hit": false
+    },
+    {
+      "row": 204,
+      "key": "the hollow needle",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.153295516967773,
+      "nocarry_hit": false
+    },
+    {
+      "row": 205,
+      "key": "the hollow needle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.674996852874756,
+      "nocarry_hit": false
+    },
+    {
+      "row": 206,
+      "key": "the hidden mirror",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.343044281005859,
+      "nocarry_hit": false
+    },
+    {
+      "row": 207,
+      "key": "the gentle valley",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 8.58802604675293,
+      "nocarry_hit": false
+    },
+    {
+      "row": 208,
+      "key": "the salted wagon",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.49031925201416,
+      "nocarry_hit": false
+    },
+    {
+      "row": 209,
+      "key": "the distant compass",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.523526191711426,
+      "nocarry_hit": false
+    },
+    {
+      "row": 210,
+      "key": "the silent wagon",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 7.017809867858887,
+      "nocarry_hit": false
+    },
+    {
+      "row": 212,
+      "key": "the distant bridge",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 7.746994495391846,
+      "nocarry_hit": false
+    },
+    {
+      "row": 213,
+      "key": "the emerald valley",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.8899359703063965,
+      "nocarry_hit": false
+    },
+    {
+      "row": 214,
+      "key": "the quiet falcon",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.59025239944458,
+      "nocarry_hit": false
+    },
+    {
+      "row": 215,
+      "key": "the quiet jacket",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 8.012380599975586,
+      "nocarry_hit": false
+    },
+    {
+      "row": 216,
+      "key": "the rusty needle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.221679210662842,
+      "nocarry_hit": false
+    },
+    {
+      "row": 217,
+      "key": "the broken engine",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.947666168212891,
+      "nocarry_hit": false
+    },
+    {
+      "row": 218,
+      "key": "the cobalt candle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.496428966522217,
+      "nocarry_hit": false
+    },
+    {
+      "row": 219,
+      "key": "the copper meadow",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.324066162109375,
+      "nocarry_hit": false
+    },
+    {
+      "row": 220,
+      "key": "the silent harbor",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.4917521476745605,
+      "nocarry_hit": false
+    },
+    {
+      "row": 221,
+      "key": "the silver bridge",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.371894359588623,
+      "nocarry_hit": false
+    },
+    {
+      "row": 222,
+      "key": "the iron bridge",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 7.046370029449463,
+      "nocarry_hit": false
+    },
+    {
+      "row": 223,
+      "key": "the copper compass",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.3365397453308105,
+      "nocarry_hit": false
+    },
+    {
+      "row": 224,
+      "key": "the lonely saddle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.51611852645874,
+      "nocarry_hit": false
+    },
+    {
+      "row": 225,
+      "key": "the shadow saddle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 4.467935562133789,
+      "nocarry_hit": false
+    },
+    {
+      "row": 226,
+      "key": "the broken orchard",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.993344783782959,
+      "nocarry_hit": false
+    },
+    {
+      "row": 227,
+      "key": "the rusty palace",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.207808017730713,
+      "nocarry_hit": false
+    },
+    {
+      "row": 228,
+      "key": "the silver needle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.769448757171631,
+      "nocarry_hit": false
+    },
+    {
+      "row": 229,
+      "key": "the violet compass",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.494019985198975,
+      "nocarry_hit": false
+    },
+    {
+      "row": 230,
+      "key": "the salted lantern",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.682490348815918,
+      "nocarry_hit": false
+    },
+    {
+      "row": 231,
+      "key": "the iron saddle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.812628746032715,
+      "nocarry_hit": false
+    },
+    {
+      "row": 232,
+      "key": "the marble organ",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.1461181640625,
+      "nocarry_hit": false
+    },
+    {
+      "row": 233,
+      "key": "the velvet lantern",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.800046920776367,
+      "nocarry_hit": false
+    },
+    {
+      "row": 234,
+      "key": "the amber compass",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 6.4166083335876465,
+      "nocarry_hit": false
+    },
+    {
+      "row": 235,
+      "key": "the velvet castle",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 8.94943904876709,
+      "nocarry_hit": false
+    },
+    {
+      "row": 236,
+      "key": "the golden mirror",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 7.423923015594482,
+      "nocarry_hit": false
+    },
+    {
+      "row": 237,
+      "key": "the iron castle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.290158271789551,
+      "nocarry_hit": false
+    },
+    {
+      "row": 238,
+      "key": "the lonely palace",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.120546340942383,
+      "nocarry_hit": false
+    },
+    {
+      "row": 239,
+      "key": "the summer island",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.063789367675781,
+      "nocarry_hit": false
+    },
+    {
+      "row": 240,
+      "key": "the broken orchard",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 8.40139102935791,
+      "nocarry_hit": false
+    },
+    {
+      "row": 241,
+      "key": "the copper harbor",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.406913757324219,
+      "nocarry_hit": false
+    },
+    {
+      "row": 242,
+      "key": "the hidden jacket",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.493281841278076,
+      "nocarry_hit": false
+    },
+    {
+      "row": 243,
+      "key": "the emerald window",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.454242706298828,
+      "nocarry_hit": false
+    },
+    {
+      "row": 244,
+      "key": "the winter meadow",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.12331485748291,
+      "nocarry_hit": false
+    },
+    {
+      "row": 245,
+      "key": "the salted lantern",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.315625190734863,
+      "nocarry_hit": false
+    },
+    {
+      "row": 246,
+      "key": "the summer palace",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 6.950662612915039,
+      "nocarry_hit": false
+    },
+    {
+      "row": 247,
+      "key": "the silver ladder",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.574833869934082,
+      "nocarry_hit": false
+    },
+    {
+      "row": 248,
+      "key": "the rusty wagon",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.457805633544922,
+      "nocarry_hit": false
+    },
+    {
+      "row": 249,
+      "key": "the velvet ribbon",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.587639808654785,
+      "nocarry_hit": false
+    },
+    {
+      "row": 250,
+      "key": "the salted wagon",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.801032066345215,
+      "nocarry_hit": false
+    },
+    {
+      "row": 251,
+      "key": "the silent island",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.059945583343506,
+      "nocarry_hit": false
+    },
+    {
+      "row": 252,
+      "key": "the ivory valley",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.933276176452637,
+      "nocarry_hit": false
+    },
+    {
+      "row": 253,
+      "key": "the crimson basket",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 4.975207328796387,
+      "nocarry_hit": false
+    },
+    {
+      "row": 254,
+      "key": "the rusty ladder",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.721759796142578,
+      "nocarry_hit": false
+    },
+    {
+      "row": 255,
+      "key": "the scarlet window",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.643436431884766,
+      "nocarry_hit": false
+    },
+    {
+      "row": 256,
+      "key": "the ivory palace",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.279335975646973,
+      "nocarry_hit": false
+    },
+    {
+      "row": 257,
+      "key": "the cobalt saddle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.897133827209473,
+      "nocarry_hit": false
+    },
+    {
+      "row": 259,
+      "key": "the cobalt anchor",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.430929183959961,
+      "nocarry_hit": false
+    },
+    {
+      "row": 260,
+      "key": "the ancient jacket",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.080828666687012,
+      "nocarry_hit": false
+    },
+    {
+      "row": 261,
+      "key": "the copper garden",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.616462707519531,
+      "nocarry_hit": false
+    },
+    {
+      "row": 262,
+      "key": "the salted ribbon",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 6.015129089355469,
+      "nocarry_hit": false
+    },
+    {
+      "row": 263,
+      "key": "the marble organ",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.852642059326172,
+      "nocarry_hit": false
+    },
+    {
+      "row": 264,
+      "key": "the broken engine",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.403141975402832,
+      "nocarry_hit": false
+    },
+    {
+      "row": 265,
+      "key": "the shadow garden",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.517129898071289,
+      "nocarry_hit": false
+    },
+    {
+      "row": 266,
+      "key": "the silver hammer",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.858733177185059,
+      "nocarry_hit": false
+    },
+    {
+      "row": 267,
+      "key": "the emerald jacket",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.579816818237305,
+      "nocarry_hit": false
+    },
+    {
+      "row": 268,
+      "key": "the iron orchard",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.8919806480407715,
+      "nocarry_hit": false
+    },
+    {
+      "row": 269,
+      "key": "the scarlet palace",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.5168914794921875,
+      "nocarry_hit": false
+    },
+    {
+      "row": 270,
+      "key": "the emerald island",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 8.397209167480469,
+      "nocarry_hit": false
+    },
+    {
+      "row": 271,
+      "key": "the lonely candle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.450117111206055,
+      "nocarry_hit": false
+    },
+    {
+      "row": 272,
+      "key": "the silent garden",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.620757102966309,
+      "nocarry_hit": false
+    },
+    {
+      "row": 273,
+      "key": "the salted engine",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 8.99001693725586,
+      "nocarry_hit": false
+    },
+    {
+      "row": 274,
+      "key": "the velvet palace",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.893540859222412,
+      "nocarry_hit": false
+    },
+    {
+      "row": 275,
+      "key": "the velvet ladder",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 8.836106300354004,
+      "nocarry_hit": false
+    },
+    {
+      "row": 276,
+      "key": "the rusty hammer",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.7619476318359375,
+      "nocarry_hit": false
+    },
+    {
+      "row": 277,
+      "key": "the velvet kettle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.357257843017578,
+      "nocarry_hit": false
+    },
+    {
+      "row": 278,
+      "key": "the shadow lantern",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.987809658050537,
+      "nocarry_hit": false
+    },
+    {
+      "row": 279,
+      "key": "the silent bridge",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.2119951248168945,
+      "nocarry_hit": false
+    },
+    {
+      "row": 280,
+      "key": "the iron orchard",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 6.7958269119262695,
+      "nocarry_hit": false
+    },
+    {
+      "row": 281,
+      "key": "the velvet lantern",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.440871238708496,
+      "nocarry_hit": false
+    },
+    {
+      "row": 282,
+      "key": "the violet island",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.394387722015381,
+      "nocarry_hit": false
+    },
+    {
+      "row": 283,
+      "key": "the shadow temple",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.037969589233398,
+      "nocarry_hit": false
+    },
+    {
+      "row": 284,
+      "key": "the marble window",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.913036346435547,
+      "nocarry_hit": false
+    },
+    {
+      "row": 285,
+      "key": "the hidden palace",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.108545303344727,
+      "nocarry_hit": false
+    },
+    {
+      "row": 286,
+      "key": "the distant jacket",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.066041946411133,
+      "nocarry_hit": false
+    },
+    {
+      "row": 287,
+      "key": "the cobalt window",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 9.444047927856445,
+      "nocarry_hit": false
+    },
+    {
+      "row": 288,
+      "key": "the violet island",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.166297912597656,
+      "nocarry_hit": false
+    },
+    {
+      "row": 289,
+      "key": "the ancient wagon",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.025544166564941,
+      "nocarry_hit": false
+    },
+    {
+      "row": 291,
+      "key": "the copper engine",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.120326995849609,
+      "nocarry_hit": false
+    },
+    {
+      "row": 292,
+      "key": "the silver needle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 6.825481414794922,
+      "nocarry_hit": false
+    },
+    {
+      "row": 293,
+      "key": "the narrow basket",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 7.040121078491211,
+      "nocarry_hit": false
+    },
+    {
+      "row": 294,
+      "key": "the marble meadow",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.525727272033691,
+      "nocarry_hit": false
+    },
+    {
+      "row": 295,
+      "key": "the emerald window",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.537265777587891,
+      "nocarry_hit": false
+    },
+    {
+      "row": 296,
+      "key": "the crimson falcon",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.092262268066406,
+      "nocarry_hit": false
+    },
+    {
+      "row": 297,
+      "key": "the silver garden",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 7.007370948791504,
+      "nocarry_hit": false
+    },
+    {
+      "row": 298,
+      "key": "the ancient falcon",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.145043849945068,
+      "nocarry_hit": false
+    },
+    {
+      "row": 300,
+      "key": "the winter island",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.513644695281982,
+      "nocarry_hit": false
+    },
+    {
+      "row": 301,
+      "key": "the salted jacket",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.719915390014648,
+      "nocarry_hit": false
+    },
+    {
+      "row": 302,
+      "key": "the golden hammer",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.578533172607422,
+      "nocarry_hit": false
+    },
+    {
+      "row": 304,
+      "key": "the silver anchor",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.626861095428467,
+      "nocarry_hit": false
+    },
+    {
+      "row": 305,
+      "key": "the distant compass",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.689399719238281,
+      "nocarry_hit": false
+    },
+    {
+      "row": 306,
+      "key": "the marble organ",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 7.374153137207031,
+      "nocarry_hit": false
+    },
+    {
+      "row": 307,
+      "key": "the scarlet harbor",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.4338884353637695,
+      "nocarry_hit": false
+    },
+    {
+      "row": 308,
+      "key": "the rusty hammer",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 8.509781837463379,
+      "nocarry_hit": false
+    },
+    {
+      "row": 309,
+      "key": "the ancient temple",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.9766645431518555,
+      "nocarry_hit": false
+    },
+    {
+      "row": 310,
+      "key": "the cobalt engine",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.250161647796631,
+      "nocarry_hit": false
+    },
+    {
+      "row": 311,
+      "key": "the iron needle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.443425178527832,
+      "nocarry_hit": false
+    },
+    {
+      "row": 312,
+      "key": "the velvet castle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.088955879211426,
+      "nocarry_hit": false
+    },
+    {
+      "row": 313,
+      "key": "the marble needle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.861851692199707,
+      "nocarry_hit": false
+    },
+    {
+      "row": 314,
+      "key": "the distant lantern",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 8.862462997436523,
+      "nocarry_hit": false
+    },
+    {
+      "row": 316,
+      "key": "the marble saddle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 9.512833595275879,
+      "nocarry_hit": false
+    },
+    {
+      "row": 317,
+      "key": "the broken bridge",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.152087211608887,
+      "nocarry_hit": false
+    },
+    {
+      "row": 318,
+      "key": "the cobalt bridge",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.83170223236084,
+      "nocarry_hit": false
+    },
+    {
+      "row": 319,
+      "key": "the summer basket",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.0821733474731445,
+      "nocarry_hit": false
+    },
+    {
+      "row": 320,
+      "key": "the distant needle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.156362056732178,
+      "nocarry_hit": false
+    },
+    {
+      "row": 321,
+      "key": "the quiet needle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.721360683441162,
+      "nocarry_hit": false
+    },
+    {
+      "row": 322,
+      "key": "the narrow harbor",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.524152755737305,
+      "nocarry_hit": false
+    },
+    {
+      "row": 323,
+      "key": "the rusty basket",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.27714729309082,
+      "nocarry_hit": false
+    },
+    {
+      "row": 324,
+      "key": "the winter palace",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.188686847686768,
+      "nocarry_hit": false
+    },
+    {
+      "row": 325,
+      "key": "the violet anchor",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.359333038330078,
+      "nocarry_hit": false
+    },
+    {
+      "row": 326,
+      "key": "the ancient ribbon",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.350983619689941,
+      "nocarry_hit": false
+    },
+    {
+      "row": 327,
+      "key": "the crimson saddle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.679988861083984,
+      "nocarry_hit": false
+    },
+    {
+      "row": 328,
+      "key": "the scarlet engine",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 7.519386291503906,
+      "nocarry_hit": false
+    },
+    {
+      "row": 329,
+      "key": "the hollow saddle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 8.63510513305664,
+      "nocarry_hit": false
+    },
+    {
+      "row": 330,
+      "key": "the marble engine",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.1078667640686035,
+      "nocarry_hit": false
+    },
+    {
+      "row": 331,
+      "key": "the golden anchor",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.402981758117676,
+      "nocarry_hit": false
+    },
+    {
+      "row": 332,
+      "key": "the hidden bridge",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 7.496194362640381,
+      "nocarry_hit": false
+    },
+    {
+      "row": 333,
+      "key": "the summer saddle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.758490085601807,
+      "nocarry_hit": false
+    },
+    {
+      "row": 334,
+      "key": "the cobalt temple",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.26231575012207,
+      "nocarry_hit": false
+    },
+    {
+      "row": 335,
+      "key": "the violet anchor",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 4.7094902992248535,
+      "nocarry_hit": false
+    },
+    {
+      "row": 336,
+      "key": "the gentle wagon",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 6.783501625061035,
+      "nocarry_hit": false
+    },
+    {
+      "row": 337,
+      "key": "the quiet organ",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 8.50561809539795,
+      "nocarry_hit": false
+    },
+    {
+      "row": 338,
+      "key": "the winter castle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.218656063079834,
+      "nocarry_hit": false
+    },
+    {
+      "row": 339,
+      "key": "the gentle needle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.437684535980225,
+      "nocarry_hit": false
+    },
+    {
+      "row": 340,
+      "key": "the cobalt bridge",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 8.325899124145508,
+      "nocarry_hit": false
+    },
+    {
+      "row": 341,
+      "key": "the scarlet organ",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.715505123138428,
+      "nocarry_hit": false
+    },
+    {
+      "row": 342,
+      "key": "the rusty lantern",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 7.584712505340576,
+      "nocarry_hit": false
+    },
+    {
+      "row": 343,
+      "key": "the silver wagon",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.515686988830566,
+      "nocarry_hit": false
+    },
+    {
+      "row": 344,
+      "key": "the scarlet compass",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.2393598556518555,
+      "nocarry_hit": false
+    },
+    {
+      "row": 345,
+      "key": "the copper bridge",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.103693008422852,
+      "nocarry_hit": false
+    },
+    {
+      "row": 346,
+      "key": "the summer castle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.612822532653809,
+      "nocarry_hit": false
+    },
+    {
+      "row": 347,
+      "key": "the hollow orchard",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.250082969665527,
+      "nocarry_hit": false
+    },
+    {
+      "row": 348,
+      "key": "the winter harbor",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.377618789672852,
+      "nocarry_hit": false
+    },
+    {
+      "row": 349,
+      "key": "the gentle window",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.622322082519531,
+      "nocarry_hit": false
+    },
+    {
+      "row": 350,
+      "key": "the winter mirror",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.76918888092041,
+      "nocarry_hit": false
+    },
+    {
+      "row": 351,
+      "key": "the quiet jacket",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 4.824274063110352,
+      "nocarry_hit": false
+    },
+    {
+      "row": 352,
+      "key": "the quiet meadow",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 5.328502655029297,
+      "nocarry_hit": false
+    },
+    {
+      "row": 353,
+      "key": "the gentle engine",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.048483371734619,
+      "nocarry_hit": false
+    },
+    {
+      "row": 354,
+      "key": "the amber organ",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.811461448669434,
+      "nocarry_hit": false
+    },
+    {
+      "row": 356,
+      "key": "the quiet kettle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 8.37712287902832,
+      "nocarry_hit": false
+    },
+    {
+      "row": 357,
+      "key": "the rusty ribbon",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.392278671264648,
+      "nocarry_hit": false
+    },
+    {
+      "row": 358,
+      "key": "the iron lantern",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.5985846519470215,
+      "nocarry_hit": false
+    },
+    {
+      "row": 360,
+      "key": "the gentle jacket",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 8.43641185760498,
+      "nocarry_hit": false
+    },
+    {
+      "row": 361,
+      "key": "the marble needle",
+      "fact_chunk": 4,
+      "distance": 3,
+      "nocarry_nll": 4.4619140625,
+      "nocarry_hit": false
+    },
+    {
+      "row": 362,
+      "key": "the amber anchor",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.47239875793457,
+      "nocarry_hit": false
+    },
+    {
+      "row": 363,
+      "key": "the scarlet palace",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 7.6594624519348145,
+      "nocarry_hit": false
+    },
+    {
+      "row": 365,
+      "key": "the summer castle",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 3.8607566356658936,
+      "nocarry_hit": false
+    },
+    {
+      "row": 366,
+      "key": "the ancient castle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.723762035369873,
+      "nocarry_hit": false
+    },
+    {
+      "row": 367,
+      "key": "the lonely orchard",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.79706335067749,
+      "nocarry_hit": false
+    },
+    {
+      "row": 369,
+      "key": "the velvet candle",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.9704108238220215,
+      "nocarry_hit": false
+    },
+    {
+      "row": 370,
+      "key": "the marble palace",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.897302150726318,
+      "nocarry_hit": false
+    },
+    {
+      "row": 371,
+      "key": "the violet needle",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.060128688812256,
+      "nocarry_hit": false
+    },
+    {
+      "row": 372,
+      "key": "the emerald compass",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.765365123748779,
+      "nocarry_hit": false
+    },
+    {
+      "row": 373,
+      "key": "the hollow temple",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 8.559137344360352,
+      "nocarry_hit": false
+    },
+    {
+      "row": 374,
+      "key": "the iron mirror",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 6.534401893615723,
+      "nocarry_hit": false
+    },
+    {
+      "row": 375,
+      "key": "the marble ribbon",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.141611099243164,
+      "nocarry_hit": false
+    },
+    {
+      "row": 376,
+      "key": "the lonely saddle",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 6.3753981590271,
+      "nocarry_hit": false
+    },
+    {
+      "row": 377,
+      "key": "the silent palace",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 6.063880920410156,
+      "nocarry_hit": false
+    },
+    {
+      "row": 378,
+      "key": "the shadow valley",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.3528242111206055,
+      "nocarry_hit": false
+    },
+    {
+      "row": 379,
+      "key": "the broken orchard",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.543124198913574,
+      "nocarry_hit": false
+    },
+    {
+      "row": 380,
+      "key": "the cobalt orchard",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.819709777832031,
+      "nocarry_hit": false
+    },
+    {
+      "row": 381,
+      "key": "the narrow mirror",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 5.577266693115234,
+      "nocarry_hit": false
+    },
+    {
+      "row": 382,
+      "key": "the cobalt island",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.1909003257751465,
+      "nocarry_hit": false
+    },
+    {
+      "row": 383,
+      "key": "the gentle jacket",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 7.098001003265381,
+      "nocarry_hit": false
+    },
+    {
+      "row": 384,
+      "key": "the cobalt harbor",
+      "fact_chunk": 2,
+      "distance": 5,
+      "nocarry_nll": 5.0776286125183105,
+      "nocarry_hit": false
+    },
+    {
+      "row": 385,
+      "key": "the summer falcon",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 4.587395668029785,
+      "nocarry_hit": false
+    },
+    {
+      "row": 386,
+      "key": "the lonely valley",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.597470760345459,
+      "nocarry_hit": false
+    },
+    {
+      "row": 387,
+      "key": "the hidden lantern",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.591547012329102,
+      "nocarry_hit": false
+    },
+    {
+      "row": 388,
+      "key": "the summer basket",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.714066505432129,
+      "nocarry_hit": false
+    },
+    {
+      "row": 390,
+      "key": "the hidden organ",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 4.9382452964782715,
+      "nocarry_hit": false
+    },
+    {
+      "row": 391,
+      "key": "the velvet organ",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 3.8656039237976074,
+      "nocarry_hit": false
+    },
+    {
+      "row": 392,
+      "key": "the ancient temple",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 6.385295867919922,
+      "nocarry_hit": false
+    },
+    {
+      "row": 393,
+      "key": "the winter lantern",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 5.557807922363281,
+      "nocarry_hit": false
+    },
+    {
+      "row": 394,
+      "key": "the violet bridge",
+      "fact_chunk": 1,
+      "distance": 6,
+      "nocarry_nll": 4.886992931365967,
+      "nocarry_hit": false
+    },
+    {
+      "row": 395,
+      "key": "the iron falcon",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.3598737716674805,
+      "nocarry_hit": false
+    },
+    {
+      "row": 396,
+      "key": "the rusty hammer",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 8.688836097717285,
+      "nocarry_hit": false
+    },
+    {
+      "row": 397,
+      "key": "the iron candle",
+      "fact_chunk": 0,
+      "distance": 7,
+      "nocarry_nll": 5.068549633026123,
+      "nocarry_hit": false
+    },
+    {
+      "row": 398,
+      "key": "the hollow kettle",
+      "fact_chunk": 5,
+      "distance": 2,
+      "nocarry_nll": 5.38541316986084,
+      "nocarry_hit": false
+    },
+    {
+      "row": 399,
+      "key": "the salted jacket",
+      "fact_chunk": 3,
+      "distance": 4,
+      "nocarry_nll": 8.178213119506836,
+      "nocarry_hit": false
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-29-2026 16:00:44
+Job ID:    14560555
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_read
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== pm_read | recall_ctrl | cortex-pm/pm-recall_ctrl/checkpoint_40146 -> eval_results/pm/limbs/pm-recall_ctrl ===
+    commit: 1a2fdee
+
+--- [recall_ctrl] val NLL fwedu  (16:00:47)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 66.90it/s]
+[load] overlaid cortex-pm/pm-recall_ctrl/checkpoint_40146/chkpt.pt: 0 missing / 0 unexpected keys
+[val_nll] memory=NO (control path)  carry=off
+  50 samples
+  100 samples
+  150 samples
+  200 samples
+  250 samples
+  300 samples
+  350 samples
+  400 samples
+
+=== val NLL | pm-recall_ctrl/fwedu ===
+    pack data/fineweb_edu_olmo_val_len4096   400 rows   T=8  n_chunks=8
+    window               NLL                  95% CI
+    all               2.6079        [2.5807, 2.6354]
+    chunk1 (no carry)    2.6239        [2.5828, 2.6660]
+    chunks 2+         2.6056        [2.5768, 2.6339]
+    per chunk: 1:2.624  2:2.595  3:2.588  4:2.600  5:2.617  6:2.638  7:2.615  8:2.586
+    chance margin 8.909 nats (mean 2.608 vs ln(vocab) 11.516)
+
+    wrote eval_results/pm/limbs/pm-recall_ctrl/val_nll_fwedu.json
+
+--- [recall_ctrl] val NLL pg19  (16:07:48)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 180.00it/s]
+[load] overlaid cortex-pm/pm-recall_ctrl/checkpoint_40146/chkpt.pt: 0 missing / 0 unexpected keys
+[val_nll] memory=NO (control path)  carry=off
+  50 samples
+  100 samples
+  150 samples
+  200 samples
+  250 samples
+  300 samples
+  350 samples
+  400 samples
+
+=== val NLL | pm-recall_ctrl/pg19 ===
+    pack data/pg19_olmo_validation_len4096_strided   400 rows   T=8  n_chunks=8
+    window               NLL                  95% CI
+    all               2.8497        [2.8011, 2.9002]
+    chunk1 (no carry)    2.8626        [2.7877, 2.9473]
+    chunks 2+         2.8479        [2.7949, 2.8977]
+    per chunk: 1:2.863  2:2.902  3:2.841  4:2.855  5:2.823  6:2.858  7:2.860  8:2.795
+    chance margin 8.667 nats (mean 2.850 vs ln(vocab) 11.516)
+
+    wrote eval_results/pm/limbs/pm-recall_ctrl/val_nll_pg19.json
+
+--- [recall_ctrl] recall probe  (16:13:48)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.25s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.59it/s]
+[load] overlaid cortex-pm/pm-recall_ctrl/checkpoint_40146/chkpt.pt: 0 missing / 0 unexpected keys
+  50 rows
+  100 rows
+  150 rows
+  200 rows
+  250 rows
+  300 rows
+  350 rows
+
+======================================================================
+RECALL PROBE  n=383 (skipped 17)
+======================================================================
+  dist    n  nocarry_nll nocarry_acc
+   all  383        1.466     0.031
+     2   73        1.462     0.014
+     3   54        1.450     0.019
+     4   70        1.451     0.029
+     5   63        1.554     0.000
+     6   58        1.461     0.069
+     7   65        1.417     0.062
+wrote eval_results/pm/limbs/pm-recall_ctrl/recall/results.json
+
+=== pm_read recall_ctrl finished rc=0 (16:18:39) -> eval_results/pm/limbs/pm-recall_ctrl ===
+---------------------------------------
+Begin Slurm Epilog: Oct-29-2026 16:18:39
+Job ID:        14560555
+Array Job ID:  14560555_5
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_read
+Resources:     
+Rsrc Used:     cput=00:00:00,vmem=,walltime=00:00:00,mem=,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         None assigned
+---------------------------------------

@@ -1,0 +1,821 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-29-2026 17:32:58
+Job ID:    14622273
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_probe
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+    znorm_target 98.0 confirmed against the diag at step 11400
+=== pm_probe | cortex @ 11444 | parts dissect,interp | cortex-5b/cortex-final/checkpoint_11444 -> eval_results/pm/cortex-final/step_11444_T8 ===
+NVIDIA H200, 143771 MiB
+    commit: 1a2fdee
+
+--- [cortex@11444] BABILong write/retain/read dissection  (17:33:02)
+[data] preflight ok: 8 cells (qa1/1k, qa1/2k, qa1/4k, qa1/8k, qa2/1k, qa2/2k, qa2/4k, qa2/8k)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '98.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.07s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.82it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[z] latent_read_znorm_target = 98.0 (expected 98.0 for this step: OK)
+[arm] memory; conditions = ['normal', 'nocarry', 'teleport', 'teleport_donor', 'fact_in_window']; T=8 seq_len=512 num_chunks=8 max_new_tokens=12; lap = 4 chunks; buffer PrefixGatedBuffer n_vec=16 n_slots=64 fill=grow
+
+--- qa1/1k: 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/1k] 10 items (319s elapsed)
+  [qa1/1k] 20 items (337s elapsed)
+  [qa1/1k] 30 items (354s elapsed)
+  [qa1/1k] 40 items (372s elapsed)
+  [qa1/1k] 50 items (389s elapsed)
+  [qa1/1k] 60 items (406s elapsed)
+  [qa1/1k] 70 items (423s elapsed)
+  [qa1/1k] 80 items (441s elapsed)
+  [qa1/1k] 90 items (458s elapsed)
+  [qa1/1k] 100 items (475s elapsed)
+  [qa1/1k] 100 evaluated, 24 skipped of 124 rows read: fact_straddles_chunk=24
+
+--- qa1/2k: 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/2k] 10 items (530s elapsed)
+  [qa1/2k] 20 items (554s elapsed)
+  [qa1/2k] 30 items (578s elapsed)
+  [qa1/2k] 40 items (600s elapsed)
+  [qa1/2k] 50 items (622s elapsed)
+  [qa1/2k] 60 items (645s elapsed)
+  [qa1/2k] 70 items (668s elapsed)
+  [qa1/2k] 80 items (689s elapsed)
+  [qa1/2k] 90 items (710s elapsed)
+  [qa1/2k] 100 items (732s elapsed)
+  [qa1/2k] 100 evaluated, 3 skipped of 103 rows read: fact_straddles_chunk=3
+
+--- qa1/4k: 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/4k] 10 items (806s elapsed)
+  [qa1/4k] 20 items (844s elapsed)
+  [qa1/4k] 30 items (882s elapsed)
+  [qa1/4k] 40 items (919s elapsed)
+  [qa1/4k] 50 items (955s elapsed)
+  [qa1/4k] 60 items (993s elapsed)
+  [qa1/4k] 70 items (1027s elapsed)
+  [qa1/4k] 80 items (1060s elapsed)
+  [qa1/4k] 90 items (1095s elapsed)
+  [qa1/4k] 100 items (1134s elapsed)
+  [qa1/4k] 100 evaluated, 1 skipped of 101 rows read: fact_straddles_chunk=1
+
+--- qa1/8k: 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/8k] 10 items (1242s elapsed)
+  [qa1/8k] 20 items (1295s elapsed)
+  [qa1/8k] 30 items (1345s elapsed)
+  [qa1/8k] 40 items (1394s elapsed)
+  [qa1/8k] 50 items (1441s elapsed)
+  [qa1/8k] 60 items (1490s elapsed)
+  [qa1/8k] 70 items (1540s elapsed)
+  [qa1/8k] 80 items (1587s elapsed)
+  [qa1/8k] 90 items (1634s elapsed)
+  [qa1/8k] 100 items (1685s elapsed)
+  [qa1/8k] 100 evaluated, 1 skipped of 101 rows read: fact_straddles_chunk=1
+
+--- qa2/1k: 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/1k] 10 items (1768s elapsed)
+  [qa2/1k] 20 items (1785s elapsed)
+  [qa2/1k] 30 items (1803s elapsed)
+  [qa2/1k] 40 items (1820s elapsed)
+  [qa2/1k] 50 items (1837s elapsed)
+  [qa2/1k] 60 items (1855s elapsed)
+  [qa2/1k] 70 items (1872s elapsed)
+  [qa2/1k] 80 items (1890s elapsed)
+  [qa2/1k] 90 items (1907s elapsed)
+  [qa2/1k] 100 items (1924s elapsed)
+  [qa2/1k] 100 evaluated, 51 skipped of 151 rows read: fact_straddles_chunk=51
+
+--- qa2/2k: 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/2k] 10 items (1982s elapsed)
+  [qa2/2k] 20 items (2006s elapsed)
+  [qa2/2k] 30 items (2031s elapsed)
+  [qa2/2k] 40 items (2053s elapsed)
+  [qa2/2k] 50 items (2077s elapsed)
+  [qa2/2k] 60 items (2099s elapsed)
+  [qa2/2k] 70 items (2123s elapsed)
+  [qa2/2k] 80 items (2146s elapsed)
+  [qa2/2k] 90 items (2170s elapsed)
+  [qa2/2k] 100 items (2194s elapsed)
+  [qa2/2k] 100 evaluated, 2 skipped of 102 rows read: fact_straddles_chunk=2
+
+--- qa2/4k: 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/4k] 10 items (2276s elapsed)
+  [qa2/4k] 20 items (2315s elapsed)
+  [qa2/4k] 30 items (2355s elapsed)
+  [qa2/4k] 40 items (2395s elapsed)
+  [qa2/4k] 50 items (2435s elapsed)
+  [qa2/4k] 60 items (2472s elapsed)
+  [qa2/4k] 70 items (2512s elapsed)
+  [qa2/4k] 80 items (2552s elapsed)
+  [qa2/4k] 90 items (2588s elapsed)
+  [qa2/4k] 100 items (2630s elapsed)
+  [qa2/4k] 100 evaluated, 3 skipped of 103 rows read: fact_straddles_chunk=3
+
+--- qa2/8k: 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/8k] 10 items (2755s elapsed)
+  [qa2/8k] 20 items (2807s elapsed)
+  [qa2/8k] 30 items (2860s elapsed)
+  [qa2/8k] 40 items (2912s elapsed)
+  [qa2/8k] 50 items (2963s elapsed)
+  [qa2/8k] 60 items (3014s elapsed)
+  [qa2/8k] 70 items (3064s elapsed)
+  [qa2/8k] 80 items (3114s elapsed)
+  [qa2/8k] 90 items (3164s elapsed)
+  [qa2/8k] 100 items (3215s elapsed)
+  [qa2/8k] 100 evaluated, 1 skipped of 101 rows read: fact_straddles_chunk=1
+
+====================================================================================================
+BABILONG DISSECTION by task x distance bucket (pooled over lengths)
+====================================================================================================
+
+--- qa1   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  0     normal              64    4.219    15.6    28.1   3.11
+  0     nocarry             64    4.113    12.5    37.5   3.02
+  1     normal              95    4.910    14.7    22.1   3.43
+  1     nocarry             95    5.187    10.5    15.8   3.76
+  1     teleport            95    4.910    14.7    22.1   3.43
+  1     teleport_donor      95    5.037    11.6    17.9   3.59
+  1     fact_in_window      95    3.742    23.2    50.5   2.57
+  2-3   normal             122    4.658    11.5    18.0   3.44
+  2-3   nocarry            122    4.828     6.6    13.1   3.53
+  2-3   teleport           122    4.540    12.3    26.2   3.33
+  2-3   teleport_donor     122    4.964     4.9    14.8   3.69
+  2-3   fact_in_window     122    3.420    33.6    56.6   2.34
+  4-7   normal              98    5.020    13.3    22.4   3.76
+  4-7   nocarry             98    5.105    11.2    16.3   3.89
+  4-7   teleport            98    4.874    14.3    29.6   3.50
+  4-7   teleport_donor      98    5.072    15.3    15.3   3.69
+  4-7   fact_in_window      98    3.803    24.5    53.1   2.69
+  8+    normal              21    5.021    14.3    19.0   3.86
+  8+    nocarry             21    4.834    23.8    23.8   3.86
+  8+    teleport            21    4.926    14.3    19.0   4.00
+  8+    teleport_donor      18    4.726    16.7    16.7   3.72
+  8+    fact_in_window      21    3.482    28.6    57.1   2.43
+  1+    normal             336    4.857    13.1    20.5   3.56
+  1+    nocarry            336    5.011    10.1    15.5   3.72
+  1+    teleport           336    4.766    13.7    25.6   3.45
+  1+    teleport_donor     333    5.004    10.5    15.9   3.66
+  1+    fact_in_window     336    3.626    27.7    53.9   2.51
+  all   normal             400    4.755    13.5    21.8   3.48
+  all   nocarry            400    4.867    10.5    19.0   3.61
+  all   teleport           336    4.766    13.7    25.6   3.45
+  all   teleport_donor     333    5.004    10.5    15.9   3.66
+  all   fact_in_window     336    3.626    27.7    53.9   2.51
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  0     normal - nocarry                    64   +0.106 [-0.092,+0.314]      +3.1 [-4.7,+10.9]      -9.4 [-18.8,+0.0]
+  1     teleport - normal                   95   +0.000 [+0.000,+0.000]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  1     teleport - normal [equal rows]      95   +0.000 [+0.000,+0.000]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  1     teleport - teleport_donor           95   -0.127 [-0.345,+0.081]      +3.2 [-4.2,+10.5]      +4.2 [-3.2,+11.6]
+  1     fact_in_window - normal             95   -1.168 [-1.440,-0.906]      +8.4 [+1.1,+16.8]    +28.4 [+18.9,+37.9]
+  1     fact_in_window - normal [len-matched]    62   -1.332 [-1.666,-0.977]      +9.7 [+1.6,+19.4]    +37.1 [+24.2,+50.0]
+  1     normal - nocarry                    95   -0.277 [-0.577,+0.017]      +4.2 [-2.1,+10.5]      +6.3 [-4.2,+16.8]
+  2-3   teleport - normal                  122   -0.118 [-0.204,-0.039]       +0.8 [-2.5,+4.1]      +8.2 [+2.5,+13.9]
+  2-3   teleport - normal [equal rows]     121   -0.123 [-0.209,-0.043]       +0.8 [-2.5,+4.1]      +8.3 [+2.5,+14.0]
+  2-3   teleport - teleport_donor          122   -0.424 [-0.616,-0.255]      +7.4 [+1.6,+13.9]     +11.5 [+4.1,+18.9]
+  2-3   fact_in_window - normal            122   -1.238 [-1.459,-1.015]    +22.1 [+14.8,+29.5]    +38.5 [+29.5,+47.5]
+  2-3   fact_in_window - normal [len-matched]    83   -1.307 [-1.621,-0.997]    +20.5 [+12.0,+28.9]    +39.8 [+28.9,+50.6]
+  2-3   normal - nocarry                   122   -0.170 [-0.407,+0.052]      +4.9 [+0.0,+10.7]      +4.9 [-2.5,+12.3]
+  4-7   teleport - normal                   98   -0.146 [-0.297,+0.000]       +1.0 [-3.1,+5.1]      +7.1 [+0.0,+15.3]
+  4-7   teleport - normal [equal rows]      61   -0.190 [-0.365,-0.020]       +0.0 [-6.6,+6.6]      +6.6 [-3.3,+16.4]
+  4-7   teleport - teleport_donor           98   -0.199 [-0.380,-0.024]       -1.0 [-7.1,+4.1]     +14.3 [+6.1,+23.5]
+  4-7   fact_in_window - normal             98   -1.217 [-1.473,-0.962]     +11.2 [+4.1,+18.4]    +30.6 [+21.4,+39.8]
+  4-7   fact_in_window - normal [len-matched]    70   -1.197 [-1.525,-0.874]      +7.1 [-1.4,+15.7]    +32.9 [+22.9,+44.3]
+  4-7   normal - nocarry                    98   -0.085 [-0.296,+0.113]       +2.0 [-5.1,+8.2]      +6.1 [-2.0,+15.3]
+  8+    teleport - normal                   21   -0.095 [-0.250,+0.061]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  8+    teleport - normal [equal rows]      15   -0.114 [-0.332,+0.083]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  8+    teleport - teleport_donor           18   -0.070 [-0.201,+0.040]       +0.0 [+0.0,+0.0]      +5.6 [+0.0,+16.7]
+  8+    fact_in_window - normal             21   -1.539 [-2.230,-0.901]     +14.3 [+0.0,+33.3]     +38.1 [+9.5,+66.7]
+  8+    fact_in_window - normal [len-matched]    21   -1.539 [-2.247,-0.893]     +14.3 [+0.0,+33.3]     +38.1 [+9.5,+66.7]
+  8+    normal - nocarry                    21   +0.187 [-0.027,+0.407]      -9.5 [-23.8,+0.0]      -4.8 [-23.8,+9.5]
+  1+    teleport - normal                  336   -0.091 [-0.145,-0.037]       +0.6 [-1.2,+2.4]       +5.1 [+1.8,+8.0]
+  1+    teleport - normal [equal rows]     292   -0.096 [-0.147,-0.044]       +0.3 [-1.7,+2.4]       +4.8 [+1.7,+7.9]
+  1+    teleport - teleport_donor          333   -0.254 [-0.359,-0.145]       +3.3 [-0.3,+6.9]      +9.9 [+5.7,+14.4]
+  1+    fact_in_window - normal            336   -1.231 [-1.370,-1.093]    +14.6 [+10.7,+19.0]    +33.3 [+28.0,+39.0]
+  1+    fact_in_window - normal [len-matched]   236   -1.302 [-1.478,-1.115]     +13.1 [+8.5,+17.8]    +36.9 [+29.7,+43.6]
+  1+    normal - nocarry                   336   -0.153 [-0.287,-0.015]       +3.0 [-0.3,+6.2]      +5.1 [+0.3,+10.1]
+  all   teleport - normal                  336   -0.091 [-0.145,-0.040]       +0.6 [-1.2,+2.4]       +5.1 [+2.1,+8.3]
+  all   teleport - normal [equal rows]     292   -0.096 [-0.148,-0.047]       +0.3 [-1.7,+2.4]       +4.8 [+1.7,+7.9]
+  all   teleport - teleport_donor          333   -0.254 [-0.361,-0.149]       +3.3 [-0.3,+6.9]      +9.9 [+5.4,+14.1]
+  all   fact_in_window - normal            336   -1.231 [-1.377,-1.091]    +14.6 [+10.4,+18.8]    +33.3 [+28.0,+38.7]
+  all   fact_in_window - normal [len-matched]   236   -1.302 [-1.491,-1.127]     +13.1 [+8.9,+18.2]    +36.9 [+30.1,+43.2]
+  all   normal - nocarry                   400   -0.112 [-0.232,+0.008]       +3.0 [-0.2,+6.0]       +2.8 [-1.8,+7.0]
+
+--- qa2   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  0     normal              22    3.646    54.5    13.6   1.95
+  0     nocarry             22    3.812    40.9    27.3   2.00
+  1     normal             149    5.221    26.2    24.8   3.06
+  1     nocarry            149    5.634    24.8    24.2   3.21
+  1     teleport           149    5.221    26.2    24.8   3.06
+  1     teleport_donor     149    5.499    21.5    23.5   3.26
+  1     fact_in_window     149    3.779    34.2    55.0   2.31
+  2-3   normal             164    5.417    22.6    23.2   3.10
+  2-3   nocarry            164    5.576    22.6    22.6   3.21
+  2-3   teleport           164    5.299    23.8    24.4   3.09
+  2-3   teleport_donor     164    5.571    23.8    16.5   3.22
+  2-3   fact_in_window     164    3.781    37.8    55.5   2.35
+  4-7   normal              56    5.799    21.4    23.2   3.36
+  4-7   nocarry             56    5.937    19.6    21.4   3.50
+  4-7   teleport            56    5.497    25.0    30.4   3.30
+  4-7   teleport_donor      53    5.780    24.5    20.8   3.49
+  4-7   fact_in_window      56    3.571    42.9    73.2   2.07
+  8+    normal               9    6.109    11.1    22.2   3.89
+  8+    nocarry              9    6.187    11.1    22.2   3.56
+  8+    teleport             9    6.158    11.1    22.2   3.67
+  8+    teleport_donor       8    6.094    12.5    25.0   4.25
+  8+    fact_in_window       9    3.522    55.6    66.7   1.89
+  1+    normal             378    5.413    23.5    23.8   3.14
+  1+    nocarry            378    5.667    22.8    23.0   3.26
+  1+    teleport           378    5.318    24.6    25.4   3.12
+  1+    teleport_donor     374    5.583    22.7    20.1   3.29
+  1+    fact_in_window     378    3.743    37.6    58.2   2.28
+  all   normal             400    5.315    25.2    23.2   3.08
+  all   nocarry            400    5.565    23.8    23.2   3.19
+  all   teleport           378    5.318    24.6    25.4   3.12
+  all   teleport_donor     374    5.583    22.7    20.1   3.29
+  all   fact_in_window     378    3.743    37.6    58.2   2.28
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  0     normal - nocarry                    22   -0.166 [-0.506,+0.149]     +13.6 [+0.0,+27.3]     -13.6 [-27.3,+0.0]
+  1     teleport - normal                  149   +0.000 [+0.000,+0.000]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  1     teleport - normal [equal rows]     149   +0.000 [+0.000,+0.000]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  1     teleport - teleport_donor          149   -0.278 [-0.480,-0.081]       +4.7 [+0.0,+9.4]       +1.3 [-4.7,+7.4]
+  1     fact_in_window - normal            149   -1.442 [-1.653,-1.230]      +8.1 [+1.3,+14.8]    +30.2 [+22.1,+38.9]
+  1     fact_in_window - normal [len-matched]    96   -1.712 [-2.007,-1.424]     +10.4 [+2.1,+18.8]    +36.5 [+26.0,+47.9]
+  1     normal - nocarry                   149   -0.414 [-0.618,-0.218]       +1.3 [-3.4,+6.7]       +0.7 [-7.4,+8.7]
+  2-3   teleport - normal                  164   -0.117 [-0.190,-0.048]       +1.2 [-1.2,+3.7]       +1.2 [-3.0,+5.5]
+  2-3   teleport - normal [equal rows]     164   -0.117 [-0.189,-0.051]       +1.2 [-1.2,+3.7]       +1.2 [-3.0,+5.5]
+  2-3   teleport - teleport_donor          164   -0.271 [-0.438,-0.115]       +0.0 [-3.0,+3.0]      +7.9 [+2.4,+14.0]
+  2-3   fact_in_window - normal            164   -1.636 [-1.862,-1.418]     +15.2 [+7.9,+23.8]    +32.3 [+23.2,+41.5]
+  2-3   fact_in_window - normal [len-matched]   124   -1.797 [-2.074,-1.538]     +16.1 [+5.6,+25.8]    +37.1 [+26.6,+48.4]
+  2-3   normal - nocarry                   164   -0.160 [-0.322,-0.005]       +0.0 [-3.0,+3.0]       +0.6 [-6.1,+7.3]
+  4-7   teleport - normal                   56   -0.302 [-0.512,-0.123]       +3.6 [+0.0,+8.9]      +7.1 [-3.6,+17.9]
+  4-7   teleport - normal [equal rows]      46   -0.140 [-0.272,-0.013]       +2.2 [+0.0,+6.5]      +6.5 [-4.3,+17.4]
+  4-7   teleport - teleport_donor           53   -0.177 [-0.323,-0.050]       +0.0 [+0.0,+0.0]      +5.7 [-3.8,+15.1]
+  4-7   fact_in_window - normal             56   -2.228 [-2.679,-1.789]     +21.4 [+7.1,+33.9]    +50.0 [+35.7,+64.3]
+  4-7   fact_in_window - normal [len-matched]    49   -2.382 [-2.855,-1.920]     +24.5 [+8.2,+40.8]    +51.0 [+34.7,+65.3]
+  4-7   normal - nocarry                    56   -0.138 [-0.287,+0.019]       +1.8 [-3.6,+7.1]      +1.8 [-8.9,+14.3]
+  8+    teleport - normal                    9   +0.048 [-0.134,+0.243]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  8+    teleport - normal [equal rows]       8   +0.100 [-0.085,+0.290]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  8+    teleport - teleport_donor            8   +0.108 [-0.052,+0.313]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  8+    fact_in_window - normal              9   -2.587 [-3.763,-1.394]    +44.4 [+11.1,+77.8]     +44.4 [+0.0,+88.9]
+  8+    fact_in_window - normal [len-matched]     9   -2.587 [-3.934,-1.401]    +44.4 [+11.1,+77.8]     +44.4 [-0.3,+88.9]
+  8+    normal - nocarry                     9   -0.078 [-0.281,+0.148]       +0.0 [+0.0,+0.0]       +0.0 [+0.0,+0.0]
+  1+    teleport - normal                  378   -0.094 [-0.141,-0.052]       +1.1 [-0.3,+2.4]       +1.6 [-0.8,+4.0]
+  1+    teleport - normal [equal rows]     367   -0.068 [-0.105,-0.032]       +0.8 [-0.3,+2.2]       +1.4 [-0.8,+3.8]
+  1+    teleport - teleport_donor          374   -0.252 [-0.365,-0.150]       +1.9 [-0.3,+4.0]       +4.8 [+1.1,+8.8]
+  1+    fact_in_window - normal            378   -1.670 [-1.818,-1.522]     +14.0 [+9.0,+18.8]    +34.4 [+28.8,+39.9]
+  1+    fact_in_window - normal [len-matched]   278   -1.897 [-2.091,-1.714]    +16.5 [+10.4,+22.3]    +39.6 [+32.4,+46.4]
+  1+    normal - nocarry                   378   -0.255 [-0.366,-0.156]       +0.8 [-1.9,+3.2]       +0.8 [-3.7,+5.0]
+  all   teleport - normal                  378   -0.094 [-0.138,-0.054]       +1.1 [+0.0,+2.4]       +1.6 [-0.8,+4.2]
+  all   teleport - normal [equal rows]     367   -0.068 [-0.106,-0.034]       +0.8 [-0.3,+2.2]       +1.4 [-0.8,+3.5]
+  all   teleport - teleport_donor          374   -0.252 [-0.359,-0.147]       +1.9 [-0.3,+4.0]       +4.8 [+1.1,+8.8]
+  all   fact_in_window - normal            378   -1.670 [-1.821,-1.516]     +14.0 [+9.0,+18.8]    +34.4 [+28.8,+39.9]
+  all   fact_in_window - normal [len-matched]   278   -1.897 [-2.082,-1.710]    +16.5 [+10.4,+22.3]    +39.6 [+32.7,+46.4]
+  all   normal - nocarry                   400   -0.250 [-0.353,-0.146]       +1.5 [-1.0,+4.0]       +0.0 [-4.5,+4.5]
+
+====================================================================================================
+by task/length, pooled over distance (1+ = memory needed)
+====================================================================================================
+
+--- qa1/1k   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  1+    normal             100    4.458    23.0    25.0   3.16
+  1+    nocarry            100    4.804    13.0    15.0   3.56
+  1+    teleport           100    4.297    23.0    33.0   2.96
+  1+    teleport_donor     100    4.747    15.0    16.0   3.38
+  1+    fact_in_window     100    3.393    41.0    50.0   2.34
+  all   normal             100    4.458    23.0    25.0   3.16
+  all   nocarry            100    4.804    13.0    15.0   3.56
+  all   teleport           100    4.297    23.0    33.0   2.96
+  all   teleport_donor     100    4.747    15.0    16.0   3.38
+  all   fact_in_window     100    3.393    41.0    50.0   2.34
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  1+    teleport - normal                  100   -0.161 [-0.301,-0.027]       +0.0 [-4.0,+4.0]      +8.0 [+1.0,+15.0]
+  1+    teleport - normal [equal rows]      82   -0.142 [-0.271,-0.019]       +0.0 [-4.9,+4.9]      +6.1 [-1.2,+14.6]
+  1+    teleport - teleport_donor          100   -0.451 [-0.726,-0.173]      +8.0 [-0.0,+17.0]     +17.0 [+8.0,+27.0]
+  1+    fact_in_window - normal            100   -1.064 [-1.251,-0.870]    +18.0 [+10.0,+27.0]    +25.0 [+17.0,+33.0]
+  1+    normal - nocarry                   100   -0.346 [-0.693,+0.008]     +10.0 [+2.0,+18.0]     +10.0 [+0.0,+20.0]
+  all   teleport - normal                  100   -0.161 [-0.299,-0.024]       +0.0 [-4.0,+4.0]      +8.0 [+1.0,+15.0]
+  all   teleport - normal [equal rows]      82   -0.142 [-0.291,-0.013]       +0.0 [-4.9,+4.9]      +6.1 [-1.2,+13.4]
+  all   teleport - teleport_donor          100   -0.451 [-0.724,-0.177]      +8.0 [-0.0,+17.0]     +17.0 [+8.0,+27.0]
+  all   fact_in_window - normal            100   -1.064 [-1.241,-0.876]    +18.0 [+10.0,+26.0]    +25.0 [+17.0,+34.0]
+  all   normal - nocarry                   100   -0.346 [-0.721,-0.010]     +10.0 [+2.0,+18.0]     +10.0 [+0.0,+21.0]
+
+--- qa1/2k   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  1+    normal              80    4.710     8.8    22.5   3.62
+  1+    nocarry             80    4.996     8.8    12.5   3.75
+  1+    teleport            80    4.610    12.5    27.5   3.39
+  1+    teleport_donor      80    4.976     8.8    15.0   3.79
+  1+    fact_in_window      80    3.866    23.8    45.0   2.71
+  all   normal             100    4.596    11.0    23.0   3.54
+  all   nocarry            100    4.744    10.0    20.0   3.56
+  all   teleport            80    4.610    12.5    27.5   3.39
+  all   teleport_donor      80    4.976     8.8    15.0   3.79
+  all   fact_in_window      80    3.866    23.8    45.0   2.71
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  1+    teleport - normal                   80   -0.099 [-0.224,+0.014]      +3.8 [-1.2,+10.0]      +5.0 [-1.2,+12.5]
+  1+    teleport - normal [equal rows]      69   -0.147 [-0.253,-0.053]       +2.9 [-2.9,+8.7]      +5.8 [+1.4,+11.6]
+  1+    teleport - teleport_donor           80   -0.365 [-0.604,-0.134]      +3.8 [-3.8,+11.2]     +12.5 [+2.5,+21.3]
+  1+    fact_in_window - normal             80   -0.844 [-1.075,-0.623]     +15.0 [+6.2,+23.8]    +22.5 [+13.8,+31.2]
+  1+    fact_in_window - normal [len-matched]    80   -0.844 [-1.069,-0.628]     +15.0 [+7.5,+23.8]    +22.5 [+13.8,+31.2]
+  1+    normal - nocarry                    80   -0.287 [-0.563,-0.001]       +0.0 [-6.2,+6.2]     +10.0 [+0.0,+20.0]
+  all   teleport - normal                   80   -0.099 [-0.216,+0.025]      +3.8 [-1.2,+10.0]      +5.0 [-1.2,+11.2]
+  all   teleport - normal [equal rows]      69   -0.147 [-0.259,-0.051]       +2.9 [-2.9,+8.7]      +5.8 [+1.4,+11.6]
+  all   teleport - teleport_donor           80   -0.365 [-0.602,-0.136]      +3.8 [-3.8,+11.2]     +12.5 [+2.5,+21.2]
+  all   fact_in_window - normal             80   -0.844 [-1.055,-0.632]     +15.0 [+6.2,+25.0]    +22.5 [+13.8,+32.5]
+  all   fact_in_window - normal [len-matched]    80   -0.844 [-1.075,-0.632]     +15.0 [+6.2,+23.8]    +22.5 [+13.8,+32.5]
+  all   normal - nocarry                   100   -0.148 [-0.398,+0.112]       +1.0 [-5.0,+8.0]      +3.0 [-7.0,+13.0]
+
+--- qa1/4k   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  1+    normal              73    5.130     9.6    13.7   3.75
+  1+    nocarry             73    5.139     8.2    13.7   3.84
+  1+    teleport            73    5.098     9.6    19.2   3.78
+  1+    teleport_donor      73    5.160     9.6    16.4   3.81
+  1+    fact_in_window      73    3.712    20.5    63.0   2.52
+  all   normal             100    4.863    10.0    20.0   3.53
+  all   nocarry            100    4.849     8.0    23.0   3.60
+  all   teleport            73    5.098     9.6    19.2   3.78
+  all   teleport_donor      73    5.160     9.6    16.4   3.81
+  all   fact_in_window      73    3.712    20.5    63.0   2.52
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  1+    teleport - normal                   73   -0.032 [-0.113,+0.029]       +0.0 [+0.0,+0.0]      +5.5 [+1.4,+11.0]
+  1+    teleport - normal [equal rows]      64   -0.037 [-0.120,+0.030]       +0.0 [+0.0,+0.0]      +6.2 [+1.6,+12.5]
+  1+    teleport - teleport_donor           73   -0.062 [-0.193,+0.058]       +0.0 [-6.8,+6.8]       +2.7 [-4.1,+9.6]
+  1+    fact_in_window - normal             73   -1.418 [-1.747,-1.100]     +11.0 [+4.1,+17.8]    +49.3 [+37.0,+61.6]
+  1+    fact_in_window - normal [len-matched]    73   -1.418 [-1.752,-1.087]     +11.0 [+4.1,+19.2]    +49.3 [+37.0,+63.0]
+  1+    normal - nocarry                    73   -0.009 [-0.130,+0.112]       +1.4 [-5.5,+9.6]       +0.0 [-8.2,+8.2]
+  all   teleport - normal                   73   -0.032 [-0.104,+0.032]       +0.0 [+0.0,+0.0]      +5.5 [+1.4,+11.0]
+  all   teleport - normal [equal rows]      64   -0.037 [-0.121,+0.028]       +0.0 [+0.0,+0.0]      +6.2 [+1.6,+12.5]
+  all   teleport - teleport_donor           73   -0.062 [-0.181,+0.049]       +0.0 [-6.8,+6.8]      +2.7 [-4.1,+11.0]
+  all   fact_in_window - normal             73   -1.418 [-1.762,-1.089]     +11.0 [+4.1,+19.2]    +49.3 [+37.0,+61.6]
+  all   fact_in_window - normal [len-matched]    73   -1.418 [-1.754,-1.090]     +11.0 [+4.1,+19.2]    +49.3 [+37.0,+63.0]
+  all   normal - nocarry                   100   +0.014 [-0.093,+0.120]       +2.0 [-3.0,+8.0]      -3.0 [-10.0,+4.0]
+
+--- qa1/8k   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  1+    normal              83    5.242     8.4    19.3   3.80
+  1+    nocarry             83    5.161     9.6    20.5   3.78
+  1+    teleport            83    5.190     7.2    20.5   3.81
+  1+    teleport_donor      80    5.211     7.5    16.2   3.76
+  1+    fact_in_window      83    3.601    21.7    59.0   2.53
+  all   normal             100    5.105    10.0    19.0   3.71
+  all   nocarry            100    5.072    11.0    18.0   3.71
+  all   teleport            83    5.190     7.2    20.5   3.81
+  all   teleport_donor      80    5.211     7.5    16.2   3.76
+  all   fact_in_window      83    3.601    21.7    59.0   2.53
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  1+    teleport - normal                   83   -0.052 [-0.114,+0.009]       -1.2 [-3.6,+0.0]       +1.2 [-2.4,+4.8]
+  1+    teleport - normal [equal rows]      77   -0.052 [-0.118,+0.010]       -1.3 [-3.9,+0.0]       +1.3 [-2.6,+5.2]
+  1+    teleport - teleport_donor           80   -0.071 [-0.130,-0.012]       +0.0 [-3.8,+3.8]      +5.0 [-1.2,+12.5]
+  1+    fact_in_window - normal             83   -1.640 [-1.986,-1.300]     +13.3 [+4.8,+22.9]    +39.8 [+28.9,+51.8]
+  1+    fact_in_window - normal [len-matched]    83   -1.640 [-1.995,-1.264]     +13.3 [+4.8,+22.9]    +39.8 [+28.9,+51.8]
+  1+    normal - nocarry                    83   +0.081 [-0.023,+0.187]       -1.2 [-6.0,+2.4]       -1.2 [-9.6,+7.2]
+  all   teleport - normal                   83   -0.052 [-0.114,+0.008]       -1.2 [-3.6,+0.0]       +1.2 [-2.4,+4.8]
+  all   teleport - normal [equal rows]      77   -0.052 [-0.118,+0.010]       -1.3 [-3.9,+0.0]       +1.3 [-2.6,+5.2]
+  all   teleport - teleport_donor           80   -0.071 [-0.134,-0.007]       +0.0 [-3.8,+3.8]      +5.0 [-1.2,+12.5]
+  all   fact_in_window - normal             83   -1.640 [-2.000,-1.281]     +13.3 [+4.8,+21.7]    +39.8 [+27.7,+51.8]
+  all   fact_in_window - normal [len-matched]    83   -1.640 [-1.999,-1.296]     +13.3 [+4.8,+21.7]    +39.8 [+28.9,+51.8]
+  all   normal - nocarry                   100   +0.034 [-0.082,+0.148]       -1.0 [-5.0,+3.0]       +1.0 [-7.0,+8.0]
+
+--- qa2/1k   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  1+    normal             100    4.943    23.0    25.0   3.05
+  1+    nocarry            100    5.505    22.0    17.0   3.32
+  1+    teleport           100    4.788    25.0    23.0   2.98
+  1+    teleport_donor      99    5.496    18.2    16.2   3.33
+  1+    fact_in_window     100    3.904    30.0    45.0   2.48
+  all   normal             100    4.943    23.0    25.0   3.05
+  all   nocarry            100    5.505    22.0    17.0   3.32
+  all   teleport           100    4.788    25.0    23.0   2.98
+  all   teleport_donor      99    5.496    18.2    16.2   3.33
+  all   fact_in_window     100    3.904    30.0    45.0   2.48
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  1+    teleport - normal                  100   -0.155 [-0.268,-0.060]       +2.0 [-2.0,+6.0]       -2.0 [-7.0,+3.0]
+  1+    teleport - normal [equal rows]      99   -0.125 [-0.225,-0.041]       +1.0 [-2.0,+5.1]       -3.0 [-7.1,+1.0]
+  1+    teleport - teleport_donor           99   -0.683 [-0.994,-0.381]      +6.1 [+0.0,+12.1]      +6.1 [-2.0,+14.1]
+  1+    fact_in_window - normal            100   -1.039 [-1.238,-0.855]      +7.0 [+0.0,+14.0]    +20.0 [+11.0,+29.0]
+  1+    normal - nocarry                   100   -0.562 [-0.848,-0.270]       +1.0 [-5.0,+7.0]      +8.0 [-3.0,+19.0]
+  all   teleport - normal                  100   -0.155 [-0.266,-0.061]       +2.0 [-2.0,+6.0]       -2.0 [-7.0,+3.0]
+  all   teleport - normal [equal rows]      99   -0.125 [-0.217,-0.043]       +1.0 [-2.0,+5.1]       -3.0 [-8.1,+1.0]
+  all   teleport - teleport_donor           99   -0.683 [-0.996,-0.398]      +6.1 [+0.0,+12.1]      +6.1 [-2.0,+15.2]
+  all   fact_in_window - normal            100   -1.039 [-1.244,-0.850]      +7.0 [+1.0,+14.0]    +20.0 [+12.0,+29.0]
+  all   normal - nocarry                   100   -0.562 [-0.853,-0.248]       +1.0 [-5.0,+7.0]      +8.0 [-3.0,+19.0]
+
+--- qa2/2k   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  1+    normal              91    5.667    19.8    20.9   3.24
+  1+    nocarry             91    5.644    20.9    20.9   3.32
+  1+    teleport            91    5.560    20.9    24.2   3.24
+  1+    teleport_donor      89    5.789    21.3    11.2   3.34
+  1+    fact_in_window      91    4.187    36.3    51.6   2.35
+  all   normal             100    5.480    23.0    19.0   3.12
+  all   nocarry            100    5.464    22.0    20.0   3.20
+  all   teleport            91    5.560    20.9    24.2   3.24
+  all   teleport_donor      89    5.789    21.3    11.2   3.34
+  all   fact_in_window      91    4.187    36.3    51.6   2.35
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  1+    teleport - normal                   91   -0.106 [-0.219,-0.004]       +1.1 [+0.0,+3.3]       +3.3 [-1.1,+7.7]
+  1+    teleport - normal [equal rows]      87   -0.042 [-0.125,+0.032]       +1.1 [+0.0,+3.4]       +4.6 [+1.1,+9.2]
+  1+    teleport - teleport_donor           89   -0.201 [-0.423,+0.013]       +0.0 [-5.6,+5.6]     +11.2 [+3.4,+20.2]
+  1+    fact_in_window - normal             91   -1.480 [-1.734,-1.248]     +16.5 [+7.7,+25.3]    +30.8 [+20.9,+40.7]
+  1+    fact_in_window - normal [len-matched]    91   -1.480 [-1.730,-1.247]     +16.5 [+6.6,+26.4]    +30.8 [+22.0,+40.7]
+  1+    normal - nocarry                    91   +0.023 [-0.202,+0.229]       -1.1 [-5.5,+4.4]       +0.0 [-8.8,+8.8]
+  all   teleport - normal                   91   -0.106 [-0.221,-0.002]       +1.1 [+0.0,+3.3]       +3.3 [-1.1,+7.7]
+  all   teleport - normal [equal rows]      87   -0.042 [-0.116,+0.030]       +1.1 [+0.0,+3.4]       +4.6 [+1.1,+9.2]
+  all   teleport - teleport_donor           89   -0.201 [-0.435,+0.033]       +0.0 [-4.5,+5.6]     +11.2 [+3.4,+19.1]
+  all   fact_in_window - normal             91   -1.480 [-1.730,-1.245]     +16.5 [+7.7,+26.4]    +30.8 [+22.0,+40.7]
+  all   fact_in_window - normal [len-matched]    91   -1.480 [-1.717,-1.235]     +16.5 [+7.7,+25.3]    +30.8 [+22.0,+40.7]
+  all   normal - nocarry                   100   +0.016 [-0.194,+0.222]       +1.0 [-4.0,+6.0]      -1.0 [-10.0,+8.0]
+
+--- qa2/4k   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  1+    normal              91    5.441    25.3    23.1   3.14
+  1+    nocarry             91    5.740    22.0    26.4   3.22
+  1+    teleport            91    5.404    26.4    26.4   3.18
+  1+    teleport_donor      91    5.552    25.3    25.3   3.23
+  1+    fact_in_window      91    3.547    41.8    62.6   2.21
+  all   normal             100    5.297    27.0    23.0   3.04
+  all   nocarry            100    5.597    23.0    28.0   3.12
+  all   teleport            91    5.404    26.4    26.4   3.18
+  all   teleport_donor      91    5.552    25.3    25.3   3.23
+  all   fact_in_window      91    3.547    41.8    62.6   2.21
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  1+    teleport - normal                   91   -0.037 [-0.101,+0.024]       +1.1 [+0.0,+3.3]       +3.3 [-1.1,+8.8]
+  1+    teleport - normal [equal rows]      86   -0.024 [-0.089,+0.037]       +1.2 [+0.0,+3.5]       +2.3 [-2.3,+7.0]
+  1+    teleport - teleport_donor           91   -0.148 [-0.296,-0.013]       +1.1 [-2.2,+5.5]       +1.1 [-6.6,+8.8]
+  1+    fact_in_window - normal             91   -1.894 [-2.235,-1.577]     +16.5 [+5.5,+27.5]    +39.6 [+26.4,+52.7]
+  1+    fact_in_window - normal [len-matched]    91   -1.894 [-2.229,-1.579]     +16.5 [+5.5,+27.5]    +39.6 [+26.4,+51.6]
+  1+    normal - nocarry                    91   -0.299 [-0.452,-0.160]       +3.3 [-2.2,+9.9]      -3.3 [-11.0,+4.4]
+  all   teleport - normal                   91   -0.037 [-0.102,+0.021]       +1.1 [+0.0,+3.3]       +3.3 [-1.1,+8.8]
+  all   teleport - normal [equal rows]      86   -0.024 [-0.087,+0.038]       +1.2 [+0.0,+3.5]       +2.3 [-2.3,+7.0]
+  all   teleport - teleport_donor           91   -0.148 [-0.293,-0.005]       +1.1 [-2.2,+5.5]       +1.1 [-6.6,+8.8]
+  all   fact_in_window - normal             91   -1.894 [-2.219,-1.570]     +16.5 [+5.5,+27.5]    +39.6 [+27.5,+52.7]
+  all   fact_in_window - normal [len-matched]    91   -1.894 [-2.227,-1.582]     +16.5 [+4.4,+27.5]    +39.6 [+27.5,+51.7]
+  all   normal - nocarry                   100   -0.300 [-0.434,-0.167]      +4.0 [-1.0,+10.0]      -5.0 [-13.0,+3.0]
+
+--- qa2/8k   (chance top-1 = 16.7%) ---
+  dist  condition            n  goldNLL   top1%    pmi%   rank
+  1+    normal              96    5.635    26.0    26.0   3.14
+  1+    nocarry             96    5.790    26.0    28.1   3.20
+  1+    teleport            96    5.560    26.0    28.1   3.11
+  1+    teleport_donor      95    5.510    26.3    27.4   3.27
+  1+    fact_in_window      96    3.340    42.7    74.0   2.07
+  all   normal             100    5.542    28.0    26.0   3.09
+  all   nocarry            100    5.695    28.0    28.0   3.14
+  all   teleport            96    5.560    26.0    28.1   3.11
+  all   teleport_donor      95    5.510    26.3    27.4   3.27
+  all   fact_in_window      96    3.340    42.7    74.0   2.07
+
+  paired contrasts (A - B; dNLL<0 / dTop1>0 = A better), 95% bootstrap CI
+  dist  contrast                             n            dNLL nats/tok               dTop1 pt           dPMI-top1 pt
+  1+    teleport - normal                   96   -0.075 [-0.123,-0.028]       +0.0 [+0.0,+0.0]       +2.1 [-2.1,+7.3]
+  1+    teleport - normal [equal rows]      95   -0.072 [-0.120,-0.024]       +0.0 [+0.0,+0.0]       +2.1 [-2.1,+7.4]
+  1+    teleport - teleport_donor           95   +0.047 [-0.029,+0.126]       +0.0 [+0.0,+0.0]       +1.1 [-4.2,+7.4]
+  1+    fact_in_window - normal             96   -2.295 [-2.651,-1.948]     +16.7 [+6.2,+27.1]    +47.9 [+34.4,+60.4]
+  1+    fact_in_window - normal [len-matched]    96   -2.295 [-2.630,-1.937]     +16.7 [+6.2,+28.1]    +47.9 [+34.4,+60.4]
+  1+    normal - nocarry                    96   -0.156 [-0.237,-0.078]       +0.0 [+0.0,+0.0]       -2.1 [-9.4,+5.2]
+  all   teleport - normal                   96   -0.075 [-0.127,-0.026]       +0.0 [+0.0,+0.0]       +2.1 [-3.1,+7.3]
+  all   teleport - normal [equal rows]      95   -0.072 [-0.123,-0.022]       +0.0 [+0.0,+0.0]       +2.1 [-3.2,+7.4]
+  all   teleport - teleport_donor           95   +0.047 [-0.027,+0.120]       +0.0 [+0.0,+0.0]       +1.1 [-5.3,+7.4]
+  all   fact_in_window - normal             96   -2.295 [-2.660,-1.938]     +16.7 [+5.2,+27.1]    +47.9 [+35.4,+61.5]
+  all   fact_in_window - normal [len-matched]    96   -2.295 [-2.632,-1.936]     +16.7 [+5.2,+28.1]    +47.9 [+35.4,+60.4]
+  all   normal - nocarry                   100   -0.153 [-0.226,-0.081]       +0.0 [+0.0,+0.0]      -2.0 [-10.0,+5.0]
+
+HOW TO READ  (delta = A - B; dNLL < 0 and dTop1 > 0 both mean A is better)
+  1. fact_in_window top-1 vs chance: ~chance => the CAPABILITY FLOOR binds --
+     the model cannot answer even with the fact in its window, and no memory
+     can win this task at this model scale.  Stop here if so.
+  2. teleport - teleport_donor: ~0 => the carried CONTENT is not used (WRITE
+     or READ failure: the fact never entered the carry, or the question chunk
+     cannot use it).  dNLL < 0 => information transfers when retention is
+     removed from the path.
+  3. teleport - normal: dNLL << 0 (teleport >> normal) => RETENTION loss: the
+     fact was written, then gated away over the intervening chunks.  Exactly 0
+     at dist 1 by construction.  Use the [equal rows] line when the source
+     chunk sits inside the first lap (gate_fill=grow: fewer carried columns).
+  4. normal - nocarry: the carry's total effect, content AND columns -- not a
+     content effect (that is 2).
+  dist = question chunk - latest carried fact chunk; dist 0 = every
+  supporting fact already in the question window.  laps = dist / 4.
+
+HEALTH  mean gold NLL (normal) 5.035 nats/tok vs ln(vocab) 11.52: margin +6.48   (ok)
+NOTE    the benchmark's gold_in_final_window is true for 489/800 items here, but the gold word is in the SUFFIX DEMOS for 409 and a supporting fact is actually in the window for 197.  Use dist, not gold_in_final_window.
+SELF    teleport==normal at dist 1: max |d cand NLL| = 0.00e+00 over 244 items
+SELF    normal vs nocarry: max |d cand NLL| = 5.675 over 800 items (must be > 0)
+DONORS  tiers {'0': 700, '1': 7}; no compatible donor for 7 items
+FIW     fact_in_window on 714 dist>=1 items; 200 of them EXTENDED the window (no filler to trade; see [len-matched])
+SKIPS   qa1/1k: fact_straddles_chunk=24; qa1/2k: fact_straddles_chunk=3; qa1/4k: fact_straddles_chunk=1; qa1/8k: fact_straddles_chunk=1; qa2/1k: fact_straddles_chunk=51; qa2/2k: fact_straddles_chunk=2; qa2/4k: fact_straddles_chunk=3; qa2/8k: fact_straddles_chunk=1
+
+TIMING  seconds per item, mean (float32, NVIDIA H200)
+    1k: chain=0.340, pmi_nocontext=0.201, normal=0.332, nocarry=0.201, teleport=0.326, teleport_donor=0.326, fact_in_window=0.331  | TOTAL 2.05 s/item
+    2k: chain=0.510, pmi_nocontext=0.201, normal=0.465, nocarry=0.330, teleport=0.459, teleport_donor=0.461, fact_in_window=0.467  | TOTAL 2.69 s/item
+    4k: chain=0.880, pmi_nocontext=0.202, normal=0.790, nocarry=0.609, teleport=0.787, teleport_donor=0.787, fact_in_window=0.795  | TOTAL 4.42 s/item
+    8k: chain=1.887, pmi_nocontext=0.203, normal=0.810, nocarry=0.628, teleport=0.818, teleport_donor=0.817, fact_in_window=0.817  | TOTAL 5.71 s/item
+
+wrote eval_results/pm/cortex-final/step_11444_T8/babilong_dissect/results.json and eval_results/pm/cortex-final/step_11444_T8/babilong_dissect/items.jsonl (3294s total)
+
+--- [cortex@11444] memory interp (A-E)  (18:28:06)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '98.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.73s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.13it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[rows] 24 rows from 24 distinct books (50 books, 1009 usable rows, 50 skipped as short/padded); row_select=spread
+  row 1/24 (ds 1): intact 3.2542 chain 1.5s  B 26.1s  D 0.1s
+  row 2/24 (ds 48): intact 2.7659 chain 1.3s  B 25.1s  D 0.1s
+  row 3/24 (ds 86): intact 3.5492 chain 1.3s  B 25.2s  D 0.1s
+  row 4/24 (ds 206): intact 2.7696 chain 1.3s  B 25.2s  D 0.1s
+  row 5/24 (ds 274): intact 3.0241 chain 1.3s  B 25.2s  D 0.1s
+  row 6/24 (ds 301): intact 2.8144 chain 1.3s  B 25.2s  D 0.1s
+  row 7/24 (ds 335): intact 2.9816 chain 1.3s  B 25.2s  D 0.1s
+  row 8/24 (ds 361): intact 3.9152 chain 1.3s  B 25.2s  D 0.1s
+  row 9/24 (ds 378): intact 3.2856 chain 1.3s  B 25.2s  D 0.1s
+  row 10/24 (ds 407): intact 3.0124 chain 1.3s  B 25.2s  D 0.1s
+  row 11/24 (ds 427): intact 3.3312 chain 1.3s  B 25.2s  D 0.1s
+  row 12/24 (ds 479): intact 2.7738 chain 1.3s  B 25.2s  D 0.1s
+  row 13/24 (ds 543): intact 2.6592 chain 1.3s  B 25.2s  D 0.1s
+  row 14/24 (ds 589): intact 4.3177 chain 1.3s  B 25.2s  D 0.1s
+  row 15/24 (ds 647): intact 3.2862 chain 1.3s  B 25.2s  D 0.1s
+  row 16/24 (ds 706): intact 3.2526 chain 1.3s  B 25.2s  D 0.1s
+  row 17/24 (ds 752): intact 3.3886 chain 1.3s  B 25.2s  D 0.1s
+  row 18/24 (ds 789): intact 2.6941 chain 1.3s  B 25.2s  D 0.1s
+  row 19/24 (ds 807): intact 2.6827 chain 1.3s  B 25.2s  D 0.1s
+  row 20/24 (ds 838): intact 3.0723 chain 1.3s  B 25.2s  D 0.1s
+  row 21/24 (ds 862): intact 3.1442 chain 1.3s  B 25.2s  D 0.1s
+  row 22/24 (ds 897): intact 3.0029 chain 1.3s  B 25.2s  D 0.1s
+  row 23/24 (ds 931): intact 2.8771 chain 1.3s  B 25.2s  D 0.1s
+  row 24/24 (ds 971): intact 2.9541 chain 1.3s  B 25.2s  D 0.1s
+
+============================================================================================
+memory interp -- cortex-5b/cortex-final/checkpoint_11444  rows=24 books=24 donor_books=[25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]  fp32
+============================================================================================
+intact NLL chunks 2..n 3.1170  chunk 1 3.3553  chance 11.5164
+checks: transparency=True replica_bit_identical=True recompute_rel_err_max=7.84e-07 (neg control min 4.28e-01) over 112 calls; block_nothing_bitwise_rows=24 fidelity=2.56e-07 block_all_differs=True ring_merges_checked=200
+layout chunk 2: [E 0..15 | Z 16..31 | tokens 32..543 | summary 544..559]; positions 0 (carried), 1..512, 513..528  |E|=79.0 |Z|=98.0 |tok|=4.25
+layout chunk 8: [E 0..63 | Z 64..127 | tokens 128..639 | summary 640..655]; positions 0 (carried), 1..512, 513..528  |E|=78.7 |Z|=98.0 |tok|=4.68
+
+A. read shares, real-token queries, chunks 2..n (head-mean)
+  block                E       Z     own   first first@c1    E/col    Z/col  own/col   E_by_age
+  prelude.0       0.0027  0.0017  0.9956  0.0072   0.0098  0.00006  0.00004  0.01269   0.001 0.001 0.001 0.001
+  prelude.1       0.0046  0.0044  0.9910  0.0123   0.0103  0.00010  0.00010  0.01232   0.002 0.001 0.001 0.001
+  prelude.2       0.0076  0.0059  0.9865  0.0259   0.0107  0.00017  0.00014  0.01187   0.003 0.002 0.002 0.002
+  prelude.3       0.0066  0.0059  0.9875  0.0471   0.0096  0.00014  0.00014  0.01190   0.003 0.002 0.002 0.002
+  core.0@t0       0.0372  0.0241  0.9387  0.0398   0.0173  0.00082  0.00054  0.00977   0.014 0.012 0.010 0.010
+  core.1@t0       0.0338  0.0241  0.9422  0.0483   0.0190  0.00074  0.00056  0.00948   0.013 0.011 0.008 0.010
+  core.2@t0       0.0673  0.0467  0.8860  0.0312   0.0224  0.00151  0.00108  0.00809   0.026 0.021 0.017 0.020
+  core.3@t0       0.0591  0.0207  0.9202  0.0369   0.0155  0.00135  0.00049  0.00877   0.022 0.018 0.015 0.020
+  core.4@t0       0.1407  0.0331  0.8262  0.0462   0.0151  0.00324  0.00076  0.00742   0.052 0.042 0.037 0.045
+  core.5@t0       0.1595  0.0221  0.8184  0.0387   0.0137  0.00374  0.00051  0.00765   0.056 0.047 0.043 0.057
+  core.0@t1       0.0488  0.0237  0.9276  0.0493   0.0141  0.00109  0.00055  0.00936   0.021 0.015 0.011 0.011
+  core.1@t1       0.0452  0.0198  0.9351  0.0552   0.0146  0.00102  0.00046  0.00933   0.018 0.014 0.011 0.014
+  core.2@t1       0.0814  0.0435  0.8751  0.0360   0.0160  0.00186  0.00100  0.00794   0.031 0.024 0.021 0.025
+  core.3@t1       0.0870  0.0196  0.8934  0.0361   0.0118  0.00202  0.00046  0.00827   0.030 0.026 0.023 0.031
+  core.4@t1       0.1771  0.0314  0.7916  0.0455   0.0117  0.00413  0.00072  0.00707   0.064 0.053 0.047 0.059
+  core.5@t1       0.2107  0.0215  0.7678  0.0342   0.0113  0.00502  0.00050  0.00704   0.071 0.062 0.058 0.078
+  core.0@t2       0.0504  0.0248  0.9248  0.0481   0.0134  0.00113  0.00058  0.00929   0.022 0.016 0.012 0.012
+  core.1@t2       0.0456  0.0188  0.9356  0.0593   0.0134  0.00103  0.00044  0.00930   0.017 0.014 0.012 0.014
+  core.2@t2       0.0840  0.0432  0.8728  0.0373   0.0146  0.00194  0.00099  0.00793   0.032 0.025 0.022 0.026
+  core.3@t2       0.0963  0.0186  0.8851  0.0368   0.0110  0.00224  0.00044  0.00820   0.033 0.029 0.026 0.035
+  core.4@t2       0.1916  0.0305  0.7780  0.0442   0.0113  0.00447  0.00070  0.00696   0.068 0.058 0.052 0.066
+  core.5@t2       0.2249  0.0206  0.7545  0.0329   0.0106  0.00533  0.00048  0.00693   0.074 0.067 0.063 0.085
+  core.0@t3       0.0488  0.0243  0.9268  0.0465   0.0132  0.00109  0.00057  0.00935   0.021 0.015 0.011 0.012
+  core.1@t3       0.0447  0.0185  0.9368  0.0607   0.0132  0.00101  0.00044  0.00928   0.017 0.014 0.011 0.014
+  core.2@t3       0.0854  0.0441  0.8705  0.0368   0.0143  0.00198  0.00101  0.00789   0.032 0.026 0.023 0.027
+  core.3@t3       0.1055  0.0186  0.8759  0.0371   0.0110  0.00248  0.00044  0.00815   0.035 0.032 0.030 0.039
+  core.4@t3       0.1994  0.0307  0.7699  0.0431   0.0114  0.00467  0.00070  0.00688   0.070 0.060 0.054 0.069
+  core.5@t3       0.2339  0.0200  0.7461  0.0331   0.0106  0.00559  0.00047  0.00688   0.077 0.070 0.066 0.088
+  core.0@t4       0.0483  0.0246  0.9271  0.0457   0.0133  0.00108  0.00057  0.00935   0.021 0.015 0.011 0.012
+  core.1@t4       0.0448  0.0180  0.9372  0.0603   0.0133  0.00102  0.00042  0.00928   0.017 0.014 0.012 0.014
+  core.2@t4       0.0840  0.0439  0.8721  0.0361   0.0144  0.00195  0.00101  0.00787   0.031 0.025 0.022 0.027
+  core.3@t4       0.1063  0.0181  0.8756  0.0393   0.0110  0.00251  0.00043  0.00821   0.035 0.032 0.030 0.039
+  core.4@t4       0.2018  0.0291  0.7691  0.0436   0.0115  0.00474  0.00067  0.00689   0.070 0.061 0.056 0.070
+  core.5@t4       0.2383  0.0192  0.7426  0.0322   0.0106  0.00571  0.00045  0.00690   0.078 0.071 0.068 0.090
+  core.0@t5       0.0487  0.0248  0.9265  0.0444   0.0133  0.00109  0.00058  0.00927   0.021 0.015 0.011 0.012
+  core.1@t5       0.0437  0.0169  0.9394  0.0606   0.0133  0.00100  0.00040  0.00934   0.016 0.013 0.011 0.014
+  core.2@t5       0.0813  0.0421  0.8766  0.0369   0.0144  0.00189  0.00097  0.00786   0.030 0.025 0.022 0.026
+  core.3@t5       0.1015  0.0174  0.8811  0.0426   0.0110  0.00239  0.00041  0.00830   0.034 0.030 0.029 0.037
+  core.4@t5       0.1996  0.0272  0.7732  0.0459   0.0115  0.00469  0.00063  0.00696   0.069 0.060 0.055 0.070
+  core.5@t5       0.2361  0.0189  0.7450  0.0312   0.0107  0.00567  0.00045  0.00690   0.077 0.070 0.067 0.088
+  core.0@t6       0.0487  0.0251  0.9262  0.0438   0.0133  0.00109  0.00059  0.00920   0.021 0.015 0.011 0.012
+  core.1@t6       0.0434  0.0169  0.9397  0.0579   0.0134  0.00099  0.00040  0.00934   0.016 0.013 0.011 0.014
+  core.2@t6       0.0808  0.0410  0.8781  0.0367   0.0144  0.00188  0.00094  0.00782   0.030 0.024 0.021 0.026
+  core.3@t6       0.1007  0.0172  0.8820  0.0427   0.0111  0.00237  0.00041  0.00833   0.034 0.030 0.028 0.037
+  core.4@t6       0.2038  0.0268  0.7694  0.0461   0.0115  0.00479  0.00062  0.00694   0.070 0.061 0.056 0.071
+  core.5@t6       0.2462  0.0193  0.7344  0.0287   0.0107  0.00593  0.00046  0.00681   0.081 0.074 0.070 0.091
+  core.0@t7       0.0488  0.0256  0.9256  0.0441   0.0134  0.00109  0.00060  0.00911   0.021 0.015 0.011 0.012
+  core.1@t7       0.0506  0.0206  0.9288  0.0449   0.0134  0.00114  0.00048  0.00901   0.019 0.015 0.013 0.016
+  core.2@t7       0.0818  0.0382  0.8800  0.0382   0.0144  0.00190  0.00088  0.00817   0.030 0.025 0.022 0.026
+  core.3@t7       0.1042  0.0173  0.8785  0.0395   0.0111  0.00244  0.00041  0.00832   0.035 0.031 0.029 0.038
+  core.4@t7       0.2037  0.0295  0.7667  0.0468   0.0115  0.00476  0.00068  0.00677   0.070 0.061 0.056 0.071
+  core.5@t7       0.3207  0.0220  0.6573  0.0128   0.0107  0.00775  0.00052  0.00618   0.105 0.096 0.091 0.119
+  coda.0          0.4892  0.0311  0.4797  0.0023   0.0095  0.01219  0.00071  0.00370   0.168 0.146 0.134 0.174
+  coda.1          0.6618  0.0202  0.3180  0.0014   0.0114  0.01661  0.00047  0.00233   0.226 0.197 0.183 0.238
+  coda.2          0.6611  0.0170  0.3220  0.0012   0.0146  0.01658  0.00041  0.00242   0.228 0.197 0.182 0.236
+  coda.3          0.6039  0.0424  0.3537  0.0013   0.0112  0.01513  0.00101  0.00288   0.205 0.180 0.169 0.218
+  top-20 memory heads (E+Z mass):
+    coda.3         h13  E 0.8112 Z 0.0098 own 0.1789 first 0.0005 (c1 0.0102)  E_age 0.287 0.240 0.222 0.279
+    coda.1         h3   E 0.8049 Z 0.0112 own 0.1839 first 0.0012 (c1 0.0117)  E_age 0.256 0.238 0.233 0.312
+    coda.1         h6   E 0.8059 Z 0.0056 own 0.1885 first 0.0010 (c1 0.0118)  E_age 0.279 0.239 0.220 0.289
+    coda.1         h13  E 0.8080 Z 0.0032 own 0.1888 first 0.0007 (c1 0.0109)  E_age 0.278 0.239 0.224 0.290
+    coda.1         h10  E 0.7594 Z 0.0347 own 0.2059 first 0.0009 (c1 0.0079)  E_age 0.257 0.226 0.212 0.275
+    coda.3         h3   E 0.7775 Z 0.0144 own 0.2081 first 0.0008 (c1 0.0187)  E_age 0.250 0.230 0.223 0.300
+    coda.3         h0   E 0.7809 Z 0.0059 own 0.2132 first 0.0009 (c1 0.0081)  E_age 0.255 0.232 0.223 0.294
+    coda.2         h4   E 0.7592 Z 0.0205 own 0.2203 first 0.0009 (c1 0.0118)  E_age 0.246 0.224 0.217 0.291
+    coda.3         h2   E 0.7355 Z 0.0383 own 0.2262 first 0.0012 (c1 0.0122)  E_age 0.239 0.218 0.211 0.278
+    coda.3         h8   E 0.7213 Z 0.0364 own 0.2423 first 0.0010 (c1 0.0117)  E_age 0.252 0.214 0.196 0.254
+    coda.1         h9   E 0.7436 Z 0.0100 own 0.2464 first 0.0014 (c1 0.0236)  E_age 0.255 0.221 0.205 0.266
+    coda.2         h6   E 0.7440 Z 0.0075 own 0.2484 first 0.0010 (c1 0.0102)  E_age 0.260 0.222 0.202 0.261
+    coda.2         h15  E 0.7244 Z 0.0082 own 0.2674 first 0.0012 (c1 0.0107)  E_age 0.258 0.216 0.195 0.249
+    coda.3         h15  E 0.5579 Z 0.1729 own 0.2692 first 0.0018 (c1 0.0236)  E_age 0.203 0.166 0.150 0.184
+    coda.3         h4   E 0.7148 Z 0.0087 own 0.2765 first 0.0014 (c1 0.0121)  E_age 0.254 0.215 0.190 0.246
+    coda.2         h13  E 0.7106 Z 0.0076 own 0.2819 first 0.0012 (c1 0.0116)  E_age 0.254 0.211 0.191 0.242
+    coda.2         h12  E 0.7054 Z 0.0092 own 0.2854 first 0.0008 (c1 0.0189)  E_age 0.227 0.209 0.203 0.270
+    coda.3         h7   E 0.6968 Z 0.0178 own 0.2854 first 0.0015 (c1 0.0109)  E_age 0.247 0.209 0.187 0.240
+    coda.3         h12  E 0.6923 Z 0.0122 own 0.2954 first 0.0008 (c1 0.0086)  E_age 0.223 0.204 0.200 0.266
+    coda.1         h0   E 0.6973 Z 0.0056 own 0.2971 first 0.0009 (c1 0.0116)  E_age 0.227 0.207 0.200 0.262
+
+B. attention blocking, real->carried, delta nats/token (intact 3.1170)
+  site                     delta                  95% CI   n
+  prelude.0              0.00859   [0.00720, 0.01029]  24 *
+  prelude.1              0.01310   [0.01098, 0.01520]  24 *
+  prelude.2              0.00524   [0.00363, 0.00673]  24 *
+  prelude.3              0.00101   [0.00019, 0.00187]  24 *
+  core.0@all_t           0.02038   [0.01847, 0.02239]  24 *
+  core.1@all_t           0.12801   [0.12170, 0.13458]  24 *
+  core.2@all_t           0.02954   [0.02654, 0.03266]  24 *
+  core.3@all_t           0.01935   [0.01694, 0.02198]  24 *
+  core.4@all_t           0.01950   [0.01664, 0.02260]  24 *
+  core.5@all_t           0.03841   [0.03436, 0.04287]  24 *
+  iter.t0@all_core       0.00002   [-0.00030, 0.00035]  24
+  iter.t1@all_core       0.00005   [-0.00025, 0.00036]  24
+  iter.t2@all_core       0.00033   [0.00000, 0.00065]  24 *
+  iter.t3@all_core       0.00054   [0.00023, 0.00085]  24 *
+  iter.t4@all_core       0.01992   [0.01704, 0.02304]  24 *
+  iter.t5@all_core       0.03761   [0.03273, 0.04245]  24 *
+  iter.t6@all_core       0.03301   [0.02949, 0.03665]  24 *
+  iter.t7@all_core       0.06501   [0.06063, 0.06953]  24 *
+  coda.0                 0.02082   [0.01744, 0.02453]  24 *
+  coda.1                 0.01616   [0.01156, 0.01993]  24 *
+  coda.2                 0.01872   [0.01538, 0.02195]  24 *
+  coda.3                 0.02132   [0.01646, 0.02765]  24 *
+  all                    0.16359   [0.15189, 0.17574]  24 *
+  all_E_only             0.10579   [0.09302, 0.11945]  24 *
+  all_Z_only             0.07064   [0.06636, 0.07496]  24 *
+
+C. summary-slot attention (write side); base rates content 0.406 function 0.326 continuation 0.077 other 0.191
+  block               E      Z   real  slots  H/lnL  first   lift ex-first(content,function,cont,other)   pos_share
+  core.0@t7       0.024  0.010  0.764  0.202  0.589  0.046    0.71  0.77  0.82  2.08   0.35 0.05 0.05 0.06 0.07 0.08 0.10 0.24
+  core.1@t7       0.028  0.005  0.779  0.187  0.485  0.067    0.68  0.76  0.73  2.21   0.47 0.03 0.03 0.03 0.04 0.06 0.09 0.26
+  core.2@t7       0.064  0.008  0.773  0.155  0.463  0.065    0.64  0.73  0.76  2.32   0.46 0.03 0.04 0.04 0.05 0.06 0.09 0.24
+  core.3@t7       0.113  0.004  0.744  0.139  0.385  0.081    0.56  0.75  0.58  2.53   0.55 0.02 0.02 0.02 0.02 0.04 0.07 0.27
+  core.4@t7       0.123  0.012  0.729  0.136  0.451  0.064    0.71  0.72  0.95  2.11   0.46 0.03 0.03 0.04 0.05 0.06 0.11 0.22
+  core.5@t7       0.278  0.006  0.526  0.190  0.591  0.036    0.86  0.77  1.09  1.64   0.30 0.05 0.05 0.05 0.06 0.07 0.12 0.30
+  coda.0          0.458  0.006  0.413  0.123  0.676  0.004    1.06  0.65  1.53  1.25   0.15 0.06 0.07 0.08 0.09 0.11 0.15 0.27
+  coda.1          0.437  0.004  0.433  0.126  0.653  0.003    1.17  0.58  1.49  1.17   0.14 0.07 0.08 0.09 0.09 0.10 0.15 0.27
+  coda.2          0.560  0.005  0.250  0.186  0.659  0.005    1.25  0.58  1.17  1.11   0.18 0.08 0.08 0.08 0.09 0.10 0.14 0.26
+  coda.3          0.494  0.004  0.148  0.355  0.725  0.004    1.07  0.79  0.97  1.22   0.17 0.07 0.08 0.09 0.09 0.10 0.14 0.27
+  (E/Z/real/slots = mass of the 16 slot queries; H, first, lift and pos are over the real tokens, renormalised)
+
+D. logit lens precision@50 (all alphabetic forms); Z is a CRUDE lens
+  cell                 own    next   donor    prev   own-donor                95% CI
+  E fresh           0.3070  0.3005  0.2878    -        +0.0192   [+0.0096, +0.0296]
+  E age1            0.2796  0.2741  0.2626    -        +0.0170   [+0.0084, +0.0267]
+  E age2            0.2843  0.2796  0.2677    -        +0.0166   [+0.0072, +0.0267]
+  E age3            0.2941  0.2874  0.2761    -        +0.0179   [+0.0088, +0.0278]
+  E age4            0.3045  0.2999  0.2841    -        +0.0204   [+0.0104, +0.0310]
+  E pure            0.3045  0.2999  0.2841    -        +0.0204   [+0.0104, +0.0310]
+  E gated           0.2465  0.2391  0.2359  0.2381     +0.0106   [+0.0005, +0.0213]
+  Z fresh           0.1517  0.1457  0.1270    -        +0.0247   [+0.0191, +0.0308]
+  Z age1            0.1797  0.1728  0.1569    -        +0.0228   [+0.0166, +0.0299]
+  Z age2            0.1733  0.1662  0.1506    -        +0.0227   [+0.0165, +0.0299]
+  Z age3            0.1633  0.1554  0.1397    -        +0.0236   [+0.0176, +0.0304]
+  Z age4            0.1478  0.1407  0.1246    -        +0.0232   [+0.0166, +0.0306]
+  Z pure            0.1478  0.1407  0.1246    -        +0.0232   [+0.0166, +0.0306]
+  Z gated           0.2235  0.2159  0.2008  0.2081     +0.0227   [+0.0152, +0.0305]
+
+  example: chunk 2 slot 5 (max own precision@k among 16 E slots) own p 0.44 donor p 0.34
+    source: this case opening westward, in which my house occupies the place of the sun. I turn round and round irresolute sometimes for a quarter of an hour, until I decide, for a thousandth time, that I will walk into the
+    E top15: [',', '\n', ':', ' (', ' is', ' of', ' -', "'s", ' so', ' the', '.', ' ', ' now', ' and', ' in']
+    Z top15 (crude, depth 6): [',', ' "', ' us', ' driven', ' America', ' and', ' today', ' em', ' Red', ' choice', '--', ' Hor', ' Americans', ' slowly', ' fresh']
+
+  example: chunk 4 slot 13 (max own precision@k among 16 E slots) own p 0.44 donor p 0.28
+    source: of equal extent with that occupied by the bulk of our States, so fertile and so rich and varied in its productions, and at the same time so habitable by the European, as this is? Michaux, who knew but part
+    E top15: [' the', ' ', ' a', ' A', ' T', ' G', ' R', ' The', ' C', ' P', ' M', ' D', ' this', ' more', ' "']
+    Z top15 (crude, depth 7): [' the', '\n', ' favour', ' "', ' even', ' history', ' various', ' more', ' new', ' better', ' why', ' numerous', ' Gr', ' Z', ' clip']
+
+  example: chunk 6 slot 13 (max own precision@k among 16 E slots) own p 0.40 donor p 0.42
+    source: comprehensive and broader, like our plains--our intellect generally on a grander scale, like our thunder and lightning, our rivers and mountains and forests-and our hearts shall even correspond in breadth and depth and grandeur to our inland seas. Perchance there
+    E top15: [' the', ' ', ' The', ' a', ' A', ' T', ' "', ' G', ' R', ' M', ' “', ' L', ' D', ' New', ' P']
+    Z top15 (crude, depth 7): [' the', '\n', ' favour', ' "', ' numerous', ' even', ' new', ' some', ' more', ' why', ' |\n', ' various', '.–', ' “', ' better']
+
+E. ring geometry after chunk c (PR rank / centred cos)
+  E: c1 3.28/-0.03  c2 4.97/-0.00  c3 5.47/0.00  c4 5.63/0.01  c5 7.00/0.00  c6 7.74/-0.00  c7 8.01/-0.00  c8 7.29/-0.00
+  Z: c1 1.77/0.05  c2 2.89/0.01  c3 4.11/0.00  c4 5.33/-0.00  c5 7.31/-0.01  c6 6.81/-0.01  c7 6.37/-0.00  c8 5.96/0.00
+
+timing s/row: chain(+A,C capture) 1.3 (excl row0 1.3)  bare chain(row0) 1.3  B 25.2 (excl row0 25.2)  D 0.1  E 0.03  load 275s  peak GPU 6.27 GiB (load 5.23)
+
+wrote eval_results/pm/cortex-final/step_11444_T8/interp/results.json  (646s)
+
+=== pm_probe cortex@11444 finished rc=0 (18:43:47) -> eval_results/pm/cortex-final/step_11444_T8 ===
+---------------------------------------
+Begin Slurm Epilog: Oct-29-2026 18:43:47
+Job ID:        14622273
+Array Job ID:  14560577_1
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_probe
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=09:28:24,vmem=0,walltime=01:11:03,mem=30073860K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-014-2-0
+---------------------------------------

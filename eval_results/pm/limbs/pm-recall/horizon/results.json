@@ -1,0 +1,98 @@
+{
+  "instrument": "influence horizon I(d)",
+  "damage_channel": "both",
+  "dual_channel_carry": true,
+  "when": "2026-10-29T17:38:11",
+  "model_name": "ckpts/olmo-retrofit-cortex",
+  "buffer": {
+    "kind": "gated",
+    "class": "PrefixGatedBuffer",
+    "n_vec": 16,
+    "capacity": 64,
+    "damage_applied": "pre-merge write, through prefix.merge"
+  },
+  "config": {
+    "n_chunks": 8,
+    "damage": "donor",
+    "T": 8,
+    "dtype": "float32",
+    "samples": 100,
+    "config_overrides": {
+      "use_memory": true,
+      "memory_slots": 0,
+      "prefix_memory": "gated",
+      "accum_vecs": 16,
+      "gate_slots": 64,
+      "gate_route": "ring",
+      "accum_max": 128,
+      "e_carry_read": true,
+      "latent_carry_read": true,
+      "gate_norm": "tanh",
+      "gate_init": "zero",
+      "gate_fill": "grow",
+      "latent_carry": true,
+      "latent_depth_rule": "absolute",
+      "latent_depth_lo": 1,
+      "latent_depth_hi": 9,
+      "latent_renorm": "none",
+      "latent_tok_pool": 4,
+      "latent_encoding": "staggered_state",
+      "latent_embed_frozen": true,
+      "latent_s0_read": false,
+      "latent_read": "embeds",
+      "latent_read_znorm": "rms",
+      "latent_read_znorm_target": "78.9"
+    }
+  },
+  "intact": {
+    "mean_nats": 2.6827303159236906,
+    "chance_nats": 11.516439284270025,
+    "margin_below_chance": 8.833708968346334,
+    "at_chance": false,
+    "n": 100
+  },
+  "depths": {
+    "1": {
+      "mean_nats": 0.0760935628414154,
+      "ci_lo": 0.04461179703474045,
+      "ci_hi": 0.1015769019126892,
+      "n": 100
+    },
+    "2": {
+      "mean_nats": 0.006490620374679565,
+      "ci_lo": -0.00434363916516304,
+      "ci_hi": 0.015768863856792447,
+      "n": 100
+    },
+    "3": {
+      "mean_nats": 0.011994918584823608,
+      "ci_lo": 0.004173673152923584,
+      "ci_hi": 0.023280696392059316,
+      "n": 100
+    },
+    "4": {
+      "mean_nats": 0.04663262486457825,
+      "ci_lo": 0.014417483776807785,
+      "ci_hi": 0.08674382650852203,
+      "n": 100
+    },
+    "5": {
+      "mean_nats": 0.010747482776641845,
+      "ci_lo": 0.005828770995140076,
+      "ci_hi": 0.017005806267261496,
+      "n": 100
+    },
+    "6": {
+      "mean_nats": 0.00651913046836853,
+      "ci_lo": 3.4475356340408343e-05,
+      "ci_hi": 0.011342656314373012,
+      "n": 100
+    },
+    "7": {
+      "mean_nats": -0.0032000720500946047,
+      "ci_lo": -0.005269426465034485,
+      "ci_hi": -0.0014150608181953434,
+      "n": 100
+    }
+  }
+}

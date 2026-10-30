@@ -1,0 +1,588 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-29-2026 14:57:04
+Job ID:    14611494
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_mech
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+    znorm_target 98.0 confirmed against the diag at step 11400
+=== pm_mech | cortex @ 11444 | cortex-5b/cortex-final/checkpoint_11444 -> eval_results/pm/cortex-final/step_11444_T8 ===
+NVIDIA H200, 143771 MiB
+    commit: 1a2fdee
+
+--- [cortex@11444] chunk1 + drift  (14:57:07)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '98.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.77s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.10it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[chunk1] bank of 64 rows: mean64 e_row_norm 68.93 vs generic64 78.34 (averaging shrinks norms -- read mean64 with that in mind)
+  chunk1: 25 rows
+  chunk1: 50 rows
+  chunk1: 75 rows
+  chunk1: 100 rows
+  chunk1: 125 rows
+  chunk1: 150 rows
+  chunk1: 175 rows
+  chunk1: 200 rows
+
+==============================================================================
+CHUNK-1 TAX  (n=200 rows, cortex)
+==============================================================================
+  none       chunk-1 NLL 3.8065
+  donor64    chunk-1 NLL 3.8692   recovered -0.0628 [-0.0697, -0.0561]
+  donor16    chunk-1 NLL 3.8518   recovered -0.0453 [-0.0511, -0.0400]
+  mean64     chunk-1 NLL 3.8513   recovered -0.0448 [-0.0514, -0.0385]
+  generic64  chunk-1 NLL 3.8573   recovered -0.0508 [-0.0572, -0.0446]
+  by position bin (64-token bins), chunk 1 no carry vs chunks 2+ with carry:
+    4.481  3.876  3.755  3.786  3.697  3.649  3.582  3.626
+    3.866  3.658  3.636  3.612  3.592  3.585  3.602  3.596
+  no-carry NLL by chunk: 3.806 3.873 3.794 3.763 3.788 3.747 3.762 3.768
+  carry NLL by chunk:    3.806 3.738 3.646 3.619 3.641 3.609 3.621 3.630
+[drift] 6 single-book streams of 202 chunks (rows [4, 34, 97, 212, 259, 316]).  ASSUMES the pack keeps each book's windows in order, as prepare_pg19_dataset.py writes it.
+  drift stream 1/6 done
+  drift stream 2/6 done
+  drift stream 3/6 done
+  drift stream 4/6 done
+  drift stream 5/6 done
+  drift stream 6/6 done
+
+==============================================================================
+DRIFT  (6 books x 202 chunks)
+==============================================================================
+  chunk laps   nll_carry nll_nocarry  carry_gain     entropy first_tok_e  e_row_norm e_eff_rank_  z_row_norm z_eff_rank_  e_turnover  z_turnover
+      1  0.0      3.7581      3.7581      0.0000      3.2684      6.8082           -           -           -           -           -           -
+      2 0.25      3.1435      3.2808      0.1373      3.0026      3.8238     78.9062      3.3172     21.1685      1.7804           -           -
+      3  0.5      2.8952      3.0371      0.1419      2.9687      4.0132     78.2354      4.9202     18.4432      2.8708           -           -
+      4 0.75      2.8922      3.0448      0.1526      2.8450      1.6881     78.0191      5.4096     17.5554      4.0947           -           -
+      5  1.0      3.3347      3.5149      0.1802      2.8622      2.8039     77.8842      5.6192     17.1023      5.3111      0.8646      0.8347
+      8 1.75      2.9588      3.0900      0.1312      3.0377      3.4615     78.9833      8.2489     20.5405      6.3872      0.7993      0.7991
+     12 2.75      2.9811      3.1040      0.1230      3.0524      3.4689     87.5208      5.6287     25.9904      4.5544      0.6212      0.5106
+     16 3.75      3.0283      3.1493      0.1210      2.9981      4.4805    100.5668      4.2098     31.1222      3.4271      0.5510      0.3886
+     24 5.75      3.1298      3.2399      0.1101      3.0510      3.5586    130.2138      2.8884     39.9107      2.5456      0.4188      0.2821
+     32 7.75      3.0143      3.0046     -0.0098      3.0362      4.8740    156.1744      2.8755     46.8234      2.2782      0.3876      0.2636
+     48 11.75      3.8944      3.4042     -0.4901      3.9061      6.0871    203.4451      1.9588     61.8502      2.5166      0.2502      0.1868
+     64 15.75      4.6249      3.4746     -1.1504      4.7116      6.4583    266.1424      1.7379     72.0582      2.5544      0.1770      0.1301
+     96 23.75      5.6857      3.3515     -2.3343      5.5062      5.4978    387.0826      1.6563     80.0921      2.3760      0.0951      0.0637
+    128 31.75      6.3067      3.3930     -2.9137      5.6083      5.8893    507.9419      1.6980     85.5344      1.8523      0.0605      0.0509
+    160 39.75      6.6625      3.5427     -3.1197      5.6059      5.8534    627.7229      1.8859     89.5028      1.3961      0.0547      0.0488
+    202 50.25      6.7547      3.3855     -3.3692      5.6918      5.6874    754.0096      2.0724     86.5026      1.3521      0.0582      0.0495
+
+  first chunk where the carry HURTS (carry_gain < 0): 31
+
+wrote eval_results/pm/cortex-final/step_11444_T8/chunk1_drift/results.json
+
+--- [cortex@11444] influence horizon, channel e  (15:20:08)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '98.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.28s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.51it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[carry] dual-channel (E+Z); damaging e.  A horizon measured on 'both' cannot say which channel carries the distance -- run e and z as well before quoting one.
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+  60 samples
+  70 samples
+  80 samples
+  90 samples
+  100 samples
+
+==============================================================================
+I(d) -- nats/token that chunk N-d's carry contribution is worth at chunk N
+buffer: PrefixGatedBuffer (gated), damage=donor, n=100 paired samples
+==============================================================================
+  intact loss 3.1694 nats/token   chance (ln vocab) 11.5164   margin +8.3470
+
+    d   I(d) nats                    95% CI     n   shape
+    1     0.01213   [  0.00641,   0.01719]   100  *
+    2     0.00119   [ -0.00493,   0.00615]   100
+    3     0.00360   [ -0.00028,   0.00803]   100
+    4    -0.00277   [ -0.00716,   0.00162]   100
+    5     0.00014   [ -0.00296,   0.00294]   100
+    6     0.00053   [ -0.00227,   0.00273]   100
+    7    -0.00080   [ -0.00187,   0.00027]   100
+
+  * = CI excludes zero, i.e. that depth still measurably matters.
+  This is a GATED buffer: expect smooth decay, no cliff, and no exact zero.  Do NOT score a plateau as failure.
+
+wrote eval_results/pm/cortex-final/step_11444_T8/horizon_e/results.json
+
+--- [cortex@11444] influence horizon, channel z  (15:40:20)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '98.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 72.95it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[carry] dual-channel (E+Z); damaging z.  A horizon measured on 'both' cannot say which channel carries the distance -- run e and z as well before quoting one.
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+  60 samples
+  70 samples
+  80 samples
+  90 samples
+  100 samples
+
+==============================================================================
+I(d) -- nats/token that chunk N-d's carry contribution is worth at chunk N
+buffer: PrefixGatedBuffer (gated), damage=donor, n=100 paired samples
+==============================================================================
+  intact loss 3.1694 nats/token   chance (ln vocab) 11.5164   margin +8.3470
+
+    d   I(d) nats                    95% CI     n   shape
+    1     0.02765   [  0.01753,   0.03682]   100  *
+    2     0.00413   [  0.00037,   0.00747]   100  *
+    3    -0.00087   [ -0.00224,   0.00059]   100
+    4     0.00441   [  0.00029,   0.00806]   100  *
+    5     0.00145   [ -0.00344,   0.00539]   100
+    6     0.00566   [  0.00154,   0.00883]   100  *
+    7    -0.00077   [ -0.00162,   0.00006]   100
+
+  * = CI excludes zero, i.e. that depth still measurably matters.
+  This is a GATED buffer: expect smooth decay, no cliff, and no exact zero.  Do NOT score a plateau as failure.
+
+wrote eval_results/pm/cortex-final/step_11444_T8/horizon_z/results.json
+
+--- [cortex@11444] influence horizon, channel both  (15:57:16)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '98.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.46s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.35it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[carry] dual-channel (E+Z); damaging both.  A horizon measured on 'both' cannot say which channel carries the distance -- run e and z as well before quoting one.
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+  60 samples
+  70 samples
+  80 samples
+  90 samples
+  100 samples
+
+==============================================================================
+I(d) -- nats/token that chunk N-d's carry contribution is worth at chunk N
+buffer: PrefixGatedBuffer (gated), damage=donor, n=100 paired samples
+==============================================================================
+  intact loss 3.1694 nats/token   chance (ln vocab) 11.5164   margin +8.3470
+
+    d   I(d) nats                    95% CI     n   shape
+    1     0.06133   [  0.04864,   0.07297]   100  *
+    2     0.00576   [ -0.00007,   0.01109]   100
+    3     0.00276   [ -0.00196,   0.00778]   100
+    4     0.00414   [ -0.00273,   0.01087]   100
+    5     0.00305   [ -0.00305,   0.00837]   100
+    6     0.00584   [  0.00095,   0.01000]   100  *
+    7    -0.00093   [ -0.00222,   0.00036]   100
+
+  * = CI excludes zero, i.e. that depth still measurably matters.
+  This is a GATED buffer: expect smooth decay, no cliff, and no exact zero.  Do NOT score a plateau as failure.
+
+wrote eval_results/pm/cortex-final/step_11444_T8/horizon_both/results.json
+
+--- [cortex@11444] 2x2 E-donor (E_content)  (16:18:03)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '98.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 181.78it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+[2x2] Z null at s0's MEASURED per-element rms 0.00857972 (row norm 0.3882, sqrt(D) apart -- do not swap them)
+  10 samples
+  20 samples
+  30 samples
+  40 samples
+  50 samples
+  60 samples
+  70 samples
+  80 samples
+  90 samples
+  100 samples
+  110 samples
+  120 samples
+  130 samples
+  140 samples
+  150 samples
+  160 samples
+  170 samples
+  180 samples
+  190 samples
+  200 samples
+  210 samples
+  220 samples
+  230 samples
+  240 samples
+  250 samples
+  260 samples
+  270 samples
+  280 samples
+  290 samples
+  300 samples
+  310 samples
+  320 samples
+  330 samples
+  340 samples
+  350 samples
+  360 samples
+  370 samples
+  380 samples
+  390 samples
+  400 samples
+
+==============================================================================
+2x2 carry ablation -- mean NLL over chunks 2..8, n=400 paired samples, scoring ALL tokens
+column count is IDENTICAL in every cell; only the contents change
+==============================================================================
+  E1Z1  E=on   Z=on    NLL 3.40293
+  E0Z1  E=dnr  Z=on    NLL 3.47665
+
+  chunk-1 sanity: max spread across cells 0.00e+00 (should be ~0 -- no cell has an incoming carry there)
+  health: mean NLL 3.4398, 8.08 nats below chance
+
+------------------------------------------------------------------------------
+  E_content      0.07372  [  0.06778,   0.07947]  *
+               NLL with ANOTHER document's E minus with this document's E, Z held on.  Positive = E's CONTENTS help.  E is on in both cells (matched columns, norms, positions), so unlike E_main under --e_null zero this is in distribution on a model trained with e_dropout 0.
+
+wrote eval_results/pm/cortex-final/step_11444_T8/e_content/results.json
+
+--- [cortex@11444] MC none  (16:40:40)
+Loading checkpoint: cortex-5b/cortex-final/checkpoint_11444
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '98.0'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.17it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.30it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.01it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Using the latest cached version of the dataset since Rowan/hellaswag couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/Rowan___hellaswag/default/0.0.0/218ec52e09a7e7462a5400043bb9a69a41d06b76 (last modified on Fri Jul 10 21:28:18 2026).
+Using the latest cached version of the dataset since allenai/winogrande couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'winogrande_xl' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___winogrande/winogrande_xl/0.0.0/01e74176c63542e6b0bcb004dcdea22d94fb67b5 (last modified on Fri Jul 10 21:28:20 2026).
+Using the latest cached version of the dataset since allenai/ai2_arc couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'ARC-Easy' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___ai2_arc/ARC-Easy/0.0.0/210d026faf9955653af8916fad021475a3f00453 (last modified on Fri Jul 10 21:28:21 2026).
+Using the latest cached version of the dataset since allenai/ai2_arc couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'ARC-Challenge' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/allenai___ai2_arc/ARC-Challenge/0.0.0/210d026faf9955653af8916fad021475a3f00453 (last modified on Fri Jul 10 21:28:22 2026).
+Using the latest cached version of the dataset since ybisk/piqa couldn't be found on the Hugging Face Hub (offline mode is enabled).
+Found the latest cached dataset configuration 'default' at /storage/home/hcoda1/3/hjiang420/scratch/hf_cache/datasets/ybisk___piqa/default/0.0.0/142c51238b3ca2bc61e9a075913871b8b600e8e1 (last modified on Fri Jul 10 21:28:23 2026).
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_11444/chkpt.pt: 0 missing / 0 unexpected keys
+T=8  tasks=['hellaswag', 'winogrande', 'arc_easy', 'arc_challenge', 'piqa']
+
+=======================================================
+Task: hellaswag
+=======================================================
+  [hellaswag] 200/10042  acc=0.4900
+  [hellaswag] 400/10042  acc=0.4750
+  [hellaswag] 600/10042  acc=0.4850
+  [hellaswag] 800/10042  acc=0.4988
+  [hellaswag] 1000/10042  acc=0.4880
+  [hellaswag] 1200/10042  acc=0.5008
+  [hellaswag] 1400/10042  acc=0.4964
+  [hellaswag] 1600/10042  acc=0.4906
+  [hellaswag] 1800/10042  acc=0.4906
+  [hellaswag] 2000/10042  acc=0.4870
+  [hellaswag] 2200/10042  acc=0.4868
+  [hellaswag] 2400/10042  acc=0.4900
+  [hellaswag] 2600/10042  acc=0.4919
+  [hellaswag] 2800/10042  acc=0.4907
+  [hellaswag] 3000/10042  acc=0.4950
+  [hellaswag] 3200/10042  acc=0.4956
+  [hellaswag] 3400/10042  acc=0.5006
+  [hellaswag] 3600/10042  acc=0.5072
+  [hellaswag] 3800/10042  acc=0.5150
+  [hellaswag] 4000/10042  acc=0.5168
+  [hellaswag] 4200/10042  acc=0.5226
+  [hellaswag] 4400/10042  acc=0.5286
+  [hellaswag] 4600/10042  acc=0.5309
+  [hellaswag] 4800/10042  acc=0.5319
+  [hellaswag] 5000/10042  acc=0.5366
+  [hellaswag] 5200/10042  acc=0.5390
+  [hellaswag] 5400/10042  acc=0.5428
+  [hellaswag] 5600/10042  acc=0.5475
+  [hellaswag] 5800/10042  acc=0.5514
+  [hellaswag] 6000/10042  acc=0.5553
+  [hellaswag] 6200/10042  acc=0.5553
+  [hellaswag] 6400/10042  acc=0.5575
+  [hellaswag] 6600/10042  acc=0.5595
+  [hellaswag] 6800/10042  acc=0.5612
+  [hellaswag] 7000/10042  acc=0.5630
+  [hellaswag] 7200/10042  acc=0.5633
+  [hellaswag] 7400/10042  acc=0.5654
+  [hellaswag] 7600/10042  acc=0.5657
+  [hellaswag] 7800/10042  acc=0.5687
+  [hellaswag] 8000/10042  acc=0.5697
+  [hellaswag] 8200/10042  acc=0.5707
+  [hellaswag] 8400/10042  acc=0.5721
+  [hellaswag] 8600/10042  acc=0.5719
+  [hellaswag] 8800/10042  acc=0.5727
+  [hellaswag] 9000/10042  acc=0.5720
+  [hellaswag] 9200/10042  acc=0.5746
+  [hellaswag] 9400/10042  acc=0.5752
+  [hellaswag] 9600/10042  acc=0.5765
+  [hellaswag] 9800/10042  acc=0.5764
+  [hellaswag] 10000/10042  acc=0.5783
+  hellaswag: 5805/10042 = 0.5781
+
+=======================================================
+Task: winogrande
+=======================================================
+  [winogrande] 200/1267  acc=0.5850
+  [winogrande] 400/1267  acc=0.5750
+  [winogrande] 600/1267  acc=0.5617
+  [winogrande] 800/1267  acc=0.5500
+  [winogrande] 1000/1267  acc=0.5360
+  [winogrande] 1200/1267  acc=0.5450
+  winogrande: 692/1267 = 0.5462
+
+=======================================================
+Task: arc_easy
+=======================================================
+  [arc_easy] 200/570  acc=0.4700
+  [arc_easy] 400/570  acc=0.4550
+  arc_easy: 271/570 = 0.4754
+
+=======================================================
+Task: arc_challenge
+=======================================================
+  [arc_challenge] 200/299  acc=0.3100
+  arc_challenge: 94/299 = 0.3144
+
+=======================================================
+Task: piqa
+=======================================================
+  [piqa] 200/1838  acc=0.7650
+  [piqa] 400/1838  acc=0.7225
+  [piqa] 600/1838  acc=0.7283
+  [piqa] 800/1838  acc=0.7137
+  [piqa] 1000/1838  acc=0.7210
+  [piqa] 1200/1838  acc=0.7150
+  [piqa] 1400/1838  acc=0.7071
+  [piqa] 1600/1838  acc=0.7156
+  [piqa] 1800/1838  acc=0.7167
+  piqa: 1319/1838 = 0.7176
+
+Task                Correct    Total      Acc
+---------------------------------------------
+hellaswag              5805    10042   0.5781
+winogrande              692     1267   0.5462
+arc_easy                271      570   0.4754
+arc_challenge            94      299   0.3144
+piqa                   1319     1838   0.7176
+
+Results saved → eval_results/pm/cortex-final/step_11444_T8/mc_none
+
+=== pm_mech cortex@11444 finished rc=0  (17:08:47) -> eval_results/pm/cortex-final/step_11444_T8 ===
+---------------------------------------
+Begin Slurm Epilog: Oct-29-2026 17:08:56
+Job ID:        14611494
+Array Job ID:  14560570_1
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_mech
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=17:34:40,vmem=0,walltime=02:11:50,mem=30441660K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------

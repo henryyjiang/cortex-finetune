@@ -1,0 +1,98 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-29-2026 15:33:21
+Job ID:    14613070
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_mech
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== pm_mech | control @ 38146 | cortex-5b/c-chunked/checkpoint_38146 -> eval_results/pm/c-chunked/step_38146_T8 ===
+NVIDIA H200, 143771 MiB
+    commit: 1a2fdee
+
+--- [control@38146] chunk1 + drift  (15:33:24)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.60s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.22it/s]
+[load] overlaid cortex-5b/c-chunked/checkpoint_38146/chkpt.pt: 0 missing / 0 unexpected keys
+  chunk1: 25 rows
+  chunk1: 50 rows
+  chunk1: 75 rows
+  chunk1: 100 rows
+  chunk1: 125 rows
+  chunk1: 150 rows
+  chunk1: 175 rows
+  chunk1: 200 rows
+
+==============================================================================
+CHUNK-1 TAX  (n=200 rows, control: no-carry profiles only)
+==============================================================================
+  none       chunk-1 NLL 3.0458
+  by position bin (64-token bins), chunk 1 no carry vs chunks 2+ with carry:
+    3.620  3.084  3.006  3.019  2.972  2.926  2.853  2.886
+    3.632  3.079  3.013  2.964  2.948  2.950  2.954  2.938
+  no-carry NLL by chunk: 3.046 3.162 3.045 3.041 3.053 3.015 3.043 3.060
+  carry NLL by chunk:    3.046 3.162 3.045 3.041 3.053 3.015 3.043 3.060
+
+wrote eval_results/pm/c-chunked/step_38146_T8/chunk1_drift/results.json
+
+--- [control@38146] context ceiling  (15:43:08)
+Loading: cortex-5b/c-chunked/final_checkpoint  (overlay: cortex-5b/c-chunked/checkpoint_38146)
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [01:58<01:58, 118.13s/it]Loading checkpoint shards: 100%|██████████| 2/2 [02:17<00:00, 59.88s/it] Loading checkpoint shards: 100%|██████████| 2/2 [02:17<00:00, 68.61s/it]
+[load] overlaid cortex-5b/c-chunked/checkpoint_38146/chkpt.pt: 0 missing / 0 unexpected keys
+T=8  n_chunks=8  carry condition: OFF (no cross state)
+context lens: 0 + [128, 256, 512]
+position bands: 4 per chunk
+data/pg19_olmo_validation_len4096_strided: 1059 rows, evaluating 100
+  sample 1 took 1.3s -> ETA 2 min
+  10/100 samples  [0 min]
+  20/100 samples  [0 min]
+  30/100 samples  [0 min]
+  40/100 samples  [1 min]
+  50/100 samples  [1 min]
+  60/100 samples  [1 min]
+  70/100 samples  [1 min]
+  80/100 samples  [1 min]
+  90/100 samples  [1 min]
+  100/100 samples  [2 min]
+
+  Chunk      N       k=0     k=128     k=256     k=512
+  ----------------------------------------------------
+  2        100    2.5968    2.5006    2.4972    2.7220
+  3         97    2.6215    2.5243    2.5229    2.7492
+  4         97    2.6547    2.5605    2.5561    2.7883
+  5         97    2.6389    2.5483    2.5430    2.7688
+  6         96    2.6531    2.5602    2.5610    2.7993
+  7         96    2.6851    2.5939    2.5883    2.8044
+  8         96    2.6390    2.5476    2.5451    2.7591
+
+  chunks 2+ pooled (n=679), delta vs k=0 (positive = that context HELPS):
+      128 real tokens : +0.09342  (SE 0.00154)
+      256 real tokens : +0.09653  (SE 0.00184)
+      512 real tokens : -0.12882  (SE 0.00464)
+
+  position bands inside the chunk (n=679 chunk-instances), delta vs k=0 in the SAME band:
+  condition            0-25%      25-50%      50-75%     75-100%
+  k128              +0.29719    +0.04488    +0.02039    +0.00900
+  k256              +0.33416    +0.06526    +0.02791    -0.04401
+  k512              +0.36428    +0.01787    -0.16610    -0.74003
+  Compare the carry's PROFILE to the oracle's, not to flat.  A
+  front-loaded oracle is the boundary effect; a carry that tracks
+  it is stitching the seam, a carry that stays flat across bands
+  is supplying something that is not the previous chunk's text.
+
+Results saved -> eval_results/pm/c-chunked/step_38146_T8/ceiling
+
+=== pm_mech control@38146 finished rc=0  (15:47:25) -> eval_results/pm/c-chunked/step_38146_T8 ===
+---------------------------------------
+Begin Slurm Epilog: Oct-29-2026 15:47:26
+Job ID:        14613070
+Array Job ID:  14560570_2
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_mech
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=01:52:56,vmem=0,walltime=00:14:07,mem=32991548K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-9-0
+---------------------------------------
