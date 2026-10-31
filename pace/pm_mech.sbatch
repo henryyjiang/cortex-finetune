@@ -98,6 +98,24 @@ if [ -n "${E_CLAMP:-}" ]; then
         --out_dir "$RES/drift_eclamp$E_CLAMP" || RC_ALL=$?
 fi
 
+# E_STORE=<norm> is the store-side twin: every STORED E row is rescaled to
+# <norm> after each merge (e_store_norm_target), so the gates, the next merge
+# and the splice all see the pinned state.  2026-10-31: E_CLAMP=82 moved the
+# crossover only 27 -> 29 while the stored E still ran 83 -> 1013, so the
+# runaway is in the write.  Read e_row_norm first: it must sit at <norm> on
+# every chunk, or the flag never reached the graft.  Pairs with chunk1_drift/.
+#   sbatch --array=0 --export=ALL,E_STORE=82 pace/pm_mech.sbatch
+if [ -n "${E_STORE:-}" ]; then
+    [ "$ARM" = "cortex" ] || { echo "E_STORE needs a cortex task (--array=0 or 1)"; exit 1; }
+    ONLY=estore
+    step "drift, stored E rescaled to $E_STORE"
+    python evals/diag_chunk1_drift.py --model_name "$MODEL" --checkpoint "$CKPT" \
+        $SETS --set e_store_norm_target="$E_STORE" --data "$PG19_VAL" --T "$T" \
+        --parts drift --max_rows 200 --bank_rows 64 --drift_chunks 202 \
+        --drift_streams 6 --dtype float32 \
+        --out_dir "$RES/drift_estore$E_STORE" || RC_ALL=$?
+fi
+
 # ---- chunk-1 tax + drift ---------------------------------------------------
 PARTS=chunk1,drift
 [ "$ARM" = "control" ] && PARTS=chunk1

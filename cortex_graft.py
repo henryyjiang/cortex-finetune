@@ -483,6 +483,15 @@ class CortexMemory(nn.Module):
         #                      token (~4.5); the post-mortem `lownorm` limb
         #                      sets it, with latent_read_znorm_target, to token
         #                      scale.  Read only: the merge sees the real carry.
+        #   e_store_norm_target rescale every STORED E row to this row norm
+        #                      after each merge (0 = off).  The STORE-side twin
+        #                      of e_read_norm_target: 2026-10-31's E_CLAMP=82
+        #                      drift pinned the read and the stored E still ran
+        #                      83 -> 1013 over 202 chunks (crossover 27 -> 29),
+        #                      so the runaway is in the write.  This pins what
+        #                      the next merge's gates and the next splice see.
+        #                      Inference-only by intent; Z is untouched (its read
+        #                      is already rescaled by latent_read_znorm).
         #   carry_dropout      OMIT the whole read (no E, no Z columns) on a
         #                      random share of forwards, training only, so the
         #                      no-carry mode (chunk 1, every MC item) trains on
@@ -505,6 +514,8 @@ class CortexMemory(nn.Module):
         self.e_dropout = float(getattr(config, "e_dropout", 0.0) or 0.0)
         self.e_read_norm_target = float(
             getattr(config, "e_read_norm_target", 0.0) or 0.0)
+        self.e_store_norm_target = float(
+            getattr(config, "e_store_norm_target", 0.0) or 0.0)
         self.carry_dropout = float(getattr(config, "carry_dropout", 0.0) or 0.0)
         # No `or True`: that would turn an explicit False into True (the trap
         # latent_tok_pool's `or 4` already sprang once, a few lines up).
@@ -744,6 +755,13 @@ class CortexMemory(nn.Module):
             raise ValueError(
                 "cortex.e_read_norm_target rescales the carried E rows of the "
                 "prefix splice; without --cortex.prefix_memory there are none.")
+        if self.e_store_norm_target < 0:
+            raise ValueError(f"cortex.e_store_norm_target must be >= 0 (0 = off); "
+                             f"got {self.e_store_norm_target}")
+        if self.e_store_norm_target > 0 and not pmode:
+            raise ValueError(
+                "cortex.e_store_norm_target rescales the stored E rows of the "
+                "prefix buffer; without --cortex.prefix_memory there are none.")
         if not 0.0 <= self.carry_dropout < 1.0:
             raise ValueError(f"cortex.carry_dropout must be in [0, 1); got "
                              f"{self.carry_dropout}")
@@ -1328,8 +1346,17 @@ class CortexMemory(nn.Module):
         # Rare (it needs the chunk's last token to be an EOS) but silent.
         # Branch retired 2026-09-15; `_valid_write` is still computed in begin()
         # and still consumed by the bolt-on buffer path below.
-        return real, self.prefix.merge(self._carried_state(), new_vecs,
-                                       self.latent_write())
+        merged = self.prefix.merge(self._carried_state(), new_vecs,
+                                   self.latent_write())
+        return real, self._store_e(merged)
+
+    def _store_e(self, state: torch.Tensor) -> torch.Tensor:
+        """e_store_norm_target: pin the stored E rows' norm; Z passes through."""
+        if self.e_store_norm_target <= 0:
+            return state
+        e, z = self.prefix.split_channels(state)
+        e = rescale_rows(e, self.e_store_norm_target)
+        return e if z is None else self.prefix.join_channels(e, z)
 
     def _carried_state(self) -> Optional[torch.Tensor]:
         """The incoming carry, as the prefix splice and the merge should see it.

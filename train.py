@@ -405,6 +405,9 @@ class CLISettings:
             # norm (0 = off, every arm before it).  A typed float default for
             # the same jsonargparse reason as e_carry_read above.
             e_read_norm_target=0.0,
+            # Post-mortem round 4: rescale the STORED E rows after each merge
+            # (0 = off).  Inference-only by intent (pm_mech E_STORE=...).
+            e_store_norm_target=0.0,
             # Post-mortem `carrydrop` limb: omit the whole carried read (E and
             # Z columns) on this share of forwards, training only (0 = off).
             carry_dropout=0.0,
@@ -1271,6 +1274,8 @@ def startup(cfg: CLISettings):
                    # it, the limb splices E at ~84 instead of token scale and
                    # is `both` wearing the limb's name.
                    "e_read_norm_target",
+                   # Round 4's stored-E rescale; same class as the line above.
+                   "e_store_norm_target",
                    # Post-mortem `carrydrop`.  Training-only in effect, but
                    # persists so the checkpoint records what it trained under.
                    "carry_dropout"):

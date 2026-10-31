@@ -508,6 +508,57 @@ class TestTheLowNormLimb:
         assert '"e_read_norm_target"' in tp[i:j]
 
 
+class TestTheStoredENormClamp:
+    """pm round 4: e_store_norm_target rescales the STORED E rows after each
+    merge (E_CLAMP pinned only the read, and the stored E still ran away)."""
+
+    def test_off_is_the_identity(self):
+        st = _carry()
+        assert _cortex()._store_e(st) is st
+
+    def test_e_rows_are_pinned_and_z_and_zero_rows_are_not(self):
+        g = _cortex(e_store_norm_target=82.0)
+        st = _carry(unwritten=2)
+        out = g._store_e(st)
+        n = out[..., :D].norm(dim=-1)
+        assert torch.allclose(n[:, :-2], torch.full_like(n[:, :-2], 82.0), atol=1e-3)
+        assert float(n[:, -2:].abs().max()) == 0.0, "unwritten rows must stay exactly zero"
+        assert torch.equal(out[..., D:], st[..., D:]), "Z passes through untouched"
+
+    def test_the_chained_carry_comes_back_pinned(self):
+        """Through the real forward: the m_cross a chain hands to the next
+        chunk is the clamped state, on the fill lap and after it."""
+        m = _model(e_store_norm_target=82.0)
+        ids = torch.randint(0, VOCAB - 1, (B, CL))
+        st = None
+        for _ in range(K // W + 2):
+            out = m(ids, num_steps=torch.tensor([0, T]), m_cross_in=st,
+                    return_m_cross=True)
+            st = out["m_cross"] if isinstance(out, dict) else out.m_cross
+            n = st[..., :D].float().norm(dim=-1)
+            assert torch.allclose(n, torch.full_like(n, 82.0), atol=1e-2)
+
+    def test_it_refuses_a_negative_target_and_a_missing_buffer(self):
+        with pytest.raises(ValueError, match=">= 0"):
+            _cortex(e_store_norm_target=-1.0)
+        with pytest.raises(ValueError, match="there are none"):
+            _cortex(e_store_norm_target=82.0, prefix_memory="", latent_carry=False,
+                    latent_encoding="delta", latent_read="none",
+                    latent_read_znorm="none", latent_s0_read=True)
+
+    def test_train_py_declares_and_persists_it(self):
+        tp = _src("train.py")
+        assert "e_store_norm_target=0.0," in tp
+        i = tp.index('    if cfg.cortex["use_memory"]:')
+        j = tp.index("setattr(config, _k, cfg.cortex[_k])", i)
+        assert '"e_store_norm_target"' in tp[i:j]
+
+    def test_pm_mech_passes_it_to_the_drift(self):
+        s = _src("pace/pm_mech.sbatch")
+        assert '--set e_store_norm_target="$E_STORE"' in s
+        assert '"$RES/drift_estore$E_STORE"' in s
+
+
 class TestTheCarryDropoutLimb:
     """pm `carrydrop`: on a sampled share of TRAINING forwards the whole read
     is omitted -- no E and no Z columns -- so the chunk runs in the no-carry
