@@ -1,0 +1,316 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-30-2026 18:32:42
+Job ID:    14701496
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_probe
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== pm_probe | limb @ both | parts interp | cortex-pm/pm-both/checkpoint_40146 -> eval_results/pm/limbs/pm-both ===
+NVIDIA H200, 143771 MiB
+    commit: 2f6d128
+
+--- [limb@both] memory interp (A,B,C,D,E,F,G)  (18:33:00)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '78.9'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  7.07it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  6.59it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  6.65it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-pm/pm-both/checkpoint_40146/chkpt.pt: 0 missing / 0 unexpected keys
+[rows] 24 rows from 24 distinct books (50 books, 1009 usable rows, 50 skipped as short/padded); row_select=spread
+[rare] 344 frequent forms dropped (alphabetic form present in < 10% of the 192 sampled chunks (document frequency over the rows' and donors' chunks)); most frequent: ['a', 'to', 'in', 'of', 'and', 'the', 'it', 'that', 'for', 'with', 'as', 'on']
+  row 1/24 (ds 1): intact 2.7702 chain 1.5s  B 26.0s  D 0.3s  F 3.0s  G 6.9s
+  row 2/24 (ds 48): intact 2.3743 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 6.0s
+  row 3/24 (ds 86): intact 2.8622 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 6.0s
+  row 4/24 (ds 206): intact 2.3192 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 5.9s
+  row 5/24 (ds 274): intact 2.1336 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+  row 6/24 (ds 301): intact 2.2198 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 5.9s
+  row 7/24 (ds 335): intact 2.4892 chain 1.3s  B 25.1s  D 0.3s  F 3.3s  G 6.0s
+  row 8/24 (ds 361): intact 2.9822 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+  row 9/24 (ds 378): intact 2.5789 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 6.0s
+  row 10/24 (ds 407): intact 2.5401 chain 1.3s  B 25.1s  D 0.3s  F 3.1s  G 6.0s
+  row 11/24 (ds 427): intact 2.4550 chain 1.3s  B 25.1s  D 0.3s  F 3.4s  G 6.0s
+  row 12/24 (ds 479): intact 2.3972 chain 1.3s  B 25.0s  D 0.3s  F 3.2s  G 5.9s
+  row 13/24 (ds 543): intact 2.2593 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+  row 14/24 (ds 589): intact 2.6440 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+  row 15/24 (ds 647): intact 2.5225 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+  row 16/24 (ds 706): intact 2.5940 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+  row 17/24 (ds 752): intact 2.7099 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+  row 18/24 (ds 789): intact 2.2168 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 5.9s
+  row 19/24 (ds 807): intact 1.7683 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+  row 20/24 (ds 838): intact 2.7639 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 6.0s
+  row 21/24 (ds 862): intact 2.3232 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 5.9s
+  row 22/24 (ds 897): intact 2.4388 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 6.0s
+  row 23/24 (ds 931): intact 2.3996 chain 1.3s  B 25.0s  D 0.3s  F 3.0s  G 5.9s
+  row 24/24 (ds 971): intact 2.5012 chain 1.3s  B 25.1s  D 0.3s  F 3.0s  G 6.0s
+
+============================================================================================
+memory interp -- cortex-pm/pm-both/checkpoint_40146  rows=24 books=24 donor_books=[25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]  fp32
+============================================================================================
+intact NLL chunks 2..n 2.4693  chunk 1 2.6363  chance 11.5164
+checks: transparency=True replica_bit_identical=True recompute_rel_err_max=8.51e-07 (neg control min 3.82e-01) over 112 calls; block_nothing_bitwise_rows=24 fidelity=3.75e-07 block_all_differs=True ring_merges_checked=392
+layout chunk 2: [E 0..15 | Z 16..31 | tokens 32..543 | summary 544..559]; positions 0 (carried), 1..512, 513..528  |E|=83.0 |Z|=78.9 |tok|=4.24
+layout chunk 8: [E 0..63 | Z 64..127 | tokens 128..639 | summary 640..655]; positions 0 (carried), 1..512, 513..528  |E|=81.7 |Z|=78.9 |tok|=4.68
+
+A. read shares, real-token queries, chunks 2..n (head-mean)
+  block                E       Z     own   first first@c1    E/col    Z/col  own/col   E_by_age
+  prelude.0       0.0027  0.0026  0.9946  0.0069   0.0098  0.00006  0.00006  0.01254   0.001 0.001 0.001 0.001
+  prelude.1       0.0047  0.0062  0.9891  0.0117   0.0097  0.00010  0.00014  0.01221   0.002 0.001 0.001 0.001
+  prelude.2       0.0071  0.0075  0.9854  0.0282   0.0091  0.00016  0.00017  0.01181   0.003 0.002 0.002 0.002
+  prelude.3       0.0061  0.0056  0.9883  0.0545   0.0089  0.00013  0.00013  0.01195   0.002 0.002 0.002 0.002
+  core.0@t0       0.0359  0.0269  0.9372  0.0419   0.0115  0.00081  0.00061  0.00972   0.014 0.011 0.010 0.010
+  core.1@t0       0.0420  0.0322  0.9258  0.0539   0.0142  0.00096  0.00074  0.00914   0.015 0.013 0.012 0.013
+  core.2@t0       0.0864  0.0576  0.8560  0.0373   0.0162  0.00197  0.00132  0.00771   0.032 0.027 0.023 0.026
+  core.3@t0       0.0835  0.0286  0.8879  0.0375   0.0116  0.00193  0.00066  0.00820   0.028 0.025 0.023 0.030
+  core.4@t0       0.2045  0.0419  0.7535  0.0495   0.0127  0.00475  0.00096  0.00668   0.072 0.062 0.056 0.069
+  core.5@t0       0.2160  0.0241  0.7599  0.0372   0.0115  0.00510  0.00056  0.00687   0.071 0.065 0.062 0.080
+  core.0@t1       0.0559  0.0324  0.9117  0.0490   0.0123  0.00128  0.00074  0.00890   0.024 0.017 0.013 0.014
+  core.1@t1       0.0576  0.0257  0.9167  0.0542   0.0116  0.00131  0.00059  0.00898   0.021 0.017 0.016 0.019
+  core.2@t1       0.1023  0.0548  0.8429  0.0337   0.0135  0.00233  0.00126  0.00754   0.039 0.031 0.026 0.031
+  core.3@t1       0.1026  0.0274  0.8701  0.0357   0.0103  0.00238  0.00064  0.00801   0.035 0.031 0.028 0.036
+  core.4@t1       0.2208  0.0434  0.7358  0.0461   0.0107  0.00515  0.00100  0.00651   0.079 0.067 0.059 0.072
+  core.5@t1       0.2426  0.0241  0.7333  0.0354   0.0101  0.00577  0.00056  0.00658   0.081 0.073 0.069 0.088
+  core.0@t2       0.0564  0.0341  0.9095  0.0497   0.0113  0.00130  0.00078  0.00883   0.024 0.017 0.014 0.014
+  core.1@t2       0.0548  0.0230  0.9222  0.0605   0.0103  0.00126  0.00053  0.00904   0.020 0.017 0.015 0.018
+  core.2@t2       0.0982  0.0539  0.8479  0.0347   0.0115  0.00225  0.00124  0.00758   0.037 0.030 0.026 0.030
+  core.3@t2       0.1042  0.0263  0.8695  0.0374   0.0091  0.00243  0.00061  0.00799   0.036 0.032 0.029 0.037
+  core.4@t2       0.2161  0.0428  0.7411  0.0476   0.0097  0.00504  0.00098  0.00659   0.077 0.066 0.059 0.072
+  core.5@t2       0.2446  0.0237  0.7317  0.0349   0.0090  0.00583  0.00055  0.00657   0.081 0.074 0.069 0.089
+  core.0@t3       0.0551  0.0334  0.9115  0.0494   0.0107  0.00127  0.00076  0.00885   0.023 0.017 0.013 0.014
+  core.1@t3       0.0528  0.0220  0.9251  0.0619   0.0097  0.00122  0.00051  0.00903   0.019 0.016 0.014 0.018
+  core.2@t3       0.0939  0.0531  0.8531  0.0345   0.0107  0.00215  0.00122  0.00759   0.035 0.029 0.025 0.029
+  core.3@t3       0.1026  0.0257  0.8717  0.0381   0.0085  0.00239  0.00060  0.00799   0.035 0.031 0.028 0.036
+  core.4@t3       0.2121  0.0417  0.7461  0.0479   0.0094  0.00496  0.00095  0.00661   0.075 0.064 0.058 0.071
+  core.5@t3       0.2414  0.0232  0.7354  0.0332   0.0087  0.00578  0.00054  0.00659   0.079 0.073 0.069 0.089
+  core.0@t4       0.0545  0.0329  0.9126  0.0491   0.0105  0.00125  0.00075  0.00886   0.023 0.017 0.013 0.014
+  core.1@t4       0.0518  0.0215  0.9268  0.0622   0.0096  0.00120  0.00049  0.00903   0.018 0.016 0.014 0.017
+  core.2@t4       0.0908  0.0522  0.8570  0.0340   0.0104  0.00208  0.00120  0.00763   0.034 0.028 0.024 0.028
+  core.3@t4       0.1019  0.0251  0.8730  0.0383   0.0084  0.00239  0.00058  0.00801   0.034 0.031 0.028 0.036
+  core.4@t4       0.2136  0.0407  0.7457  0.0472   0.0093  0.00502  0.00093  0.00657   0.075 0.065 0.059 0.073
+  core.5@t4       0.2402  0.0228  0.7369  0.0309   0.0085  0.00578  0.00053  0.00661   0.079 0.072 0.069 0.089
+  core.0@t5       0.0544  0.0327  0.9129  0.0491   0.0104  0.00125  0.00075  0.00884   0.023 0.017 0.013 0.014
+  core.1@t5       0.0527  0.0219  0.9255  0.0604   0.0096  0.00122  0.00050  0.00904   0.019 0.016 0.014 0.018
+  core.2@t5       0.0918  0.0515  0.8567  0.0334   0.0103  0.00212  0.00118  0.00765   0.034 0.028 0.024 0.029
+  core.3@t5       0.1037  0.0246  0.8717  0.0384   0.0083  0.00245  0.00057  0.00805   0.035 0.031 0.029 0.038
+  core.4@t5       0.2206  0.0399  0.7395  0.0462   0.0093  0.00521  0.00091  0.00651   0.076 0.067 0.061 0.077
+  core.5@t5       0.2469  0.0228  0.7304  0.0280   0.0085  0.00599  0.00053  0.00661   0.080 0.074 0.071 0.092
+  core.0@t6       0.0552  0.0336  0.9112  0.0493   0.0104  0.00127  0.00077  0.00877   0.023 0.017 0.013 0.014
+  core.1@t6       0.0551  0.0239  0.9211  0.0542   0.0096  0.00126  0.00055  0.00901   0.019 0.017 0.015 0.019
+  core.2@t6       0.0938  0.0494  0.8568  0.0332   0.0103  0.00216  0.00113  0.00770   0.035 0.029 0.025 0.030
+  core.3@t6       0.1060  0.0237  0.8703  0.0385   0.0083  0.00250  0.00055  0.00806   0.035 0.032 0.030 0.039
+  core.4@t6       0.2366  0.0385  0.7249  0.0431   0.0093  0.00562  0.00088  0.00637   0.081 0.071 0.065 0.083
+  core.5@t6       0.2641  0.0228  0.7131  0.0236   0.0085  0.00645  0.00054  0.00653   0.087 0.079 0.075 0.098
+  core.0@t7       0.0574  0.0353  0.9072  0.0484   0.0105  0.00133  0.00081  0.00857   0.024 0.018 0.014 0.015
+  core.1@t7       0.0552  0.0266  0.9182  0.0496   0.0096  0.00127  0.00061  0.00891   0.019 0.017 0.015 0.019
+  core.2@t7       0.0899  0.0461  0.8640  0.0375   0.0103  0.00206  0.00105  0.00806   0.033 0.027 0.024 0.029
+  core.3@t7       0.1084  0.0216  0.8700  0.0386   0.0083  0.00254  0.00050  0.00830   0.036 0.033 0.030 0.040
+  core.4@t7       0.2538  0.0403  0.7059  0.0442   0.0094  0.00598  0.00092  0.00629   0.086 0.077 0.070 0.091
+  core.5@t7       0.3796  0.0268  0.5936  0.0054   0.0085  0.00938  0.00063  0.00549   0.125 0.114 0.107 0.140
+  coda.0          0.5090  0.0413  0.4497  0.0017   0.0080  0.01275  0.00094  0.00340   0.175 0.153 0.140 0.180
+  coda.1          0.6668  0.0279  0.3054  0.0011   0.0099  0.01676  0.00065  0.00222   0.227 0.200 0.185 0.239
+  coda.2          0.6756  0.0244  0.3000  0.0010   0.0130  0.01698  0.00057  0.00225   0.233 0.203 0.186 0.238
+  coda.3          0.6239  0.0445  0.3317  0.0011   0.0112  0.01566  0.00105  0.00283   0.210 0.187 0.174 0.225
+  top-20 memory heads (E+Z mass):
+    coda.3         h13  E 0.8287 Z 0.0172 own 0.1542 first 0.0005 (c1 0.0092)  E_age 0.291 0.247 0.226 0.288
+    coda.1         h13  E 0.8339 Z 0.0043 own 0.1617 first 0.0006 (c1 0.0092)  E_age 0.285 0.247 0.231 0.302
+    coda.1         h3   E 0.8069 Z 0.0156 own 0.1775 first 0.0009 (c1 0.0116)  E_age 0.261 0.240 0.232 0.306
+    coda.3         h2   E 0.7864 Z 0.0316 own 0.1819 first 0.0008 (c1 0.0101)  E_age 0.254 0.235 0.225 0.297
+    coda.1         h10  E 0.7725 Z 0.0423 own 0.1851 first 0.0007 (c1 0.0065)  E_age 0.257 0.231 0.218 0.283
+    coda.1         h6   E 0.7987 Z 0.0088 own 0.1925 first 0.0009 (c1 0.0089)  E_age 0.279 0.239 0.217 0.281
+    coda.3         h3   E 0.7876 Z 0.0169 own 0.1956 first 0.0007 (c1 0.0162)  E_age 0.251 0.235 0.227 0.303
+    coda.3         h15  E 0.6371 Z 0.1634 own 0.1995 first 0.0011 (c1 0.0243)  E_age 0.220 0.192 0.177 0.222
+    coda.1         h9   E 0.7852 Z 0.0154 own 0.1995 first 0.0010 (c1 0.0185)  E_age 0.270 0.234 0.215 0.281
+    coda.3         h0   E 0.7879 Z 0.0094 own 0.2027 first 0.0008 (c1 0.0088)  E_age 0.256 0.235 0.225 0.298
+    coda.3         h8   E 0.7173 Z 0.0548 own 0.2278 first 0.0008 (c1 0.0127)  E_age 0.251 0.216 0.195 0.248
+    coda.2         h4   E 0.7444 Z 0.0237 own 0.2319 first 0.0007 (c1 0.0111)  E_age 0.242 0.222 0.212 0.281
+    coda.2         h13  E 0.7531 Z 0.0144 own 0.2324 first 0.0011 (c1 0.0097)  E_age 0.268 0.225 0.203 0.258
+    coda.2         h6   E 0.7472 Z 0.0184 own 0.2344 first 0.0009 (c1 0.0111)  E_age 0.264 0.225 0.200 0.258
+    coda.2         h15  E 0.7268 Z 0.0202 own 0.2530 first 0.0009 (c1 0.0100)  E_age 0.260 0.218 0.196 0.245
+    coda.2         h11  E 0.7355 Z 0.0049 own 0.2597 first 0.0006 (c1 0.0135)  E_age 0.234 0.219 0.213 0.283
+    coda.2         h12  E 0.7293 Z 0.0090 own 0.2617 first 0.0006 (c1 0.0149)  E_age 0.235 0.217 0.210 0.277
+    coda.3         h4   E 0.7112 Z 0.0236 own 0.2652 first 0.0014 (c1 0.0102)  E_age 0.256 0.214 0.188 0.241
+    coda.2         h9   E 0.7041 Z 0.0246 own 0.2713 first 0.0012 (c1 0.0108)  E_age 0.249 0.211 0.189 0.242
+    coda.1         h11  E 0.7066 Z 0.0162 own 0.2772 first 0.0009 (c1 0.0075)  E_age 0.248 0.212 0.191 0.246
+
+B. attention blocking, real->carried, delta nats/token (intact 2.4693)
+  site                     delta                  95% CI   n
+  prelude.0              0.00498   [0.00398, 0.00604]  24 *
+  prelude.1              0.01695   [0.01464, 0.01945]  24 *
+  prelude.2              0.01312   [0.01183, 0.01449]  24 *
+  prelude.3              0.00591   [0.00351, 0.00921]  24 *
+  core.0@all_t           0.02724   [0.02480, 0.02978]  24 *
+  core.1@all_t           0.09910   [0.09365, 0.10449]  24 *
+  core.2@all_t           0.02273   [0.02005, 0.02585]  24 *
+  core.3@all_t           0.01733   [0.01544, 0.01926]  24 *
+  core.4@all_t           0.03051   [0.02777, 0.03326]  24 *
+  core.5@all_t           0.03654   [0.03246, 0.04098]  24 *
+  iter.t0@all_core       0.00013   [-0.00026, 0.00055]  24
+  iter.t1@all_core       0.00067   [0.00012, 0.00123]  24 *
+  iter.t2@all_core       0.00076   [0.00020, 0.00134]  24 *
+  iter.t3@all_core       0.00175   [0.00111, 0.00240]  24 *
+  iter.t4@all_core       0.01385   [0.01154, 0.01624]  24 *
+  iter.t5@all_core       0.02698   [0.02437, 0.02951]  24 *
+  iter.t6@all_core       0.03323   [0.03000, 0.03706]  24 *
+  iter.t7@all_core       0.08186   [0.07638, 0.08779]  24 *
+  coda.0                 0.02028   [0.01663, 0.02446]  24 *
+  coda.1                 0.02122   [0.01902, 0.02355]  24 *
+  coda.2                 0.02606   [0.02258, 0.03025]  24 *
+  coda.3                 0.01508   [0.01284, 0.01752]  24 *
+  all                    0.17142   [0.15845, 0.18472]  24 *
+  all_E_only             0.12694   [0.11322, 0.14262]  24 *
+  all_Z_only             0.07053   [0.06664, 0.07477]  24 *
+
+C. summary-slot attention (write side); base rates content 0.406 function 0.326 continuation 0.077 other 0.191
+  block               E      Z   real  slots  H/lnL  first   lift ex-first(content,function,cont,other)   pos_share
+  core.0@t7       0.031  0.013  0.789  0.167  0.509  0.056    0.67  0.74  0.85  2.21   0.42 0.04 0.05 0.06 0.06 0.07 0.09 0.21
+  core.1@t7       0.051  0.008  0.799  0.143  0.457  0.066    0.68  0.73  0.82  2.21   0.48 0.03 0.04 0.04 0.05 0.06 0.08 0.22
+  core.2@t7       0.074  0.008  0.796  0.121  0.431  0.065    0.64  0.71  0.80  2.33   0.47 0.03 0.04 0.05 0.05 0.07 0.09 0.21
+  core.3@t7       0.125  0.004  0.748  0.123  0.358  0.085    0.49  0.73  0.50  2.73   0.59 0.02 0.02 0.03 0.03 0.04 0.07 0.21
+  core.4@t7       0.143  0.015  0.723  0.119  0.445  0.060    0.75  0.68  1.13  2.01   0.45 0.04 0.05 0.05 0.06 0.07 0.09 0.18
+  core.5@t7       0.307  0.008  0.500  0.185  0.647  0.020    0.96  0.76  1.18  1.42   0.22 0.06 0.06 0.07 0.08 0.10 0.13 0.30
+  coda.0          0.434  0.013  0.432  0.122  0.682  0.003    1.08  0.64  1.46  1.25   0.14 0.07 0.08 0.09 0.10 0.12 0.15 0.25
+  coda.1          0.394  0.007  0.457  0.143  0.658  0.003    1.20  0.58  1.47  1.10   0.14 0.07 0.09 0.10 0.10 0.11 0.15 0.24
+  coda.2          0.574  0.009  0.271  0.146  0.660  0.006    1.25  0.58  1.15  1.13   0.18 0.08 0.08 0.08 0.09 0.10 0.13 0.25
+  coda.3          0.497  0.004  0.159  0.341  0.742  0.004    1.07  0.83  0.95  1.16   0.17 0.07 0.08 0.09 0.09 0.10 0.14 0.26
+  (E/Z/real/slots = mass of the 16 slot queries; H, first, lift and pos are over the real tokens, renormalised)
+
+D. logit lens precision@50 (all alphabetic forms); Z is a CRUDE lens
+  cell                 own    next   donor    prev   own-donor                95% CI
+  E fresh           0.3949  0.3920  0.3841    -        +0.0108   [-0.0039, +0.0266]
+  E age1            0.3755  0.3734  0.3647    -        +0.0108   [-0.0032, +0.0262]
+  E age2            0.3794  0.3768  0.3690    -        +0.0104   [-0.0043, +0.0264]
+  E age3            0.3841  0.3817  0.3738    -        +0.0102   [-0.0057, +0.0270]
+  E age4            0.3873  0.3876  0.3771    -        +0.0101   [-0.0057, +0.0278]
+  E pure            0.3873  0.3876  0.3771    -        +0.0101   [-0.0057, +0.0278]
+  E gated           0.3630  0.3553  0.3517  0.3480     +0.0113   [-0.0070, +0.0303]
+  Z fresh           0.2606  0.2524  0.2299    -        +0.0307   [+0.0199, +0.0427]
+  Z age1            0.2879  0.2804  0.2625    -        +0.0255   [+0.0139, +0.0392]
+  Z age2            0.2829  0.2741  0.2568    -        +0.0261   [+0.0145, +0.0400]
+  Z age3            0.2731  0.2651  0.2447    -        +0.0284   [+0.0165, +0.0418]
+  Z age4            0.2573  0.2483  0.2279    -        +0.0294   [+0.0176, +0.0432]
+  Z pure            0.2573  0.2483  0.2279    -        +0.0294   [+0.0176, +0.0432]
+  Z gated           0.3318  0.3255  0.3111  0.3154     +0.0206   [+0.0050, +0.0378]
+
+  D lenses beyond the head's own top-k (rare = alphabetic form present in < 10% of the 192 sampled chunks (document frequency over the rows' and donors' chunks); tied_embeddings=False)
+  lens      cell           own    next   donor   own-donor                95% CI
+  rare      E fresh     0.0590  0.0528  0.0440     +0.0150   [+0.0060, +0.0236]
+  rare      E pure      0.0570  0.0513  0.0420     +0.0150   [+0.0065, +0.0235]
+  rare      E gated     0.0531  0.0477  0.0400     +0.0131   [+0.0031, +0.0232]
+  rare      Z fresh     0.0464  0.0396  0.0274     +0.0189   [+0.0136, +0.0246]
+  rare      Z pure      0.0465  0.0409  0.0267     +0.0198   [+0.0146, +0.0255]
+  rare      Z gated     0.0469  0.0381  0.0311     +0.0158   [+0.0068, +0.0247]
+  emb_all   E fresh     0.0086  0.0082  0.0077     +0.0009   [-0.0003, +0.0022]
+  emb_all   E pure      0.0090  0.0080  0.0078     +0.0012   [-0.0003, +0.0030]
+  emb_all   E gated     0.0054  0.0052  0.0053     +0.0002   [-0.0007, +0.0011]
+  emb_all   Z fresh     0.0061  0.0062  0.0060     +0.0001   [-0.0005, +0.0007]
+  emb_all   Z pure      0.0061  0.0063  0.0061     -0.0000   [-0.0006, +0.0006]
+  emb_all   Z gated     0.0034  0.0033  0.0034     -0.0001   [-0.0012, +0.0010]
+  emb_rare  E fresh     0.0166  0.0148  0.0118     +0.0048   [+0.0015, +0.0084]
+  emb_rare  E pure      0.0165  0.0136  0.0106     +0.0059   [+0.0020, +0.0100]
+  emb_rare  E gated     0.0126  0.0122  0.0100     +0.0026   [-0.0008, +0.0058]
+  emb_rare  Z fresh     0.0127  0.0127  0.0112     +0.0015   [-0.0010, +0.0041]
+  emb_rare  Z pure      0.0121  0.0128  0.0106     +0.0014   [-0.0014, +0.0042]
+  emb_rare  Z gated     0.0148  0.0141  0.0138     +0.0010   [-0.0037, +0.0058]
+
+  example: chunk 2 slot 14 (max own precision@k among 16 E slots) own p 0.52 donor p 0.34
+    source: this case opening westward, in which my house occupies the place of the sun. I turn round and round irresolute sometimes for a quarter of an hour, until I decide, for a thousandth time, that I will walk into the
+    E top15: [',', ' and', ' ', ' in', '.', ':', '/', ' is', '\n', ';', ' (', ' of', ' for', ' to', ' or']
+    E top15 rare (head): [' starting', ' works', ' next', ' success', ' break', ' within', ' does', ' effect', ' pre', ' American', ' int', ' early', ' directly', ' cost', ' current']
+    E top15 rare (wte cosine): [' Escorts', ' DOC', ' why', ' FileName', ' WHY', 'why', ' Why', ' murdered', ' helps', 'IGATION', ' helped', 'retweeted', 'itize', 'questions', ' resembles']
+    Z top15 (crude, depth 1): [',', ' when', ' to', 'or', ':', ' but', ' or', ' "', '(', ' and', ' that', '"', ' how', '/', ' for']
+    Z top15 rare (wte cosine): [' DOC', ' Escorts', 'Interestingly', 'rbrace', 'Whether', ' everytime', 'whether', ' illustrates', ' Seems', ' sluts', ' Whether', 'LOGY', ' sogar', ' FileName', ' thats']
+
+  example: chunk 4 slot 12 (max own precision@k among 16 E slots) own p 0.46 donor p 0.30
+    source: of equal extent with that occupied by the bulk of our States, so fertile and so rich and varied in its productions, and at the same time so habitable by the European, as this is? Michaux, who knew but part
+    E top15: [' ', ' the', ' a', ' "', '\n', ' I', ' A', ' all', ' T', " '", ' to', ' The', ' P', ',', ' one']
+    E top15 rare (head): [' J', ' big', ' Dr', ' small', ' early', ' K', ' Jack', ' John', ' Bill', ' American', ' U', ' close', ' works', ' King', ' Mar']
+    E top15 rare (wte cosine): [' getPath', ' ngOn', 'addtogroup', 'keyboard', 'WiFi', ' conna', ' veterinary', ' uart', '\tapi', 'が', ' Produto', ' meteor', 'poi', 'ppt', ' Keyboard']
+    Z top15 (crude, depth 6): ['amp', 'ient', ' Champ', ' sake', 'lying', ' Tab', ' Bowen', 'aly', 'up', 'lit', ' reli', 'itals', 'cas', 'ée', 'ra']
+    Z top15 rare (wte cosine): [' einige', 'pickup', 'nego', 'conto', 'agree', 'selling', ' conformity', 'kaar', ' mensen', 'ının', 'COPE', 'ább', ' ucfirst', ' cutter', ' anymore']
+
+  example: chunk 6 slot 12 (max own precision@k among 16 E slots) own p 0.46 donor p 0.46
+    source: comprehensive and broader, like our plains--our intellect generally on a grander scale, like our thunder and lightning, our rivers and mountains and forests-and our hearts shall even correspond in breadth and depth and grandeur to our inland seas. Perchance there
+    E top15: [' ', ' the', ' a', ' "', ' I', ' A', ' T', '\n', ' all', ' to', ' The', " '", ',', ' in', ' one']
+    E top15 rare (head): [' J', ' big', ' Dr', ' small', ' K', ' John', ' early', ' Jack', ' Bill', ' U', ' close', ' free', ' American', ' Mar', ' King']
+    E top15 rare (wte cosine): [' getPath', ' ngOn', 'WiFi', 'addtogroup', 'keyboard', '\tapi', ' uart', ' veterinary', ' conna', 'が', ' Produto', ' meteor', 'poi', 'cheap', ' Keyboard']
+    Z top15 (crude, depth 6): [' Tab', 'amp', ' Bowen', 'aly', ' Champ', 'lying', 'ESCO', 'SA', ' tab', 'enance', ' result', 'ificial', ' CU', ' Covid', ' Dio']
+    Z top15 rare (wte cosine): [' einige', 'nego', ' conformity', 'kaar', 'conto', 'ingly', 'agree', ' kinds', 'itten', 'oon', 'emy', '管', 'ább', ' bordered', 'ollections']
+
+E. ring geometry after chunk c (PR rank / centred cos)
+  E: c1 2.59/-0.00  c2 3.53/0.02  c3 3.83/0.03  c4 3.82/0.03  c5 5.05/0.02  c6 6.14/0.01  c7 6.87/0.01  c8 6.42/0.00
+  Z: c1 1.79/0.06  c2 2.98/0.01  c3 4.29/0.00  c4 5.57/-0.00  c5 7.60/-0.01  c6 7.06/-0.01  c7 6.65/-0.00  c8 6.34/0.00
+
+F. topic steering: read chunk q with the DONOR's carry instead of its own (nats, log-mass on each word set)
+  steer_lift (don - ctl)       +0.1587   [+0.1341, +0.1827]  24 *
+  own_drop   (own - ctl)       -0.2234   [-0.2507, -0.1939]  24 *
+  delta don                    +0.4568   [+0.4151, +0.5018]  24 *
+  delta own                    +0.0747   [+0.0319, +0.1157]  24 *
+  delta ctl                    +0.2981   [+0.2584, +0.3417]  24 *
+  steer_lift by chunk q=2..n: +0.192 +0.157 +0.209 +0.150 +0.139 +0.132 +0.132   mean set sizes (forms): own 290 don 309 ctl 312
+
+  steer demo (illustration only: one passage pair, one neutral passage; delta = mean log-prob over the neutral passage under the royalty carry minus under the sea carry, >= 4-letter tokens)
+    royalty carry > sea carry: royal +3.73, monarch +3.37, lords +3.35, king +3.27, royalty +3.27, throne +3.25, knight +3.23, princ +3.20, court +3.08, noble +3.06, knights +3.02, kings +3.02, palace +3.01, armor +3.00, honor +2.99, princes +2.96, queen +2.88, King +2.88, honored +2.79, feudal +2.78
+    sea carry > royalty carry: shore +3.16, sail +2.94, sailor +2.80, marine +2.72, sailors +2.69, ship +2.67, crew +2.59, seaw +2.58, sails +2.56, Captain +2.54, reef +2.50, cargo +2.46, Coast +2.46, aboard +2.44, boat +2.39, boats +2.39, beach +2.36, submarine +2.36, shore +2.33, Cape +2.31
+
+G. soft carry-attention scaling: log(alpha) on every real->carried logit, delta NLL vs intact (negative = better)
+  cell             delta                  95% CI   n   by query-position bin
+  EZ a=0.5      +0.00858   [+0.00731, +0.00985]  24 *   +0.018 +0.008 +0.004 +0.008 +0.008 +0.008 +0.006 +0.007
+  E a=0.5       +0.00435   [+0.00356, +0.00515]  24 *   +0.008 +0.005 +0.004 +0.004 +0.005 +0.003 +0.002 +0.003
+  EZ a=0.75     +0.00161   [+0.00102, +0.00220]  24 *   +0.003 +0.002 +0.000 +0.002 +0.002 +0.002 +0.001 +0.002
+  E a=0.75      +0.00095   [+0.00064, +0.00127]  24 *   +0.002 +0.001 +0.001 +0.001 +0.001 +0.001 +0.000 +0.001
+  EZ a=1.25     +0.00084   [+0.00034, +0.00133]  24 *   +0.002 +0.001 +0.002 +0.000 +0.001 +0.001 +0.001 +0.001
+  E a=1.25      +0.00022   [-0.00004, +0.00049]  24   +0.001 +0.000 +0.000 -0.000 -0.000 +0.000 +0.000 +0.000
+
+timing s/row: F 3.0  G 6.0  steer_demo 0.2s
+
+timing s/row: chain(+A,C capture) 1.3 (excl row0 1.3)  bare chain(row0) 1.2  B 25.1 (excl row0 25.0)  D 0.3  E 0.03  load 361s  peak GPU 6.49 GiB (load 5.23)
+
+wrote eval_results/pm/limbs/pm-both/interp/results.json  (872s)
+
+=== pm_probe limb@both finished rc=0 (18:53:52) -> eval_results/pm/limbs/pm-both ===
+---------------------------------------
+Begin Slurm Epilog: Oct-30-2026 18:53:52
+Job ID:        14701496
+Array Job ID:  14684118_3
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_probe
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=02:51:12,vmem=0,walltime=00:21:24,mem=27392124K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------
