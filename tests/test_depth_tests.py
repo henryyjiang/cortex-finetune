@@ -199,3 +199,23 @@ def test_restart_refuses_c_le_7_on_the_model(tiny):
     with pytest.raises(ValueError, match="before chunk 1"):
         part_depth(m, buf, ds, _args(depths="4,8"), ns, dev, buf.hidden_size,
                    True, False)
+
+
+def test_contents_saves_and_decodes_every_e_row(tiny, tmp_path):
+    from evals.diag_chunk1_drift import part_contents
+    m, buf, ds, ns, dev = tiny
+    plain = part_drift(m, buf, ds, _args(), ns, dev, buf.hidden_size)
+    out = part_contents(m, m, buf, ds, _args(content_depths="2,9,14",
+                                             out_dir=str(tmp_path)),
+                        ns, dev, buf.hidden_size, _vocab_text())
+    saved = torch.load(tmp_path / "contents_e.pt")
+    assert saved["E"]["0_2"].shape == (NV, buf.hidden_size)      # one chunk written
+    assert saved["E"]["0_14"].shape == (KS, buf.hidden_size)     # full ring
+    text = (tmp_path / "contents_e.txt").read_text(encoding="utf-8")
+    assert text.count("\n  row ") == 3 * (NV + 2 * KS)
+    d14 = out["depths"]["14"]
+    assert 1 <= d14["top1_distinct"] <= KS and 0 <= d14["rare_own_p10"] <= 1
+    assert 0 < d14["attractor_share"] <= 1 and 0 <= d14["xbook_jaccard"] <= 1
+    assert d14["e_centred_cosine"] is not None
+    # same chain as the drift: its e_row_norm at chunk 14 is these rows' mean norm
+    assert d14["row_norm"] == pytest.approx(plain["per_chunk"][13]["e_row_norm"], rel=1e-5)

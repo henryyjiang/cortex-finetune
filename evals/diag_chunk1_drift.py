@@ -52,6 +52,10 @@ number pairs chunk for chunk with chunk1_drift/ (--drift_baseline checks it).
   forced    A5: the drift with every gated row's update overridden: `fifo`
             replaces it (fg=0, ig=1); `hardgate` replaces it if its trained fg,
             averaged over dims, is < 0.5, else keeps it bit-identical.
+  contents  the stored E rows themselves at --content_depths (contents_e.pt)
+            and decoded per row (contents_e.txt, interp part D's lenses), to
+            judge by eye and by distinct-top-1 / own-vs-control precision
+            whether deep rows have gone degenerate.
   Reading: handoff Part A.  Every part writes results.json as it finishes.
 
 CONTROL ARM.  Loaded without --set it has no prefix buffer; chunk1 then
@@ -78,6 +82,7 @@ READING IT
 from __future__ import annotations
 
 import argparse
+import collections
 import contextlib
 import json
 import math
@@ -120,6 +125,8 @@ def parse_args():
                    help="restart/recency: target chunks (1-based), each >= 8 "
                         "and 8 + a multiple of the ring's lap")
     p.add_argument("--forced_modes", default="fifo,hardgate")
+    p.add_argument("--content_depths", default="2,8,16,32,64,128,202",
+                   help="contents: chunks whose incoming E rows are saved and decoded")
     p.add_argument("--drift_baseline", default=None,
                    help="chunk1_drift/results.json to pair gates/forced/restart "
                         "against (same streams and seeds)")
@@ -844,6 +851,139 @@ def part_depth(model, buf, ds, args, num_steps, device, hidden, do_restart,
     return (restart if do_restart else None), (recency if do_recency else None)
 
 
+# --------------------------------------------------------------------------
+# part contents: the stored E rows themselves
+# --------------------------------------------------------------------------
+
+def part_contents(model, inner, buf, ds, args, num_steps, device, hidden,
+                  vocab_text):
+    """Save the E rows entering each --content_depths chunk and decode them.
+
+    Lenses (interp part D's): `head` = lm_head top-k (E is post-ln_f, so this
+    is the model's own readout; D found it all " "/"the"/"a" even in range),
+    `rare` = the head's top-k among rare forms only, `emb` = top-k rare forms
+    by cosine to the input embeddings (E is spliced where token embeddings go).
+    Degenerate rows show as few distinct head top-1s across the 64 rows and as
+    rare/emb precision vs the row's own writer chunk sinking to the control's.
+    """
+    from evals.diag_memory_interp import (RARE_MAX_DF, bag_of_forms,
+                                          build_form_table, frequent_forms,
+                                          precision_at_k, restrict_forms,
+                                          ring_writers)
+    depths = sorted({int(d) for d in args.content_depths.split(",") if d.strip()})
+    if depths[0] < 2 or depths[-1] > args.drift_chunks:
+        raise SystemExit(f"--content_depths must lie in 2..{args.drift_chunks}")
+    W, K, k_top = int(buf.n_vec), int(getattr(buf, "n_slots", 64)), 10
+    streams, chunk_len = book_streams(ds, args)
+    if len(streams) < 2:
+        raise SystemExit("contents needs >= 2 streams: the control is another book's")
+    xs = [stream_xy(ds, s, n)[0] for s, n in streams]
+    chunk = lambda s, j: xs[s][j * chunk_len:(j + 1) * chunk_len]  # noqa: E731
+    form_all, forms = build_form_table(vocab_text, 1)
+    form_all, nf = form_all.to(device), len(forms)
+    bags = [[bag_of_forms(chunk(s, j), form_all, nf) for j in range(depths[-1])]
+            for s in range(len(streams))]
+    rare = restrict_forms(form_all, ~frequent_forms([b for bs in bags for b in bs],
+                                                    RARE_MAX_DF))
+    rbags = [[bag_of_forms(chunk(s, j), rare, nf) for j in range(depths[-1])]
+             for s in range(len(streams))]
+    off = rare < 0
+    wte = inner.transformer.wte.weight[:len(vocab_text)].float()
+    wte_n = F.normalize(wte, dim=-1)
+    lap = max(K // W, 1)
+    first_lap = lambda s: torch.stack(rbags[s][:lap]).any(0)  # noqa: E731
+    words = lambda ids: [vocab_text[t] for t in ids.tolist()]  # noqa: E731
+
+    saved, per, vocab = {}, {c: [] for c in depths}, {}
+    txt = [f"E buffer contents, {len(streams)} books (rows {[s for s, _ in streams]}), "
+           f"top-{k_top} per lens; head = lm_head, rare = head among rare forms, "
+           f"emb = rare forms by input-embedding cosine.  writer = the chunk that "
+           f"last wrote the row (ring replay); rows are blends of every write since."]
+    for s_i in range(len(streams)):
+        sd = lambda j: seed_for(args.seed + 99991 * s_i, j)  # noqa: E731
+        o, st = (s_i + 1) % len(streams), None
+        for j in range(depths[-1]):
+            c = j + 1
+            if c in per:
+                e = st[0, :, :hidden]
+                saved[f"{s_i}_{c}"] = e.detach().float().cpu()
+                writers = ring_writers(c, W, K)
+                h = e.to(inner.lm_head.weight.dtype)
+                with torch.no_grad():
+                    lg = inner.lm_head(h).float()
+                top = {"head": lg.topk(k_top, -1).indices,
+                       "rare": lg.masked_fill(off, float("-inf")).topk(k_top, -1).indices,
+                       "emb": (F.normalize(e.float(), dim=-1) @ wte_n.T)
+                       .masked_fill(off, float("-inf")).topk(k_top, -1).indices}
+                r = {"stream": s_i, "top1_distinct": len(set(top["head"][:, 0].tolist())),
+                     "row_norm": float(e.float().norm(dim=-1).mean())}
+                h_ = carry_health(st, hidden)
+                for key in ("e_eff_rank_pr", "e_centred_cosine"):
+                    r[key] = h_.get(key)
+                for lens in ("rare", "emb"):
+                    for ref, bag_of in (("own", lambda w: rbags[s_i][w - 1]),
+                                        ("ctl", lambda w: rbags[o][w - 1])):
+                        r[f"{lens}_{ref}_p{k_top}"] = float(torch.stack([
+                            precision_at_k(top[lens][i:i + 1], rare, bag_of(w))[0]
+                            for i, w in enumerate(writers)]).mean())
+                    r[f"{lens}_firstlap_p{k_top}"] = float(
+                        precision_at_k(top[lens], rare, first_lap(s_i)).mean())
+                    r[f"{lens}_firstlap_ctl_p{k_top}"] = float(
+                        precision_at_k(top[lens], rare, first_lap(o)).mean())
+                vocab[(s_i, c)] = collections.Counter(top["rare"].flatten().tolist())
+                per[c].append(r)
+                txt.append(f"\n=== book {s_i} | entering chunk {c} | "
+                           f"{r['top1_distinct']} distinct head top-1 of {len(writers)} rows"
+                           f" | mean norm {r['row_norm']:.1f}")
+                txt.append("  chunk %d text: %s" % (c - 1, "".join(
+                    words(chunk(s_i, c - 2)[:60])).replace("\n", " ")))
+                norms = e.float().norm(dim=-1)
+                for i, w in enumerate(writers):
+                    txt.append(f"  row {i:>2} w{w:>3} age {c - w:>3} |{norms[i]:7.1f}| "
+                               + " | ".join(f"{lens}: " + " ".join(
+                                   repr(t.strip() or t) for t in words(top[lens][i, :6]))
+                                   for lens in ("head", "rare", "emb")))
+            _, st = fwd(model, chunk(s_i, j), st, num_steps, device, sd(j))
+        print(f"  contents stream {s_i + 1}/{len(streams)} done", flush=True)
+
+    torch.save({"streams": streams, "depths": depths, "E": saved},
+               os.path.join(args.out_dir, "contents_e.pt"))
+    with open(os.path.join(args.out_dir, "contents_e.txt"), "w", encoding="utf-8") as fh:
+        fh.write("\n".join(txt) + "\n")
+    out = {"streams": streams, "top_k": k_top, "depths": {},
+           "note": "p = precision of the lens top-k against a reference's rare "
+                   "forms: own = the row's writer chunk, ctl = the next book's "
+                   "same chunk, firstlap = chunks 1..lap (ctl: next book's).  "
+                   "attractor_share = share of a book's rare top-k slots taken "
+                   "by its 6 commonest tokens; xbook_jaccard = overlap of two "
+                   "books' 10 commonest (-> 1: every book decodes alike)"}
+    print(f"\n{'=' * 78}\nE CONTENTS  ({len(streams)} books)\n{'=' * 78}")
+    print("  chunk  top1_distinct  eff_rank  cos_mean  rare own/ctl    emb own/ctl"
+          "    rare firstlap/ctl  attractor  xbook")
+    for c, rs in per.items():
+        d = {key: sum(r[key] for r in rs) / len(rs) for key in rs[0]
+             if key != "stream" and all(r.get(key) is not None for r in rs)}
+        commonest = lambda s, n: {t for t, _ in vocab[(s, c)].most_common(n)}  # noqa: E731
+        nxt = lambda s: (s + 1) % len(streams)  # noqa: E731
+        d["attractor_share"] = sum(
+            sum(v for _, v in vocab[(s, c)].most_common(6)) / sum(vocab[(s, c)].values())
+            for s in range(len(streams))) / len(streams)
+        d["xbook_jaccard"] = sum(
+            len(commonest(s, 10) & commonest(nxt(s), 10))
+            / len(commonest(s, 10) | commonest(nxt(s), 10))
+            for s in range(len(streams))) / len(streams)
+        d["per_stream"] = rs
+        out["depths"][str(c)] = d
+        g = lambda k: d.get(k, float("nan"))  # noqa: E731
+        print(f"  {c:>5} {g('top1_distinct'):>14.1f} {g('e_eff_rank_pr'):>9.2f} "
+              f"{g('e_centred_cosine'):>9.3f}   {g('rare_own_p10'):.3f}/{g('rare_ctl_p10'):.3f}"
+              f"    {g('emb_own_p10'):.3f}/{g('emb_ctl_p10'):.3f}"
+              f"    {g('rare_firstlap_p10'):.3f}/{g('rare_firstlap_ctl_p10'):.3f}"
+              f"        {g('attractor_share'):.3f}  {g('xbook_jaccard'):.3f}")
+    print(f"  rows decoded in {os.path.join(args.out_dir, 'contents_e.txt')}")
+    return out
+
+
 def main() -> int:
     args = parse_args()
     if args.dtype == "bfloat16":
@@ -881,7 +1021,8 @@ def main() -> int:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(report, fh, indent=2)
 
-    unknown = set(parts) - {"chunk1", "drift", "gates", "restart", "recency", "forced"}
+    unknown = set(parts) - {"chunk1", "drift", "gates", "restart", "recency",
+                            "forced", "contents"}
     if unknown:
         print(f"FAILED: unknown --parts {sorted(unknown)}")
         return 2
@@ -906,15 +1047,19 @@ def main() -> int:
         g = part_drift(model, buf, ds, args, num_steps, device, hidden, "trained")
         g["vs_baseline"] = vs_baseline(g, args.drift_baseline)
         report["gates"] = g
+    vocab_text = None
+    if {"recency", "contents"} & set(parts):
+        from transformers import AutoTokenizer
+        tok = AutoTokenizer.from_pretrained(args.model_name)
+        V = int(inner.lm_head.weight.shape[0])
+        vocab_text = tok.batch_decode([[i] for i in range(V)],
+                                      clean_up_tokenization_spaces=False)
+    if "contents" in parts:
+        save()
+        report["contents"] = part_contents(model, inner, buf, ds, args, num_steps,
+                                           device, hidden, vocab_text)
     if "restart" in parts or "recency" in parts:
         save()
-        vocab_text = None
-        if "recency" in parts:
-            from transformers import AutoTokenizer
-            tok = AutoTokenizer.from_pretrained(args.model_name)
-            V = int(inner.lm_head.weight.shape[0])
-            vocab_text = tok.batch_decode([[i] for i in range(V)],
-                                          clean_up_tokenization_spaces=False)
         rs, rc = part_depth(model, buf, ds, args, num_steps, device, hidden,
                             "restart" in parts, "recency" in parts, vocab_text)
         pair = depth_pairing(rs or rc, args.drift_baseline)

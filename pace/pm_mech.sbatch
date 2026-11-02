@@ -116,7 +116,7 @@ if [ -n "${E_STORE:-}" ]; then
         --out_dir "$RES/drift_estore$E_STORE" || RC_ALL=$?
 fi
 
-# DEPTH_TESTS=<gates|restart|recency|forced|all> runs v2_buffer_handoff.md
+# DEPTH_TESTS=<gates|restart|recency|forced|contents|all> runs v2_buffer_handoff.md
 # Part A (evals/diag_chunk1_drift.py header) into depth_<value>/ -- never over
 # chunk1_drift/.  2026-11-02: E_CLAMP / E_STORE moved the first harmful chunk
 # only 27 -> 29 / 30, so these ask WHY: gates A1, restart A2+A3, recency A4,
@@ -126,13 +126,15 @@ fi
 # read each part's pairing check first (~0).
 # `all` is one load and ~30 min on an H200; results.json is rewritten after
 # each part, so a late failure keeps the earlier parts.
+# contents saves the E rows at chunks 2..202 (contents_e.pt, ~20 MB) and
+# decodes every row (contents_e.txt) to read for degeneracy by eye.
 #   sbatch --array=0 --export=ALL,DEPTH_TESTS=all pace/pm_mech.sbatch
 if [ -n "${DEPTH_TESTS:-}" ]; then
     [ "$ARM" = "cortex" ] || { echo "DEPTH_TESTS needs a cortex task (--array=0 or 1)"; exit 1; }
     case "$DEPTH_TESTS" in
-        gates|restart|recency|forced) DPARTS=$DEPTH_TESTS ;;
-        all) DPARTS=gates,restart,recency,forced ;;
-        *) echo "DEPTH_TESTS must be gates|restart|recency|forced|all, got '$DEPTH_TESTS'"; exit 1 ;;
+        gates|restart|recency|forced|contents) DPARTS=$DEPTH_TESTS ;;
+        all) DPARTS=contents,gates,restart,recency,forced ;;
+        *) echo "DEPTH_TESTS must be gates|restart|recency|forced|contents|all, got '$DEPTH_TESTS'"; exit 1 ;;
     esac
     BASE="$RES/chunk1_drift/results.json"
     [ -f "$BASE" ] || { echo "DEPTH_TESTS pairs against $BASE, which is missing"; exit 1; }
