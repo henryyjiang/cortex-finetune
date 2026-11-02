@@ -636,9 +636,10 @@ def part_drift(model, buf, ds, args, num_steps, device, hidden, gate_mode=None):
         gcols = [f"{ch}_{k}" for ch in ("e", "z") for k in
                  ("fg", "ig", "fg_ig_gt1", "write_over_stored", "replaced")]
         gcols = [k for k in gcols if any(k in r for r in out["per_chunk"])]
-        print(f"\n  gates ({gate_mode}), over the rows each merge touched:")
-        print("  chunk " + " ".join(f"{k[:13]:>13}" for k in gcols))
-        for c in [5, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 160, 202]:
+        if gcols:   # gated_v2 never calls the gate: nothing to print
+            print(f"\n  gates ({gate_mode}), over the rows each merge touched:")
+            print("  chunk " + " ".join(f"{k[:13]:>13}" for k in gcols))
+        for c in ([5, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 160, 202] if gcols else []):
             if c > args.drift_chunks:
                 continue
             r = out["per_chunk"][c - 1]

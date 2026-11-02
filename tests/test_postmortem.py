@@ -203,3 +203,20 @@ def test_v2_long_reuses_limb_8_and_stops_itself_after_the_timeout_save():
     assert "$(( WALL_SECS - SECONDS - 480 ))" in s
     assert '[ -n "${WALL_LIMITED:-}" ] && [ $RC -eq 124 ] && RC=0' in s
     assert 'CHAIN="--resume_path $RESUME_PATH"' in s
+
+
+def test_the_readout_scores_v2capwarm_as_it_trained_and_pm_both_the_same_way():
+    r = open(os.path.join(ROOT, "pace/pm_limb_readout.sbatch"), encoding="utf-8").read()
+    s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
+    limbs = re.search(r"^LIMBS=\((.*)\)$", r, re.M).group(1).split()
+    assert limbs.index("v2capwarm") == 10 and limbs.index("both") == 0
+    assert '--set prefix_memory=gated_v2 --set v2_pairing=paired' in r
+    assert '--set e_store_norm_target=$E_CAP' in r
+    pat = r"E_CAP=\$\{E_CAP:-([0-9.]+)\}"
+    assert re.findall(pat, r) == re.findall(pat, s) != []
+    # depth + BABILong run on v2capwarm, and on pm-both via COMPARE_ONLY
+    assert "--parts drift,gates,restart,recency" in r
+    assert "--tasks qa1 qa2" in r and "--seq_len 512 --num_chunks 8" in r
+    assert '[ "$LIMB" = "v2capwarm" ] && depth_babilong' in r
+    assert 'if [ "${COMPARE_ONLY:-}" = "1" ]; then' in r
+    assert r.index("depth_babilong() {") < r.index('if [ "${COMPARE_ONLY:-}" = "1" ]; then')

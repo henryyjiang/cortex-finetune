@@ -23,7 +23,18 @@
 #     [8] lownorm           (sbatch --array=8; needs pm_limbs --array=6)
 #     [9] carrydrop         (sbatch --array=9; needs pm_limbs --array=7):
 #                           val NLL (chunk 1 IS the no-carry mode), recall, MC
-#   mc/   both + lownorm + carrydrop: the MC suite, so the benchmark gap is read limb
+#     [10] v2capwarm        (sbatch --array=10 -t 12:00:00; needs pm_limbs --array=8):
+#                           rebuilt as gated_v2 (paired) with its E cap, so it is
+#                           scored as it trained.  val NLL, recall, MC, plus
+#                           depth/ and babilong/ (below).
+#   COMPARE_ONLY=1 with --array=0: ONLY depth/ + babilong/ on pm-both, the
+#         baseline v2capwarm is read against (same steps, same flags).
+#   depth/    diag_chunk1_drift drift,gates,restart,recency on 202-chunk books:
+#             first harmful chunk, benefit at 2/8/32/64/202, gates or v2
+#             replace rate, the restart/swap gaps and recency lift.
+#   babilong/ qa1 qa2 at 1k-32k in the 5B pair's geometry (8 x 512, T 8,
+#             250/cell, ranked + PMI): the cell cortex-final lost from 16k.
+#   mc/   both + lownorm + carrydrop + v2capwarm: the MC suite, so the benchmark gap is read limb
 #         against limb (`both` absorbs the re-warm, as everywhere else).
 #
 # Run AFTER pm_limbs; each limb task refuses if its checkpoint_40146/chkpt.pt is
@@ -49,18 +60,25 @@
 #                   + horizon ~24m + loads ~50m                  ~= 3.2 h
 #   edrop           + the full 2x2 (~43m) instead of the horizon ~= 3.5 h
 #   eonly / zonly   ~2.3 h      recall_ctrl ~1 h      tasks 6/7 ~35 min
-# 8 h wall.
+#   v2capwarm       val_nll ~21m + recall ~23m + MC ~25m + depth ~25m
+#                   + BABILong ~2-3.5 h + loads ~50m           ~= 5-6 h
+#   both, COMPARE_ONLY=1   depth ~25m + BABILong ~2-3.5 h      ~= 3-4 h
+# 8 h wall; submit v2capwarm with -t 12:00:00.
 # ============================================================================
 
 cd $SLURM_SUBMIT_DIR
 source pace/pm_common.sh
 pm_env
 
-LIMBS=(both eonly zonly edrop recall recall_ctrl ref_cortex ref_control lownorm carrydrop)
+LIMBS=(both eonly zonly edrop recall recall_ctrl ref_cortex ref_control lownorm carrydrop v2capwarm)
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 LIMB=${LIMBS[$IDX]}
-[ -n "$LIMB" ] || { echo "no task at index $IDX (use --array=0-9)"; exit 0; }
+[ -n "$LIMB" ] || { echo "no task at index $IDX (use --array=0-10)"; exit 0; }
 LOWNORM_TARGET=${LOWNORM_TARGET:-4.5}
+E_CAP=${E_CAP:-82}                    # pm_limbs' default: what v2capwarm trained at
+BABILONG_PATH=${BABILONG_PATH:-data/babilong-1k}
+BABILONG_REPO=${BABILONG_REPO:-RMT-team/babilong-1k-samples}
+BABILONG_MAX=${BABILONG_MAX:-250}
 STOP=${STOP:-40146}
 RECALL_VAL=${RECALL_VAL:-data/pg19_val_recall_len4096}
 RC_ALL=0
@@ -96,11 +114,51 @@ if not tg or abs(tg[-1] - float(sys.argv[2])) > 1e-6:
 print(f"    lownorm znorm_target {sys.argv[2]} confirmed against its diag")
 CHECK
                     ;;
+                v2capwarm)
+                    # gated_v2 sets the score heads' shape: rebuilt as gated it
+                    # would load with 3 unexpected keys and score the old ring.
+                    SETS="$SETS --set prefix_memory=gated_v2 --set v2_pairing=paired"
+                    SETS="$SETS --set e_store_norm_target=$E_CAP"
+                    python - "cortex-pm/pm-v2capwarm/cortex_diag.jsonl" "$E_CAP" <<'CHECK' || exit 1
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+if not any(r.get("v2_replace_rate") is not None for r in rows):
+    sys.exit("ERROR: pm-v2capwarm's diag has no v2_replace_rate: it did not train gated_v2")
+en = [r["z_e_carried_norm"] for r in rows if r.get("z_e_carried_norm") is not None]
+cap = float(sys.argv[2])
+if not en or max(abs(v - cap) for v in en) > 0.02 * cap:
+    sys.exit(f"ERROR: pm-v2capwarm carried E at {en[:1]}..{en[-1:]}, rebuilding at cap {cap}")
+print(f"    v2capwarm: gated_v2 and E cap {cap} confirmed against its diag")
+CHECK
+                    ;;
             esac
         fi ;;
 esac
 echo "=== pm_read | $LIMB | $CKPT -> $RES ==="
 git rev-parse --short HEAD 2>/dev/null | sed 's/^/    commit: /'
+
+# depth/ + babilong/: the Part B read-out (v2_buffer_handoff.md B5), run on
+# v2capwarm and, with COMPARE_ONLY=1, on pm-both with the same flags.
+depth_babilong() {
+    step "depth tests: drift, gates, restart, recency (202-chunk books)"
+    python evals/diag_chunk1_drift.py --model_name "$MODEL" --checkpoint "$CKPT" \
+        $SETS --data "$PG19_VAL" --T "$T" --parts drift,gates,restart,recency \
+        --drift_chunks 202 --drift_streams 6 --depths 8,16,32,64,128 \
+        --dtype float32 --out_dir "$RES/depth" || RC_ALL=$?
+    step "BABILong qa1 qa2, 1k-32k (8 x 512, T $T)"
+    python evals/eval_babilong.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
+        --dataset_path "$BABILONG_PATH" --dataset_repo "$BABILONG_REPO" \
+        --tasks qa1 qa2 --max_examples "$BABILONG_MAX" --seq_len 512 --num_chunks 8 \
+        --T "$T" --score_nll --rank_answers --pmi \
+        --out_dir "$RES/babilong" || RC_ALL=$?
+}
+if [ "${COMPARE_ONLY:-}" = "1" ]; then
+    [ "$LIMB" = "both" ] || { echo "COMPARE_ONLY=1 is for the pm-both baseline (--array=0)"; exit 1; }
+    depth_babilong
+    echo ""
+    echo "=== pm_read both (COMPARE_ONLY) finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="
+    exit $RC_ALL
+fi
 
 if [ "$LIMB" != "ref_cortex" ] && [ "$LIMB" != "ref_control" ]; then
     EXPECT=""
@@ -152,12 +210,13 @@ if [ "$LIMB" = "both" ] || [ "$LIMB" = "recall" ]; then
         --damage donor --damage_channel both --T "$T" --max_examples 100 \
         --dtype float32 --out_dir "$RES/horizon" || RC_ALL=$?
 fi
-if [ "$LIMB" = "both" ] || [ "$LIMB" = "lownorm" ] || [ "$LIMB" = "carrydrop" ]; then
+if [ "$LIMB" = "v2capwarm" ] || [ "$LIMB" = "both" ] || [ "$LIMB" = "lownorm" ] || [ "$LIMB" = "carrydrop" ]; then
     step "MC suite (single forward: the chunk-1 tax on benchmarks)"
     python evals/eval_multiple_choice.py --model_name "$MODEL" \
         --checkpoint "$CKPT" $SETS --tasks hellaswag winogrande arc_easy arc_challenge piqa \
         --T "$T" --out_dir "$RES/mc" || RC_ALL=$?
 fi
+[ "$LIMB" = "v2capwarm" ] && depth_babilong
 echo ""
 echo "=== pm_read $LIMB finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="
 exit $RC_ALL
