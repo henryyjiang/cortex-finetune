@@ -113,3 +113,40 @@ def test_pick_control_avoids_row_and_donor_books():
 
 def test_parts_include_f_and_g():
     assert {"F", "G"} <= set(mi.PARTS)
+
+
+# -- --z_loop (2026-11-02) ----------------------------------------------------
+
+def test_loop_only_scopes_cover_the_complement():
+    calls = ([("prelude", i, None) for i in range(4)]
+             + [("core", i, t) for t in range(8) for i in range(6)]
+             + [("coda", i, None) for i in range(4)])
+    for kind, i, t in calls:
+        assert mi.site_hits("core", None, kind, i, t) == (kind == "core")
+        # not_core blocks exactly what core leaves readable, and vice versa
+        assert mi.site_hits("not_core", None, kind, i, t) != mi.site_hits(
+            "core", None, kind, i, t)
+        assert mi.site_hits("not_coda", None, kind, i, t) == (kind != "coda")
+        assert mi.site_hits("all", None, kind, i, t)
+
+
+def test_splice_z_takes_own_e_and_donor_z():
+    own, don = torch.zeros(1, 16, 8), torch.ones(1, 16, 8)
+    mix = mi.splice_z(own, don)
+    assert torch.equal(mix[..., :4], own[..., :4])
+    assert torch.equal(mix[..., 4:], don[..., 4:])
+    assert torch.equal(mi.splice_z(own, own), own)
+
+
+def test_z_loop_sites_are_named_uniquely():
+    class P:
+        n_pre, n_core, n_coda, T = 4, 6, 4, 8
+    base = mi.build_sites(P)
+    s = mi.build_sites(P, z_loop=True)
+    assert s[:22] == base[:22]          # the EZ per-site map is unchanged
+    assert len(s) == len(base) + 22 + 3
+    names = [mi.site_name(x) for x in s]
+    assert len(set(names)) == len(names)
+    for nm in ("core.1@all_t[Z]", "loop[Z]", "all_but_loop[Z]",
+               "all_but_coda[Z]", "all_Z_only", "core.1@all_t"):
+        assert nm in names

@@ -28,6 +28,8 @@
 #   sbatch --array=3-4 --export=ALL,PARTS=dissect pace/pm_probe.sbatch
 #       does the recall limb's past-the-lap retention (25-31% at 5-6 chunks on
 #       its own probe) reach BABILong?  Watch teleport - normal at dist 4-7/8+.
+#   sbatch --array=0,3,5 --export=ALL,PARTS=interp,Z_LOOP=1 pace/pm_probe.sbatch
+#       (2026-11-02) does the LOOP read Z?  -> $RES/interp_zloop/
 #   sbatch --array=3,5 --export=ALL,PARTS=interp pace/pm_probe.sbatch
 #       does reading the carry at token scale move WHERE it is read (coda mass,
 #       part B's blocking map) -- the lownorm question the battery left open.
@@ -102,7 +104,14 @@ else
 fi
 BABILONG_PATH=${BABILONG_PATH:-data/babilong-1k}
 PARTS=${PARTS:-dissect,interp}
-INTERP_PARTS=${INTERP_PARTS:-A,B,C,D,E,F,G}
+# Z_LOOP=1 (2026-11-02): does the loop read Z?  Adds --z_loop (B: Z-only sites,
+# Z readable only in the loop / coda; F + demo: Z-only swap), defaults the
+# parts to B,F (--export splits on commas, so they cannot be passed there) and
+# writes to interp_zloop/ so the round-3 interp/ results are kept.  Cost: B
+# grows by 25 sites, F by 5 forwards a chunk -- roughly double the B+F time.
+INTERP_OUT=interp; ZFLAG=""; PARTS_DEFAULT=A,B,C,D,E,F,G
+[ "${Z_LOOP:-0}" = "1" ] && { INTERP_OUT=interp_zloop; ZFLAG="--z_loop"; PARTS_DEFAULT=B,F; }
+INTERP_PARTS=${INTERP_PARTS:-$PARTS_DEFAULT}
 # the benchmark's own records, for the per-item reproduction check (38146 only)
 case "$ARM@$STEP" in
     cortex@38146)  REC="--records eval_results/longcontext_5b-final/cortex-final-T8-nc8-sl512/babilong" ;;
@@ -129,8 +138,8 @@ if [ "$ARM" != "control" ] && [[ ",$PARTS," == *",interp,"* ]]; then
     step "memory interp ($INTERP_PARTS)"
     python evals/diag_memory_interp.py --model_name "$MODEL" --checkpoint "$CKPT" \
         $SETS --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_rows 24 \
-        --parts "$INTERP_PARTS" --steer_demo --dtype float32 --seed 1234 --boot 2000 \
-        --out_dir "$RES/interp" || RC_ALL=$?
+        --parts "$INTERP_PARTS" --steer_demo $ZFLAG --dtype float32 --seed 1234 --boot 2000 \
+        --out_dir "$RES/$INTERP_OUT" || RC_ALL=$?
 fi
 
 echo ""

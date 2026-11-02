@@ -188,6 +188,22 @@ G. SOFT CARRY-ATTENTION SCALING.  B with a finite bias: log(alpha) added to
    Teacher-forced like B.  Veto, row 0: alpha = 1 through the explicit path
    must reproduce intact within FIDELITY_TOL (the B fidelity bound).
 
+--z_loop: DOES THE LOOP READ Z?  (2026-11-02)  Z rows ARE loop states, so a
+   write-side match to the loop's distribution is true by construction; only
+   the read side can show the two communicate.  A puts Z's mass flat across
+   t0..t7 (~0.02-0.06 per core layer) but B only blocked E+Z per site.  Adds:
+     B  every per-site block again on Z only (`[Z]`), plus Z blocked in the
+        whole loop (`loop[Z]`) and Z readable ONLY in the loop
+        (`all_but_loop[Z]`) or ONLY in the coda (`all_but_coda[Z]`).
+        B.z_loop: recovered = all_Z_only - all_but_<where>[Z], paired per row.
+     F  the donor swap on Z ONLY (own E, donor Z), read with Z everywhere /
+        only in the loop / only in the coda; own and swapped carries read
+        under the same block.  Keys `steer_lift|Z`, `|Z@loop`, `|Z@coda`.
+     steer_demo  the royalty/sea contrast with only Z swapped (E averaged
+        over both bases), same three regimes; `theme_gap` per regime.
+   No relay leak: E columns precede Z, so under the causal mask they never see
+   Z; a Z column reaches a token only through that token's own attention.
+
 ROWS.  The strided PG-19 pack is consecutive non-overlapping windows, ~21 per
 book, with each book's last window EOS-marked and EOS-padded.  The first 24
 rows would be ~1-2 books, and the next row -- the obvious donor -- the same
@@ -255,6 +271,13 @@ PARTS = ("A", "B", "C", "D", "E", "F", "G")
 #: A form is "rare" (D's `rare` / `emb_rare`, F's word sets) when it occurs in
 #: fewer than this share of the sampled chunks (rows' and donors').
 RARE_MAX_DF = 0.10
+#: --z_loop read regimes for the Z-only swap: (label, block).  The block hides
+#: Z from real tokens everywhere EXCEPT the loop / the coda.  E columns precede
+#: Z in the packed layout, so under the causal mask E cannot relay Z content
+#: around the block: the only route from a Z column to a token is that token's
+#: own attention at an unblocked site.
+Z_REGIMES = (("Z", None), ("Z@loop", ("not_core", None, "Z")),
+             ("Z@coda", ("not_coda", None, "Z")))
 #: Which bag of forms each D lens variant is scored against.
 LENS_BAG = {"all": "all", "long": "long", "rare": "rare",
             "emb_all": "all", "emb_rare": "rare"}
@@ -441,6 +464,29 @@ def carry_logit_bias(causal: torch.Tensor, real: tuple, ranges: list,
     for lo, hi in ranges:
         b[r0:r1, lo:hi] = b[r0:r1, lo:hi] + logbias
     return b
+
+
+def site_hits(scope, idx, kind, i, t) -> bool:
+    """Does a block scoped (scope, idx) cover attention call `kind`.i at loop
+    iteration t?  `core` is the whole loop (every core layer, every t);
+    `not_core` / `not_coda` block everywhere EXCEPT the loop / the coda, so the
+    carry stays readable there and only there."""
+    return (scope == "all"
+            or (scope in ("prelude", "coda") and kind == scope and idx == i)
+            or (scope == "core_layer" and kind == "core" and idx == i)
+            or (scope == "iter" and kind == "core" and idx == t)
+            or (scope == "core" and kind == "core")
+            or (scope == "not_core" and kind != "core")
+            or (scope == "not_coda" and kind != "coda"))
+
+
+def splice_z(own: torch.Tensor, donor: torch.Tensor) -> torch.Tensor:
+    """The carry with `own`'s E half and `donor`'s Z half ([..., 2D] rows)."""
+    if own.shape != donor.shape:
+        raise RuntimeError(f"cannot splice Z across carries of shape "
+                           f"{tuple(own.shape)} and {tuple(donor.shape)}")
+    D = own.shape[-1] // 2
+    return torch.cat([own[..., :D], donor[..., D:]], dim=-1)
 
 
 def set_logmass(logp: torch.Tensor, ids: torch.Tensor) -> torch.Tensor:
@@ -894,11 +940,7 @@ class AttnProbe:
             return None, None
         scope, idx, ch = self.block[:3]
         lb = self.block[3] if len(self.block) > 3 else float("-inf")
-        hit = (scope == "all"
-               or (scope in ("prelude", "coda") and kind == scope and idx == i)
-               or (scope == "core_layer" and kind == "core" and idx == i)
-               or (scope == "iter" and kind == "core" and idx == t))
-        if not hit:
+        if not site_hits(scope, idx, kind, i, t):
             return None, None
         lay, ranges = self.lay, []
         if "E" in ch and lay["nE"]:
@@ -1217,6 +1259,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--steer_demo", action="store_true",
                    help="part F illustration: royalty vs sea passage carries "
                         "read into one neutral passage; top tokens that rise")
+    p.add_argument("--z_loop", action="store_true",
+                   help="does the LOOP read Z?  B adds Z-only blocking per site "
+                        "plus Z readable only in the loop / only in the coda; "
+                        "F and --steer_demo add a Z-only swap (own E, donor Z) "
+                        "read under the same three regimes")
     p.add_argument("--topk", type=int, default=50)
     p.add_argument("--n_bins", type=int, default=8)
     p.add_argument("--out_dir", default="eval_results/memory_interp")
@@ -1238,12 +1285,17 @@ def _git_head():
         return None
 
 
-def build_sites(probe) -> list:
-    s = [("prelude", i, "EZ") for i in range(probe.n_pre)]
-    s += [("core_layer", i, "EZ") for i in range(probe.n_core)]
-    s += [("iter", t, "EZ") for t in range(probe.T)]
-    s += [("coda", i, "EZ") for i in range(probe.n_coda)]
+def build_sites(probe, z_loop: bool = False) -> list:
+    chans = ("EZ", "Z") if z_loop else ("EZ",)
+    s = []
+    for ch in chans:
+        s += [("prelude", i, ch) for i in range(probe.n_pre)]
+        s += [("core_layer", i, ch) for i in range(probe.n_core)]
+        s += [("iter", t, ch) for t in range(probe.T)]
+        s += [("coda", i, ch) for i in range(probe.n_coda)]
     s += [("all", None, "EZ"), ("all", None, "E"), ("all", None, "Z")]
+    if z_loop:
+        s += [("core", None, "Z"), ("not_core", None, "Z"), ("not_coda", None, "Z")]
     return s
 
 
@@ -1251,11 +1303,16 @@ def site_name(site) -> str:
     scope, idx, ch = site
     if scope == "all":
         return {"EZ": "all", "E": "all_E_only", "Z": "all_Z_only"}[ch]
+    tag = "" if ch == "EZ" else f"[{ch}]"
     if scope == "core_layer":
-        return f"core.{idx}@all_t"
+        return f"core.{idx}@all_t{tag}"
     if scope == "iter":
-        return f"iter.t{idx}@all_core"
-    return f"{scope}.{idx}"
+        return f"iter.t{idx}@all_core{tag}"
+    if scope == "core":
+        return f"loop{tag}"
+    if scope in ("not_core", "not_coda"):
+        return f"all_but_{'loop' if scope == 'not_core' else 'coda'}{tag}"
+    return f"{scope}.{idx}{tag}"
 
 
 def main() -> int:
@@ -1384,7 +1441,7 @@ def main() -> int:
     n_age = n_lap
     acc = Acc(probe.n_blk, probe.H, n, n_age, args.n_bins, W, device)
     probe.acc = acc
-    sites = build_sites(probe) if "B" in parts else []
+    sites = build_sites(probe, args.z_loop) if "B" in parts else []
     bins_cache = {}
 
     def make_ctx(q, cls_ids):
@@ -1811,6 +1868,23 @@ def main() -> int:
             rb = {key: [bag_of_forms(x, form_rare, nf) for x in xx]
                   for key, xx in (("own", xs), ("don", dxs), ("ctl", cxs))}
             per_q = []
+            per_q_z = {reg: [] for reg, _ in Z_REGIMES}
+
+            def read_lp(st_, blk, q_):
+                """Teacher-forced read of chunk q_ on carry st_, Z blocked per blk."""
+                probe.block, probe.ctx = blk, make_ctx(q_, cls[q_ - 1])
+                torch.manual_seed(chunk_seed(args.seed, si, q_))
+                try:
+                    with probe, ring_pointer_guard(buf), \
+                            _patched_merge(buf, lambda s, nv, nl=None: s), \
+                            torch.no_grad():
+                        out = model(input_ids=xs[q_ - 1][None].to(device),
+                                    num_steps=num_steps, m_cross_in=st_,
+                                    return_m_cross=False)
+                finally:
+                    probe.block = None
+                return torch.log_softmax(out.logits[0].float(), dim=-1)
+
             for q in range(2, n + 1):
                 win = range(max(1, q - n_lap), q)
                 u = {key: torch.stack([b[c - 1] for c in win]).any(0)
@@ -1837,6 +1911,16 @@ def main() -> int:
                                "donor contrast would not be paired")
                     lps.append(torch.log_softmax(out.logits[0].float(), dim=-1))
                 dd = steer_deltas(lps[0], lps[1], ids_f, valid[q - 1])
+                if args.z_loop:
+                    # Own E, donor Z: the steer that only Z can carry, read
+                    # with Z visible everywhere / only in the loop / only in
+                    # the coda (own and mixed carries under the same block).
+                    mix = splice_z(states[q - 1], d_states[q - 1])
+                    for reg, blk in Z_REGIMES:
+                        own_lp = lps[0] if blk is None else read_lp(states[q - 1], blk, q)
+                        per_q_z[reg].append(steer_deltas(
+                            own_lp, read_lp(mix, blk, q), ids_f, valid[q - 1]))
+                        del own_lp
                 for key, m in sets_f.items():
                     F_sizes.setdefault(key, []).append(int(m.sum()))
                 if dd["steer_lift"] is not None:
@@ -1848,6 +1932,14 @@ def main() -> int:
             for key in ("steer_lift", "own_drop", "don", "own", "ctl"):
                 F_rows.setdefault(key, []).append(
                     _mean([d[key] for d in use]) if use else None)
+            for reg, dz in per_q_z.items():
+                if not dz:
+                    continue
+                use_z = [d for d, d0 in zip(dz, per_q)
+                         if d0["steer_lift"] is not None and d0["own_drop"] is not None]
+                for key in ("steer_lift", "own_drop", "don", "own", "ctl"):
+                    F_rows.setdefault(f"{key}|{reg}", []).append(
+                        _mean([d[key] for d in use_z]) if use_z else None)
             _sync(device)
             timing["F_s"].append(time.perf_counter() - t0)
 
@@ -1892,8 +1984,11 @@ def main() -> int:
         # Fresh chains from m_cross_in=None reset the ring pointer: safe only
         # here, after every row's chain is finished.
         t0 = time.perf_counter()
-        report["steer_demo"] = steer_demo(model, buf, tok, form_long, vocab_text,
-                                          num_steps, device, args.seed)
+        report["steer_demo"] = steer_demo(
+            model, buf, tok, form_long, vocab_text, num_steps, device, args.seed,
+            probe=probe if args.z_loop else None,
+            demo_ctx=lambda L_: {"q": 2, "L": L_, "nS": W,
+                                 "nE": carried_rows(2, W, K)})
         report["timing"]["steer_demo_s"] = time.perf_counter() - t0
         with open(os.path.join(args.out_dir, "results.json"), "w",
                   encoding="utf-8") as fh:
@@ -1941,38 +2036,72 @@ STEER_PASSAGES = {
 
 
 def steer_demo(model, buf, tok, form_long, vocab_text, num_steps, device, seed,
-               k: int = 20) -> dict:
+               probe=None, demo_ctx=None, k: int = 20) -> dict:
     """ILLUSTRATION for part F, not a statistic: read the neutral passage with
     the carry each themed passage writes as chunk 1, and list the >= 4-letter
     tokens whose mean log-prob over the neutral passage rises most under one
-    carry relative to the other."""
+    carry relative to the other.
+
+    With `probe` (--z_loop) it repeats the contrast swapping ONLY Z: each
+    theme's Z under a shared E half, averaged over both E bases so E cancels,
+    read with Z visible everywhere / only in the loop / only in the coda
+    (Z_REGIMES).  `theme_gap` = mean delta on the full-carry top-k royalty
+    tokens minus on its top-k sea tokens: how much of that contrast Z alone
+    reproduces under each regime.  `demo_ctx(L)` is the probe's chunk context
+    for a chunk-2 read of L tokens."""
     enc = lambda s: tok(s, add_special_tokens=False)["input_ids"]  # noqa: E731
     neutral = torch.tensor(enc(STEER_PASSAGES["neutral"]))[None].to(device)
-    mean_lp = {}
+    carry = {}
     for name in ("royalty", "sea"):
         src = torch.tensor([tok.eos_token_id] + enc(STEER_PASSAGES[name]))
         torch.manual_seed(seed)
         with torch.no_grad():
-            st = model(input_ids=src[None].to(device), num_steps=num_steps,
-                       m_cross_in=None, return_m_cross=True).m_cross
-            torch.manual_seed(seed + 1)
-            with ring_pointer_guard(buf), \
-                    _patched_merge(buf, lambda s, nv, nl=None: s):
+            carry[name] = model(input_ids=src[None].to(device), num_steps=num_steps,
+                                m_cross_in=None, return_m_cross=True).m_cross
+
+    def read(st, blk=None):
+        torch.manual_seed(seed + 1)
+        with ring_pointer_guard(buf), \
+                _patched_merge(buf, lambda s, nv, nl=None: s), torch.no_grad():
+            if blk is None:
                 lg = model(input_ids=neutral, num_steps=num_steps, m_cross_in=st,
                            return_m_cross=False).logits[0].float()
-        mean_lp[name] = torch.log_softmax(lg, dim=-1).mean(0)
-    d = (mean_lp["royalty"] - mean_lp["sea"]).masked_fill(
-        form_long.to(device) < 0, float("nan"))
+            else:
+                probe.block, probe.ctx = blk, demo_ctx(neutral.shape[1])
+                try:
+                    with probe:
+                        lg = model(input_ids=neutral, num_steps=num_steps,
+                                   m_cross_in=st, return_m_cross=False).logits[0].float()
+                finally:
+                    probe.block = None
+        return torch.log_softmax(lg, dim=-1).mean(0)
+
+    long_only = lambda x: x.masked_fill(form_long.to(device) < 0, float("nan"))  # noqa: E731
+    d = long_only(read(carry["royalty"]) - read(carry["sea"]))
 
     def top(x):
         v, i = x.nan_to_num(float("-inf")).topk(k)
         return [[vocab_text[j], round(float(a), 3)] for j, a in zip(i.tolist(), v.tolist())]
 
-    return {"note": "illustration only: one passage pair, one neutral passage; "
-                    "delta = mean log-prob over the neutral passage under the "
-                    "royalty carry minus under the sea carry, >= 4-letter tokens",
-            "passages": STEER_PASSAGES,
-            "royalty_over_sea": top(d), "sea_over_royalty": top(-d)}
+    out = {"note": "illustration only: one passage pair, one neutral passage; "
+                   "delta = mean log-prob over the neutral passage under the "
+                   "royalty carry minus under the sea carry, >= 4-letter tokens",
+           "passages": STEER_PASSAGES,
+           "royalty_over_sea": top(d), "sea_over_royalty": top(-d)}
+    if probe is not None:
+        roy = d.nan_to_num(float("-inf")).topk(k).indices
+        sea = (-d).nan_to_num(float("-inf")).topk(k).indices
+        gap = lambda x: float(x[roy].mean() - x[sea].mean())  # noqa: E731
+        out["theme_gap_full_carry"] = gap(d)
+        out["z_only"] = {}
+        for reg, blk in Z_REGIMES:
+            dz = long_only(sum(read(splice_z(carry[b], carry["royalty"]), blk)
+                               - read(splice_z(carry[b], carry["sea"]), blk)
+                               for b in ("royalty", "sea")) / 2)
+            out["z_only"][reg] = {"theme_gap": gap(dz),
+                                  "royalty_over_sea": top(dz),
+                                  "sea_over_royalty": top(-dz)}
+    return out
 
 
 def report_FG(args, F_rows, F_lift_by_chunk, F_sizes, G_res, G_bins) -> dict:
@@ -2154,6 +2283,20 @@ def build_report(args, parts, probe, acc, geo, depth_map, checks, layout_checks,
                 "site": nm, **boot(B_res[nm], args.boot, args.seed),
                 "by_chunk": [_mean(v) for v in B_chunk[nm]],
                 "per_row": r6(B_res[nm])})
+        z_all = B_res.get("all_Z_only")
+        if z_all and B_res.get("all_but_loop[Z]"):
+            # Z recovered = cost of reading Z nowhere minus cost of reading it
+            # at one place only; paired per row.
+            rec = {where: [a - b for a, b in zip(z_all, B_res[f"all_but_{where}[Z]"])]
+                   for where in ("loop", "coda")}
+            rep["B"]["z_loop"] = {
+                "note": "recovered = all_Z_only - all_but_<where>[Z]: the NLL "
+                        "Z buys back when it is readable ONLY there; share = "
+                        "mean recovered / mean all_Z_only",
+                **{f"{w}_recovered": boot(v, args.boot, args.seed)
+                   for w, v in rec.items()},
+                **{f"{w}_share": (_mean(v) / _mean(z_all) if _mean(z_all) else None)
+                   for w, v in rec.items()}}
 
     if "D" in parts and D_rows:
         out = {"lens": {"E": "lm_head(E row) -- exact head on post-ln_f states",
@@ -2244,6 +2387,13 @@ def print_report(rep, probe) -> None:
                          or s["lo"] <= 0 <= s["hi"]) else " *"
             print(f"  {s['site']:<20}{_f(s['mean'], '.5f'):>10}   "
                   f"[{_f(s['lo'], '.5f')}, {_f(s['hi'], '.5f')}]{s['n']:>4}{sig}")
+        if "z_loop" in B:
+            zl = B["z_loop"]
+            print("  Z readable at ONE place only (recovered vs all_Z_only):")
+            for w in ("loop", "coda"):
+                s = zl[f"{w}_recovered"]
+                print(f"    {w:<6}{_f(s['mean'], '+.5f'):>10}   [{_f(s['lo'], '+.5f')}, "
+                      f"{_f(s['hi'], '+.5f')}]  share {_f(zl[f'{w}_share'], '.2f')}")
     if "C" in rep:
         C = rep["C"]
         T = probe.T
@@ -2340,6 +2490,17 @@ def print_report(rep, probe) -> None:
               + "   mean set sizes (forms): "
               + " ".join(f"{k} {v:.0f}" for k, v in Fr["set_size_mean_forms"].items()
                          if v is not None))
+        if "steer_lift|Z" in Fr:
+            print("  Z-only swap (own E, donor Z), Z readable everywhere / only in "
+                  "the loop / only in the coda:")
+            for reg, _ in Z_REGIMES:
+                for key in ("steer_lift", "own_drop"):
+                    s = Fr.get(f"{key}|{reg}") or {}
+                    sig = "" if (s.get("lo") is None or s.get("n", 0) < 2
+                                 or s["lo"] <= 0 <= s["hi"]) else " *"
+                    print(f"    {key + ' ' + reg:<24}{_f(s.get('mean'), '+.4f'):>10}   "
+                          f"[{_f(s.get('lo'), '+.4f')}, {_f(s.get('hi'), '+.4f')}]"
+                          f"{s.get('n', 0):>4}{sig}")
     if "steer_demo" in rep:
         sd = rep["steer_demo"]
         print(f"\n  steer demo ({sd['note']})")
@@ -2347,6 +2508,13 @@ def print_report(rep, probe) -> None:
               + ", ".join(f"{w.strip()} {d:+.2f}" for w, d in sd["royalty_over_sea"]))
         print("    sea carry > royalty carry: "
               + ", ".join(f"{w.strip()} {d:+.2f}" for w, d in sd["sea_over_royalty"]))
+        if "z_only" in sd:
+            print(f"    Z-only swap, theme_gap (full carry "
+                  f"{sd['theme_gap_full_carry']:+.3f}):")
+            for reg, z in sd["z_only"].items():
+                print(f"      {reg:<7}{z['theme_gap']:+.3f}  royalty Z > sea Z: "
+                      + ", ".join(f"{w.strip()} {d:+.2f}"
+                                  for w, d in z["royalty_over_sea"][:10]))
     if "G" in rep:
         Gr = rep["G"]
         print("\nG. soft carry-attention scaling: log(alpha) on every real->carried "
