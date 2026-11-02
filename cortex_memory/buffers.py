@@ -841,3 +841,135 @@ class PrefixGatedBuffer(_PrefixBufferBase):
             "min_cross_chunks": 2 * lap,
             "params": sum(p.numel() for p in self.parameters()),
         }
+
+
+class PrefixGatedBufferV2(PrefixGatedBuffer):
+    """Hard keep/replace (v2_buffer_handoff.md B1): a stored row is either kept
+    bit-identical or replaced by a fresh write.  Never a blend.
+
+    WHERE A NEW ROW CAN GO.  Z's read assigns loop depth by row index
+    (`depths[r % W]`, cortex_graft.py latent rows), so write slot j may only
+    land in a row r with r = j (mod W).  Selection is therefore per slot CLASS:
+    for each j, the L = K/W stored rows of class j and new write j compete, and
+    the class keeps L of the L+1.  That is the global "top 64 of 80" with the
+    one constraint that keeps the depth map true.
+
+    AGE, STATELESSLY.  Within a class the rows are kept in age order (row p of
+    the class is at r = pW + j, oldest first), so age needs no state on the
+    buffer (the ring-pointer trap): a stored row's age is its rank, L - p, and
+    a new write's is 0.  Under FIFO that is exactly its age in chunks; once
+    writes are dropped it counts the class's newer rows, not chunks.
+
+    SCORE.  learned(rms(row), rms(row) * rms(mean of the W new rows)) - beta *
+    age, one head per pairing unit.  The learned head is zero at init, so step
+    0 replaces the oldest row of every class: FIFO, the ring with fg=0, ig=1,
+    up to a block rotation (the ring rotates which block is newest; v2 keeps
+    the newest block last, one of the rotations the ring trained on).
+
+      paired       one head on both halves; E and Z rows move together.
+      independent  one head per channel, each with its own per-class choice,
+                   so E row r and Z row r can come from different chunks.
+
+    GRADIENT.  Straight-through: the forward is the hard choice, exactly;
+    the backward sends sigmoid(score_new - score_dropped) through to both
+    scores, scaled by (replaced - kept).  The surrogate term is g - g.detach()
+    = 0 in the forward, so no stored row is perturbed by it.
+    """
+
+    PAIRINGS = ("paired", "independent")
+    AGE_PRIOR_INIT = 1.0    # any beta > 0 gives FIFO at a zero head; 1 keeps
+                            # sigmoid'(4 beta) ~ 0.018 so the score still trains
+
+    def __init__(self, hidden_size: int, n_vec: int = 32,
+                 n_slots: Optional[int] = None, pairing: str = "paired",
+                 **kw) -> None:
+        super().__init__(hidden_size, n_vec, n_slots=n_slots, **kw)
+        if pairing not in self.PAIRINGS:
+            raise ValueError(f"v2_pairing must be one of {self.PAIRINGS}; got {pairing!r}")
+        if self.route != "ring" or self.fill != "grow" or self.latent_stride != 1:
+            raise ValueError(
+                "gated_v2 needs gate_route=ring, gate_fill=grow and "
+                f"latent_stride=1; got {self.route!r}, {self.fill!r}, "
+                f"{self.latent_stride}")
+        if self.n_slots % self.n_vec:
+            raise ValueError(f"gated_v2 needs gate_slots ({self.n_slots}) to be a "
+                             f"multiple of accum_vecs ({self.n_vec})")
+        self.pairing = pairing
+        D = hidden_size
+        if self.carries_latent and pairing == "independent":
+            self._units = [slice(0, D), slice(D, 2 * D)]
+        else:
+            self._units = [slice(0, 2 * D if self.carries_latent else D)]
+        self.score_heads = nn.ModuleList(
+            nn.Linear(2 * (u.stop - u.start), 1) for u in self._units)
+        self.age_prior = nn.Parameter(torch.full((len(self._units),),
+                                                 self.AGE_PRIOR_INIT))
+        self.last_replace_rate: list = []
+        self.apply_gate_init()
+
+    def apply_gate_init(self) -> None:
+        super().apply_gate_init()
+        if not hasattr(self, "score_heads"):     # the parent's __init__ call
+            return
+        for h in self.score_heads:
+            nn.init.zeros_(h.weight)
+            nn.init.zeros_(h.bias)
+        with torch.no_grad():
+            self.age_prior.fill_(self.AGE_PRIOR_INIT)
+
+    def _rms_halves(self, x: torch.Tensor) -> torch.Tensor:
+        """rms-normalise each D-wide channel of a pairing unit separately, so
+        E's ~84-norm rows cannot drown Z's in a paired score."""
+        return torch.cat([self._rms(p) for p in x.split(self.hidden_size, -1)], -1)
+
+    @staticmethod
+    def _rms(x: torch.Tensor) -> torch.Tensor:
+        xf = x.float()
+        return xf * torch.rsqrt(xf.pow(2).mean(-1, keepdim=True).clamp_min(1e-12))
+
+    def _select(self, stored: torch.Tensor, new: torch.Tensor, h: int) -> torch.Tensor:
+        B, K, C = stored.shape
+        W = self.n_vec
+        L = K // W
+        cand = torch.cat([stored.reshape(B, L, W, C), new.unsqueeze(1)], dim=1)
+        feat = self._rms_halves(cand)                       # [B, L+1, W, C]
+        ctx = self._rms_halves(new).mean(1, keepdim=True)   # [B, 1, C]
+        ctx = self._rms(ctx).unsqueeze(1)                         # [B, 1, 1, C]
+        head = self.score_heads[h]
+        learned = head(torch.cat([feat, feat * ctx], dim=-1).to(head.weight.dtype))
+        age = torch.cat([torch.arange(L, 0, -1, dtype=torch.float32),
+                         torch.zeros(1)]).to(stored.device)
+        score = learned.squeeze(-1).float() - self.age_prior[h].float() * age[None, :, None]
+        s_old = score[:, :L]                                       # [B, L, W]
+        q = s_old.argmin(dim=1)                                    # [B, W]
+        s_q = s_old.gather(1, q.unsqueeze(1)).squeeze(1)
+        s_new = score[:, L]
+        accept = s_new > s_q
+        p = torch.arange(L, device=stored.device).view(1, L, 1)
+        idx = (p + (p >= q.unsqueeze(1)).long()).unsqueeze(-1).expand(B, L, W, C)
+        replaced = cand.gather(1, idx)       # drop q, shift the newer rows down, append new
+        kept = cand[:, :L]
+        hard = torch.where(accept[:, None, :, None], replaced, kept)
+        g = torch.sigmoid(s_new - s_q)
+        st = (g - g.detach())[:, None, :, None].to(hard.dtype)
+        self.last_replace_rate.append(accept.detach().float().mean())
+        return (hard + st * (replaced - kept)).reshape(B, K, C)
+
+    def merge(self, state: Optional[torch.Tensor],
+              new_vecs: torch.Tensor,
+              new_latent: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Grow exactly as `gated` does; once full, per-class keep/replace."""
+        self.last_replace_rate = []         # one entry per unit, full merges only
+        if state is None or state.shape[1] < self.n_slots:
+            return super().merge(state, new_vecs, new_latent)
+        if new_vecs.shape[1] != self.n_vec:
+            raise ValueError(f"merge got {new_vecs.shape[1]} new vectors, buffer "
+                             f"writes {self.n_vec}")
+        if state.shape[1] != self.n_slots:
+            raise ValueError(f"carried state has {state.shape[1]} rows, buffer "
+                             f"holds {self.n_slots}")
+        cand = self.join_channels(new_vecs, new_latent)
+        out = [self._select(state[..., u], cand[..., u], h)
+               for h, u in enumerate(self._units)]
+        self._chunk += 1
+        return out[0] if len(out) == 1 else torch.cat(out, dim=-1)

@@ -137,7 +137,8 @@ import torch
 import torch.nn as nn
 
 from cortex_memory.buffers import (AccumCCoT, DirectCCoT, GatedAccumBuffer,
-                                   LSTMBuffer, PrefixAccumBuffer, PrefixGatedBuffer)
+                                   LSTMBuffer, PrefixAccumBuffer, PrefixGatedBuffer,
+                                   PrefixGatedBufferV2)
 from cortex_memory.eos import compute_eos_masks, apply_write_reset, apply_valid_write
 from cortex_memory.latent_read import (LatentRead, LatentRefresh,
                                        apply_designed_init as apply_latent_read_init)
@@ -516,6 +517,8 @@ class CortexMemory(nn.Module):
             getattr(config, "e_read_norm_target", 0.0) or 0.0)
         self.e_store_norm_target = float(
             getattr(config, "e_store_norm_target", 0.0) or 0.0)
+        self.z_store_norm_target = float(
+            getattr(config, "z_store_norm_target", 0.0) or 0.0)
         self.carry_dropout = float(getattr(config, "carry_dropout", 0.0) or 0.0)
         # No `or True`: that would turn an explicit False into True (the trap
         # latent_tok_pool's `or 4` already sprang once, a few lines up).
@@ -762,6 +765,13 @@ class CortexMemory(nn.Module):
             raise ValueError(
                 "cortex.e_store_norm_target rescales the stored E rows of the "
                 "prefix buffer; without --cortex.prefix_memory there are none.")
+        if self.z_store_norm_target < 0:
+            raise ValueError(f"cortex.z_store_norm_target must be >= 0 (0 = off); "
+                             f"got {self.z_store_norm_target}")
+        if self.z_store_norm_target > 0 and not (pmode and self.latent_carry):
+            raise ValueError(
+                "cortex.z_store_norm_target rescales the stored Z rows; it needs "
+                "--cortex.prefix_memory and --cortex.latent_carry true.")
         if not 0.0 <= self.carry_dropout < 1.0:
             raise ValueError(f"cortex.carry_dropout must be in [0, 1); got "
                              f"{self.carry_dropout}")
@@ -879,13 +889,18 @@ class CortexMemory(nn.Module):
             self.prefix = PrefixAccumBuffer(
                 D, n_vec, int(getattr(config, "accum_max", 128)),
                 carries_latent=self.latent_carry)
-        elif pmode == "gated":
+        elif pmode in ("gated", "gated_v2"):
             # gate_slots 0 => the pre-P1.0 shape (K == W).  Everything else
             # defaults to the P1.0 recommendation; see the PrefixGatedBuffer
             # docstring for why, and train.py for the cross_chunks assert that
-            # stops a configuration where the gate never fires.
-            self.prefix = PrefixGatedBuffer(
-                D, n_vec,
+            # stops a configuration where the gate never fires.  gated_v2 keeps
+            # the gate's parameters (unused) so a 38,146 overlay loads with no
+            # unexpected keys; only its score heads start fresh.
+            v2 = {} if pmode == "gated" else {"pairing": str(
+                getattr(config, "v2_pairing", "paired") or "paired")}
+            self.prefix = (PrefixGatedBuffer if pmode == "gated"
+                           else PrefixGatedBufferV2)(
+                D, n_vec, **v2,
                 n_slots=int(getattr(config, "gate_slots", 0) or 0) or None,
                 route=str(getattr(config, "gate_route", "ring") or "ring"),
                 gate_norm=str(getattr(config, "gate_norm", "tanh") or "tanh"),
@@ -896,7 +911,8 @@ class CortexMemory(nn.Module):
                 carries_latent=self.latent_carry,
                 latent_stride=self.latent_stride)
         elif pmode:
-            raise ValueError(f"prefix_memory must be '', 'accum' or 'gated'; got {pmode!r}")
+            raise ValueError(f"prefix_memory must be '', 'accum', 'gated' or "
+                             f"'gated_v2'; got {pmode!r}")
         else:
             self.prefix = None
         if self.prefix is not None:
@@ -1351,11 +1367,14 @@ class CortexMemory(nn.Module):
         return real, self._store_e(merged)
 
     def _store_e(self, state: torch.Tensor) -> torch.Tensor:
-        """e_store_norm_target: pin the stored E rows' norm; Z passes through."""
-        if self.e_store_norm_target <= 0:
+        """e/z_store_norm_target: pin the stored rows' norm per channel (0 = off)."""
+        if self.e_store_norm_target <= 0 and self.z_store_norm_target <= 0:
             return state
         e, z = self.prefix.split_channels(state)
-        e = rescale_rows(e, self.e_store_norm_target)
+        if self.e_store_norm_target > 0:
+            e = rescale_rows(e, self.e_store_norm_target)
+        if z is not None and self.z_store_norm_target > 0:
+            z = rescale_rows(z, self.z_store_norm_target)
         return e if z is None else self.prefix.join_channels(e, z)
 
     def _carried_state(self) -> Optional[torch.Tensor]:

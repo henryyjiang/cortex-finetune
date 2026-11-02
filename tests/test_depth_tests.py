@@ -219,3 +219,18 @@ def test_contents_saves_and_decodes_every_e_row(tiny, tmp_path):
     assert d14["e_centred_cosine"] is not None
     # same chain as the drift: its e_row_norm at chunk 14 is these rows' mean norm
     assert d14["row_norm"] == pytest.approx(plain["per_chunk"][13]["e_row_norm"], rel=1e-5)
+
+
+def test_drift_runs_on_gated_v2_and_logs_its_replace_rate():
+    torch.manual_seed(1234)
+    m = _build_raven(use_memory=True, memory_slots=0, accum_vecs=NV,
+                     latent_carry=True, eos_token_id=VOCAB - 1,
+                     prefix_memory="gated_v2", gate_slots=KS, gate_route="ring",
+                     gate_init="zero", gate_fill="grow").eval()
+    buf = m.cortex.prefix
+    out = part_drift(m, buf, _ds(), _args(), torch.tensor([4, 0]),
+                     torch.device("cpu"), buf.hidden_size)
+    rows = out["per_chunk"]
+    assert all("replace_rate" not in r for r in rows[:KS // NV])     # still growing
+    assert all(r["replace_rate"] == 1.0 for r in rows[KS // NV:])    # FIFO at init
+    assert not any("e_turnover" in r for r in rows)

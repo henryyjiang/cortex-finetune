@@ -231,3 +231,59 @@ def control_has_memory(use_memory: bool, has_cortex: bool) -> bool:
     against a config that may still select a mechanism.
     """
     return (not use_memory) and has_cortex
+
+
+#: Buffer attributes that hold the ring's write pointer (buffers.py merge).
+RING_POINTER_ATTRS = ("_chunk", "_z_chunk", "_z_pending")
+
+
+class WarmCarry:
+    """B3 deep-memory warm-up: carry each lane's detached memory across
+    micro-batches (v2_buffer_handoff.md, option 2: no extra compute).
+
+    `start` returns the memory a micro-batch begins from: with probability `p`
+    the previous micro-batch's (if it is the same batch size and continuing it
+    starts it with at most `max_chunks` chunks of history), else None.  `end` stores the chain's
+    final memory, detached.  The ring pointer travels WITH the memory: it is
+    state on the buffer, and any forward that starts from None (validation, an
+    eval hook) resets it, so `start` restores the snapshot `end` took.  The
+    draw uses its own RNG so the run's global RNG stream -- and with it the
+    per-update pairing against `pm-both` -- is unchanged.
+    """
+
+    def __init__(self, p: float, max_chunks: int, n_chunks: int, seed: int = 0):
+        import random
+        if not 0.0 <= p < 1.0:
+            raise ValueError(f"warm_p must be in [0, 1); got {p}")
+        self.p, self.max_chunks, self.n_chunks = float(p), int(max_chunks), int(n_chunks)
+        self.rng = random.Random(seed)
+        self.mem = self.ptr = None
+        self.depth = 0
+        self.n_rows = self.n_warm = self.depth_sum = 0
+
+    def start(self, buf, batch_size: int) -> Optional[torch.Tensor]:
+        can = (self.mem is not None and self.mem.shape[0] == batch_size
+               and self.depth <= self.max_chunks)
+        warm = can and self.rng.random() < self.p
+        if warm:
+            for k, v in self.ptr.items():
+                setattr(buf, k, list(v) if isinstance(v, list) else v)
+        else:
+            self.depth = 0
+        self.n_rows += 1
+        self.n_warm += int(warm)
+        self.depth_sum += self.depth
+        return self.mem if warm else None
+
+    def end(self, buf, m_cross: Optional[torch.Tensor]) -> None:
+        if m_cross is None:
+            self.mem, self.depth = None, 0
+            return
+        self.mem = m_cross.detach()
+        self.depth += self.n_chunks
+        self.ptr = {k: (list(v) if isinstance(v, list) else v)
+                    for k, v in buf.__dict__.items() if k in RING_POINTER_ATTRS}
+
+    def stats(self) -> dict:
+        n = max(self.n_rows, 1)
+        return {"warm_share": self.n_warm / n, "warm_mean_depth": self.depth_sum / n}

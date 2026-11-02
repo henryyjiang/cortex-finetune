@@ -35,6 +35,7 @@ from recipe_utils import (
     reduce_chunk_losses,
     resolve_warmup_steps,
     select_fwd_bwd_path,
+    WarmCarry,
 )
 from dataclasses import dataclass, field
 from jsonargparse import CLI
@@ -411,6 +412,19 @@ class CLISettings:
             # Post-mortem `carrydrop` limb: omit the whole carried read (E and
             # Z columns) on this share of forwards, training only (0 = off).
             carry_dropout=0.0,
+            # v2 (v2_buffer_handoff.md Part B), all typed for jsonargparse:
+            #   v2_pairing           gated_v2 only: 'paired' = one keep/replace
+            #                        score per row over E and Z together,
+            #                        'independent' = one per channel
+            #   z_store_norm_target  Z's twin of e_store_norm_target (0 = off)
+            #   warm_p               B3: share of micro-batches that start from
+            #                        the previous micro-batch's detached memory
+            #                        instead of empty (0 = off; keep < 1, cold
+            #                        rows are the only empty-memory training)
+            #   warm_max_chunks      B3: memory older than this many chunks is
+            #                        reset instead of continued
+            v2_pairing="paired", z_store_norm_target=0.0,
+            warm_p=0.0, warm_max_chunks=56,
             # Z ATTEMPT 2 (J3), cortex_memory/scratchpad.py.  latent_read
             # 'scratch' + latent_encoding 'scratch' is the in-loop scratchpad;
             #   latent_carry_read          False = J3's no-read limb (carry
@@ -550,9 +564,9 @@ class CLISettings:
                     f"checkpoint that carries this flag still works — the graft "
                     f"builds the legacy buffer for the load path.)")
         if self.cortex["prefix_memory"]:
-            assert self.cortex["prefix_memory"] in ("accum", "gated"), (
-                "cortex.prefix_memory must be '', 'accum' or 'gated'; got "
-                f"{self.cortex['prefix_memory']!r}"
+            assert self.cortex["prefix_memory"] in ("accum", "gated", "gated_v2"), (
+                "cortex.prefix_memory must be '', 'accum', 'gated' or 'gated_v2'; "
+                f"got {self.cortex['prefix_memory']!r}"
             )
             assert self.cortex["use_memory"], "cortex.prefix_memory needs use_memory=true"
             assert self.cortex["cross_chunks"] > 1, (
@@ -573,7 +587,27 @@ class CLISettings:
                     f"cross_chunks x accum_vecs "
                     f"({self.cortex['cross_chunks']} x {self.cortex['accum_vecs']})"
                 )
-            if self.cortex["prefix_memory"] == "gated":
+            if self.cortex["prefix_memory"] == "gated_v2":
+                # v2 keeps rows in per-slot-class age order (buffers.py); every
+                # other geometry would break Z's row -> depth map
+                for key, want in (("gate_route", "ring"), ("gate_fill", "grow")):
+                    assert self.cortex[key] == want, (
+                        f"cortex.prefix_memory=gated_v2 needs cortex.{key}={want}; "
+                        f"got {self.cortex[key]!r}")
+                assert int(self.cortex["latent_stride"]) == 1, (
+                    "cortex.prefix_memory=gated_v2 needs latent_stride=1: v2 "
+                    "keeps E and Z on one age order, not J6's split pointers")
+                assert self.cortex["v2_pairing"] in ("paired", "independent"), (
+                    f"cortex.v2_pairing must be 'paired' or 'independent'; got "
+                    f"{self.cortex['v2_pairing']!r}")
+            wp, wn = float(self.cortex["warm_p"]), int(self.cortex["warm_max_chunks"])
+            assert 0.0 <= wp < 1.0, (
+                f"cortex.warm_p ({wp}) must be in [0, 1): rows that start empty "
+                "are the only place the empty-memory case trains")
+            assert wp == 0.0 or wn >= int(self.cortex["cross_chunks"]), (
+                f"cortex.warm_max_chunks ({wn}) < cross_chunks: no row could "
+                "ever start warm")
+            if self.cortex["prefix_memory"] in ("gated", "gated_v2"):
                 for key, allowed in (("gate_route", ("ring", "mix")),
                                      ("gate_norm", ("tanh", "rms", "none")),
                                      ("gate_init", ("zero", "default")),
@@ -638,8 +672,8 @@ class CLISettings:
                 f"a multiple of latent_stride ({_st}), or the last pooling "
                 "window never closes and that chunk's Z is silently dropped.")
         if self.cortex["latent_carry"]:
-            assert self.cortex["prefix_memory"] in ("accum", "gated"), (
-                "cortex.latent_carry needs --cortex.prefix_memory accum|gated. "
+            assert self.cortex["prefix_memory"] in ("accum", "gated", "gated_v2"), (
+                "cortex.latent_carry needs --cortex.prefix_memory accum|gated|gated_v2. "
                 "Z is read by substituting into the CARRIED COLUMNS of s0, so "
                 "without a prefix buffer there are no carried columns: the read "
                 "would be a no-op and the arm would train a write that nothing "
@@ -1278,7 +1312,12 @@ def startup(cfg: CLISettings):
                    "e_store_norm_target",
                    # Post-mortem `carrydrop`.  Training-only in effect, but
                    # persists so the checkpoint records what it trained under.
-                   "carry_dropout"):
+                   "carry_dropout",
+                   # v2.  v2_pairing persists HARDEST: it sets the score heads'
+                   # shapes, so an eval rebuilt at the default cannot load an
+                   # `independent` limb.  The rest record the condition.
+                   "v2_pairing", "z_store_norm_target", "warm_p",
+                   "warm_max_chunks"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -1293,7 +1332,9 @@ def startup(cfg: CLISettings):
                      f",norm={cfg.cortex['gate_norm']}"
                      f",init={cfg.cortex['gate_init']}"
                      f",fill={cfg.cortex['gate_fill']}) "
-                     if cfg.cortex['prefix_memory'] == 'gated' else "")
+                     + (f"v2({cfg.cortex['v2_pairing']}) "
+                        if cfg.cortex['prefix_memory'] == 'gated_v2' else "")
+                     if cfg.cortex['prefix_memory'] in ('gated', 'gated_v2') else "")
                   + (f"latent(Z on, rule={cfg.cortex['latent_depth_rule']}"
                      f",band={cfg.cortex['latent_depth_lo']}.."
                      f"{cfg.cortex['latent_depth_hi']}"
@@ -2056,6 +2097,15 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
     # nothing.  It is held because the diagnostic runs at the wandb log site,
     # which is outside the closure that produced it.
     cortex_diag_state = {"carry": None}
+    # B3 deep-memory warm-up (recipe_utils.WarmCarry): None when warm_p is 0,
+    # so every arm before it runs the chain exactly as it did.
+    if float(cfg.cortex["warm_p"]) > 0 and not cfg.cortex["prefix_memory"]:
+        raise ValueError("--cortex.warm_p carries a prefix buffer's memory across "
+                         "micro-batches; set --cortex.prefix_memory")
+    warm_carry = (WarmCarry(float(cfg.cortex["warm_p"]),
+                            int(cfg.cortex["warm_max_chunks"]),
+                            int(cfg.cortex["cross_chunks"]), seed=cfg.seed)
+                  if float(cfg.cortex["warm_p"]) > 0 else None)
 
     output_details = {
         "return_logits": False,
@@ -2297,6 +2347,10 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         x_chunks = [c.contiguous() for c in torch.chunk(input_ids, n_chunks, dim=1)]
                         y_chunks = [c.contiguous() for c in torch.chunk(labels, n_chunks, dim=1)]
                     m_cross = None
+                    warm_buf = None
+                    if warm_carry is not None:
+                        warm_buf = get_unwrapped_model(model).cortex.prefix
+                        m_cross = warm_carry.start(warm_buf, input_ids.shape[0])
                     chunk_losses = []
                     chunk_tokens = []       # unmasked labels per kept chunk
                     n_ng = n_wg = 0
@@ -2351,6 +2405,8 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                             else:
                                 chunk_losses.append(out["loss"])
                                 chunk_tokens.append(n_valid)
+                    if warm_carry is not None:
+                        warm_carry.end(warm_buf, m_cross)
                     if window_bwd:
                         if cfg.cortex["diag_interval"] and m_cross is not None:
                             cortex_diag_state["carry"] = m_cross.detach()
@@ -2542,6 +2598,8 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         "train/mean_backprop_depth": new_backprop_depth,
                         "train/elapsed_time": elapsed_time_to_log,
                         **{f"train/{k}": v for k,v in agg_metrics.items()},
+                        **({f"train/{k}": v for k, v in warm_carry.stats().items()}
+                           if warm_carry is not None else {}),
                         **wandb_lr_log,
                     }, step=optimizer_step)
 

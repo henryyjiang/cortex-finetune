@@ -37,7 +37,7 @@ in the project root; README.md is the current source of record.
 """
 from __future__ import annotations
 
-from .buffers import PrefixAccumBuffer, PrefixGatedBuffer
+from .buffers import PrefixAccumBuffer, PrefixGatedBuffer, PrefixGatedBufferV2
 from .legacy import LSTMBuffer, DirectCCoT, AccumCCoT, GatedAccumBuffer
 from .chunking import random_chunk_sizes, detach_old_vecs, ablate_vec_slice
 from .lti import LTIInjection, _init_dt_bias
@@ -53,6 +53,7 @@ from .eos import compute_eos_masks, apply_write_reset, apply_valid_write
 __all__ = [
     "PrefixAccumBuffer",
     "PrefixGatedBuffer",
+    "PrefixGatedBufferV2",
     "LSTMBuffer",
     "DirectCCoT",
     "AccumCCoT",

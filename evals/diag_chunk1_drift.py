@@ -98,6 +98,7 @@ from evals.model_utils import (_unwrap, load_checkpoint,  # noqa: E402
                                parse_config_overrides, to_num_steps)
 from cortex_memory.health import (carry_health, chance_margin,  # noqa: E402
                                   expected_ring_rows)
+from cortex_memory.buffers import PrefixGatedBufferV2  # noqa: E402
 
 N_POS_BINS = 8
 
@@ -524,6 +525,7 @@ def part_drift(model, buf, ds, args, num_steps, device, hidden, gate_mode=None):
           f"each book's windows in order, as prepare_pg19_dataset.py writes it.")
     n_slots = int(getattr(buf, "n_slots", getattr(buf, "max_vecs", 64)))
     n_vec = int(buf.n_vec)
+    is_v2 = isinstance(buf, PrefixGatedBufferV2)
     per_chunk = [dict() for _ in range(args.drift_chunks)]
     keys_acc = {}
 
@@ -546,6 +548,8 @@ def part_drift(model, buf, ds, args, num_steps, device, hidden, gate_mode=None):
             def spy(state, new_vecs, new_latent=None):
                 out = real_merge(state, new_vecs, new_latent)
                 seen["before"], seen["after"] = state, out
+                if is_v2:   # the no-carry side forward's merge clears it
+                    seen["v2_rates"] = list(buf.last_replace_rate)
                 return out
 
             sd = seed_for(args.seed + 99991 * s_i, c)
@@ -575,7 +579,15 @@ def part_drift(model, buf, ds, args, num_steps, device, hidden, gate_mode=None):
                           "z_row_norm", "z_eff_rank_pr", "z_centred_cos_mean",
                           "z_over_e_norm"):
                     add(c, k, h.get(k))
-            if "after" in seen:
+            if is_v2:
+                # v2 keeps rows in age order, so the ring rule and its turnover
+                # do not apply; its own turnover is the share of writes kept
+                rates = seen.get("v2_rates", [])
+                names = (["replace_rate"] if len(rates) == 1
+                         else ["e_replace_rate", "z_replace_rate"])
+                for k, v in zip(names, rates):
+                    add(c, k, v)
+            elif "after" in seen:
                 # chunk c (0-based) is the c-th merge the ring has run
                 rows = expected_ring_rows(c, n_vec, n_slots)
                 tv = turnover(seen["before"], seen["after"], rows, hidden)
@@ -606,8 +618,10 @@ def part_drift(model, buf, ds, args, num_steps, device, hidden, gate_mode=None):
 
     print(f"\n{'=' * 78}\nDRIFT  ({len(streams)} books x {args.drift_chunks} chunks)\n{'=' * 78}")
     cols = ["nll_carry", "nll_nocarry", "carry_gain", "entropy", "first_tok_entropy",
-            "e_row_norm", "e_eff_rank_pr", "z_row_norm", "z_eff_rank_pr",
-            "e_turnover", "z_turnover"]
+            "e_row_norm", "e_eff_rank_pr", "z_row_norm", "z_eff_rank_pr"]
+    cols += ([k for k in ("replace_rate", "e_replace_rate", "z_replace_rate")
+              if any(k in r for r in out["per_chunk"])] if is_v2
+             else ["e_turnover", "z_turnover"])
     print("  chunk laps " + " ".join(f"{k[:11]:>11}" for k in cols))
     for c in [1, 2, 3, 4, 5, 8, 12, 16, 24, 32, 48, 64, 96, 128, 160, 202]:
         if c > args.drift_chunks:
@@ -1034,6 +1048,11 @@ def main() -> int:
     depth_parts = set(parts) - {"chunk1", "drift"}
     if depth_parts and not has_mem:
         print(f"FAILED: {sorted(depth_parts)} need a memory arm; this model has no buffer.")
+        return 2
+    ring_only = {"forced", "contents"} & set(parts)
+    if ring_only and isinstance(buf, PrefixGatedBufferV2):
+        print(f"FAILED: {sorted(ring_only)} assume the ring's gate / row order; "
+              f"this is gated_v2 (use drift / gates / restart / recency).")
         return 2
     if "chunk1" in parts:
         report["chunk1"] = part_chunk1(model, ds, args, num_steps, device, has_mem, vocab)
