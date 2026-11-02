@@ -1,0 +1,187 @@
+---------------------------------------
+Begin Slurm Prolog: Nov-02-2026 08:30:28
+Job ID:    14994033
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_probe
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+    znorm_target 78.9 confirmed against the diag at step 38100
+=== pm_probe | cortex @ 38146 | parts interp | cortex-5b/cortex-final/checkpoint_38146 -> eval_results/pm/cortex-final/step_38146_T8 ===
+NVIDIA H200, 143771 MiB
+    commit: 7a95190
+
+--- [cortex@38146] memory interp (B,F)  (08:30:30)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '78.9'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.51s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.29it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_38146/chkpt.pt: 0 missing / 0 unexpected keys
+[rows] 24 rows from 24 distinct books (50 books, 1009 usable rows, 50 skipped as short/padded); row_select=spread
+[rare] 344 frequent forms dropped (alphabetic form present in < 10% of the 192 sampled chunks (document frequency over the rows' and donors' chunks)); most frequent: ['a', 'to', 'in', 'of', 'and', 'the', 'it', 'that', 'for', 'with', 'as', 'on']
+  row 1/24 (ds 1): intact 2.7507 chain 1.3s  B 50.3s  F 7.9s
+  row 2/24 (ds 48): intact 2.3573 chain 1.1s  B 49.3s  F 7.9s
+  row 3/24 (ds 86): intact 2.8424 chain 1.1s  B 49.4s  F 7.9s
+  row 4/24 (ds 206): intact 2.2985 chain 1.1s  B 49.4s  F 7.9s
+  row 5/24 (ds 274): intact 2.1194 chain 1.1s  B 49.4s  F 7.9s
+  row 6/24 (ds 301): intact 2.1972 chain 1.1s  B 49.4s  F 7.9s
+  row 7/24 (ds 335): intact 2.4776 chain 1.1s  B 49.4s  F 7.9s
+  row 8/24 (ds 361): intact 2.9568 chain 1.1s  B 49.4s  F 7.9s
+  row 9/24 (ds 378): intact 2.5677 chain 1.1s  B 49.3s  F 7.9s
+  row 10/24 (ds 407): intact 2.5195 chain 1.1s  B 49.3s  F 7.9s
+  row 11/24 (ds 427): intact 2.4346 chain 1.1s  B 49.3s  F 7.9s
+  row 12/24 (ds 479): intact 2.3843 chain 1.1s  B 49.3s  F 7.9s
+  row 13/24 (ds 543): intact 2.2435 chain 1.1s  B 49.3s  F 7.9s
+  row 14/24 (ds 589): intact 2.6336 chain 1.1s  B 49.3s  F 7.9s
+  row 15/24 (ds 647): intact 2.5043 chain 1.1s  B 49.3s  F 7.9s
+  row 16/24 (ds 706): intact 2.5778 chain 1.1s  B 49.3s  F 7.9s
+  row 17/24 (ds 752): intact 2.6970 chain 1.1s  B 49.3s  F 7.9s
+  row 18/24 (ds 789): intact 2.1991 chain 1.1s  B 49.3s  F 7.9s
+  row 19/24 (ds 807): intact 1.7529 chain 1.1s  B 49.3s  F 11.1s
+  row 20/24 (ds 838): intact 2.7422 chain 1.1s  B 49.3s  F 7.9s
+  row 21/24 (ds 862): intact 2.3118 chain 1.1s  B 49.3s  F 8.0s
+  row 22/24 (ds 897): intact 2.4219 chain 1.1s  B 49.3s  F 8.0s
+  row 23/24 (ds 931): intact 2.3883 chain 1.1s  B 49.3s  F 8.0s
+  row 24/24 (ds 971): intact 2.4837 chain 1.1s  B 49.3s  F 8.0s
+
+============================================================================================
+memory interp -- cortex-5b/cortex-final/checkpoint_38146  rows=24 books=24 donor_books=[25, 27, 29, 31, 33, 35, 37, 39, 41, 43, 45, 47, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]  fp32
+============================================================================================
+intact NLL chunks 2..n 2.4526  chunk 1 2.6182  chance 11.5164
+checks: transparency=True replica_bit_identical=True recompute_rel_err_max=1.02e-06 (neg control min 3.73e-01) over 112 calls; block_nothing_bitwise_rows=24 fidelity=3.00e-07 block_all_differs=True ring_merges_checked=392
+layout chunk 2: [E 0..15 | Z 16..31 | tokens 32..543 | summary 544..559]; positions 0 (carried), 1..512, 513..528  |E|=83.0 |Z|=78.9 |tok|=4.24
+layout chunk 8: [E 0..63 | Z 64..127 | tokens 128..639 | summary 640..655]; positions 0 (carried), 1..512, 513..528  |E|=81.8 |Z|=78.9 |tok|=4.68
+
+B. attention blocking, real->carried, delta nats/token (intact 2.4526)
+  site                     delta                  95% CI   n
+  prelude.0              0.00416   [0.00314, 0.00519]  24 *
+  prelude.1              0.01431   [0.01247, 0.01624]  24 *
+  prelude.2              0.01356   [0.01212, 0.01515]  24 *
+  prelude.3              0.00467   [0.00325, 0.00633]  24 *
+  core.0@all_t           0.02510   [0.02309, 0.02720]  24 *
+  core.1@all_t           0.10010   [0.09508, 0.10515]  24 *
+  core.2@all_t           0.02549   [0.02275, 0.02847]  24 *
+  core.3@all_t           0.01545   [0.01342, 0.01764]  24 *
+  core.4@all_t           0.02746   [0.02488, 0.03022]  24 *
+  core.5@all_t           0.03787   [0.03358, 0.04272]  24 *
+  iter.t0@all_core       0.00041   [0.00006, 0.00083]  24 *
+  iter.t1@all_core       0.00065   [0.00009, 0.00116]  24 *
+  iter.t2@all_core       0.00077   [0.00029, 0.00127]  24 *
+  iter.t3@all_core       0.00161   [0.00105, 0.00218]  24 *
+  iter.t4@all_core       0.01920   [0.01713, 0.02143]  24 *
+  iter.t5@all_core       0.03141   [0.02917, 0.03361]  24 *
+  iter.t6@all_core       0.03219   [0.02898, 0.03606]  24 *
+  iter.t7@all_core       0.07859   [0.07345, 0.08426]  24 *
+  coda.0                 0.01991   [0.01657, 0.02380]  24 *
+  coda.1                 0.02098   [0.01896, 0.02311]  24 *
+  coda.2                 0.02499   [0.02165, 0.02898]  24 *
+  coda.3                 0.01441   [0.01226, 0.01677]  24 *
+  prelude.0[Z]           0.00306   [0.00235, 0.00380]  24 *
+  prelude.1[Z]           0.01130   [0.00929, 0.01350]  24 *
+  prelude.2[Z]           0.00216   [0.00148, 0.00286]  24 *
+  prelude.3[Z]           0.00056   [0.00024, 0.00094]  24 *
+  core.0@all_t[Z]        0.03637   [0.03399, 0.03877]  24 *
+  core.1@all_t[Z]        0.00179   [0.00130, 0.00229]  24 *
+  core.2@all_t[Z]        0.00283   [0.00202, 0.00360]  24 *
+  core.3@all_t[Z]        0.00168   [0.00117, 0.00213]  24 *
+  core.4@all_t[Z]        0.00642   [0.00530, 0.00743]  24 *
+  core.5@all_t[Z]        0.00216   [0.00170, 0.00254]  24 *
+  iter.t0@all_core[Z]    0.00024   [0.00004, 0.00046]  24 *
+  iter.t1@all_core[Z]    0.00010   [-0.00016, 0.00036]  24
+  iter.t2@all_core[Z]    0.00011   [-0.00010, 0.00032]  24
+  iter.t3@all_core[Z]    0.00005   [-0.00024, 0.00034]  24
+  iter.t4@all_core[Z]    0.00004   [-0.00027, 0.00035]  24
+  iter.t5@all_core[Z]    0.00072   [0.00030, 0.00115]  24 *
+  iter.t6@all_core[Z]    0.02020   [0.01855, 0.02188]  24 *
+  iter.t7@all_core[Z]    0.01152   [0.01053, 0.01245]  24 *
+  coda.0[Z]              0.00092   [0.00058, 0.00125]  24 *
+  coda.1[Z]              0.00095   [0.00062, 0.00126]  24 *
+  coda.2[Z]              0.00097   [0.00048, 0.00168]  24 *
+  coda.3[Z]              0.00096   [0.00056, 0.00141]  24 *
+  all                    0.17223   [0.15974, 0.18523]  24 *
+  all_E_only             0.12852   [0.11524, 0.14362]  24 *
+  all_Z_only             0.07084   [0.06697, 0.07491]  24 *
+  loop[Z]                0.04239   [0.03885, 0.04595]  24 *
+  all_but_loop[Z]        0.02141   [0.01928, 0.02363]  24 *
+  all_but_coda[Z]        0.05955   [0.05607, 0.06295]  24 *
+  Z readable at ONE place only (recovered vs all_Z_only):
+    loop    +0.04943   [+0.04639, +0.05250]  share 0.70
+    coda    +0.01129   [+0.01002, +0.01277]  share 0.16
+
+F. topic steering: read chunk q with the DONOR's carry instead of its own (nats, log-mass on each word set)
+  steer_lift (don - ctl)       +0.1617   [+0.1374, +0.1858]  24 *
+  own_drop   (own - ctl)       -0.2212   [-0.2488, -0.1906]  24 *
+  delta don                    +0.4644   [+0.4179, +0.5144]  24 *
+  delta own                    +0.0815   [+0.0395, +0.1234]  24 *
+  delta ctl                    +0.3027   [+0.2611, +0.3483]  24 *
+  steer_lift by chunk q=2..n: +0.195 +0.153 +0.209 +0.155 +0.142 +0.138 +0.139   mean set sizes (forms): own 290 don 309 ctl 312
+  Z-only swap (own E, donor Z), Z readable everywhere / only in the loop / only in the coda:
+    steer_lift Z               +0.0836   [+0.0714, +0.0961]  24 *
+    own_drop Z                 -0.1008   [-0.1212, -0.0799]  24 *
+    steer_lift Z@loop          +0.0441   [+0.0368, +0.0515]  24 *
+    own_drop Z@loop            -0.0604   [-0.0738, -0.0463]  24 *
+    steer_lift Z@coda          +0.0320   [+0.0255, +0.0389]  24 *
+    own_drop Z@coda            -0.0368   [-0.0447, -0.0288]  24 *
+
+  steer demo (illustration only: one passage pair, one neutral passage; delta = mean log-prob over the neutral passage under the royalty carry minus under the sea carry, >= 4-letter tokens)
+    royalty carry > sea carry: royal +3.87, royalty +3.59, monarch +3.58, lords +3.52, princ +3.46, knight +3.46, throne +3.46, king +3.44, knights +3.29, princes +3.28, honor +3.24, kings +3.23, armor +3.22, palace +3.16, court +3.16, noble +3.08, queen +3.07, duke +3.06, honored +3.01, prince +2.97
+    sea carry > royalty carry: shore +3.27, sail +2.87, sailor +2.86, sailors +2.80, ship +2.70, cargo +2.69, marine +2.68, seaw +2.67, crew +2.65, Sail +2.64, Captain +2.59, Coast +2.59, reef +2.57, boats +2.51, aboard +2.50, sails +2.49, boat +2.46, beach +2.44, submarine +2.43, Cape +2.40
+    Z-only swap, theme_gap (full carry +5.947):
+      Z      +3.083  royalty Z > sea Z: royal +2.28, monarch +2.24, lords +2.24, noble +2.19, throne +2.18, royalty +2.17, princ +2.16, knight +2.12, thereof +1.98, court +1.98
+      Z@loop +1.232  royalty Z > sea Z: thereof +1.47, grac +1.40, vener +1.38, publicly +1.37, unto +1.33, wherein +1.33, pertaining +1.30, governmental +1.28, noble +1.26, therein +1.24
+      Z@coda +1.349  royalty Z > sea Z: royal +0.70, throne +0.70, monarch +0.69, lords +0.68, royalty +0.67, knights +0.66, knight +0.66, princ +0.66, coron +0.65, king +0.64
+
+timing s/row: F 8.1  G     -     steer_demo 0.8s
+
+timing s/row: chain(+A,C capture) 1.1 (excl row0 1.1)  bare chain(row0) 2.2  B 49.3 (excl row0 49.3)  D     -     E     -     load 314s  peak GPU 6.48 GiB (load 5.23)
+
+wrote eval_results/pm/cortex-final/step_38146_T8/interp_zloop/results.json  (1416s)
+
+=== pm_probe cortex@38146 finished rc=0 (08:59:44) -> eval_results/pm/cortex-final/step_38146_T8 ===
+---------------------------------------
+Begin Slurm Epilog: Nov-02-2026 08:59:44
+Job ID:        14994033
+Array Job ID:  14993859_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_probe
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=03:54:48,vmem=0,walltime=00:29:21,mem=28777376K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-23-0
+---------------------------------------

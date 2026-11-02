@@ -1,0 +1,101 @@
+---------------------------------------
+Begin Slurm Prolog: Oct-31-2026 13:19:12
+Job ID:    14824695
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_mech
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+    znorm_target 78.9 confirmed against the diag at step 38100
+=== pm_mech | cortex @ 38146 | cortex-5b/cortex-final/checkpoint_38146 -> eval_results/pm/cortex-final/step_38146_T8 ===
+NVIDIA H200, 143771 MiB
+    commit: f8d14cf
+
+--- [cortex@38146] drift, stored E rescaled to 82  (13:19:25)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '78.9'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_store_norm_target: '<absent>' -> 82  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.44s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.35it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-5b/cortex-final/checkpoint_38146/chkpt.pt: 0 missing / 0 unexpected keys
+[drift] 6 single-book streams of 202 chunks (rows [4, 34, 97, 212, 259, 316]).  ASSUMES the pack keeps each book's windows in order, as prepare_pg19_dataset.py writes it.
+  drift stream 1/6 done
+  drift stream 2/6 done
+  drift stream 3/6 done
+  drift stream 4/6 done
+  drift stream 5/6 done
+  drift stream 6/6 done
+
+==============================================================================
+DRIFT  (6 books x 202 chunks)
+==============================================================================
+  chunk laps   nll_carry nll_nocarry  carry_gain     entropy first_tok_e  e_row_norm e_eff_rank_  z_row_norm z_eff_rank_  e_turnover  z_turnover
+      1  0.0      1.8298      1.8298      0.0000      1.9288      2.3237           -           -           -           -           -           -
+      2 0.25      2.1312      2.2705      0.1393      2.2111      2.9332     82.0000      2.9650     20.9905      1.6160           -           -
+      3  0.5      2.0436      2.2026      0.1591      2.1380      2.4286     82.0000      3.8993     18.2961      2.5413           -           -
+      4 0.75      2.0447      2.2025      0.1578      2.0949      1.2499     82.0000      4.1312     17.4150      3.5723           -           -
+      5  1.0      1.8861      2.0586      0.1725      1.9933      2.1262     82.0000      4.1582     16.9242      4.5924      0.7770      0.9400
+      8 1.75      2.4593      2.5815      0.1222      2.5591      2.8106     82.0000      7.0730     20.8346      6.1021      0.6920      0.8418
+     12 2.75      2.6292      2.7240      0.0949      2.6461      3.3324     82.0000      5.0923     27.0788      4.3397      0.6498      0.5811
+     16 3.75      2.6650      2.7437      0.0787      2.5957      5.1079     82.0000      5.3480     32.5366      4.0868      0.6085      0.6061
+     24 5.75      2.5903      2.6729      0.0826      2.6983      3.8545     82.0000      3.8615     44.0161      3.2019      0.5780      0.3017
+     32 7.75      2.5811      2.5651     -0.0160      2.7150      4.8499     82.0000      3.7867     54.3896      2.8190      0.6079      0.2966
+     48 11.75      3.1538      2.8390     -0.3147      3.3046      5.0666     82.0000      3.8555     71.6541      2.3343      0.5621      0.1786
+     64 15.75      3.5969      2.8061     -0.7908      3.3698      4.8536     82.0000      4.5307     84.8857      2.0424      0.5580      0.1320
+     96 23.75      4.1723      2.8421     -1.3302      3.8230      5.7404     82.0000      4.0644    107.8416      2.0990      0.4654      0.0628
+    128 31.75      4.2296      2.6938     -1.5358      3.7627      5.3396     82.0000      3.6633    130.2005      2.1688      0.4417      0.0418
+    160 39.75      4.4967      2.9473     -1.5493      4.0414      5.2926     82.0000      3.1178    149.9495      2.0946      0.4003      0.0314
+    202 50.25      4.5036      2.8187     -1.6849      4.0075      5.6799     82.0000      2.9358    173.0909      1.9553      0.3790      0.0232
+
+  first chunk where the carry HURTS (carry_gain < 0): 30
+
+wrote eval_results/pm/cortex-final/step_38146_T8/drift_estore82/results.json
+
+=== pm_mech cortex@38146 finished rc=0  (13:30:54) -> eval_results/pm/cortex-final/step_38146_T8 ===
+---------------------------------------
+Begin Slurm Epilog: Oct-31-2026 13:30:54
+Job ID:        14824695
+Array Job ID:  14824695_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_mech
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=01:34:56,vmem=0,walltime=00:11:52,mem=29750320K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-2-0
+---------------------------------------
