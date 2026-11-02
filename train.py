@@ -2568,6 +2568,15 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         getattr(get_unwrapped_model(model), "cortex", None),
                         cortex_diag_state["carry"])
                     if cortex_diag_row:
+                        # measured, so pm_limbs' gate can prove v2 / warm-up ran
+                        if warm_carry is not None:
+                            cortex_diag_row.update(warm_carry.stats())
+                        _rates = getattr(getattr(get_unwrapped_model(model), "cortex", None),
+                                         "prefix", None)
+                        _rates = getattr(_rates, "last_replace_rate", None)
+                        if _rates:
+                            cortex_diag_row["v2_replace_rate"] = float(
+                                sum(float(r) for r in _rates) / len(_rates))
                         cortex_diag_row["step"] = optimizer_step
                         cortex_diag_row["loss"] = float(loss.item())
                         cortex_diag_row["grad_norm"] = float(total_norm)

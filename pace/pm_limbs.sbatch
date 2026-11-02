@@ -20,6 +20,25 @@
 #     [0] both  [1] eonly  [2] zonly  [3] edrop  [4] recall  [5] recall_ctrl
 #   sbatch --array=6 pace/pm_limbs.sbatch      [6] lownorm (added 2026-10-29)
 #   sbatch --array=7 pace/pm_limbs.sbatch      [7] carrydrop (added 2026-10-30)
+#   sbatch --array=8 pace/pm_limbs.sbatch      [8] v2capwarm (added 2026-11-02)
+#
+# v2capwarm (2026-11-02, v2_buffer_handoff.md Part B): memory turns harmful
+# from chunk ~27 on 202-chunk books, and deep E rows decode to one input-
+# independent vocabulary.  Three changes at once, read against `both`:
+#   --cortex.prefix_memory gated_v2   hard keep/replace: a stored row is kept
+#                                     bit-identical or replaced, never blended
+#                                     (paired: E and Z move together)
+#   --cortex.e_store_norm_target E_CAP  stored E pinned at its trained-depth
+#                                     length (82.1-82.8 at chunks 2-8, PG-19
+#                                     drift on 38,146), now IN TRAINING
+#   --cortex.warm_p WARM_P            each micro-batch continues the previous
+#                                     one's detached memory with prob WARM_P
+#                                     (up to WARM_MAX chunks of history), so
+#                                     training sees chunks 9..64 for free
+# At WARM_P 0.75, ~28% of rows still start empty (resets at the cap included;
+# start-depth share pi_0 p^k, k = 0..7 laps of 8 chunks) and ~24% start 32+ deep.
+# v2 starts as FIFO, which on the local smoke cost ~0.2 nats at chunk 8 vs
+# the trained blend: a null after 2,000 updates at x0.1 LR is weak evidence.
 #
 # carrydrop (2026-10-30): the battery left the no-carry penalty (+0.080 on
 # chunk 1 AND on chunks 2-8 run without carry; the whole MC gap) standing as
@@ -136,10 +155,10 @@ source pace/final_5b_common.sh
 OUT_DIR=${OUT_DIR:-cortex-pm}         # its own wandb project and scratch dir
 final5b_shared
 
-LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm carrydrop)
+LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm carrydrop v2capwarm)
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 LIMB=${LIMBS[$IDX]}
-if [ -z "$LIMB" ]; then echo "no limb at index $IDX (use --array=0-7)"; exit 0; fi
+if [ -z "$LIMB" ]; then echo "no limb at index $IDX (use --array=0-8)"; exit 0; fi
 
 PARENT_STEP=${PARENT_STEP:-38146}
 CELL_STEPS=${CELL_STEPS:-2000}
@@ -151,6 +170,9 @@ SEED=${LIMB_SEED:-75}
 ZNORM_TARGET=${ZNORM_TARGET:-78.9}
 LOWNORM_TARGET=${LOWNORM_TARGET:-4.5}
 CARRYDROP_P=${CARRYDROP_P:-0.5}
+E_CAP=${E_CAP:-82}
+WARM_P=${WARM_P:-0.75}
+WARM_MAX=${WARM_MAX:-56}
 # lownorm moves Z's target too, so ARM_ARGS below carries ONE znorm flag.
 [ "$LIMB" = "lownorm" ] && ZNORM_TARGET=$LOWNORM_TARGET
 RECALL_DATA=${RECALL_DATA:-data/pg19fw50_recall_train_len4096}
@@ -219,6 +241,7 @@ else
         edrop) READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.25" ;;
         lownorm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.e_read_norm_target $LOWNORM_TARGET" ;;
         carrydrop) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.carry_dropout $CARRYDROP_P" ;;
+        v2capwarm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.prefix_memory gated_v2 --cortex.v2_pairing paired --cortex.e_store_norm_target $E_CAP --cortex.warm_p $WARM_P --cortex.warm_max_chunks $WARM_MAX" ;;
         *)     READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.0" ;;
     esac
     ARM_ARGS="$ARM_ARGS $READ"
@@ -280,9 +303,10 @@ echo "=== limb $LIMB finished rc=$RC ==="
 # ===== THE GATE: did this limb run ITS OWN condition? ======================
 # Reads the MEASURED diagnostics, never the flags (the e_carry_read lesson).
 # Every check is j5_joint.sbatch's, re-keyed for these limbs.
-python - "$OUT_DIR/$RUN_NAME/cortex_diag.jsonl" "$LIMB" "$ZNORM_TARGET" "$CARRYDROP_P" <<'GATE'
+python - "$OUT_DIR/$RUN_NAME/cortex_diag.jsonl" "$LIMB" "$ZNORM_TARGET" "$CARRYDROP_P"     "$E_CAP" "$WARM_P" <<'GATE'
 import json, sys
 path, limb, target, cd_p = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4])
+e_cap, warm_p = float(sys.argv[5]), float(sys.argv[6])
 try:
     rows = [json.loads(l) for l in open(path) if l.strip()]
 except FileNotFoundError:
@@ -360,6 +384,27 @@ if limb == "carrydrop":
             fails.append("carry_dropout configured but no read was ever omitted")
 elif cdv and max(cdv) != 0.0:
     fails.append(f"z_carry_dropout {max(cdv)} on limb {limb}, which never drops the carry")
+rr, ws = vals("v2_replace_rate"), vals("warm_share")
+if limb == "v2capwarm":
+    if not rr:
+        fails.append("v2_replace_rate absent: the gated_v2 merge never ran")
+    else:
+        notes.append(f"v2_replace_rate {rr[0]:.3f} -> {rr[-1]:.3f} (1.0 = FIFO)")
+    if not ws or ws[-1] <= 0:
+        fails.append(f"warm_share {ws[-1:] or None}: no row ever started warm")
+    else:
+        # cumulative share, so the last record is the run's; geometric with resets
+        # at the cap, so it sits a little under warm_p
+        notes.append(f"warm_share {ws[-1]:.3f} (warm_p {warm_p}), mean start depth "
+                     f"{vals('warm_mean_depth')[-1]:.1f} chunks")
+        if not 0.5 * warm_p <= ws[-1] <= warm_p + 0.05:
+            fails.append(f"warm_share {ws[-1]:.3f} far from warm_p {warm_p}")
+    ec = vals("z_e_carried_norm")
+    if ec and max(abs(v - e_cap) for v in ec) > 0.02 * e_cap:
+        fails.append(f"carried E norm {min(ec):.2f}..{max(ec):.2f}, expected {e_cap}: "
+                     "e_store_norm_target never reached the training path")
+elif rr or ws:
+    fails.append(f"limb {limb} logged v2/warm-up diagnostics it should not have")
 en = vals("z_e_carried_norm")
 if en:
     m = sum(en) / len(en)

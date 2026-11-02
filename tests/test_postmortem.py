@@ -141,7 +141,7 @@ def test_lownorm_moves_both_channels_and_is_read_as_itself():
     """A lownorm limb that lost either flag would train (or be scored as) a
     half-rescaled carry under the limb's name."""
     s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
-    assert "LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm carrydrop)" in s
+    assert "LIMBS=(both eonly zonly edrop recall recall_ctrl lownorm carrydrop v2capwarm)" in s
     assert '[ "$LIMB" = "lownorm" ] && ZNORM_TARGET=$LOWNORM_TARGET' in s
     assert "--cortex.e_read_norm_target $LOWNORM_TARGET" in s
     # the switch must precede the ARM_ARGS line that consumes ZNORM_TARGET
@@ -168,3 +168,18 @@ def test_carrydrop_trains_its_flag_and_is_read_against_both():
     limbs = re.search(r"^LIMBS=\((.*)\)$", r, re.M).group(1).split()
     assert limbs.index("carrydrop") == 9 and limbs.index("both") == 0
     assert '[ "$LIMB" = "carrydrop" ]; then\n    step "MC suite' in r
+
+
+def test_v2capwarm_trains_all_three_changes_and_its_gate_checks_them():
+    """v2capwarm = gated_v2 (paired) + the E store cap + the warm-up, appended
+    on its READ line so they win over the shared ARM_ARGS; the gate must read
+    each one back from the measured diagnostics."""
+    s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
+    line = re.search(r"^\s*v2capwarm\) READ=\"(.*)\" ;;$", s, re.M).group(1)
+    for flag in ("--cortex.prefix_memory gated_v2", "--cortex.v2_pairing paired",
+                 "--cortex.e_store_norm_target $E_CAP", "--cortex.warm_p $WARM_P",
+                 "--cortex.warm_max_chunks $WARM_MAX"):
+        assert flag in line, flag
+    assert "E_CAP=${E_CAP:-82}" in s and "WARM_P=${WARM_P:-0.75}" in s
+    for key in ('vals("v2_replace_rate")', 'vals("warm_share")', "e_store_norm_target never"):
+        assert key in s, key
