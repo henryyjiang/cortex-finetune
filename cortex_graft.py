@@ -896,8 +896,9 @@ class CortexMemory(nn.Module):
             # stops a configuration where the gate never fires.  gated_v2 keeps
             # the gate's parameters (unused) so a 38,146 overlay loads with no
             # unexpected keys; only its score heads start fresh.
-            v2 = {} if pmode == "gated" else {"pairing": str(
-                getattr(config, "v2_pairing", "paired") or "paired")}
+            v2 = {} if pmode == "gated" else {
+                "pairing": str(getattr(config, "v2_pairing", "paired") or "paired"),
+                "age_prior_init": float(getattr(config, "v2_age_prior", 1.0))}
             self.prefix = (PrefixGatedBuffer if pmode == "gated"
                            else PrefixGatedBufferV2)(
                 D, n_vec, **v2,

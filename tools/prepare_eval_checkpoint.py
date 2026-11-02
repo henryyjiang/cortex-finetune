@@ -115,7 +115,8 @@ CORTEX_FLAGS = ("use_memory", "memory_slots", "memory_slots_iter", "memory_heads
                 # v2: v2_pairing sets the score heads' shapes (an eval at the
                 # default cannot load an `independent` limb); the Z cap is the
                 # stored state; warm_* record the training condition.
-                "v2_pairing", "z_store_norm_target", "warm_p", "warm_max_chunks",
+                "v2_pairing", "v2_age_prior", "z_store_norm_target", "warm_p",
+                "warm_max_chunks",
                 "h_T_proj", "lora_rank", "lora_alpha",
                 "mean_recurrence", "mean_backprop_depth")
 

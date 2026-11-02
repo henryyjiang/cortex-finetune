@@ -128,7 +128,7 @@ def test_apply_gate_init_resets_the_score_and_the_age_prior():
         v2.age_prior.fill_(-3.0)
     v2.apply_gate_init()
     assert all(float(h.weight.abs().sum()) == 0 for h in v2.score_heads)
-    assert torch.equal(v2.age_prior, torch.full_like(v2.age_prior, v2.AGE_PRIOR_INIT))
+    assert torch.equal(v2.age_prior, torch.full_like(v2.age_prior, v2.age_prior_init))
 
 
 def test_v2_refuses_geometries_it_cannot_keep_in_order():
@@ -190,7 +190,7 @@ def test_v2_chain_trains_and_the_reset_reapplies_its_init():
         buf.age_prior.fill_(9.0)
     reset_cortex_graft_init(m)
     assert float(buf.score_heads[0].weight.abs().sum()) == 0
-    assert float(buf.age_prior[0]) == buf.AGE_PRIOR_INIT
+    assert float(buf.age_prior[0]) == buf.age_prior_init
 
 
 def test_z_store_norm_target_pins_the_stored_z_rows():
@@ -243,3 +243,22 @@ def test_warm_carry_resets_past_max_chunks_and_counts_the_share():
     assert s["warm_mean_depth"] == pytest.approx(48 / 7)
     with pytest.raises(ValueError):
         WarmCarry(1.0, 56, 8)
+
+
+def test_a_small_age_prior_is_still_fifo_at_init_and_the_spread_is_logged():
+    small = PrefixGatedBufferV2(D, n_vec=W, n_slots=K, carries_latent=True,
+                                age_prior_init=0.1)
+    ref = _v2()
+    sa = sb = None
+    for e, z in _writes(9, seed=11):
+        sa, sb = small.merge(sa, e, z), ref.merge(sb, e, z)
+    assert torch.equal(sa, sb)
+    assert float(small.age_prior[0]) == pytest.approx(0.1)
+    assert [float(x) for x in small.last_learned_over_age] == [0.0]   # zero head
+    big = _v2(random_heads=True)
+    st = None
+    for e, z in _writes(9, seed=11):
+        st = big.merge(st, e, z)
+    assert float(big.last_learned_over_age[0]) > 0
+    with pytest.raises(ValueError, match="v2_age_prior"):
+        PrefixGatedBufferV2(D, n_vec=W, n_slots=K, age_prior_init=0.0)

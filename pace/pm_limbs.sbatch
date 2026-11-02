@@ -173,6 +173,11 @@ CARRYDROP_P=${CARRYDROP_P:-0.5}
 E_CAP=${E_CAP:-82}
 WARM_P=${WARM_P:-0.75}
 WARM_MAX=${WARM_MAX:-56}
+V2_AGE_PRIOR=${V2_AGE_PRIOR:-1.0}
+# pace/v2_long.sbatch reuses this file for a wall-limited run: it sets
+# LIMB_SAVE_INTERVAL (resumable every 2 x) and, on later links, RESUME_PATH.
+LIMB_SAVE_INTERVAL=${LIMB_SAVE_INTERVAL:--1}   # not SAVE_INTERVAL: final5b_shared defaults that to 300
+RESUME_PATH=${RESUME_PATH:-}
 # lownorm moves Z's target too, so ARM_ARGS below carries ONE znorm flag.
 [ "$LIMB" = "lownorm" ] && ZNORM_TARGET=$LOWNORM_TARGET
 RECALL_DATA=${RECALL_DATA:-data/pg19fw50_recall_train_len4096}
@@ -197,6 +202,21 @@ RUN_NAME=pm-${LIMB}${RUN_SUFFIX:-}
 [ -d "$DATA_PATH" ] || { echo "ERROR: no such pack: $DATA_PATH"
     [ "$DATA_PATH" = "$RECALL_DATA" ] && echo "  build it first: bash pace/pm_prep_packs.sh"
     exit 1; }
+# Branch from the parent on the first link; a later link resumes this run
+# (optimizer, the fresh schedule, data cursor and step all restored).
+CHAIN="--branch_path $BRANCH_PATH --ignore_past_scheduler true"
+if [ -n "$RESUME_PATH" ]; then
+    [ -f "$RESUME_PATH/chkpt.pt" ] || { echo "ERROR: no chkpt.pt under RESUME_PATH=$RESUME_PATH"; exit 1; }
+    case "$RESUME_PATH" in
+        "$OUT_DIR/$RUN_NAME"/checkpoint_*) ;;
+        *) echo "ERROR: RESUME_PATH=$RESUME_PATH is not a checkpoint of $OUT_DIR/$RUN_NAME"; exit 1 ;;
+    esac
+    CHAIN="--resume_path $RESUME_PATH"
+fi
+if [ -n "${WALL_LIMITED:-}" ] && [ -z "$RESUME_PATH" ] && ls -d "$OUT_DIR/$RUN_NAME"/checkpoint_* >/dev/null 2>&1; then
+    echo "ERROR: $OUT_DIR/$RUN_NAME already has checkpoints; a first link would branch"
+    echo "  over them.  Resume with RESUME_PATH=..., or start fresh with RUN_SUFFIX=..."; exit 1
+fi
 if [ -e "$OUT_DIR/$RUN_NAME/checkpoint_$STOP_AT_STEP/chkpt.pt" ]; then
     echo "ERROR: $OUT_DIR/$RUN_NAME already finished.  Pass RUN_SUFFIX=-b to run"
     echo "  a second copy rather than overwrite the first."; exit 1
@@ -241,7 +261,7 @@ else
         edrop) READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.25" ;;
         lownorm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.e_read_norm_target $LOWNORM_TARGET" ;;
         carrydrop) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.carry_dropout $CARRYDROP_P" ;;
-        v2capwarm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.prefix_memory gated_v2 --cortex.v2_pairing paired --cortex.e_store_norm_target $E_CAP --cortex.warm_p $WARM_P --cortex.warm_max_chunks $WARM_MAX" ;;
+        v2capwarm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.prefix_memory gated_v2 --cortex.v2_pairing paired --cortex.e_store_norm_target $E_CAP --cortex.warm_p $WARM_P --cortex.warm_max_chunks $WARM_MAX --cortex.v2_age_prior $V2_AGE_PRIOR" ;;
         *)     READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.0" ;;
     esac
     ARM_ARGS="$ARM_ARGS $READ"
@@ -257,10 +277,21 @@ echo "    lr:       x$LR_SCALE of the 5B peaks -> lr $LR_L muon $MUON_L memory $
      "(constant after 96 warmup steps)"
 echo "    seed:     $SEED   znorm_target: $ZNORM_TARGET"
 echo "    limb:     ${READ:-use_memory false}"
+echo "    chain:    $CHAIN   saves every $LIMB_SAVE_INTERVAL (-1 = only at the end)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 git rev-parse --short HEAD 2>/dev/null | sed 's/^/    commit:   /'
 
-python train.py \
+# WALL_LIMITED (v2_long.sbatch): the timeout save fires 20 min before the
+# wall and does NOT stop training, so the wall would kill this script before
+# the gate.  Stop python ourselves 8 min before the wall, after that save.
+PY_PREFIX=""
+if [ -n "${WALL_LIMITED:-}" ]; then
+    : "${WALL_SECS:?WALL_LIMITED needs WALL_SECS (the #SBATCH -t in seconds)}"
+    PY_PREFIX="timeout --signal=TERM --kill-after=120 $(( WALL_SECS - SECONDS - 480 ))"
+    echo "    wall:     python stops in $(( (WALL_SECS - SECONDS - 480) / 60 )) min" \
+         "(the timeout save fires at 20 min left)"
+fi
+$PY_PREFIX python train.py \
     --run_name $RUN_NAME \
     --out_path $OUT_DIR \
     --model_name $MODEL \
@@ -279,7 +310,7 @@ python train.py \
     --no_amp false \
     --max_grad_norm 1.0 \
     --compile false \
-    --save_interval -1 \
+    --save_interval $LIMB_SAVE_INTERVAL \
     --save_n_mins_before_timeout 20 \
     --seed $SEED \
     --mean_recurrence_schedule.turn_on true \
@@ -290,14 +321,25 @@ python train.py \
     --cortex.eos_from_tokens true \
     --cortex.diag_interval $DIAG_INTERVAL \
     $ARM_ARGS \
-    --branch_path $BRANCH_PATH \
-    --ignore_past_scheduler true
+    $CHAIN
 RC=$?
+# 124 = our own stop above, the planned end of a wall-limited link
+[ -n "${WALL_LIMITED:-}" ] && [ $RC -eq 124 ] && RC=0
 echo ""
 echo "=== limb $LIMB finished rc=$RC ==="
-[ -f "$OUT_DIR/$RUN_NAME/checkpoint_$STOP_AT_STEP/chkpt.pt" ] \
-    && echo "    resumable checkpoint: $OUT_DIR/$RUN_NAME/checkpoint_$STOP_AT_STEP" \
-    || { echo "    *** NO chkpt.pt at checkpoint_$STOP_AT_STEP -- round 2 cannot load this limb"; RC=1; }
+LAST=$(ls -d "$OUT_DIR/$RUN_NAME"/checkpoint_* 2>/dev/null | sed 's/.*checkpoint_//' | sort -n \
+       | while read -r n; do [ -f "$OUT_DIR/$RUN_NAME/checkpoint_$n/chkpt.pt" ] && echo "$n"; done | tail -1)
+if [ -f "$OUT_DIR/$RUN_NAME/checkpoint_$STOP_AT_STEP/chkpt.pt" ]; then
+    echo "    resumable checkpoint: $OUT_DIR/$RUN_NAME/checkpoint_$STOP_AT_STEP"
+elif [ -n "${WALL_LIMITED:-}" ] && [ -n "$LAST" ]; then
+    # read the NEXT link's 'Resumed from' line: a wall-killed link's last
+    # logged update is behind where it really stopped
+    echo "    wall-limited: latest resumable checkpoint $OUT_DIR/$RUN_NAME/checkpoint_$LAST"
+    echo "    next link: sbatch --export=ALL,RESUME_PATH=$OUT_DIR/$RUN_NAME/checkpoint_$LAST pace/v2_long.sbatch"
+    [ $RC -ne 0 ] && echo "    (rc=$RC: the link did not exit clean -- read the epilog before resuming)"
+else
+    echo "    *** NO chkpt.pt at checkpoint_$STOP_AT_STEP -- round 2 cannot load this limb"; RC=1
+fi
 [ "$LIMB" = "recall_ctrl" ] && exit $RC
 
 # ===== THE GATE: did this limb run ITS OWN condition? ======================
@@ -390,6 +432,11 @@ if limb == "v2capwarm":
         fails.append("v2_replace_rate absent: the gated_v2 merge never ran")
     else:
         notes.append(f"v2_replace_rate {rr[0]:.3f} -> {rr[-1]:.3f} (1.0 = FIFO)")
+        lo, ap = vals("v2_learned_over_age"), vals("v2_age_prior")
+        if lo and ap:
+            # > ~1: the learned score can override one chunk of age
+            notes.append(f"v2_learned_over_age {lo[0]:.3f} -> {lo[-1]:.3f}, "
+                         f"beta {ap[0]:.3f} -> {ap[-1]:.3f}")
     if not ws or ws[-1] <= 0:
         fails.append(f"warm_share {ws[-1:] or None}: no row ever started warm")
     else:

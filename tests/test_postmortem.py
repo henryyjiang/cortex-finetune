@@ -183,3 +183,23 @@ def test_v2capwarm_trains_all_three_changes_and_its_gate_checks_them():
     assert "E_CAP=${E_CAP:-82}" in s and "WARM_P=${WARM_P:-0.75}" in s
     for key in ('vals("v2_replace_rate")', 'vals("warm_share")', "e_store_norm_target never"):
         assert key in s, key
+
+
+def test_v2_long_reuses_limb_8_and_stops_itself_after_the_timeout_save():
+    w = open(os.path.join(ROOT, "pace/v2_long.sbatch"), encoding="utf-8").read()
+    s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
+    limbs = re.search(r"^LIMBS=\((.*)\)$", s, re.M).group(1).split()
+    idx = int(re.search(r"SLURM_ARRAY_TASK_ID=(\d+)", w).group(1))
+    assert limbs[idx] == "v2capwarm"
+    hours = int(re.search(r"#SBATCH -t (\d+):00:00", w).group(1))
+    assert f"WALL_SECS=$(( {hours} * 3600 ))" in w
+    assert "exec bash pace/pm_limbs.sbatch" in w and "WALL_LIMITED=1" in w
+    # a limb-only name: final5b_shared defaults SAVE_INTERVAL to 300
+    assert "--save_interval $LIMB_SAVE_INTERVAL" in s
+    assert "LIMB_SAVE_INTERVAL=${LIMB_SAVE_INTERVAL:--1}" in s
+    assert "LIMB_SAVE_INTERVAL" in w and "export SAVE_INTERVAL" not in w
+    # python must stop after the 20-min timeout save and before the wall
+    assert "--save_n_mins_before_timeout 20" in s
+    assert "$(( WALL_SECS - SECONDS - 480 ))" in s
+    assert '[ -n "${WALL_LIMITED:-}" ] && [ $RC -eq 124 ] && RC=0' in s
+    assert 'CHAIN="--resume_path $RESUME_PATH"' in s

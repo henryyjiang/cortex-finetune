@@ -423,7 +423,11 @@ class CLISettings:
             #                        rows are the only empty-memory training)
             #   warm_max_chunks      B3: memory older than this many chunks is
             #                        reset instead of continued
-            v2_pairing="paired", z_store_norm_target=0.0,
+            #   v2_age_prior         gated_v2 only: beta's start in score =
+            #                        learned - beta * age (> 0 = FIFO at init;
+            #                        smaller lets the learned score override
+            #                        age sooner)
+            v2_pairing="paired", v2_age_prior=1.0, z_store_norm_target=0.0,
             warm_p=0.0, warm_max_chunks=56,
             # Z ATTEMPT 2 (J3), cortex_memory/scratchpad.py.  latent_read
             # 'scratch' + latent_encoding 'scratch' is the in-loop scratchpad;
@@ -597,6 +601,9 @@ class CLISettings:
                 assert int(self.cortex["latent_stride"]) == 1, (
                     "cortex.prefix_memory=gated_v2 needs latent_stride=1: v2 "
                     "keeps E and Z on one age order, not J6's split pointers")
+                assert float(self.cortex["v2_age_prior"]) > 0, (
+                    f"cortex.v2_age_prior must be > 0 (FIFO at init); got "
+                    f"{self.cortex['v2_age_prior']}")
                 assert self.cortex["v2_pairing"] in ("paired", "independent"), (
                     f"cortex.v2_pairing must be 'paired' or 'independent'; got "
                     f"{self.cortex['v2_pairing']!r}")
@@ -1316,8 +1323,8 @@ def startup(cfg: CLISettings):
                    # v2.  v2_pairing persists HARDEST: it sets the score heads'
                    # shapes, so an eval rebuilt at the default cannot load an
                    # `independent` limb.  The rest record the condition.
-                   "v2_pairing", "z_store_norm_target", "warm_p",
-                   "warm_max_chunks"):
+                   "v2_pairing", "v2_age_prior", "z_store_norm_target",
+                   "warm_p", "warm_max_chunks"):
             setattr(config, _k, cfg.cortex[_k])
         if is_main_process():
             print(f"[cortex] memory ON: K={cfg.cortex['memory_slots']} "
@@ -2571,12 +2578,15 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         # measured, so pm_limbs' gate can prove v2 / warm-up ran
                         if warm_carry is not None:
                             cortex_diag_row.update(warm_carry.stats())
-                        _rates = getattr(getattr(get_unwrapped_model(model), "cortex", None),
-                                         "prefix", None)
-                        _rates = getattr(_rates, "last_replace_rate", None)
-                        if _rates:
-                            cortex_diag_row["v2_replace_rate"] = float(
-                                sum(float(r) for r in _rates) / len(_rates))
+                        _pre = getattr(getattr(get_unwrapped_model(model), "cortex", None),
+                                       "prefix", None)
+                        for _k, _attr in (("v2_replace_rate", "last_replace_rate"),
+                                          ("v2_learned_over_age", "last_learned_over_age")):
+                            _v = getattr(_pre, _attr, None)
+                            if _v:
+                                cortex_diag_row[_k] = float(sum(float(r) for r in _v) / len(_v))
+                        if hasattr(_pre, "age_prior"):
+                            cortex_diag_row["v2_age_prior"] = float(_pre.age_prior.detach().float().mean())
                         cortex_diag_row["step"] = optimizer_step
                         cortex_diag_row["loss"] = float(loss.item())
                         cortex_diag_row["grad_norm"] = float(total_norm)

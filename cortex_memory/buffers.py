@@ -877,13 +877,16 @@ class PrefixGatedBufferV2(PrefixGatedBuffer):
     """
 
     PAIRINGS = ("paired", "independent")
-    AGE_PRIOR_INIT = 1.0    # any beta > 0 gives FIFO at a zero head; 1 keeps
-                            # sigmoid'(4 beta) ~ 0.018 so the score still trains
 
     def __init__(self, hidden_size: int, n_vec: int = 32,
                  n_slots: Optional[int] = None, pairing: str = "paired",
-                 **kw) -> None:
+                 age_prior_init: float = 1.0, **kw) -> None:
+        # beta_0: any value > 0 gives FIFO at a zero head; it sets how large
+        # the learned score must grow (~beta per chunk of age) to override age
+        self.age_prior_init = float(age_prior_init)
         super().__init__(hidden_size, n_vec, n_slots=n_slots, **kw)
+        if not self.age_prior_init > 0:
+            raise ValueError(f"v2_age_prior must be > 0 (FIFO at init); got {age_prior_init}")
         if pairing not in self.PAIRINGS:
             raise ValueError(f"v2_pairing must be one of {self.PAIRINGS}; got {pairing!r}")
         if self.route != "ring" or self.fill != "grow" or self.latent_stride != 1:
@@ -903,8 +906,9 @@ class PrefixGatedBufferV2(PrefixGatedBuffer):
         self.score_heads = nn.ModuleList(
             nn.Linear(2 * (u.stop - u.start), 1) for u in self._units)
         self.age_prior = nn.Parameter(torch.full((len(self._units),),
-                                                 self.AGE_PRIOR_INIT))
+                                                 self.age_prior_init))
         self.last_replace_rate: list = []
+        self.last_learned_over_age: list = []
         self.apply_gate_init()
 
     def apply_gate_init(self) -> None:
@@ -915,7 +919,7 @@ class PrefixGatedBufferV2(PrefixGatedBuffer):
             nn.init.zeros_(h.weight)
             nn.init.zeros_(h.bias)
         with torch.no_grad():
-            self.age_prior.fill_(self.AGE_PRIOR_INIT)
+            self.age_prior.fill_(self.age_prior_init)
 
     def _rms_halves(self, x: torch.Tensor) -> torch.Tensor:
         """rms-normalise each D-wide channel of a pairing unit separately, so
@@ -953,6 +957,11 @@ class PrefixGatedBufferV2(PrefixGatedBuffer):
         g = torch.sigmoid(s_new - s_q)
         st = (g - g.detach())[:, None, :, None].to(hard.dtype)
         self.last_replace_rate.append(accept.detach().float().mean())
+        # > ~1: the learned score varies across a class by more than one
+        # chunk's age penalty, i.e. it can override FIFO
+        self.last_learned_over_age.append(
+            learned.detach().float().squeeze(-1).std(dim=1).mean()
+            / self.age_prior.detach().float()[h].abs().clamp_min(1e-6))
         return (hard + st * (replaced - kept)).reshape(B, K, C)
 
     def merge(self, state: Optional[torch.Tensor],
@@ -960,6 +969,7 @@ class PrefixGatedBufferV2(PrefixGatedBuffer):
               new_latent: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Grow exactly as `gated` does; once full, per-class keep/replace."""
         self.last_replace_rate = []         # one entry per unit, full merges only
+        self.last_learned_over_age = []
         if state is None or state.shape[1] < self.n_slots:
             return super().merge(state, new_vecs, new_latent)
         if new_vecs.shape[1] != self.n_vec:
