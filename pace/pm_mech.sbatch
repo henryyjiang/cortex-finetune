@@ -120,9 +120,11 @@ fi
 # Part A (evals/diag_chunk1_drift.py header) into depth_<value>/ -- never over
 # chunk1_drift/.  2026-11-02: E_CLAMP / E_STORE moved the first harmful chunk
 # only 27 -> 29 / 30, so these ask WHY: gates A1, restart A2+A3, recency A4,
-# forced A5 (fifo + hardgate).  Same streams and seeds as chunk1_drift/, which
-# every part is paired against: read each part's pairing check first (~0).
-# `all` is one load and ~45 min on an H200; results.json is rewritten after
+# forced A5 (fifo only: in the smoke the trained fg was ~0.06-0.09 < 0.5, so
+# hardgate replaced every row and duplicated fifo; Henry dropped it 2026-11-02).
+# Same streams and seeds as chunk1_drift/, which every part is paired against:
+# read each part's pairing check first (~0).
+# `all` is one load and ~30 min on an H200; results.json is rewritten after
 # each part, so a late failure keeps the earlier parts.
 #   sbatch --array=0 --export=ALL,DEPTH_TESTS=all pace/pm_mech.sbatch
 if [ -n "${DEPTH_TESTS:-}" ]; then
@@ -139,7 +141,7 @@ if [ -n "${DEPTH_TESTS:-}" ]; then
     python evals/diag_chunk1_drift.py --model_name "$MODEL" --checkpoint "$CKPT" \
         $SETS --data "$PG19_VAL" --T "$T" --parts "$DPARTS" \
         --drift_chunks 202 --drift_streams 6 --depths 8,16,32,64,128 \
-        --forced_modes fifo,hardgate --drift_baseline "$BASE" \
+        --forced_modes fifo --drift_baseline "$BASE" \
         --dtype float32 --out_dir "$RES/depth_$DEPTH_TESTS" || RC_ALL=$?
 fi
 
