@@ -1,0 +1,6 @@
+task,correct,total,accuracy
+hellaswag,5946,10042,0.5921
+winogrande,701,1267,0.5533
+arc_easy,284,570,0.4982
+arc_challenge,101,299,0.3378
+piqa,1330,1838,0.7236

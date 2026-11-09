@@ -1,0 +1,307 @@
+---------------------------------------
+Begin Slurm Prolog: Nov-08-2026 18:41:31
+Job ID:    15323152
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_read
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+=== pm_read | both | cortex-pm/pm-both/checkpoint_40146 -> eval_results/pm/limbs/pm-both ===
+    commit: d465558
+
+--- [both] depth tests: drift, gates, restart, recency (202-chunk books)  (18:41:35)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '78.9'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.40s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.36it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-pm/pm-both/checkpoint_40146/chkpt.pt: 0 missing / 0 unexpected keys
+[drift] 6 single-book streams of 202 chunks (rows [4, 34, 97, 212, 259, 316]).  ASSUMES the pack keeps each book's windows in order, as prepare_pg19_dataset.py writes it.
+  drift stream 1/6 done
+  drift stream 2/6 done
+  drift stream 3/6 done
+  drift stream 4/6 done
+  drift stream 5/6 done
+  drift stream 6/6 done
+
+==============================================================================
+DRIFT  (6 books x 202 chunks)
+==============================================================================
+  chunk laps   nll_carry nll_nocarry  carry_gain     entropy first_tok_e  e_row_norm e_eff_rank_  z_row_norm z_eff_rank_  e_turnover  z_turnover
+      1  0.0      1.8604      1.8604      0.0000      1.9546      2.3316           -           -           -           -           -           -
+      2 0.25      2.1550      2.2924      0.1374      2.2297      2.9198     82.8402      2.6385     20.2146      1.7656           -           -
+      3  0.5      2.0507      2.2022      0.1516      2.1528      2.4054     82.4040      3.5818     17.8368      2.9246           -           -
+      4 0.75      2.0562      2.2154      0.1592      2.1165      1.2171     82.1640      3.7975     17.0697      4.2066           -           -
+      5  1.0      1.9029      2.0846      0.1818      2.0224      2.3047     81.8832      3.8140     16.6373      5.4372      0.7937      0.9521
+      8 1.75      2.4673      2.5962      0.1289      2.5900      2.7809     82.1896      7.0972     20.4679      6.5982      0.7013      0.8401
+     12 2.75      2.6388      2.7427      0.1039      2.6835      3.5639     89.6679      5.6589     26.3361      4.5549      0.6290      0.5855
+     16 3.75      2.6442      2.7599      0.1157      2.6150      4.3720    102.4813      5.4098     31.7992      4.2638      0.5901      0.5756
+     24 5.75      2.6390      2.6927      0.0536      2.7110      3.2836    133.5875      3.1964     42.7830      3.4047      0.4244      0.3314
+     32 7.75      2.7159      2.5771     -0.1388      2.9220      4.9640    165.8863      2.3405     53.3595      2.9585      0.3464      0.2688
+     48 11.75      3.5222      2.8578     -0.6644      3.5858      6.1542    233.8754      1.7224     71.4365      2.5265      0.1939      0.1312
+     64 15.75      3.7353      2.8250     -0.9104      3.9986      6.7040    304.0422      1.5670     83.8806      2.3652      0.1235      0.0814
+     96 23.75      4.3714      2.8620     -1.5094      4.3375      5.8084    442.8601      1.4617    105.6373      2.2547      0.0690      0.0468
+    128 31.75      4.5877      2.7079     -1.8797      4.7415      5.1959    579.3513      1.4275    125.3347      2.1230      0.0532      0.0327
+    160 39.75      5.0353      2.9698     -2.0655      5.1108      5.3462    713.5013      1.3533    140.9155      1.9590      0.0371      0.0264
+    202 50.25      5.2475      2.8362     -2.4114      5.4320      5.1151    886.1532      1.3824    142.1036      1.8889      0.0226      0.0272
+
+  first chunk where the carry HURTS (carry_gain < 0): 27
+[drift] 6 single-book streams of 202 chunks (rows [4, 34, 97, 212, 259, 316]).  ASSUMES the pack keeps each book's windows in order, as prepare_pg19_dataset.py writes it.
+  drift stream 1/6 done
+  drift stream 2/6 done
+  drift stream 3/6 done
+  drift stream 4/6 done
+  drift stream 5/6 done
+  drift stream 6/6 done
+
+==============================================================================
+DRIFT  (6 books x 202 chunks)
+==============================================================================
+  chunk laps   nll_carry nll_nocarry  carry_gain     entropy first_tok_e  e_row_norm e_eff_rank_  z_row_norm z_eff_rank_  e_turnover  z_turnover
+      1  0.0      1.8604      1.8604      0.0000      1.9546      2.3316           -           -           -           -           -           -
+      2 0.25      2.1550      2.2924      0.1374      2.2297      2.9198     82.8402      2.6385     20.2146      1.7656           -           -
+      3  0.5      2.0507      2.2022      0.1516      2.1528      2.4054     82.4040      3.5818     17.8368      2.9246           -           -
+      4 0.75      2.0562      2.2154      0.1592      2.1165      1.2171     82.1640      3.7975     17.0697      4.2066           -           -
+      5  1.0      1.9029      2.0846      0.1818      2.0224      2.3047     81.8832      3.8140     16.6373      5.4372      0.7937      0.9521
+      8 1.75      2.4673      2.5962      0.1289      2.5900      2.7809     82.1896      7.0972     20.4679      6.5982      0.7013      0.8401
+     12 2.75      2.6388      2.7427      0.1039      2.6835      3.5639     89.6679      5.6589     26.3361      4.5549      0.6290      0.5855
+     16 3.75      2.6442      2.7599      0.1157      2.6150      4.3720    102.4813      5.4098     31.7992      4.2638      0.5901      0.5756
+     24 5.75      2.6390      2.6927      0.0536      2.7110      3.2836    133.5875      3.1964     42.7830      3.4047      0.4244      0.3314
+     32 7.75      2.7159      2.5771     -0.1388      2.9220      4.9640    165.8863      2.3405     53.3595      2.9585      0.3464      0.2688
+     48 11.75      3.5222      2.8578     -0.6644      3.5858      6.1542    233.8754      1.7224     71.4365      2.5265      0.1939      0.1312
+     64 15.75      3.7353      2.8250     -0.9104      3.9986      6.7040    304.0422      1.5670     83.8806      2.3652      0.1235      0.0814
+     96 23.75      4.3714      2.8620     -1.5094      4.3375      5.8084    442.8601      1.4617    105.6373      2.2547      0.0690      0.0468
+    128 31.75      4.5877      2.7079     -1.8797      4.7415      5.1959    579.3513      1.4275    125.3347      2.1230      0.0532      0.0327
+    160 39.75      5.0353      2.9698     -2.0655      5.1108      5.3462    713.5013      1.3533    140.9155      1.9590      0.0371      0.0264
+    202 50.25      5.2475      2.8362     -2.4114      5.4320      5.1151    886.1532      1.3824    142.1036      1.8889      0.0226      0.0272
+
+  first chunk where the carry HURTS (carry_gain < 0): 27
+
+  gates (trained), over the rows each merge touched:
+  chunk          e_fg          e_ig   e_fg_ig_gt1 e_write_over_          z_fg          z_ig   z_fg_ig_gt1 z_write_over_
+      5        0.0790        0.8586        0.5241        0.9800        0.0982        0.9137        0.5883        0.9269
+      6        0.0722        0.8651        0.5288        0.9871        0.0980        0.9141        0.5952        0.9752
+      8        0.0721        0.8652        0.5300        0.9976        0.0958        0.9153        0.5933        0.9999
+     12        0.0527        0.9119        0.5557        1.0178        0.0810        0.9355        0.5988        0.7303
+     16        0.0518        0.9110        0.5524        0.8880        0.0709        0.9397        0.5923        0.7462
+     24        0.0367        0.9431        0.5636        0.6567        0.0647        0.9468        0.5882        0.4418
+     32        0.0421        0.9285        0.5549        0.5186        0.0600        0.9476        0.5708        0.3641
+     48        0.0393        0.9344        0.5569        0.3706        0.0374        0.9624        0.5520        0.2684
+     64        0.0368        0.9391        0.5188        0.2749        0.0394        0.9600        0.5489        0.2294
+     96        0.0355        0.9400        0.4920        0.1827        0.0398        0.9617        0.5563        0.1900
+    128        0.0301        0.9517        0.4878        0.1368        0.0398        0.9617        0.5603        0.1604
+    160        0.0262        0.9593        0.4710        0.1096        0.0380        0.9638        0.5567        0.1446
+    202        0.0177        0.9773        0.4717        0.0866        0.0152        0.9853        0.5369        0.1351
+[depth] 6 streams (rows [4, 34, 97, 212, 259, 316]), depths [8, 16, 32, 64, 128], restart=True recency=True
+  depth stream 1/6 done
+  depth stream 2/6 done
+  depth stream 3/6 done
+  depth stream 4/6 done
+  depth stream 5/6 done
+  depth stream 6/6 done
+
+==============================================================================
+DEPTH TESTS  (6 books)
+==============================================================================
+  restart: gain = NLL(long) - NLL(X), + = X cheaper than the long memory
+  chunk  nocarry     long  fresh-gain  freshZ-gain  freshE-gain    e_cos    z_cos
+      8   2.5962   2.4673    +0.0000      +0.0000      +0.0000  +1.0000  +1.0000
+     16   2.7599   2.6442    +0.0494      +0.0193      +0.0139  +0.7600  +0.8469
+     32   2.5771   2.7159    +0.2995      +0.0738      +0.1788  +0.4514  +0.4549
+     64   2.8250   3.7353    +1.0875      +0.5694      +0.3547  +0.2683  +0.1322
+    128   2.7079   4.5877    +2.0571      +0.2047      +0.6412  +0.1782  +0.1074
+  recency: lift = d(set) - d(ctl), d = log-mass with memory - without
+  chunk  recent_lift  old_lift   n_recent  n_old  n_ctl
+      8     +0.0730   +0.0165        346    258    395
+     16     +0.0958   +0.0672        346    666    416
+     32     +0.0161   -0.0231        340    700    376
+     64     -0.1434   -0.1564        334    719    376
+    128     -0.3398   -0.1589        349    718    385
+
+wrote eval_results/pm/limbs/pm-both/depth/results.json
+
+--- [both] BABILong qa1 qa2, 1k-32k (8 x 512, T 8)  (19:00:14)
+Loading checkpoint: cortex-pm/pm-both/checkpoint_40146
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '78.9'  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:21<00:21, 21.64s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:25<00:00, 10.93s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:25<00:00, 12.54s/it]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 5 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-pm/pm-both/checkpoint_40146/chkpt.pt: 0 missing / 0 unexpected keys
+T=8  tasks=['qa1', 'qa2']  num_chunks=8  passes_per_chunk=1  ccot_passes=0  no_carry=False
+
+--- qa1 ---
+  [qa1/1k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/1k] 50 examples processed...
+  [qa1/1k] 100 examples processed...
+  [qa1/1k] 150 examples processed...
+  [qa1/1k] 200 examples processed...
+  [qa1/1k] 250 examples processed...
+  [qa1/2k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/2k] 50 examples processed...
+  [qa1/2k] 100 examples processed...
+  [qa1/2k] 150 examples processed...
+  [qa1/2k] 200 examples processed...
+  [qa1/2k] 250 examples processed...
+  [qa1/4k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/4k] 50 examples processed...
+  [qa1/4k] 100 examples processed...
+  [qa1/4k] 150 examples processed...
+  [qa1/4k] 200 examples processed...
+  [qa1/4k] 250 examples processed...
+  [qa1/8k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/8k] 50 examples processed...
+  [qa1/8k] 100 examples processed...
+  [qa1/8k] 150 examples processed...
+  [qa1/8k] 200 examples processed...
+  [qa1/8k] 250 examples processed...
+  [qa1/16k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/16k] 50 examples processed...
+  [qa1/16k] 100 examples processed...
+  [qa1/16k] 150 examples processed...
+  [qa1/16k] 200 examples processed...
+  [qa1/16k] 250 examples processed...
+  [qa1/32k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa1/32k] 50 examples processed...
+  [qa1/32k] 100 examples processed...
+  [qa1/32k] 150 examples processed...
+  [qa1/32k] 200 examples processed...
+  [qa1/32k] 250 examples processed...
+  Bucket        Correct    Total      Acc
+  ----------------------------------------
+  1k                 45      250    0.180
+  2k                 50      250    0.200
+  4k                 42      250    0.168
+  8k                 45      250    0.180
+  16k                49      250    0.196
+  32k                19      250    0.076
+
+--- qa2 ---
+  [qa2/1k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/1k] 50 examples processed...
+  [qa2/1k] 100 examples processed...
+  [qa2/1k] 150 examples processed...
+  [qa2/1k] 200 examples processed...
+  [qa2/1k] 250 examples processed...
+  [qa2/2k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/2k] 50 examples processed...
+  [qa2/2k] 100 examples processed...
+  [qa2/2k] 150 examples processed...
+  [qa2/2k] 200 examples processed...
+  [qa2/2k] 250 examples processed...
+  [qa2/4k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/4k] 50 examples processed...
+  [qa2/4k] 100 examples processed...
+  [qa2/4k] 150 examples processed...
+  [qa2/4k] 200 examples processed...
+  [qa2/4k] 250 examples processed...
+  [qa2/8k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/8k] 50 examples processed...
+  [qa2/8k] 100 examples processed...
+  [qa2/8k] 150 examples processed...
+  [qa2/8k] 200 examples processed...
+  [qa2/8k] 250 examples processed...
+  [qa2/16k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/16k] 50 examples processed...
+  [qa2/16k] 100 examples processed...
+  [qa2/16k] 150 examples processed...
+  [qa2/16k] 200 examples processed...
+  [qa2/16k] 250 examples processed...
+  [qa2/32k] 6 candidates (chance 16.7%): bathroom, bedroom, garden, hallway, kitchen, office
+  [qa2/32k] 50 examples processed...
+  [qa2/32k] 100 examples processed...
+  [qa2/32k] 150 examples processed...
+  [qa2/32k] 200 examples processed...
+  [qa2/32k] 250 examples processed...
+  Bucket        Correct    Total      Acc
+  ----------------------------------------
+  1k                 55      250    0.220
+  2k                 49      250    0.196
+  4k                 46      250    0.184
+  8k                 44      250    0.176
+  16k                41      250    0.164
+  32k                44      250    0.176
+
+Per-example records → eval_results/pm/limbs/pm-both/babilong/records.jsonl
+
+Results saved → eval_results/pm/limbs/pm-both/babilong
+
+=== pm_read both (COMPARE_ONLY) finished rc=0 (20:14:04) -> eval_results/pm/limbs/pm-both ===
+---------------------------------------
+Begin Slurm Epilog: Nov-08-2026 20:14:04
+Job ID:        15323152
+Array Job ID:  15323152_0
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_read
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=12:21:12,vmem=0,walltime=01:32:39,mem=34601604K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-019-14-0
+---------------------------------------

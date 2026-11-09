@@ -1,0 +1,68 @@
+{
+  "cortex-pm": {
+    "qa1": {
+      "1k": {
+        "correct": 49,
+        "total": 250,
+        "accuracy": 0.196
+      },
+      "2k": {
+        "correct": 51,
+        "total": 250,
+        "accuracy": 0.204
+      },
+      "4k": {
+        "correct": 50,
+        "total": 250,
+        "accuracy": 0.2
+      },
+      "8k": {
+        "correct": 48,
+        "total": 250,
+        "accuracy": 0.192
+      },
+      "16k": {
+        "correct": 48,
+        "total": 250,
+        "accuracy": 0.192
+      },
+      "32k": {
+        "correct": 45,
+        "total": 250,
+        "accuracy": 0.18
+      }
+    },
+    "qa2": {
+      "1k": {
+        "correct": 50,
+        "total": 250,
+        "accuracy": 0.2
+      },
+      "2k": {
+        "correct": 42,
+        "total": 250,
+        "accuracy": 0.168
+      },
+      "4k": {
+        "correct": 48,
+        "total": 250,
+        "accuracy": 0.192
+      },
+      "8k": {
+        "correct": 40,
+        "total": 250,
+        "accuracy": 0.16
+      },
+      "16k": {
+        "correct": 41,
+        "total": 250,
+        "accuracy": 0.164
+      },
+      "32k": {
+        "correct": 40,
+        "total": 250,
+        "accuracy": 0.16
+      }
+    }
+  }
+}
