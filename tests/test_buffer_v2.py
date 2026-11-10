@@ -113,30 +113,21 @@ def test_the_score_gets_a_gradient_at_init():
     assert v2.age_prior.grad.abs().sum() > 0
 
 
-def test_the_score_gradient_comes_only_from_the_slot_the_choice_changes():
-    # 2026-11-09: the surrogate was (replaced - kept), nonzero on every slot of
-    # a class (the newer rows shift down one), so a loss on slots the choice
-    # does not change still trained the score.  Now only the contested slot
-    # carries it: under FIFO (zero head) that is the new write, last in class.
+def test_the_surrogate_is_the_line_between_the_two_outcomes_shift_included():
+    # 2026-11-10: a contested-slot-only surrogate got a decision's sign right
+    # 52% of the time on the real weights vs 62% for (replaced - kept), and its
+    # limb's loss rose; the read is NOT blind to row order within a class, so
+    # the shifted slots must carry gradient too
     v2 = _v2(seed=2)
     st = None
     for e, z in _writes(L, seed=6):
         st = v2.merge(st, e, z)
     e, z = _writes(1, seed=7)[0]
-    head = v2.score_heads[0].weight
-
-    def grad_from(mask):
-        head.grad = None
-        out = v2.merge(st, e, z).view(2, L, W, -1)
-        (out * mask * torch.randn_like(out)).sum().backward()
-        return head.grad.abs().sum()
-
-    contested = torch.zeros(2, L, W, 1)
-    contested[:, L - 1] = 1.0
-    assert grad_from(torch.ones(2, L, W, 1) - contested) == 0
-    assert float(v2.last_replace_rate[0]) == 1.0
-    assert float(v2.last_evict_oldest_rate[0]) == 1.0
-    assert grad_from(contested) > 0
+    out = v2.merge(st, e, z).view(2, L, W, -1)
+    shifted = torch.ones(2, L, W, 1)
+    shifted[:, L - 1] = 0.0                # everything but the slot the write lands in
+    (out * shifted * torch.randn_like(out)).sum().backward()
+    assert v2.score_heads[0].weight.grad.abs().sum() > 0
 
 
 def test_evict_oldest_rate_is_one_under_fifo_and_drops_with_random_heads():

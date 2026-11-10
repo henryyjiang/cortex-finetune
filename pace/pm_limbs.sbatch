@@ -54,6 +54,20 @@
 # RESULT 2026-11-10 (15399193_8): it left FIFO (replace 0.531, evict-oldest
 # 0.25, learned/age 2.27, Z rank 6.0 vs 3.5) but the paired training loss
 # rose to +0.058 in the last quarter, still accelerating.  v2_long pins FIFO.
+# WHY (local_probes/eviction_estimator_probe.py, 38,146 read at FIFO, 288
+# steady-state class decisions, true next-chunk effect of each flip in fp32):
+# the contested-slot surrogate got the decision's sign right 0.52 [0.46,0.58]
+# -- chance -- so 11x more gradient drove the score to coin-flip decisions.
+# The original (replaced - kept) got 0.62 [0.57,0.67], Spearman +0.37: the
+# read is NOT order-blind within a class, and that line is the exact path
+# between the two outcomes.  The surrogate is reverted (buffers.py).
+#
+# v2capwarm-b025 (2026-11-10), the next check: the original surrogate, now
+# with beta 0.25 so its gradient is not choked (pm-v2capwarm's beta 1.0 left
+# it at learned/age 0.66 after 2,000 updates, harmless but inert):
+#   sbatch --array=8 --export=ALL,RUN_SUFFIX=-b025,V2_AGE_PRIOR=0.25 pace/pm_limbs.sbatch
+# Read it on the paired training loss against pm-v2capwarm (tools as for
+# stfix) and on v2_evict_oldest_rate, then the read-out against both.
 #
 # carrydrop (2026-10-30): the battery left the no-carry penalty (+0.080 on
 # chunk 1 AND on chunks 2-8 run without carry; the whole MC gap) standing as

@@ -46,8 +46,11 @@
 # 1.000 -> 0.531, evict-oldest 1.0 -> 0.25 -- but its training loss, paired
 # step for step against pm-v2capwarm, got steadily worse: -0.002 / +0.004 /
 # +0.009 / +0.058 nats over the four 500-update quarters, 99% of the last
-# 200 updates worse.  Learned eviction as built drops fresh writes and hurts;
-# this run is the configuration that worked: FIFO replace + E cap + warm-up.
+# 200 updates worse.  The cause was the contested-slot surrogate (sign right
+# at chance on the real weights; reverted).  Until pm-v2capwarm-b025 (the
+# original surrogate at beta 0.25) is read, this run stays the configuration
+# that worked: FIFO replace + E cap + warm-up.  If b025 holds up, launch with
+# --export=ALL,V2_AGE_PRIOR=0.25.
 # ============================================================================
 
 cd $SLURM_SUBMIT_DIR
