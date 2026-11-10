@@ -2586,6 +2586,11 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                             _v = getattr(_pre, _attr, None)
                             if _v:
                                 cortex_diag_row[_k] = float(sum(float(r) for r in _v) / len(_v))
+                                if len(_v) == 2:    # independent: E and Z decide apart
+                                    cortex_diag_row[_k + "_e"] = float(_v[0])
+                                    cortex_diag_row[_k + "_z"] = float(_v[1])
+                        if hasattr(_pre, "score_heads"):
+                            cortex_diag_row["v2_n_units"] = len(_pre.score_heads)
                         if hasattr(_pre, "age_prior"):
                             cortex_diag_row["v2_age_prior"] = float(_pre.age_prior.detach().float().mean())
                         cortex_diag_row["step"] = optimizer_step

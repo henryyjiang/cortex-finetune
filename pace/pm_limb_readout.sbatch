@@ -81,6 +81,7 @@ LIMB=${LIMBS[$IDX]}
 [ -n "$LIMB" ] || { echo "no task at index $IDX (use --array=0-10)"; exit 0; }
 LOWNORM_TARGET=${LOWNORM_TARGET:-4.5}
 E_CAP=${E_CAP:-82}                    # pm_limbs' default: what v2capwarm trained at
+V2_PAIRING=${V2_PAIRING:-paired}      # what the limb trained with (pm_limbs V2_PAIRING)
 BABILONG_PATH=${BABILONG_PATH:-data/babilong-1k}
 BABILONG_REPO=${BABILONG_REPO:-RMT-team/babilong-1k-samples}
 BABILONG_MAX=${BABILONG_MAX:-250}
@@ -123,11 +124,16 @@ CHECK
                 v2capwarm)
                     # gated_v2 sets the score heads' shape: rebuilt as gated it
                     # would load with 3 unexpected keys and score the old ring.
-                    SETS="$SETS --set prefix_memory=gated_v2 --set v2_pairing=paired"
+                    SETS="$SETS --set prefix_memory=gated_v2 --set v2_pairing=$V2_PAIRING"
                     SETS="$SETS --set e_store_norm_target=$E_CAP"
-                    python - "cortex-pm/$LIMB_RUN/cortex_diag.jsonl" "$E_CAP" <<'CHECK' || exit 1
+                    python - "cortex-pm/$LIMB_RUN/cortex_diag.jsonl" "$E_CAP" "$V2_PAIRING" <<'CHECK' || exit 1
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+units = {r["v2_n_units"] for r in rows if r.get("v2_n_units") is not None}
+want = 2 if sys.argv[3] == "independent" else 1
+if units != {want} and not (not units and want == 1):   # diags before 2026-11-10 lack it: paired
+    sys.exit(f"ERROR: the limb trained with {sorted(units) or 'unrecorded'} score head(s); "
+             f"V2_PAIRING={sys.argv[3]} would rebuild it with {want}")
 if not any(r.get("v2_replace_rate") is not None for r in rows):
     sys.exit("ERROR: pm-v2capwarm's diag has no v2_replace_rate: it did not train gated_v2")
 en = [r["z_e_carried_norm"] for r in rows if r.get("z_e_carried_norm") is not None]

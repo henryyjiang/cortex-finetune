@@ -176,7 +176,8 @@ def test_v2capwarm_trains_all_three_changes_and_its_gate_checks_them():
     each one back from the measured diagnostics."""
     s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
     line = re.search(r"^\s*v2capwarm\) READ=\"(.*)\" ;;$", s, re.M).group(1)
-    for flag in ("--cortex.prefix_memory gated_v2", "--cortex.v2_pairing paired",
+    assert "V2_PAIRING=${V2_PAIRING:-paired}" in s and 'vals("v2_n_units")' in s
+    for flag in ("--cortex.prefix_memory gated_v2", "--cortex.v2_pairing $V2_PAIRING",
                  "--cortex.e_store_norm_target $E_CAP", "--cortex.warm_p $WARM_P",
                  "--cortex.warm_max_chunks $WARM_MAX"):
         assert flag in line, flag
@@ -223,7 +224,8 @@ def test_the_readout_scores_v2capwarm_as_it_trained_and_pm_both_the_same_way():
     s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()
     limbs = re.search(r"^LIMBS=\((.*)\)$", r, re.M).group(1).split()
     assert limbs.index("v2capwarm") == 10 and limbs.index("both") == 0
-    assert '--set prefix_memory=gated_v2 --set v2_pairing=paired' in r
+    assert '--set prefix_memory=gated_v2 --set v2_pairing=$V2_PAIRING' in r
+    assert 'V2_PAIRING=${V2_PAIRING:-paired}' in r
     assert '--set e_store_norm_target=$E_CAP' in r
     pat = r"E_CAP=\$\{E_CAP:-([0-9.]+)\}"
     assert re.findall(pat, r) == re.findall(pat, s) != []

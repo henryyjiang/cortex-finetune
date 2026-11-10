@@ -69,6 +69,12 @@
 # Read it on the paired training loss against pm-v2capwarm (tools as for
 # stfix) and on v2_evict_oldest_rate, then the read-out against both.
 #
+# v2capwarm-b025ind, its twin with V2_PAIRING=independent (one score head per
+# channel; E row r and Z row r may come from different chunks).  At FIFO the
+# two pairings are identical, so this only differs once eviction is learned:
+# read it against b025, which it pairs with step for step.
+#   sbatch --array=8 --export=ALL,RUN_SUFFIX=-b025ind,V2_AGE_PRIOR=0.25,V2_PAIRING=independent pace/pm_limbs.sbatch
+#
 # carrydrop (2026-10-30): the battery left the no-carry penalty (+0.080 on
 # chunk 1 AND on chunks 2-8 run without carry; the whole MC gap) standing as
 # a TRAINING-ALLOCATION effect by elimination: borrowed/fixed carries make it
@@ -203,6 +209,8 @@ E_CAP=${E_CAP:-82}
 WARM_P=${WARM_P:-0.75}
 WARM_MAX=${WARM_MAX:-56}
 V2_AGE_PRIOR=${V2_AGE_PRIOR:-1.0}
+V2_PAIRING=${V2_PAIRING:-paired}      # independent: E and Z keep/replace apart (one score head each)
+case "$V2_PAIRING" in paired|independent) ;; *) echo "V2_PAIRING must be paired|independent, got '$V2_PAIRING'"; exit 1 ;; esac
 # pace/v2_long.sbatch reuses this file for a wall-limited run: it sets
 # LIMB_SAVE_INTERVAL (resumable every 2 x) and, on later links, RESUME_PATH.
 LIMB_SAVE_INTERVAL=${LIMB_SAVE_INTERVAL:--1}   # not SAVE_INTERVAL: final5b_shared defaults that to 300
@@ -290,7 +298,7 @@ else
         edrop) READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.25" ;;
         lownorm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.e_read_norm_target $LOWNORM_TARGET" ;;
         carrydrop) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.carry_dropout $CARRYDROP_P" ;;
-        v2capwarm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.prefix_memory gated_v2 --cortex.v2_pairing paired --cortex.e_store_norm_target $E_CAP --cortex.warm_p $WARM_P --cortex.warm_max_chunks $WARM_MAX --cortex.v2_age_prior $V2_AGE_PRIOR" ;;
+        v2capwarm) READ="--cortex.e_carry_read true --cortex.latent_carry_read true --cortex.e_dropout 0.0 --cortex.prefix_memory gated_v2 --cortex.v2_pairing $V2_PAIRING --cortex.e_store_norm_target $E_CAP --cortex.warm_p $WARM_P --cortex.warm_max_chunks $WARM_MAX --cortex.v2_age_prior $V2_AGE_PRIOR" ;;
         *)     READ="--cortex.e_carry_read true  --cortex.latent_carry_read true  --cortex.e_dropout 0.0" ;;
     esac
     ARM_ARGS="$ARM_ARGS $READ"
@@ -374,10 +382,10 @@ fi
 # ===== THE GATE: did this limb run ITS OWN condition? ======================
 # Reads the MEASURED diagnostics, never the flags (the e_carry_read lesson).
 # Every check is j5_joint.sbatch's, re-keyed for these limbs.
-python - "$OUT_DIR/$RUN_NAME/cortex_diag.jsonl" "$LIMB" "$ZNORM_TARGET" "$CARRYDROP_P"     "$E_CAP" "$WARM_P" "$V2_AGE_PRIOR" <<'GATE'
+python - "$OUT_DIR/$RUN_NAME/cortex_diag.jsonl" "$LIMB" "$ZNORM_TARGET" "$CARRYDROP_P"     "$E_CAP" "$WARM_P" "$V2_AGE_PRIOR" "$V2_PAIRING" <<'GATE'
 import json, sys
 path, limb, target, cd_p = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4])
-e_cap, warm_p, beta0 = float(sys.argv[5]), float(sys.argv[6]), float(sys.argv[7])
+e_cap, warm_p, beta0, pairing = float(sys.argv[5]), float(sys.argv[6]), float(sys.argv[7]), sys.argv[8]
 try:
     rows = [json.loads(l) for l in open(path) if l.strip()]
 except FileNotFoundError:
@@ -467,6 +475,18 @@ if limb == "v2capwarm":
             # rate alone cannot show a newer row being evicted instead
             notes.append(f"v2_evict_oldest_rate {fr[0]:.3f} -> {fr[-1]:.3f}, "
                          f"min {min(fr):.3f} (1.0 = FIFO)")
+        # measured from the built buffer (its score-head count), not the flag
+        nu, want_u = vals("v2_n_units"), 2 if pairing == "independent" else 1
+        if set(nu) != {want_u}:
+            fails.append(f"v2_n_units {sorted(set(nu)) or None}, expected {want_u}: "
+                         f"V2_PAIRING={pairing} never reached the graft")
+        else:
+            notes.append(f"v2_pairing {pairing} ({want_u} score head{'s' * (want_u > 1)})")
+        for ch in ("e", "z"):
+            fc = vals(f"v2_evict_oldest_rate_{ch}")
+            if fc:
+                notes.append(f"  {ch.upper()}: v2_evict_oldest_rate {fc[0]:.3f} -> {fc[-1]:.3f}, "
+                             f"replace {vals(f'v2_replace_rate_{ch}')[-1]:.3f}")
         lo, ap = vals("v2_learned_over_age"), vals("v2_age_prior")
         # beta is learned, but slowly (1.000 -> 0.990 over 2,000 updates)
         if ap and abs(ap[0] - beta0) > 0.05 * beta0:

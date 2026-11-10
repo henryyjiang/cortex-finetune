@@ -93,6 +93,8 @@ def _j1(limb="real"):
                  latent_tok_pool=2, latent_s0_read=False)
     if limb == "v2":            # gated_v2's keep/replace merge, same read
         flags.update(prefix_memory="gated_v2")
+    if limb == "v2ind":         # ... with E and Z deciding apart
+        flags.update(prefix_memory="gated_v2", v2_pairing="independent")
     if limb == "noread":
         flags.update(latent_read="none", latent_write_only=True)
     else:
@@ -124,7 +126,7 @@ def _grads(model):
 
 
 class TestTheGradientIsTheOneBackwardGradient:
-    @pytest.mark.parametrize("limb", ["real", "donor", "noread", "v2"])
+    @pytest.mark.parametrize("limb", ["real", "donor", "noread", "v2", "v2ind"])
     @pytest.mark.parametrize("grad_chunks", [4, 2])
     def test_same_loss_and_same_gradient(self, limb, grad_chunks):
         a = _j1(limb)
