@@ -2581,6 +2581,7 @@ def train(state, device, cfg, data_start_step=1, optimizer_step=0, total_tokens_
                         _pre = getattr(getattr(get_unwrapped_model(model), "cortex", None),
                                        "prefix", None)
                         for _k, _attr in (("v2_replace_rate", "last_replace_rate"),
+                                          ("v2_evict_oldest_rate", "last_evict_oldest_rate"),
                                           ("v2_learned_over_age", "last_learned_over_age")):
                             _v = getattr(_pre, _attr, None)
                             if _v:

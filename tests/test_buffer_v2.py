@@ -113,6 +113,44 @@ def test_the_score_gets_a_gradient_at_init():
     assert v2.age_prior.grad.abs().sum() > 0
 
 
+def test_the_score_gradient_comes_only_from_the_slot_the_choice_changes():
+    # 2026-11-09: the surrogate was (replaced - kept), nonzero on every slot of
+    # a class (the newer rows shift down one), so a loss on slots the choice
+    # does not change still trained the score.  Now only the contested slot
+    # carries it: under FIFO (zero head) that is the new write, last in class.
+    v2 = _v2(seed=2)
+    st = None
+    for e, z in _writes(L, seed=6):
+        st = v2.merge(st, e, z)
+    e, z = _writes(1, seed=7)[0]
+    head = v2.score_heads[0].weight
+
+    def grad_from(mask):
+        head.grad = None
+        out = v2.merge(st, e, z).view(2, L, W, -1)
+        (out * mask * torch.randn_like(out)).sum().backward()
+        return head.grad.abs().sum()
+
+    contested = torch.zeros(2, L, W, 1)
+    contested[:, L - 1] = 1.0
+    assert grad_from(torch.ones(2, L, W, 1) - contested) == 0
+    assert float(v2.last_replace_rate[0]) == 1.0
+    assert float(v2.last_evict_oldest_rate[0]) == 1.0
+    assert grad_from(contested) > 0
+
+
+def test_evict_oldest_rate_is_one_under_fifo_and_drops_with_random_heads():
+    fifo, rand = _v2(), _v2(random_heads=True)
+    sa = sb = None
+    fa, fb = [], []
+    for e, z in _writes(20, seed=9):
+        sa, sb = fifo.merge(sa, e, z), rand.merge(sb, e, z)
+        fa += [float(r) for r in fifo.last_evict_oldest_rate]
+        fb += [float(r) for r in rand.last_evict_oldest_rate]
+    assert fa and all(r == 1.0 for r in fa)
+    assert min(fb) < 1.0
+
+
 def test_stored_rows_stay_bounded_over_200_chunks():
     v2 = _v2(random_heads=True)
     st, peak = None, 0.0

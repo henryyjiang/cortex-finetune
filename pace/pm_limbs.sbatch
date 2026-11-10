@@ -40,6 +40,18 @@
 # v2 starts as FIFO, which on the local smoke cost ~0.2 nats at chunk 8 vs
 # the trained blend: a null after 2,000 updates at x0.1 LR is weak evidence.
 #
+# v2capwarm-stfix (2026-11-09), the 2,000-update check before v2_long.sbatch:
+#   sbatch --array=8 --export=ALL,RUN_SUFFIX=-stfix,V2_AGE_PRIOR=0.25 pace/pm_limbs.sbatch
+# pm-v2capwarm read: depth failure gone (never harmful to chunk 202), but
+# v2_replace_rate stayed 1.000 and learned/age reached only 0.66, i.e. FIFO.
+# Two reasons, both fixed for this run: the straight-through surrogate put
+# (replaced - kept) on every slot of the class, mostly the shift of the newer
+# rows, which the read barely sees (now: new - dropped on the one slot that
+# changes, buffers.py _select); and beta 1.0 holds the new-vs-oldest gap at
+# 4 beta, where sigmoid' is 0.018 (beta 0.25: gap 1.0, sigmoid' 0.20; still
+# FIFO at init).  Read v2_evict_oldest_rate (1.0 = FIFO), not the replace
+# rate, which only drops below 1 once the learned gap reaches ~L x beta.
+#
 # carrydrop (2026-10-30): the battery left the no-carry penalty (+0.080 on
 # chunk 1 AND on chunks 2-8 run without carry; the whole MC gap) standing as
 # a TRAINING-ALLOCATION effect by elimination: borrowed/fixed carries make it
@@ -345,10 +357,10 @@ fi
 # ===== THE GATE: did this limb run ITS OWN condition? ======================
 # Reads the MEASURED diagnostics, never the flags (the e_carry_read lesson).
 # Every check is j5_joint.sbatch's, re-keyed for these limbs.
-python - "$OUT_DIR/$RUN_NAME/cortex_diag.jsonl" "$LIMB" "$ZNORM_TARGET" "$CARRYDROP_P"     "$E_CAP" "$WARM_P" <<'GATE'
+python - "$OUT_DIR/$RUN_NAME/cortex_diag.jsonl" "$LIMB" "$ZNORM_TARGET" "$CARRYDROP_P"     "$E_CAP" "$WARM_P" "$V2_AGE_PRIOR" <<'GATE'
 import json, sys
 path, limb, target, cd_p = sys.argv[1], sys.argv[2], float(sys.argv[3]), float(sys.argv[4])
-e_cap, warm_p = float(sys.argv[5]), float(sys.argv[6])
+e_cap, warm_p, beta0 = float(sys.argv[5]), float(sys.argv[6]), float(sys.argv[7])
 try:
     rows = [json.loads(l) for l in open(path) if l.strip()]
 except FileNotFoundError:
@@ -431,8 +443,18 @@ if limb == "v2capwarm":
     if not rr:
         fails.append("v2_replace_rate absent: the gated_v2 merge never ran")
     else:
-        notes.append(f"v2_replace_rate {rr[0]:.3f} -> {rr[-1]:.3f} (1.0 = FIFO)")
+        notes.append(f"v2_replace_rate {rr[0]:.3f} -> {rr[-1]:.3f} (share of writes kept)")
+        fr = vals("v2_evict_oldest_rate")
+        if fr:
+            # 1.0 = every decision was FIFO's (new in, oldest out); the replace
+            # rate alone cannot show a newer row being evicted instead
+            notes.append(f"v2_evict_oldest_rate {fr[0]:.3f} -> {fr[-1]:.3f}, "
+                         f"min {min(fr):.3f} (1.0 = FIFO)")
         lo, ap = vals("v2_learned_over_age"), vals("v2_age_prior")
+        # beta is learned, but slowly (1.000 -> 0.990 over 2,000 updates)
+        if ap and abs(ap[0] - beta0) > 0.05 * beta0:
+            fails.append(f"v2_age_prior starts at {ap[0]:.3f}, expected {beta0}: "
+                         "V2_AGE_PRIOR never reached the graft")
         if lo and ap:
             # > ~1: the learned score can override one chunk of age
             notes.append(f"v2_learned_over_age {lo[0]:.3f} -> {lo[-1]:.3f}, "

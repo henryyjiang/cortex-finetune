@@ -872,8 +872,10 @@ class PrefixGatedBufferV2(PrefixGatedBuffer):
 
     GRADIENT.  Straight-through: the forward is the hard choice, exactly;
     the backward sends sigmoid(score_new - score_dropped) through to both
-    scores, scaled by (replaced - kept).  The surrogate term is g - g.detach()
-    = 0 in the forward, so no stored row is perturbed by it.
+    scores, scaled by (new write - dropped row) on the one slot holding the
+    contested row (not by replaced - kept, whose shift of the newer rows the
+    read barely sees).  The surrogate term is g - g.detach() = 0 in the
+    forward, so no stored row is perturbed by it.
     """
 
     PAIRINGS = ("paired", "independent")
@@ -908,6 +910,7 @@ class PrefixGatedBufferV2(PrefixGatedBuffer):
         self.age_prior = nn.Parameter(torch.full((len(self._units),),
                                                  self.age_prior_init))
         self.last_replace_rate: list = []
+        self.last_evict_oldest_rate: list = []
         self.last_learned_over_age: list = []
         self.apply_gate_init()
 
@@ -956,19 +959,33 @@ class PrefixGatedBufferV2(PrefixGatedBuffer):
         hard = torch.where(accept[:, None, :, None], replaced, kept)
         g = torch.sigmoid(s_new - s_q)
         st = (g - g.detach())[:, None, :, None].to(hard.dtype)
+        # The surrogate sits on the ONE slot the choice changes (row q out, the
+        # new write in), not on `replaced - kept`: that also shifts every newer
+        # row down a slot, and the read is nearly blind to order within a class
+        # (all rows at RoPE 0, Z's depth set by the class), so the shift fed the
+        # score a gradient for a change the loss barely sees (2026-11-09).
+        row_q = kept.gather(1, q[:, None, :, None].expand(B, 1, W, C))
+        slot = torch.where(accept, torch.full_like(q, L - 1), q)       # [B, W]
+        at = (p == slot.unsqueeze(1)).unsqueeze(-1).to(hard.dtype)      # [B, L, W, 1]
+        surrogate = at * (cand[:, L:] - row_q).to(hard.dtype)
         self.last_replace_rate.append(accept.detach().float().mean())
+        # share of class decisions that are FIFO's (new in, OLDEST out).  The
+        # replace rate cannot show a newer row being evicted instead, which
+        # needs a learned gap of only ~beta, not the ~L*beta that drops a write
+        self.last_evict_oldest_rate.append((accept & (q == 0)).detach().float().mean())
         # > ~1: the learned score varies across a class by more than one
         # chunk's age penalty, i.e. it can override FIFO
         self.last_learned_over_age.append(
             learned.detach().float().squeeze(-1).std(dim=1).mean()
             / self.age_prior.detach().float()[h].abs().clamp_min(1e-6))
-        return (hard + st * (replaced - kept)).reshape(B, K, C)
+        return (hard + st * surrogate).reshape(B, K, C)
 
     def merge(self, state: Optional[torch.Tensor],
               new_vecs: torch.Tensor,
               new_latent: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Grow exactly as `gated` does; once full, per-class keep/replace."""
         self.last_replace_rate = []         # one entry per unit, full merges only
+        self.last_evict_oldest_rate = []
         self.last_learned_over_age = []
         if state is None or state.shape[1] < self.n_slots:
             return super().merge(state, new_vecs, new_latent)

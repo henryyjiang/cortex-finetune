@@ -38,6 +38,9 @@
 #                read the next link's "Resumed from" line, not the last logged
 #                update -- a timeout save is behind where the link stopped)
 # Knobs (via --export): LR_SCALE, WARM_P, E_CAP, V2_AGE_PRIOR, RUN_SUFFIX.
+# V2_AGE_PRIOR defaults to 0.25 here (2026-11-09): the setting checked by the
+# 2,000-update pm-v2capwarm-stfix limb, with the fixed straight-through
+# surrogate (pm_limbs.sbatch header).  Read that limb before launching this.
 # ============================================================================
 
 cd $SLURM_SUBMIT_DIR
@@ -47,6 +50,7 @@ export LIMB_BATCH=${LIMB_BATCH:-32}
 export CELL_STEPS=${CELL_STEPS:-20000}
 export LIMB_SAVE_INTERVAL=${LIMB_SAVE_INTERVAL:-300}
 export DIAG_INTERVAL=${DIAG_INTERVAL:-50}
+export V2_AGE_PRIOR=${V2_AGE_PRIOR:-0.25}
 export WALL_LIMITED=1
 export WALL_SECS=$(( 48 * 3600 ))            # keep equal to #SBATCH -t above
 exec bash pace/pm_limbs.sbatch

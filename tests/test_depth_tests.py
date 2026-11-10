@@ -233,4 +233,5 @@ def test_drift_runs_on_gated_v2_and_logs_its_replace_rate():
     rows = out["per_chunk"]
     assert all("replace_rate" not in r for r in rows[:KS // NV])     # still growing
     assert all(r["replace_rate"] == 1.0 for r in rows[KS // NV:])    # FIFO at init
+    assert all(r["fifo_rate"] == 1.0 for r in rows[KS // NV:])       # oldest evicted
     assert not any("e_turnover" in r for r in rows)

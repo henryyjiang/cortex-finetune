@@ -550,6 +550,7 @@ def part_drift(model, buf, ds, args, num_steps, device, hidden, gate_mode=None):
                 seen["before"], seen["after"] = state, out
                 if is_v2:   # the no-carry side forward's merge clears it
                     seen["v2_rates"] = list(buf.last_replace_rate)
+                    seen["v2_fifo"] = list(buf.last_evict_oldest_rate)
                 return out
 
             sd = seed_for(args.seed + 99991 * s_i, c)
@@ -587,6 +588,10 @@ def part_drift(model, buf, ds, args, num_steps, device, hidden, gate_mode=None):
                          else ["e_replace_rate", "z_replace_rate"])
                 for k, v in zip(names, rates):
                     add(c, k, v)
+                # share of decisions that are FIFO's (new in, oldest out)
+                for k, v in zip([n.replace("replace_rate", "fifo_rate") for n in names],
+                                seen.get("v2_fifo", [])):
+                    add(c, k, v)
             elif "after" in seen:
                 # chunk c (0-based) is the c-th merge the ring has run
                 rows = expected_ring_rows(c, n_vec, n_slots)
@@ -619,7 +624,8 @@ def part_drift(model, buf, ds, args, num_steps, device, hidden, gate_mode=None):
     print(f"\n{'=' * 78}\nDRIFT  ({len(streams)} books x {args.drift_chunks} chunks)\n{'=' * 78}")
     cols = ["nll_carry", "nll_nocarry", "carry_gain", "entropy", "first_tok_entropy",
             "e_row_norm", "e_eff_rank_pr", "z_row_norm", "z_eff_rank_pr"]
-    cols += ([k for k in ("replace_rate", "e_replace_rate", "z_replace_rate")
+    cols += ([k for k in ("replace_rate", "e_replace_rate", "z_replace_rate",
+                          "fifo_rate", "e_fifo_rate", "z_fifo_rate")
               if any(k in r for r in out["per_chunk"])] if is_v2
              else ["e_turnover", "z_turnover"])
     print("  chunk laps " + " ".join(f"{k[:11]:>11}" for k in cols))

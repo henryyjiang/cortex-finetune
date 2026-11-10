@@ -26,7 +26,12 @@
 #     [10] v2capwarm        (sbatch --array=10 -t 12:00:00; needs pm_limbs --array=8):
 #                           rebuilt as gated_v2 (paired) with its E cap, so it is
 #                           scored as it trained.  val NLL, recall, MC, plus
-#                           depth/ and babilong/ (below).
+#                           depth/ and babilong/ (below), and since 2026-11-09
+#                           z_content/ + e_content/.
+#         RUN_SUFFIX=-stfix reads pm_limbs' re-run cortex-pm/pm-v2capwarm-stfix
+#         into eval_results/pm/limbs/pm-v2capwarm-stfix (any limb, any suffix).
+#         CONTENT_ONLY=1 on [10]: ONLY z_content/ + e_content/ (~1.2 h), for
+#         the original v2capwarm, whose first read-out ran without them.
 #   COMPARE_ONLY=1 with --array=0: ONLY depth/ + babilong/ on pm-both, the
 #         baseline v2capwarm is read against (same steps, same flags).
 #   depth/    diag_chunk1_drift drift,gates,restart,recency on 202-chunk books:
@@ -61,7 +66,7 @@
 #   edrop           + the full 2x2 (~43m) instead of the horizon ~= 3.5 h
 #   eonly / zonly   ~2.3 h      recall_ctrl ~1 h      tasks 6/7 ~35 min
 #   v2capwarm       val_nll ~21m + recall ~23m + MC ~25m + depth ~25m
-#                   + BABILong ~2-3.5 h + loads ~50m           ~= 5-6 h
+#                   + z/e content 2x~32m + BABILong ~2-3.5 h + loads ~65m ~= 6-7.5 h
 #   both, COMPARE_ONLY=1   depth ~25m + BABILong ~2-3.5 h      ~= 3-4 h
 # 8 h wall; submit v2capwarm with -t 12:00:00.
 # ============================================================================
@@ -88,16 +93,17 @@ case "$LIMB" in
     ref_cortex)  pm_resolve cortex 38146 || exit 1 ;;
     ref_control) pm_resolve control 38146 || exit 1 ;;
     *)
-        CKPT="cortex-pm/pm-$LIMB/checkpoint_$STOP"
-        RES="eval_results/pm/limbs/pm-$LIMB"
+        RUN="pm-$LIMB${RUN_SUFFIX:-}"         # RUN_SUFFIX: a pm_limbs re-run of this limb
+        CKPT="cortex-pm/$RUN/checkpoint_$STOP"
+        RES="eval_results/pm/limbs/$RUN"
         mkdir -p "$RES"
         [ -f "$CKPT/chkpt.pt" ] || { echo "ERROR: no $CKPT/chkpt.pt -- did pm_limbs[$IDX] finish?"; exit 1; }
         if [ "$LIMB" = "recall_ctrl" ]; then
             SETS=""
         else
             pm_resolve cortex 38146 >/dev/null || exit 1   # builds the 78.9 SETS
-            CKPT="cortex-pm/pm-$LIMB/checkpoint_$STOP"     # pm_resolve overwrote it
-            RES="eval_results/pm/limbs/pm-$LIMB"
+            CKPT="cortex-pm/$RUN/checkpoint_$STOP"     # pm_resolve overwrote it
+            RES="eval_results/pm/limbs/$RUN"
             case "$LIMB" in
                 eonly) SETS="$SETS --set latent_carry_read=false" ;;
                 zonly) SETS="$SETS --set e_carry_read=false" ;;
@@ -119,7 +125,7 @@ CHECK
                     # would load with 3 unexpected keys and score the old ring.
                     SETS="$SETS --set prefix_memory=gated_v2 --set v2_pairing=paired"
                     SETS="$SETS --set e_store_norm_target=$E_CAP"
-                    python - "cortex-pm/pm-v2capwarm/cortex_diag.jsonl" "$E_CAP" <<'CHECK' || exit 1
+                    python - "cortex-pm/$RUN/cortex_diag.jsonl" "$E_CAP" <<'CHECK' || exit 1
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
 if not any(r.get("v2_replace_rate") is not None for r in rows):
@@ -152,6 +158,36 @@ depth_babilong() {
         --T "$T" --score_nll --rank_answers --pmi \
         --out_dir "$RES/babilong" || RC_ALL=$?
 }
+content_tests() {
+case "$LIMB" in
+    both|edrop|recall|lownorm|v2capwarm)
+        step "Z content (E on)"
+        python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
+            --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 --dtype float32 \
+            --z_null donor --cells E1Z1,E1Z0 --out_dir "$RES/z_content" || RC_ALL=$? ;;
+    zonly)
+        step "Z content (E off: the limb's own cell)"
+        python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
+            --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 --dtype float32 \
+            --z_null donor --cells E0Z1,E0Z0 --out_dir "$RES/z_content" || RC_ALL=$? ;;
+esac
+case "$LIMB" in
+    both|eonly|edrop|recall|lownorm|v2capwarm)
+        step "E content"
+        python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
+            --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 --dtype float32 \
+            --e_null donor --cells E1Z1,E0Z1 --out_dir "$RES/e_content" || RC_ALL=$? ;;
+esac
+}
+# CONTENT_ONLY=1 on [10]: just z_content/ + e_content/ on a limb already read
+# (2026-11-09: v2capwarm's Z rank fell 9.9 -> 3.5; is Z still carrying content?)
+if [ "${CONTENT_ONLY:-}" = "1" ]; then
+    [ "$LIMB" = "v2capwarm" ] || { echo "CONTENT_ONLY=1 is for v2capwarm (--array=10)"; exit 1; }
+    content_tests
+    echo ""
+    echo "=== pm_read $LIMB (CONTENT_ONLY) finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="
+    exit $RC_ALL
+fi
 if [ "${COMPARE_ONLY:-}" = "1" ]; then
     [ "$LIMB" = "both" ] || { echo "COMPARE_ONLY=1 is for the pm-both baseline (--array=0)"; exit 1; }
     depth_babilong
@@ -178,25 +214,7 @@ python evals/score_recall_probe.py --model_name "$MODEL" --checkpoint "$CKPT" \
     $SETS --data "$RECALL_VAL" --T "$T" --max_rows 400 --dtype float32 \
     --out_dir "$RES/recall" || RC_ALL=$?
 
-case "$LIMB" in
-    both|edrop|recall|lownorm)
-        step "Z content (E on)"
-        python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
-            --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 --dtype float32 \
-            --z_null donor --cells E1Z1,E1Z0 --out_dir "$RES/z_content" || RC_ALL=$? ;;
-    zonly)
-        step "Z content (E off: the limb's own cell)"
-        python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
-            --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 --dtype float32 \
-            --z_null donor --cells E0Z1,E0Z0 --out_dir "$RES/z_content" || RC_ALL=$? ;;
-esac
-case "$LIMB" in
-    both|eonly|edrop|recall|lownorm)
-        step "E content"
-        python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
-            --data "$PG19_VAL" --n_chunks 8 --T "$T" --max_examples 400 --dtype float32 \
-            --e_null donor --cells E1Z1,E0Z1 --out_dir "$RES/e_content" || RC_ALL=$? ;;
-esac
+content_tests
 if [ "$LIMB" = "edrop" ]; then
     step "full 2x2, in distribution"
     python evals/eval_carry_2x2.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
