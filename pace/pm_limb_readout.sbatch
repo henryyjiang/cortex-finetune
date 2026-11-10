@@ -93,17 +93,17 @@ case "$LIMB" in
     ref_cortex)  pm_resolve cortex 38146 || exit 1 ;;
     ref_control) pm_resolve control 38146 || exit 1 ;;
     *)
-        RUN="pm-$LIMB${RUN_SUFFIX:-}"         # RUN_SUFFIX: a pm_limbs re-run of this limb
-        CKPT="cortex-pm/$RUN/checkpoint_$STOP"
-        RES="eval_results/pm/limbs/$RUN"
+        LIMB_RUN="pm-$LIMB${RUN_SUFFIX:-}"    # not RUN: pm_resolve sets RUN=cortex-final
+        CKPT="cortex-pm/$LIMB_RUN/checkpoint_$STOP"
+        RES="eval_results/pm/limbs/$LIMB_RUN"
         mkdir -p "$RES"
         [ -f "$CKPT/chkpt.pt" ] || { echo "ERROR: no $CKPT/chkpt.pt -- did pm_limbs[$IDX] finish?"; exit 1; }
         if [ "$LIMB" = "recall_ctrl" ]; then
             SETS=""
         else
             pm_resolve cortex 38146 >/dev/null || exit 1   # builds the 78.9 SETS
-            CKPT="cortex-pm/$RUN/checkpoint_$STOP"     # pm_resolve overwrote it
-            RES="eval_results/pm/limbs/$RUN"
+            CKPT="cortex-pm/$LIMB_RUN/checkpoint_$STOP"     # pm_resolve overwrote it
+            RES="eval_results/pm/limbs/$LIMB_RUN"
             case "$LIMB" in
                 eonly) SETS="$SETS --set latent_carry_read=false" ;;
                 zonly) SETS="$SETS --set e_carry_read=false" ;;
@@ -125,7 +125,7 @@ CHECK
                     # would load with 3 unexpected keys and score the old ring.
                     SETS="$SETS --set prefix_memory=gated_v2 --set v2_pairing=paired"
                     SETS="$SETS --set e_store_norm_target=$E_CAP"
-                    python - "cortex-pm/$RUN/cortex_diag.jsonl" "$E_CAP" <<'CHECK' || exit 1
+                    python - "cortex-pm/$LIMB_RUN/cortex_diag.jsonl" "$E_CAP" <<'CHECK' || exit 1
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
 if not any(r.get("v2_replace_rate") is not None for r in rows):

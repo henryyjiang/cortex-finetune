@@ -205,6 +205,19 @@ def test_v2_long_reuses_limb_8_and_stops_itself_after_the_timeout_save():
     assert 'CHAIN="--resume_path $RESUME_PATH"' in s
 
 
+def test_the_readout_never_reads_RUN_which_pm_resolve_overwrites():
+    # 2026-11-10: the RUN_SUFFIX path used $RUN, which pm_resolve sets to
+    # cortex-final, so both v2capwarm read-outs looked for
+    # cortex-pm/cortex-final/cortex_diag.jsonl and died in 10 s.
+    r = open(os.path.join(ROOT, "pace/pm_limb_readout.sbatch"), encoding="utf-8").read()
+    c = open(os.path.join(ROOT, "pace/pm_common.sh"), encoding="utf-8").read()
+    assert "RUN=cortex-final" in c
+    assert not re.search(r"\$\{?RUN\b", r)
+    assert "LIMB_RUN=" not in c
+    assert 'CKPT="cortex-pm/$LIMB_RUN/checkpoint_$STOP"' in r
+    assert r.index("content_tests() {") < r.index('if [ "${CONTENT_ONLY:-}" = "1" ]; then')
+
+
 def test_the_readout_scores_v2capwarm_as_it_trained_and_pm_both_the_same_way():
     r = open(os.path.join(ROOT, "pace/pm_limb_readout.sbatch"), encoding="utf-8").read()
     s = open(os.path.join(ROOT, "pace/pm_limbs.sbatch"), encoding="utf-8").read()

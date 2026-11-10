@@ -38,9 +38,16 @@
 #                read the next link's "Resumed from" line, not the last logged
 #                update -- a timeout save is behind where the link stopped)
 # Knobs (via --export): LR_SCALE, WARM_P, E_CAP, V2_AGE_PRIOR, RUN_SUFFIX.
-# V2_AGE_PRIOR defaults to 0.25 here (2026-11-09): the setting checked by the
-# 2,000-update pm-v2capwarm-stfix limb, with the fixed straight-through
-# surrogate (pm_limbs.sbatch header).  Read that limb before launching this.
+# V2_AGE_PRIOR defaults to 100 here: FIFO PINNED.  At a gap of 4 x 100 the
+# gate's sigmoid is exactly 1 in fp32, so every decision is FIFO's and the
+# score heads and beta get exactly zero gradient (checked on a trained-scale
+# random head).  Why (2026-11-10): the 2,000-update pm-v2capwarm-stfix check
+# (beta 0.25, contested-slot surrogate) DID leave FIFO -- replace rate
+# 1.000 -> 0.531, evict-oldest 1.0 -> 0.25 -- but its training loss, paired
+# step for step against pm-v2capwarm, got steadily worse: -0.002 / +0.004 /
+# +0.009 / +0.058 nats over the four 500-update quarters, 99% of the last
+# 200 updates worse.  Learned eviction as built drops fresh writes and hurts;
+# this run is the configuration that worked: FIFO replace + E cap + warm-up.
 # ============================================================================
 
 cd $SLURM_SUBMIT_DIR
@@ -50,7 +57,7 @@ export LIMB_BATCH=${LIMB_BATCH:-32}
 export CELL_STEPS=${CELL_STEPS:-20000}
 export LIMB_SAVE_INTERVAL=${LIMB_SAVE_INTERVAL:-300}
 export DIAG_INTERVAL=${DIAG_INTERVAL:-50}
-export V2_AGE_PRIOR=${V2_AGE_PRIOR:-0.25}
+export V2_AGE_PRIOR=${V2_AGE_PRIOR:-100}
 export WALL_LIMITED=1
 export WALL_SECS=$(( 48 * 3600 ))            # keep equal to #SBATCH -t above
 exec bash pace/pm_limbs.sbatch

@@ -51,6 +51,9 @@
 # 4 beta, where sigmoid' is 0.018 (beta 0.25: gap 1.0, sigmoid' 0.20; still
 # FIFO at init).  Read v2_evict_oldest_rate (1.0 = FIFO), not the replace
 # rate, which only drops below 1 once the learned gap reaches ~L x beta.
+# RESULT 2026-11-10 (15399193_8): it left FIFO (replace 0.531, evict-oldest
+# 0.25, learned/age 2.27, Z rank 6.0 vs 3.5) but the paired training loss
+# rose to +0.058 in the last quarter, still accelerating.  v2_long pins FIFO.
 #
 # carrydrop (2026-10-30): the battery left the no-carry penalty (+0.080 on
 # chunk 1 AND on chunks 2-8 run without carry; the whole MC gap) standing as
