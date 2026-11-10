@@ -1,0 +1,25 @@
+---------------------------------------
+Begin Slurm Prolog: Nov-09-2026 20:17:00
+Job ID:    15399195
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_read
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+Traceback (most recent call last):
+  File "<stdin>", line 2, in <module>
+FileNotFoundError: [Errno 2] No such file or directory: 'cortex-pm/cortex-final/cortex_diag.jsonl'
+---------------------------------------
+Begin Slurm Epilog: Nov-09-2026 20:17:03
+Job ID:        15399195
+Array Job ID:  15399195_10
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_read
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=00:01:36,vmem=0,walltime=00:00:12,mem=39720K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-02-012-16-0
+---------------------------------------
