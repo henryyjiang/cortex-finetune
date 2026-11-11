@@ -372,7 +372,8 @@ elif [ -n "${WALL_LIMITED:-}" ] && [ -n "$LAST" ]; then
     # read the NEXT link's 'Resumed from' line: a wall-killed link's last
     # logged update is behind where it really stopped
     echo "    wall-limited: latest resumable checkpoint $OUT_DIR/$RUN_NAME/checkpoint_$LAST"
-    echo "    next link: sbatch --export=ALL,RESUME_PATH=$OUT_DIR/$RUN_NAME/checkpoint_$LAST pace/v2_long.sbatch"
+    # the knobs that shape the model ride along: a resume rebuilds it from flags
+    echo "    next link: sbatch --export=ALL,RESUME_PATH=$OUT_DIR/$RUN_NAME/checkpoint_$LAST,V2_AGE_PRIOR=$V2_AGE_PRIOR,V2_PAIRING=$V2_PAIRING pace/v2_long.sbatch"
     [ $RC -ne 0 ] && echo "    (rc=$RC: the link did not exit clean -- read the epilog before resuming)"
 else
     echo "    *** NO chkpt.pt at checkpoint_$STOP_AT_STEP -- round 2 cannot load this limb"; RC=1

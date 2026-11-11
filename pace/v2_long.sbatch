@@ -33,7 +33,7 @@
 #                  run; the final checkpoint is at constant LR, like the limbs.
 #
 #   first link:  sbatch pace/v2_long.sbatch
-#   next link:   sbatch --export=ALL,RESUME_PATH=cortex-pm/pm-v2capwarm-long/checkpoint_<N> pace/v2_long.sbatch
+#   next link:   sbatch --export=ALL,RESUME_PATH=cortex-pm/pm-v2capwarm-long/checkpoint_<N>,V2_AGE_PRIOR=<same>,V2_PAIRING=<same> pace/v2_long.sbatch
 #                (the end of each link prints this line with <N> filled in;
 #                read the next link's "Resumed from" line, not the last logged
 #                update -- a timeout save is behind where the link stopped)
@@ -51,6 +51,15 @@
 # original surrogate at beta 0.25) is read, this run stays the configuration
 # that worked: FIFO replace + E cap + warm-up.  If b025 holds up, launch with
 # --export=ALL,V2_AGE_PRIOR=0.25.
+# READ 2026-11-11 (b025 15431625_8, b025ind 15431627_8, paired per update vs
+# pm-v2capwarm): the loss regression is gone -- median cost in the last 200
+# updates +0.0013 (b025) / +0.0006 (b025ind), not accelerating (stfix:
+# +0.078) -- and both keep every fresh write (replace 1.000) while choosing
+# which old row to evict (evict-oldest 0.34 / 0.56).  vs FIFO: PG-19 chunks
+# 2+ -0.0048 / -0.0042, recall at distance 5-7 -0.38 / -0.14 nats, depth
+# never harmful to chunk 202 (b025).  b025 hurt BABILong qa2's gold margin
+# (+0.17..+0.66 nats, 2k-32k); b025ind's depth/BABILong were cut off by the
+# wall (REST_ONLY=1 reruns them).  Pairing is chosen on that read.
 # ============================================================================
 
 cd $SLURM_SUBMIT_DIR

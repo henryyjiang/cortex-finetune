@@ -167,7 +167,8 @@ def test_carrydrop_trains_its_flag_and_is_read_against_both():
     r = open(os.path.join(ROOT, "pace/pm_limb_readout.sbatch"), encoding="utf-8").read()
     limbs = re.search(r"^LIMBS=\((.*)\)$", r, re.M).group(1).split()
     assert limbs.index("carrydrop") == 9 and limbs.index("both") == 0
-    assert '[ "$LIMB" = "carrydrop" ]; then\n    step "MC suite' in r
+    assert '[ "$LIMB" = "carrydrop" ]; then\n    mc_suite' in r
+    assert 'step "MC suite' in r and 'timeout 7200 python evals/eval_multiple_choice.py' in r
 
 
 def test_v2capwarm_trains_all_three_changes_and_its_gate_checks_them():

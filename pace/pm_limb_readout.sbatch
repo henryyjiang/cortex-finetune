@@ -32,6 +32,8 @@
 #         into eval_results/pm/limbs/pm-v2capwarm-stfix (any limb, any suffix).
 #         CONTENT_ONLY=1 on [10]: ONLY z_content/ + e_content/ (~1.2 h), for
 #         the original v2capwarm, whose first read-out ran without them.
+#         REST_ONLY=1 on [10]: ONLY depth/ + babilong/ then mc/ (~3-4.5 h), for
+#         a read-out the wall cut off after content.
 #   COMPARE_ONLY=1 with --array=0: ONLY depth/ + babilong/ on pm-both, the
 #         baseline v2capwarm is read against (same steps, same flags).
 #   depth/    diag_chunk1_drift drift,gates,restart,recency on 202-chunk books:
@@ -185,6 +187,24 @@ case "$LIMB" in
             --e_null donor --cells E1Z1,E0Z1 --out_dir "$RES/e_content" || RC_ALL=$? ;;
 esac
 }
+mc_suite() {
+    step "MC suite (single forward: the chunk-1 tax on benchmarks)"
+    # timeout: 2026-11-11 the b025ind read-out hung 10 h in this step's offline
+    # dataset load (shared hf_cache) and the wall took depth/ and babilong/ with it
+    timeout 7200 python evals/eval_multiple_choice.py --model_name "$MODEL" \
+        --checkpoint "$CKPT" $SETS --tasks hellaswag winogrande arc_easy arc_challenge piqa \
+        --T "$T" --out_dir "$RES/mc" || RC_ALL=$?
+}
+# REST_ONLY=1 on [10]: the steps after content -- depth/ + babilong/ FIRST, then
+# MC -- for a read-out cut off after content (b025ind, 2026-11-11)
+if [ "${REST_ONLY:-}" = "1" ]; then
+    [ "$LIMB" = "v2capwarm" ] || { echo "REST_ONLY=1 is for v2capwarm (--array=10)"; exit 1; }
+    depth_babilong
+    mc_suite
+    echo ""
+    echo "=== pm_read $LIMB (REST_ONLY) finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="
+    exit $RC_ALL
+fi
 # CONTENT_ONLY=1 on [10]: just z_content/ + e_content/ on a limb already read
 # (2026-11-09: v2capwarm's Z rank fell 9.9 -> 3.5; is Z still carrying content?)
 if [ "${CONTENT_ONLY:-}" = "1" ]; then
@@ -235,10 +255,7 @@ if [ "$LIMB" = "both" ] || [ "$LIMB" = "recall" ]; then
         --dtype float32 --out_dir "$RES/horizon" || RC_ALL=$?
 fi
 if [ "$LIMB" = "v2capwarm" ] || [ "$LIMB" = "both" ] || [ "$LIMB" = "lownorm" ] || [ "$LIMB" = "carrydrop" ]; then
-    step "MC suite (single forward: the chunk-1 tax on benchmarks)"
-    python evals/eval_multiple_choice.py --model_name "$MODEL" \
-        --checkpoint "$CKPT" $SETS --tasks hellaswag winogrande arc_easy arc_challenge piqa \
-        --T "$T" --out_dir "$RES/mc" || RC_ALL=$?
+    mc_suite
 fi
 [ "$LIMB" = "v2capwarm" ] && depth_babilong
 echo ""
