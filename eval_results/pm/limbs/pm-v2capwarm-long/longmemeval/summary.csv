@@ -1,0 +1,6 @@
+model,bucket,correct,total,accuracy
+cortex-pm,≤5sess,0,0,0.0000
+cortex-pm,≤10sess,0,0,0.0000
+cortex-pm,≤20sess,0,0,0.0000
+cortex-pm,≤50sess,25,272,0.0919
+cortex-pm,>50sess,14,228,0.0614

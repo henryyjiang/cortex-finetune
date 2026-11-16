@@ -1,0 +1,142 @@
+[
+  {
+    "bucket": ">50sess",
+    "question": "What degree did I graduate with?",
+    "gold": "Business Administration",
+    "pred": " I graduated with a Bachelor's degree in Food Science and Technology.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How long is my daily commute to work?",
+    "gold": "45 minutes each way",
+    "pred": " My daily commute to work is 30 minutes.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I redeem a $5 coupon on coffee creamer?",
+    "gold": "Target",
+    "pred": " I redeemed a $5 coupon on coffee creamer at the grocery store.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What play did I attend at the local community theater?",
+    "gold": "The Glass Menagerie",
+    "pred": " I attended a play called \"The Last Supper\" at the local community theater.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What is the name of the playlist I created on Spotify?",
+    "gold": "Summer Vibes",
+    "pred": " The playlist I created on Spotify is called \"Shawarma-Style Chicken.\"\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What was my last name before I changed it?",
+    "gold": "Johnson",
+    "pred": " My last name was Smith.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where do I take yoga classes?",
+    "gold": "Serenity Yoga",
+    "pred": " I recommend starting with a studio that offers a variety of classes and styles. You can also try out different classes to see what you like and what you don't",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What color did I repaint my bedroom walls?",
+    "gold": "a lighter shade of gray",
+    "pred": " I painted the walls of my bedroom in a light blue color.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "When did I volunteer at the local animal shelter's fundraising dinner?",
+    "gold": "February 14th",
+    "pred": " I volunteered at the local animal shelter's fundraising dinner in 2019.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I buy my new tennis racket from?",
+    "gold": "the sports store downtown",
+    "pred": " I bought my new tennis racket from a local sports shop.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What was my previous occupation?",
+    "gold": "Marketing specialist at a small startup",
+    "pred": " I was a software engineer for a large tech company.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How much did I spend on a designer handbag?",
+    "gold": "$800",
+    "pred": " I spent $500 on a designer handbag.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "How many playlists do I have on Spotify?",
+    "gold": "20",
+    "pred": " You have 3 playlists on Spotify.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "Where did I attend for my study abroad program?",
+    "gold": "University of Melbourne in Australia",
+    "pred": " I attended a photography workshop in Japan.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What was the discount I got on my first purchase from the new clothing brand?",
+    "gold": "10%",
+    "pred": " The discount I got on my first purchase from the new clothing brand was 10% off the price of the item.\n",
+    "correct": true
+  },
+  {
+    "bucket": ">50sess",
+    "question": "How long did it take me to assemble the IKEA bookshelf?",
+    "gold": "4 hours",
+    "pred": " It took me about 30 minutes to assemble the IKEA bookshelf.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What did I buy for my sister's birthday gift?",
+    "gold": "a yellow dress",
+    "pred": " I bought her a new laptop.\n",
+    "correct": false
+  },
+  {
+    "bucket": "\u226450sess",
+    "question": "What speed is my new internet plan?",
+    "gold": "500 Mbps",
+    "pred": " The speed of your new internet plan is likely to be between 25 and 50 Mbps, depending on the provider and the type of plan you have. However",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "How many shirts did I pack for my 5-day trip to Costa Rica?",
+    "gold": "7",
+    "pred": " I packed 5 shirts for my 5-day trip to Costa Rica.\n",
+    "correct": false
+  },
+  {
+    "bucket": ">50sess",
+    "question": "What was my previous stance on spirituality?",
+    "gold": "A staunch atheist",
+    "pred": " I was a skeptic of spirituality, believing that it was just a fad or a way to escape reality.\n",
+    "correct": false
+  }
+]

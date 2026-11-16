@@ -1,0 +1,109 @@
+---------------------------------------
+Begin Slurm Prolog: Nov-16-2026 11:15:27
+Job ID:    15730786
+User ID:   hjiang420
+Account:   gts-aivanova7-lab
+Job name:  pm_read
+Partition: gpu-h200
+QOS:       inferno
+---------------------------------------
+    v2capwarm: gated_v2 and E cap 82.0 confirmed against its diag
+=== pm_read | v2capwarm | cortex-pm/pm-v2capwarm-long/checkpoint_44558 -> eval_results/pm/limbs/pm-v2capwarm-long ===
+    commit: 133a4a8
+
+--- [v2capwarm] fact probe: write / survival / read, qa1 2k-16k (8 x 512, T 8)  (11:15:31)
+[cortex] OVERRIDE config.use_memory: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.memory_slots: '<absent>' -> 0  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.prefix_memory: '<absent>' -> 'gated_v2'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_vecs: '<absent>' -> 16  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_slots: '<absent>' -> 64  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_route: '<absent>' -> 'ring'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.accum_max: '<absent>' -> 128  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry_read: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_norm: '<absent>' -> 'tanh'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_init: '<absent>' -> 'zero'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.gate_fill: '<absent>' -> 'grow'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_carry: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_rule: '<absent>' -> 'absolute'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_lo: '<absent>' -> 1  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_depth_hi: '<absent>' -> 9  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_renorm: '<absent>' -> 'none'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_tok_pool: '<absent>' -> 4  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_encoding: '<absent>' -> 'staggered_state'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_embed_frozen: '<absent>' -> True  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_s0_read: '<absent>' -> False  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read: '<absent>' -> 'embeds'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm: '<absent>' -> 'rms'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.latent_read_znorm_target: '<absent>' -> '78.9'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.v2_pairing: '<absent>' -> 'independent'  (NOT what this checkpoint trained with unless they match)
+[cortex] OVERRIDE config.e_store_norm_target: '<absent>' -> 82  (NOT what this checkpoint trained with unless they match)
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Random Initialization not implemented.
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.62s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.21it/s]
+Some weights of RavenForCausalLM were not initialized from the model checkpoint at ckpts/olmo-retrofit-cortex and are newly initialized: ['cortex.latent_embed.proj.weight', 'cortex.prefix.age_prior', 'cortex.prefix.forget_bias', 'cortex.prefix.forget_bias_z', 'cortex.prefix.gate_proj_in.bias', 'cortex.prefix.gate_proj_in.weight', 'cortex.prefix.gate_proj_in_z.bias', 'cortex.prefix.gate_proj_in_z.weight', 'cortex.prefix.gate_proj_mem.bias', 'cortex.prefix.gate_proj_mem.weight', 'cortex.prefix.gate_proj_mem_z.bias', 'cortex.prefix.gate_proj_mem_z.weight', 'cortex.prefix.input_bias', 'cortex.prefix.input_bias_z', 'cortex.prefix.score_heads.0.bias', 'cortex.prefix.score_heads.0.weight', 'cortex.prefix.score_heads.1.bias', 'cortex.prefix.score_heads.1.weight', 'cortex.prefix.summary_emb', 'cortex.prefix.summary_seeded']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+[cortex] reset 7 cortex submodules to nn defaults + re-applied designed inits ['prefix.[summary_emb~N(reseeded from wte on first forward),forget_bias=1,input_bias=0,gate_init=zero,forget_bias_z=1,input_bias_z=0,gate_init_z=zero]', 'latent_embed.[proj=I, bias=none]', 'latent_embed.[FROZEN at identity]'] (undo post_init clobber)
+[load] overlaid cortex-pm/pm-v2capwarm-long/checkpoint_44558/chkpt.pt: 0 missing / 0 unexpected keys
+[arm] PrefixGatedBufferV2 n_vec=16 n_slots=64 dual=True hidden=2048
+[2k] 200 items  (516s)
+[4k] 200 items  (984s)
+[8k] 200 items  (1670s)
+[16k] 200 items  (2796s)
+
+== fact probe: 800 qa1 items, chance 0.167 ==
+  text_bag           acc 0.426  (n=800, majority 0.179, l2=0.001)
+  e_write            acc 0.401  (n=800, majority 0.179, l2=0.0001)
+  shuffled_e_write   acc 0.189  (n=800, majority 0.179, l2=0.001)
+  e_slot             acc 0.323  (n=800, majority 0.179, l2=0.001)
+  shuffled_e_slot    acc 0.204  (n=800, majority 0.179, l2=0.0001)
+  final_e            acc 0.166  (n=800, majority 0.179, l2=0.1)
+  e_prev             acc 0.197  (n=766, majority 0.184, l2=0.1)
+  final_e_fact       acc 0.342  (n=692, majority 0.178, l2=0.01)
+  z_write            acc 0.287  (n=800, majority 0.179, l2=0.001)
+  z_slot             acc 0.338  (n=800, majority 0.179, l2=0.1)
+  shuffled_z_slot    acc 0.209  (n=800, majority 0.179, l2=0.0001)
+  final_z            acc 0.163  (n=800, majority 0.179, l2=0.001)
+  z_prev             acc 0.157  (n=766, majority 0.184, l2=0.1)
+  final_z_fact       acc 0.254  (n=696, majority 0.185, l2=0.01)
+  survival e: provenance valid=True (min cos 1.0000)
+     dist    1: 15.6/16 fact rows left, any 1.00  (n=156)
+     dist  2-4: 13.1/16 fact rows left, any 1.00  (n=328)
+     dist  5-8: 3.5/16 fact rows left, any 0.85  (n=177)
+     dist   9+: 1.0/16 fact rows left, any 0.41  (n=139)
+  survival z: provenance valid=True (min cos 1.0000)
+     dist    1: 15.7/16 fact rows left, any 1.00  (n=156)
+     dist  2-4: 12.3/16 fact rows left, any 1.00  (n=328)
+     dist  5-8: 3.9/16 fact rows left, any 0.85  (n=177)
+     dist   9+: 1.2/16 fact rows left, any 0.45  (n=139)
+  own - nocarry gold margin -0.156 [-0.246, -0.066] (negative = the carry helps)
+  swap e    shift +0.094 [+0.052, +0.137]  picks donor 0.177 (own carry 0.175)
+  swap z    shift +0.049 [+0.010, +0.089]  picks donor 0.176 (own carry 0.175)
+  swap both shift +0.095 [+0.042, +0.151]  picks donor 0.176 (own carry 0.175)
+  skipped: {'fact_in_window': 182, 'fact_straddles_chunk': 12}
+-> eval_results/pm/limbs/pm-v2capwarm-long/fact_probe  (5582s)
+
+=== pm_read v2capwarm (PROBE_ONLY) finished rc=0 (12:48:56) -> eval_results/pm/limbs/pm-v2capwarm-long ===
+---------------------------------------
+Begin Slurm Epilog: Nov-16-2026 12:48:56
+Job ID:        15730786
+Array Job ID:  15730786_10
+User ID:       hjiang420
+Account:       gts-aivanova7-lab
+Job name:      pm_read
+Resources:     cpu=8,gres/gpu:h200=1,mem=96G,node=1
+Rsrc Used:     cput=12:28:32,vmem=0,walltime=01:33:34,mem=30492012K,energy_used=0
+Partition:     gpu-h200
+QOS:           inferno
+Nodes:         atl1-1-03-020-18-0
+---------------------------------------

@@ -1,0 +1,29 @@
+{
+  "cortex-pm": {
+    "\u22645sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226410sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226420sess": {
+      "correct": 0,
+      "total": 0,
+      "accuracy": 0.0
+    },
+    "\u226450sess": {
+      "correct": 25,
+      "total": 272,
+      "accuracy": 0.09191176470588236
+    },
+    ">50sess": {
+      "correct": 14,
+      "total": 228,
+      "accuracy": 0.06140350877192982
+    }
+  }
+}

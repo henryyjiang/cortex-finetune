@@ -1,0 +1,7 @@
+model,task,bucket,correct,total,accuracy
+cortex-pm,qa3,1k,29,250,0.1160
+cortex-pm,qa3,2k,28,250,0.1120
+cortex-pm,qa3,4k,31,250,0.1240
+cortex-pm,qa3,8k,24,250,0.0960
+cortex-pm,qa3,16k,25,250,0.1000
+cortex-pm,qa3,32k,24,250,0.0960

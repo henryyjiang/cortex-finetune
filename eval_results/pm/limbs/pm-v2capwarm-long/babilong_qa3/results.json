@@ -1,0 +1,36 @@
+{
+  "cortex-pm": {
+    "qa3": {
+      "1k": {
+        "correct": 29,
+        "total": 250,
+        "accuracy": 0.116
+      },
+      "2k": {
+        "correct": 28,
+        "total": 250,
+        "accuracy": 0.112
+      },
+      "4k": {
+        "correct": 31,
+        "total": 250,
+        "accuracy": 0.124
+      },
+      "8k": {
+        "correct": 24,
+        "total": 250,
+        "accuracy": 0.096
+      },
+      "16k": {
+        "correct": 25,
+        "total": 250,
+        "accuracy": 0.1
+      },
+      "32k": {
+        "correct": 24,
+        "total": 250,
+        "accuracy": 0.096
+      }
+    }
+  }
+}
