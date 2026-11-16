@@ -205,6 +205,29 @@ if [ "${REST_ONLY:-}" = "1" ]; then
     echo "=== pm_read $LIMB (REST_ONLY) finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="
     exit $RC_ALL
 fi
+# BENCH_ONLY=1 on [10]: the 5B pair's benchmarks NOT in the read-out (GSM8K,
+# BABILong qa3, LongMemEval), in the 5B geometry (8 x 512, T $T), built with
+# this limb's gated_v2 SETS.  eval_basic/eval_longcontext cannot do this: they
+# pass no --set, so they would rebuild the old gated ring.  ~8-14 h: -t 16:00:00.
+if [ "${BENCH_ONLY:-}" = "1" ]; then
+    [ "$LIMB" = "v2capwarm" ] || { echo "BENCH_ONLY=1 is for v2capwarm (--array=10)"; exit 1; }
+    step "GSM8K 8-shot (500, T $T)"
+    python evals/eval_gsm8k.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
+        --max_examples 500 --n_shot 8 --T "$T" --out_dir "$RES/gsm8k" || RC_ALL=$?
+    step "BABILong qa3, 1k-32k (8 x 512, T $T)"
+    python evals/eval_babilong.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
+        --dataset_path "$BABILONG_PATH" --dataset_repo "$BABILONG_REPO" \
+        --tasks qa3 --max_examples "$BABILONG_MAX" --seq_len 512 --num_chunks 8 \
+        --T "$T" --score_nll --rank_answers --pmi \
+        --out_dir "$RES/babilong_qa3" || RC_ALL=$?
+    step "LongMemEval (all, 8 x 512, T $T)"
+    python evals/eval_longmemeval.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
+        --dataset_path data/LongMemEval --max_examples 0 --seq_len 512 --num_chunks 8 \
+        --T "$T" --score_nll --out_dir "$RES/longmemeval" || RC_ALL=$?
+    echo ""
+    echo "=== pm_read $LIMB (BENCH_ONLY) finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="
+    exit $RC_ALL
+fi
 # CONTENT_ONLY=1 on [10]: just z_content/ + e_content/ on a limb already read
 # (2026-11-09: v2capwarm's Z rank fell 9.9 -> 3.5; is Z still carrying content?)
 if [ "${CONTENT_ONLY:-}" = "1" ]; then
