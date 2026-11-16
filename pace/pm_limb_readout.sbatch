@@ -228,6 +228,23 @@ if [ "${BENCH_ONLY:-}" = "1" ]; then
     echo "=== pm_read $LIMB (BENCH_ONLY) finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="
     exit $RC_ALL
 fi
+# PROBE_ONLY=1: evals/diag_fact_probe.py -- is a qa1 fact WRITTEN into E / Z,
+# does it SURVIVE to the question, is it READ (per-channel donor swap).  On
+# [10] v2capwarm (with RUN_SUFFIX) and [6] ref_cortex (cortex-final@38146, the
+# comparison).  Same 8 x 512 geometry as the benchmark.  ~2-4 h.
+if [ "${PROBE_ONLY:-}" = "1" ]; then
+    case "$LIMB" in v2capwarm|ref_cortex) ;; *)
+        echo "PROBE_ONLY=1 is for v2capwarm (--array=10) or ref_cortex (--array=6)"; exit 1 ;;
+    esac
+    step "fact probe: write / survival / read, qa1 2k-16k (8 x 512, T $T)"
+    python evals/diag_fact_probe.py --model_name "$MODEL" --checkpoint "$CKPT" $SETS \
+        --dataset_path "$BABILONG_PATH" --dataset_repo "$BABILONG_REPO" \
+        --lengths 2k 4k 8k 16k --max_items 200 --seq_len 512 --num_chunks 8 \
+        --T "$T" --out_dir "$RES/fact_probe" || RC_ALL=$?
+    echo ""
+    echo "=== pm_read $LIMB (PROBE_ONLY) finished rc=$RC_ALL ($(date +%H:%M:%S)) -> $RES ==="
+    exit $RC_ALL
+fi
 # CONTENT_ONLY=1 on [10]: just z_content/ + e_content/ on a limb already read
 # (2026-11-09: v2capwarm's Z rank fell 9.9 -> 3.5; is Z still carrying content?)
 if [ "${CONTENT_ONLY:-}" = "1" ]; then
